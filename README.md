@@ -1,18 +1,15 @@
-# Guest Guide Platform — The House Guide v3.5.0
+# Guest Guide Platform — The House Guide v4.0.0
 
-Adds the dedicated Roctopus Dive module.
+First complete visual design-system release.
 
-Design standard:
-- The official business logo is used as the partner identity and Explore card visual.
-- Detail pages retain real swipeable photo galleries.
-- The Roctopus gallery uses three user-supplied images.
-- Booking is intentionally routed through The House booking team (Fah).
-- No direct Roctopus telephone number is shown.
-- Map and official website remain secondary information buttons.
-
-Files added:
-- public/diving.html
-- public/assets/diving/roctopus-logo.jpg
-- public/assets/diving/roctopus-team.jpg
-- public/assets/diving/roctopus-heart-dive.jpg
-- public/assets/diving/roctopus-wreck-dive.jpg
+Key changes:
+- New shared `public/design-system.css`
+- Explore cards use a consistent 40% visual / 60% information structure
+- No ratings, recommendation badges or unnecessary labels on overview cards
+- Business cards use logos where available
+- Natural-place cards use photographs
+- Restaurant overview keeps horizontal swipe browsing
+- Restaurant details keep swipeable image galleries
+- Roctopus page uses a restrained logo header and real swipeable photos
+- Cleaner spacing, typography, buttons, shadows and mobile layout
+- Shared styling prepared for future Guest Guide Platform clients

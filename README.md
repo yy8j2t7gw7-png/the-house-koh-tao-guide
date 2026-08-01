@@ -1,22 +1,19 @@
-# The House Guide v3.0
+# The House Guide v3.1
 
-Centralized contacts and maps:
-- `public/contacts.js`
-- `public/guide-app.js`
+Adds a complete Beaches module:
+- Aow Leuk Bay
+- Tanote Bay
+- Freedom Beach
+- June Juea Beach
+- Mae Haad Beach
+- Bamboo Beach Bar sunset recommendation
 
-Agreed contact separation:
-- House/stay assistance uses the House team number: +66 64 097 3491
-- Activities and bookings use: +66 96 274 1424
+Architecture:
+- `public/beaches-data.js` contains the content and links
+- `public/beaches.html` renders a swipeable mobile gallery
 
-Help & Emergency includes:
-- National medical emergency: 1669
-- Koh Tao Rescue: +66 87 979 0191
-- Koh Tao Police Station: +66 77 456 098
-- Tourist Police: 1155
-- Koh Tao Hospital: +66 77 456 490 plus Google Maps
-
-Buttons remain generic:
-- Contact
-- Call
-- Open Map
-- Book With Us
+Photo licensing:
+- Images use Wikimedia Commons sources with attribution.
+- The June Juea card temporarily uses an explicitly labelled illustrative
+  southwest-coast image because a verified freely licensed exact photo was
+  not located. Replace it when an exact licensed or owner-supplied photo is available.

@@ -1,21 +1,22 @@
 window.GUEST_GUIDE_ACTIONS = {
-  "contact": {
-    "label": "Contact Us",
-    "type": "whatsapp",
-    "linkKey": "houseWhatsapp"
+  contact: {
+    label: "Contact Us",
+    hrefKey: "houseWhatsapp"
   },
-  "book": {
-    "label": "Book with Us",
-    "type": "whatsapp",
-    "linkKey": "bookingWhatsapp"
+  booking: {
+    label: "Book with Us",
+    hrefKey: "bookingWhatsapp"
   },
-  "map": {
-    "label": "Open Map"
+  call: {
+    label: "Call"
   },
-  "website": {
-    "label": "Visit Website"
+  map: {
+    label: "Open Map"
   },
-  "discover": {
-    "label": "Discover →"
+  website: {
+    label: "Visit Website"
+  },
+  discover: {
+    label: "Discover →"
   }
 };

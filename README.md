@@ -1,15 +1,11 @@
-# Guest Guide Platform with AI Concierge — The House v4.2.0
+# Guest Guide Platform with AI Concierge — The House v4.2.1
 
-Modular Architecture Release
+Contact Button Fix
 
-Changes:
-- Introduced a central module registry
-- Added configurable module folders
-- Kept all current public URLs working
-- Standardized Contact Us, Book with Us, Open Map, Visit Website and Discover actions
-- Kept the page title Departure
-- Standardized the time wording to “Check-out is by 11:00 AM.”
-- Prepared disabled placeholders for AI Concierge and Secure Digital Check-in
-- Added architecture documentation for future properties
-
-The House remains the first showcase property for the reusable platform.
+- All house-support WhatsApp buttons now display “Contact Us”.
+- Booking WhatsApp buttons display “Book with Us”.
+- Added a central action-label configuration.
+- Added a runtime normalizer for buttons generated dynamically by JavaScript.
+- Added `data-action` attributes to support and booking buttons.
+- Synchronized corrected files into the modular folders.
+- Kept the underlying Su and Fah WhatsApp destinations unchanged.

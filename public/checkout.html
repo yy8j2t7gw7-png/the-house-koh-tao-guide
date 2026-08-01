@@ -72,12 +72,12 @@ a{color:inherit}
  <div class="rule"><strong>🧳 Late checkout</strong>Ask in advance. We will help when possible if the room is not needed immediately.</div>
  <div class="rule"><strong>⭐ Review</strong>If you enjoyed your stay, an honest Airbnb review is greatly appreciated.</div>
 </div>
-<div class="btns"><a class="btn" href="https://wa.me/66640973491" target="_blank">Contact Us</a></div>
+<div class="btns"><a class="btn" href="https://wa.me/66640973491" target="_blank" data-action="contact">Contact Us</a></div>
 </section>
 
 <footer class="footer">The House – Koh Tao · Simple, comfortable, budget-friendly accommodation in Mae Haad.</footer>
 </div>
-<a class="float-wa" data-link="houseWhatsapp" target="_blank" rel="noopener">Contact</a>
+<a class="float-wa" data-link="houseWhatsapp" target="_blank" rel="noopener" data-action="contact">Contact</a>
 <script>
 document.addEventListener('click', e => {
   const a=e.target.closest('a[data-room]');
@@ -88,4 +88,5 @@ document.addEventListener('click', e => {
 <script src="/guide-app.js"></script>
 <script src="/module-registry.js"></script>
 <script src="/platform-actions.js"></script>
+<script src="/platform-action-runtime.js"></script>
 </body></html>

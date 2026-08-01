@@ -30,7 +30,7 @@
 
 <footer class="footer">The House Guide · Restaurant details.</footer>
 </div>
-<a class="float-wa" data-link="houseWhatsapp" target="_blank" rel="noopener">Contact</a>
+<a class="float-wa" data-link="houseWhatsapp" target="_blank" rel="noopener" data-action="contact">Contact</a>
 <script src="/contacts.js"></script>
 <script src="/guide-app.js"></script>
 <script src="/restaurants-data.js"></script>
@@ -51,7 +51,7 @@
   ).join("");
   const tags = r.tags.map(tag => `<span class="tag">${tag}</span>`).join("");
   const website = r.website
-    ? `<a class="btn secondary" href="${r.website}" target="_blank" rel="noopener">View Website / Menu</a>`
+    ? `<a class="btn secondary" href="${r.website}" target="_blank" rel="noopener">Visit Website</a>`
     : "";
 
   root.innerHTML = `
@@ -82,5 +82,8 @@
   `;
 })();
 </script>
+<script src="/module-registry.js"></script>
+<script src="/platform-actions.js"></script>
+<script src="/platform-action-runtime.js"></script>
 </body>
 </html>

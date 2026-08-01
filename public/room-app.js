@@ -11,7 +11,7 @@
   const data = window.HOUSE_ROOMS && window.HOUSE_ROOMS[room];
   if (!data) {
     document.getElementById("roomTitle").textContent = "Room link not found";
-    document.getElementById("roomNote").textContent = "Please check the link or contact Su on WhatsApp.";
+    document.getElementById("roomNote").textContent = "Please check the link or Contact Us on WhatsApp.";
     return;
   }
 

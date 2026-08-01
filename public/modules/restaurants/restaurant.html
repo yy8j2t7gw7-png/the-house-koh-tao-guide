@@ -51,7 +51,7 @@
   ).join("");
   const tags = r.tags.map(tag => `<span class="tag">${tag}</span>`).join("");
   const website = r.website
-    ? `<a class="btn secondary" href="${r.website}" target="_blank" rel="noopener">Visit Website</a>`
+    ? `<a class="btn secondary" href="${r.website}" target="_blank" rel="noopener">View Website / Menu</a>`
     : "";
 
   root.innerHTML = `
@@ -82,7 +82,5 @@
   `;
 })();
 </script>
-<script src="/module-registry.js"></script>
-<script src="/platform-actions.js"></script>
 </body>
 </html>

@@ -1,28 +1,15 @@
-# Guest Guide Platform — The House Guide v4.1.0
+# Guest Guide Platform with AI Concierge — The House v4.2.0
 
-Editorial Edition
+Modular Architecture Release
 
-This release rewrites the guest-facing copy across the guide in one consistent voice.
+Changes:
+- Introduced a central module registry
+- Added configurable module folders
+- Kept all current public URLs working
+- Standardized Contact Us, Book with Us, Open Map, Visit Website and Discover actions
+- Kept the page title Departure
+- Standardized the time wording to “Check-out is by 11:00 AM.”
+- Prepared disabled placeholders for AI Concierge and Secure Digital Check-in
+- Added architecture documentation for future properties
 
-Updated:
-- Home
-- Navigation labels
-- Explore
-- Beaches and all five beach descriptions
-- Restaurants and all ten restaurant descriptions
-- Restaurant detail wording
-- Roctopus Dive
-- Practical information
-- Help & Emergency
-- Checkout / Departure
-- House information
-- Room selection and room-page wording
-- Buttons, headings and helper text
-
-Editorial standard:
-- Warm, calm and useful
-- Written like a knowledgeable local host
-- Short paragraphs for mobile reading
-- No exaggerated claims
-- Clear reasons why a place is worth a guest's time
-- "Local Tip" replaces generic factual callouts where appropriate
+The House remains the first showcase property for the reusable platform.

@@ -1,0 +1,74 @@
+window.GUEST_GUIDE_MODULES = {
+  "platform": {
+    "name": "Guest Guide Platform with AI Concierge",
+    "client": "The House – Koh Tao",
+    "version": "4.2.0"
+  },
+  "modules": {
+    "house": {
+      "enabled": true,
+      "label": "The House",
+      "entry": "/house.html"
+    },
+    "explore": {
+      "enabled": true,
+      "label": "Explore Koh Tao",
+      "entry": "/explore.html"
+    },
+    "beaches": {
+      "enabled": true,
+      "label": "Beaches",
+      "entry": "/beaches.html"
+    },
+    "restaurants": {
+      "enabled": true,
+      "label": "Restaurants",
+      "entry": "/restaurants.html"
+    },
+    "diving": {
+      "enabled": true,
+      "label": "Diving",
+      "entry": "/diving.html"
+    },
+    "practical": {
+      "enabled": true,
+      "label": "Guest Information",
+      "entry": "/practical.html"
+    },
+    "emergency": {
+      "enabled": true,
+      "label": "Help & Emergency",
+      "entry": "/emergency.html"
+    },
+    "departure": {
+      "enabled": true,
+      "label": "Departure",
+      "entry": "/checkout.html"
+    },
+    "aiConcierge": {
+      "enabled": false,
+      "label": "AI Concierge",
+      "entry": "/ai-concierge.html"
+    },
+    "secureCheckIn": {
+      "enabled": false,
+      "label": "Secure Check-in",
+      "entry": "/check-in.html"
+    },
+    "bookings": {
+      "enabled": true,
+      "label": "Bookings",
+      "entry": "/practical.html"
+    },
+    "transport": {
+      "enabled": true,
+      "label": "Transport",
+      "entry": "/practical.html"
+    },
+    "activities": {
+      "enabled": true,
+      "label": "Activities",
+      "entry": "/practical.html"
+    }
+  }
+};

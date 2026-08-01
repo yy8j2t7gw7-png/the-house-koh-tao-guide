@@ -1,10 +1,11 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex,nofollow">
-<meta name="description" content="The House Koh Tao guest information">
-<title>Welcome | The House – Koh Tao</title>
+<meta name="description" content="Personal room guide for The House Koh Tao">
+<title>Your room at The House | The House – Koh Tao</title>
 <link rel="icon" href="/logo.svg">
 <style>
 :root{
@@ -70,38 +71,88 @@ a{color:inherit}
 <div class="shell">
 <header class="topbar">
   <a class="brand" href="/"><img src="/logo.svg" alt="The House Koh Tao"></a>
-  <nav class="nav"><a href="/rooms.html">Your Room</a><a href="/house.html">The House</a><a href="/practical.html">Guest Information</a><a href="/explore.html">Explore</a><a href="/emergency.html">Help & Emergency</a><a href="/checkout.html">Departure</a></nav>
+  <nav class="nav">
+    <a href="/house.html">The House</a>
+    <a href="/practical.html">Guest Information</a>
+    <a href="/explore.html">Explore</a>
+    <a href="/emergency.html">Help & Emergency</a>
+    <a href="/checkout.html">Departure</a>
+  </nav>
 </header>
 
-<section class="hero">
-  <img src="/assets/photo-01.jpeg" alt="The House and Koh Tao">
+<section class="section">
+  <span class="badge" id="roomBadge">Your room</span>
+  <h1 id="roomTitle">Loading your room…</h1>
+  <p class="section-intro">Your personal guest guide for The House – Koh Tao.</p>
+</section>
+
+<section class="hero" style="min-height:360px">
+  <img id="roomPhoto" src="/assets/photo-01.jpeg" alt="Your room location" style="height:360px">
   <div class="hero-copy">
-    <span class="badge">Welcome to Koh Tao</span>
-    <h1>Welcome to The House.</h1>
-    <p>Your island base in Mae Haad — close to the ferry pier, the beach and everything you need for an easy stay on Koh Tao.</p>
+    <span class="badge">Your room</span>
+    <h1 id="heroRoom" style="font-size:38px">Room</h1>
+    <p id="roomNote">Loading room details…</p>
   </div>
 </section>
 
 <section class="grid">
- <a class="card" href="/rooms.html"><h3>🛏 My Room</h3><p>Find your room, check-in details, Wi-Fi and arrival photos.</p></a>
- <a class="card" href="/explore.html"><h3>🌴 Explore Koh Tao</h3><p>Discover the beaches, restaurants, diving and island experiences we genuinely enjoy recommending.</p></a>
- <a class="card" href="/house.html"><h3>🏡 House Information</h3><p>A clear overview of the house, facilities and the few things that help everyone enjoy a comfortable stay.</p></a>
- <a class="card" href="/practical.html"><h3>🚕 Practical Information</h3><p>Transport, ferry tickets, laundry, ATMs, pharmacies and everyday essentials.</p></a>
- <a class="card emergency-card" href="/emergency.html"><h3>🚨 Help & Emergency</h3><p>Emergency contacts, medical care and help with your stay.</p></a>
- <a class="card" href="/checkout.html"><h3>👋 Checkout</h3><p>Checkout time, key return and a few simple departure reminders.</p></a>
+  <a class="card" href="#arrival"><h3>📍 Find My Room</h3><p>Arrival photos and self check-in instructions.</p></a>
+  <a class="card" href="/explore.html"><h3>🌴 Explore Koh Tao</h3><p>Diving, beaches, food and island ideas.</p></a>
+  <a class="card" href="/house.html"><h3>🏡 House Information</h3><p>Rules, towels, laundry, parking, water and more.</p></a>
+  <a class="card" href="/practical.html"><h3>🚕 Practical Information</h3><p>Taxi, ferries, laundry, ATMs and shops.</p></a>
+  <a class="card emergency-card" href="/emergency.html"><h3>🚨 Help & Emergency</h3><p>Help & Emergency numbers and medical help.</p></a>
+  <a class="card" href="/checkout.html"><h3>👋 Checkout</h3><p>Checkout time, key return and departure reminders.</p></a>
+</section>
+
+<section class="section">
+  <div class="grid">
+    <div class="card"><h3>🕑 Check-in</h3><p>From <strong>2:00 PM</strong>.</p></div>
+    <div class="card"><h3>👋 Checkout</h3><p>By <strong>11:00 AM</strong>.</p></div>
+    <div class="card"><h3>📶 Wi-Fi</h3><p><strong>The House</strong><br>Password: <strong id="wifiPassword">123456789!</strong></p><div class="btns"><button class="btn secondary copy-btn" type="button" onclick="copyWifi()">Copy password</button></div></div>
+    <div class="card"><h3>🔑 Self check-in</h3><p>Your room may be unlocked, with the key waiting inside.</p></div>
+  </div>
+</section>
+
+<section class="section" id="arrival">
+  <h2 id="arrivalTitle">Finding your room</h2>
+  <p class="section-intro">Use these pictures when you arrive.</p>
+  <div class="gallery">
+    <figure>
+      <img src="/assets/photo-04.jpeg" alt="Entrance beside Bar Thai Food">
+      <figcaption><strong>Step 1.</strong> Enter beside Bar Thai Food and follow the access route around to The House.</figcaption>
+    </figure>
+    <figure>
+      <img id="arrivalRoomPhoto" src="/assets/photo-01.jpeg" alt="Your room location">
+      <figcaption id="arrivalCaption"><strong>Step 2.</strong> Follow the room-specific picture.</figcaption>
+    </figure>
+  </div>
 </section>
 
 <section class="section info">
- <h2>Everything you need for a relaxed stay</h2>
- <p>Check-in is from <strong>2:00 PM</strong>, checkout is by <strong>11:00 AM</strong>, and self check-in is available. This guide brings together practical information, trusted local recommendations and the quickest ways to reach our team.</p>
- <div class="btns"><a class="btn" href="https://maps.app.goo.gl/5MV4j4B1YzyR1SR69" target="_blank" rel="noopener">Find The House</a><a class="btn secondary" href="https://wa.me/66640973491" target="_blank" rel="noopener">Contact Us</a></div>
+  <h2>Need anything during your stay?</h2>
+  <p>Contact our team for help with your stay: <strong>+66 64 097 3491</strong>.</p>
+  <div class="btns">
+    <a class="btn" data-link="houseWhatsapp" target="_blank" rel="noopener">Contact</a>
+    <a class="btn secondary" href="https://maps.app.goo.gl/5MV4j4B1YzyR1SR69" target="_blank" rel="noopener">Open Google Maps</a>
+  </div>
 </section>
 
 <footer class="footer">The House – Koh Tao · Simple, comfortable, budget-friendly accommodation in Mae Haad.</footer>
 </div>
 <a class="float-wa" data-link="houseWhatsapp" target="_blank" rel="noopener">Contact</a>
+
+<script>
+function copyWifi(){
+  navigator.clipboard.writeText('123456789!').then(function(){
+    alert('Wi-Fi password copied');
+  }).catch(function(){
+    prompt('Copy the Wi-Fi password:', '123456789!');
+  });
+}
+</script>
 <script src="/contacts.js"></script>
 <script src="/guide-app.js"></script>
-<script src="/module-registry.js"></script>
-<script src="/platform-actions.js"></script>
-</body></html>
+<script src="/room-data.js"></script>
+<script src="/room-app.js"></script>
+</body>
+</html>

@@ -1,6 +1,6 @@
 {
   "name": "the-house-koh-tao-guide",
-  "version": "2.3.0",
+  "version": "3.0.0",
   "private": true,
   "scripts": {
     "deploy": "wrangler deploy",

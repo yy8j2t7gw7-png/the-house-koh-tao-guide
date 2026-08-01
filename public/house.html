@@ -59,18 +59,20 @@ a{color:inherit}
 <div class="shell">
 <header class="topbar">
   <a class="brand" href="index.html"><img src="logo.svg" alt="The House Koh Tao"></a>
-  <nav class="nav"><a href="rooms.html">My Room</a><a href="house.html">House Info</a><a href="explore.html">Explore</a><a href="checkout.html">Checkout</a></nav>
+  <nav class="nav"><a href="/rooms.html">My Room</a><a href="/house.html">House Info</a><a href="/practical.html">Practical</a><a href="/explore.html">Explore</a><a href="/emergency.html">Help & Emergency</a><a href="/checkout.html">Checkout</a></nav>
 </header>
 
 <section class="section"><h1>House information</h1><p class="section-intro">A few simple points to keep your stay comfortable and help us look after the property.</p><div class="list"><div class="rule"><strong>🚭 Smoking</strong>Smoking is allowed outside on the balcony. Please do not smoke inside the rooms.</div><div class="rule"><strong>👥 Overnight visitors</strong>Please notify us and send a passport photo for every overnight visitor so we can complete the required Immigration registration.</div><div class="rule"><strong>🌙 Quiet hours</strong>Please keep noise down after 10:00 PM.</div><div class="rule"><strong>🔑 Lost key</strong>A replacement fee of 500 THB applies.</div><div class="rule"><strong>🛏 Towels</strong>Need a towel change? Just message us.</div><div class="rule"><strong>❄️ Air conditioning</strong>Please switch off the AC whenever you leave the room to save energy and protect the environment.</div><div class="rule"><strong>💧 Water</strong>Fresh water is limited on Koh Tao. Please use it responsibly.</div><div class="rule"><strong>🚽 Toilet</strong>Do not flush toilet paper, wipes or anything else. Use the bin provided.</div><div class="rule"><strong>🧺 Laundry</strong>The House does not provide laundry. Several services are available along Songserm Road.</div><div class="rule"><strong>🛵 Parking</strong>Parking is available along the roadside. Please avoid blocking entrances or neighbouring businesses.</div><div class="rule"><strong>🚰 Drinking water</strong>Tap water is not suitable for drinking. Bottled water is available nearby.</div></div></section>
 
 <footer class="footer">The House – Koh Tao · Simple, comfortable, budget-friendly accommodation in Mae Haad.</footer>
 </div>
-<a class="float-wa" href="https://wa.me/66640973491" target="_blank" rel="noopener">WhatsApp Su</a>
+<a class="float-wa" data-link="houseWhatsapp" target="_blank" rel="noopener">Contact</a>
 <script>
 document.addEventListener('click', e => {
   const a=e.target.closest('a[data-room]');
   if(a){ localStorage.setItem('houseRoom', a.dataset.room); }
 });
 </script>
+<script src="/contacts.js"></script>
+<script src="/guide-app.js"></script>
 </body></html>

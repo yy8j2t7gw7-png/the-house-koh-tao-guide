@@ -1,29 +1,22 @@
-# The House – Koh Tao Guide
+# The House Guide v3.0
 
-Cloudflare Workers Static Assets deployment.
+Centralized contacts and maps:
+- `public/contacts.js`
+- `public/guide-app.js`
 
-## Cloudflare build settings
+Agreed contact separation:
+- House/stay assistance uses the House team number: +66 64 097 3491
+- Activities and bookings use: +66 96 274 1424
 
-- Production branch: `main`
-- Build command: leave blank
-- Deploy command: `npx wrangler deploy`
-- Root directory: leave blank
+Help & Emergency includes:
+- National medical emergency: 1669
+- Koh Tao Rescue: +66 87 979 0191
+- Koh Tao Police Station: +66 77 456 098
+- Tourist Police: 1155
+- Koh Tao Hospital: +66 77 456 490 plus Google Maps
 
-The Worker name in Cloudflare must be:
-`the-house-koh-tao-guide`
-
-## Clean room links
-
-After deployment:
-- `/room/1`
-- `/room/2`
-- `/room/3`
-- `/room/4`
-- `/room/5`
-- `/room/6`
-- `/room/8`
-- `/room/9`
-- `/room/10`
-- `/room/11`
-
-The Worker rewrites those paths internally to the shared `public/room.html` page while keeping the clean URL visible.
+Buttons remain generic:
+- Contact
+- Call
+- Open Map
+- Book With Us

@@ -54,6 +54,16 @@ a{color:inherit}
  .grid,.gallery{grid-template-columns:1fr}.room-select{grid-template-columns:repeat(3,1fr)}
  .gallery img{height:230px}.brand img{width:165px}
 }
+
+.emergency-card{border:2px solid #c94b45;background:#fff7f6}
+.emergency-card h3,.emergency-card strong{color:#9e2f2a}
+.btn.danger{background:#b83b35}
+.btn.call{min-width:150px}
+.small{font-size:13px;color:var(--muted)}
+.copy-btn{border:0;cursor:pointer;font:inherit}
+.notice{border-left:5px solid var(--green);padding:14px 16px;background:var(--mint);border-radius:10px}
+.quick-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+@media(max-width:650px){.quick-grid{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -62,7 +72,9 @@ a{color:inherit}
   <a class="brand" href="/"><img src="/logo.svg" alt="The House Koh Tao"></a>
   <nav class="nav">
     <a href="/house.html">House Info</a>
+    <a href="/practical.html">Practical</a>
     <a href="/explore.html">Explore</a>
+    <a href="/emergency.html">Help & Emergency</a>
     <a href="/checkout.html">Checkout</a>
   </nav>
 </header>
@@ -86,6 +98,8 @@ a{color:inherit}
   <a class="card" href="#arrival"><h3>📍 Find My Room</h3><p>Arrival photos and self check-in instructions.</p></a>
   <a class="card" href="/explore.html"><h3>🌴 Explore Koh Tao</h3><p>Diving, beaches, food and island ideas.</p></a>
   <a class="card" href="/house.html"><h3>🏡 House Information</h3><p>Rules, towels, laundry, parking, water and more.</p></a>
+  <a class="card" href="/practical.html"><h3>🚕 Practical Information</h3><p>Taxi, ferries, laundry, ATMs and shops.</p></a>
+  <a class="card emergency-card" href="/emergency.html"><h3>🚨 Help & Emergency</h3><p>Help & Emergency numbers and medical help.</p></a>
   <a class="card" href="/checkout.html"><h3>👋 Checkout</h3><p>Checkout time, key return and departure reminders.</p></a>
 </section>
 
@@ -93,7 +107,7 @@ a{color:inherit}
   <div class="grid">
     <div class="card"><h3>🕑 Check-in</h3><p>From <strong>2:00 PM</strong>.</p></div>
     <div class="card"><h3>👋 Checkout</h3><p>By <strong>11:00 AM</strong>.</p></div>
-    <div class="card"><h3>📶 Wi-Fi</h3><p><strong>The House</strong><br>Password: <strong>123456789!</strong></p></div>
+    <div class="card"><h3>📶 Wi-Fi</h3><p><strong>The House</strong><br>Password: <strong id="wifiPassword">123456789!</strong></p><div class="btns"><button class="btn secondary copy-btn" type="button" onclick="copyWifi()">Copy password</button></div></div>
     <div class="card"><h3>🔑 Self check-in</h3><p>Your room may be unlocked, with the key waiting inside.</p></div>
   </div>
 </section>
@@ -115,17 +129,28 @@ a{color:inherit}
 
 <section class="section info">
   <h2>Need help?</h2>
-  <p>Message Su on WhatsApp: <strong>+66 64 097 3491</strong>.</p>
+  <p>Contact our team for help with your stay: <strong>+66 64 097 3491</strong>.</p>
   <div class="btns">
-    <a class="btn" href="https://wa.me/66640973491" target="_blank" rel="noopener">WhatsApp Su</a>
+    <a class="btn" data-link="houseWhatsapp" target="_blank" rel="noopener">Contact</a>
     <a class="btn secondary" href="https://maps.app.goo.gl/5MV4j4B1YzyR1SR69" target="_blank" rel="noopener">Open Google Maps</a>
   </div>
 </section>
 
 <footer class="footer">The House – Koh Tao · Simple, comfortable, budget-friendly accommodation in Mae Haad.</footer>
 </div>
-<a class="float-wa" href="https://wa.me/66640973491" target="_blank" rel="noopener">WhatsApp Su</a>
+<a class="float-wa" data-link="houseWhatsapp" target="_blank" rel="noopener">Contact</a>
 
+<script>
+function copyWifi(){
+  navigator.clipboard.writeText('123456789!').then(function(){
+    alert('Wi-Fi password copied');
+  }).catch(function(){
+    prompt('Copy the Wi-Fi password:', '123456789!');
+  });
+}
+</script>
+<script src="/contacts.js"></script>
+<script src="/guide-app.js"></script>
 <script src="/room-data.js"></script>
 <script src="/room-app.js"></script>
 </body>

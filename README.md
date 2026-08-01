@@ -1,11 +1,10 @@
-# Guest Guide Platform with AI Concierge — The House v4.4.1
+# Guest Guide Platform with AI Concierge — The House v4.4.2
 
-External Contact Button Fix
+Definitive Action Button Fix
 
-Changes:
-- House-support WhatsApp buttons remain “Contact Us”.
-- Booking WhatsApp buttons remain “Book with Us”.
-- External telephone contacts now display “Call”.
-- Emergency services, hospital, police and rescue telephone links are classified as external call actions.
-- Central action configuration now enforces the correct labels.
-- Modular copies synchronized with the root pages.
+- Emergency and external telephone buttons display “Call”.
+- The House WhatsApp support displays “Contact Us”.
+- Booking WhatsApp displays “Book with Us”.
+- The action runtime now identifies buttons by `data-link`, `data-action`, or `tel:` destination.
+- Dynamically assigned telephone links are corrected after `guide-app.js` runs.
+- Removed the previous text-based normalization that incorrectly turned “Contact” into “Contact Us”.

@@ -1,56 +1,75 @@
 (function () {
-  const actionConfig = window.GUEST_GUIDE_ACTIONS || {};
+  const actions = window.GUEST_GUIDE_ACTIONS || {};
 
-  const normalizeText = (value) =>
-    String(value || "")
-      .replace(/\s+/g, " ")
-      .trim()
-      .toLowerCase();
+  const labels = {
+    contact: actions.contact?.label || "Contact Us",
+    booking: actions.booking?.label || "Book with Us",
+    call: actions.call?.label || "Call",
+    map: actions.map?.label || "Open Map",
+    website: actions.website?.label || "Visit Website",
+    discover: actions.discover?.label || "Discover →"
+  };
 
-  const labelMap = new Map([
-    ["Contact Us", actionConfig.contact?.label || "Contact Us"],
-    ["Contact Us", actionConfig.contact?.label || "Contact Us"],
-    ["Contact Us", actionConfig.contact?.label || "Contact Us"],
-    ["Contact Us", actionConfig.contact?.label || "Contact Us"],
-    ["Contact Us", actionConfig.contact?.label || "Contact Us"],
-    ["Contact Us", actionConfig.contact?.label || "Contact Us"],
-    ["contact", actionConfig.contact?.label || "Contact Us"],
-    ["book with us", actionConfig.booking?.label || "Book with Us"],
-    ["book with us →", actionConfig.booking?.label || "Book with Us"],
-    ["website / menu", actionConfig.website?.label || "Visit Website"],
-    ["view website / menu", actionConfig.website?.label || "Visit Website"],
-    ["visit website", actionConfig.website?.label || "Visit Website"],
-    ["explore →", actionConfig.discover?.label || "Discover →"],
-    ["view details", actionConfig.discover?.label || "Discover →"],
-    ["call", actionConfig.call?.label || "Call"]
+  const callLinkKeys = new Set([
+    "houseCall",
+    "bookingCall",
+    "medicalNationalCall",
+    "rescueCall",
+    "policeCall",
+    "touristPoliceCall",
+    "hospitalCall"
   ]);
 
-  const applyLabels = (root = document) => {
-    root.querySelectorAll("a, button").forEach((element) => {
-      const current = normalizeText(element.textContent);
-      const replacement = labelMap.get(current);
-      if (replacement) element.textContent = replacement;
-    });
+  const inferAction = (element) => {
+    if (element.dataset.action) return element.dataset.action;
 
-    root.querySelectorAll("[data-action]").forEach((element) => {
-      const key = element.dataset.action;
-      const config = actionConfig[key];
-      if (config?.label) element.textContent = config.label;
+    const linkKey = element.dataset.link || "";
+    if (linkKey === "houseWhatsapp") return "contact";
+    if (linkKey === "bookingWhatsapp") return "booking";
+    if (callLinkKeys.has(linkKey)) return "call";
+
+    const href = element.getAttribute("href") || "";
+    if (href.toLowerCase().startsWith("tel:")) return "call";
+
+    return "";
+  };
+
+  const applyActions = (root = document) => {
+    const elements = [];
+
+    if (root.matches?.("a,button")) elements.push(root);
+    root.querySelectorAll?.("a,button").forEach((element) => elements.push(element));
+
+    elements.forEach((element) => {
+      const action = inferAction(element);
+      if (!action || !labels[action]) return;
+
+      element.dataset.action = action;
+      element.textContent = labels[action];
     });
   };
 
-  applyLabels();
+  applyActions();
 
-  // Handles buttons rendered later by JavaScript.
   const observer = new MutationObserver((mutations) => {
-    for (const mutation of mutations) {
+    mutations.forEach((mutation) => {
       mutation.addedNodes.forEach((node) => {
-        if (node.nodeType === Node.ELEMENT_NODE) {
-          applyLabels(node);
-        }
+        if (node.nodeType === Node.ELEMENT_NODE) applyActions(node);
       });
-    }
+
+      if (
+        mutation.type === "attributes" &&
+        mutation.target instanceof Element
+      ) {
+        applyActions(mutation.target);
+      }
+    });
   });
 
-  observer.observe(document.body, { childList: true, subtree: true });
+  observer.observe(document.body, {
+    childList: true,
+    subtree: true,
+    attributes: true,
+    attributeFilter: ["href", "data-link", "data-action"]
+  });
 })();

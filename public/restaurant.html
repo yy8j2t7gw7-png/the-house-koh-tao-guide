@@ -14,12 +14,12 @@
 <header class="topbar">
   <a class="brand" href="/"><img src="/logo.svg" alt="The House Koh Tao"></a>
   <nav class="nav">
-    <a href="/rooms.html">My Room</a>
-    <a href="/house.html">House Info</a>
-    <a href="/practical.html">Practical</a>
+    <a href="/rooms.html">Your Room</a>
+    <a href="/house.html">The House</a>
+    <a href="/practical.html">Guest Information</a>
     <a href="/explore.html">Explore</a>
     <a href="/emergency.html">Help & Emergency</a>
-    <a href="/checkout.html">Checkout</a>
+    <a href="/checkout.html">Departure</a>
   </nav>
 </header>
 
@@ -51,7 +51,7 @@
   ).join("");
   const tags = r.tags.map(tag => `<span class="tag">${tag}</span>`).join("");
   const website = r.website
-    ? `<a class="btn secondary" href="${r.website}" target="_blank" rel="noopener">Website / Menu</a>`
+    ? `<a class="btn secondary" href="${r.website}" target="_blank" rel="noopener">View Website / Menu</a>`
     : "";
 
   root.innerHTML = `
@@ -62,10 +62,10 @@
       </div>
     </div>
 
-    <div class="tip-box"><strong>Why we recommend it</strong><br>${r.tip}</div>
+    <div class="tip-box"><strong>Why it is worth your time</strong><br>${r.tip}</div>
     <p>${r.description}</p>
 
-    <h2>Photos</h2>
+    <h2>A closer look</h2>
     <p class="swipe-hint">← Swipe across the photos →</p>
     <div class="detail-gallery">${images}</div>
 

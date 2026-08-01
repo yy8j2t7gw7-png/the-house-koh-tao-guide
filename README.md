@@ -1,15 +1,28 @@
-# Guest Guide Platform — The House Guide v4.0.0
+# Guest Guide Platform — The House Guide v4.1.0
 
-First complete visual design-system release.
+Editorial Edition
 
-Key changes:
-- New shared `public/design-system.css`
-- Explore cards use a consistent 40% visual / 60% information structure
-- No ratings, recommendation badges or unnecessary labels on overview cards
-- Business cards use logos where available
-- Natural-place cards use photographs
-- Restaurant overview keeps horizontal swipe browsing
-- Restaurant details keep swipeable image galleries
-- Roctopus page uses a restrained logo header and real swipeable photos
-- Cleaner spacing, typography, buttons, shadows and mobile layout
-- Shared styling prepared for future Guest Guide Platform clients
+This release rewrites the guest-facing copy across the guide in one consistent voice.
+
+Updated:
+- Home
+- Navigation labels
+- Explore
+- Beaches and all five beach descriptions
+- Restaurants and all ten restaurant descriptions
+- Restaurant detail wording
+- Roctopus Dive
+- Practical information
+- Help & Emergency
+- Checkout / Departure
+- House information
+- Room selection and room-page wording
+- Buttons, headings and helper text
+
+Editorial standard:
+- Warm, calm and useful
+- Written like a knowledgeable local host
+- Short paragraphs for mobile reading
+- No exaggerated claims
+- Clear reasons why a place is worth a guest's time
+- "Local Tip" replaces generic factual callouts where appropriate

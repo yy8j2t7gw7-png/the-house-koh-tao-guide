@@ -1,9 +1,20 @@
-# The House Companion — Version 2.0
+# The House – Koh Tao Guide
 
-This version uses one shared room page selected by the URL.
+Cloudflare Workers Static Assets deployment.
 
-## Direct room links after deployment
+## Cloudflare build settings
 
+- Production branch: `main`
+- Build command: leave blank
+- Deploy command: `npx wrangler deploy`
+- Root directory: leave blank
+
+The Worker name in Cloudflare must be:
+`the-house-koh-tao-guide`
+
+## Clean room links
+
+After deployment:
 - `/room/1`
 - `/room/2`
 - `/room/3`
@@ -15,22 +26,4 @@ This version uses one shared room page selected by the URL.
 - `/room/10`
 - `/room/11`
 
-Example:
-`https://YOUR-SITE.pages.dev/room/1`
-
-## How it works
-
-Cloudflare Pages reads `_redirects` and serves the shared `room.html` file for every `/room/*` URL.
-`room-app.js` reads the room number from the URL and loads the correct room number, floor, photo and directions from `room-data.js`.
-
-This means:
-- One shared room layout
-- One shared set of house information
-- One shared Explore page
-- Only room-specific data changes
-- Future design updates need to be made once
-
-## Temporary privacy
-
-All pages include `noindex,nofollow`, which asks search engines not to index the test site.
-Anyone with the link can still open it. For actual password protection, use Cloudflare Access later.
+The Worker rewrites those paths internally to the shared `public/room.html` page while keeping the clean URL visible.

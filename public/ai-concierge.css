@@ -28,22 +28,83 @@
   background:#234f45;
   box-shadow:0 18px 42px rgba(24,59,52,.30);
 }
+
+.ai-concierge-backdrop{
+  position:fixed;
+  inset:0;
+  z-index:78;
+  opacity:0;
+  visibility:hidden;
+  pointer-events:none;
+  background:rgba(16,30,27,.34);
+  backdrop-filter:blur(0);
+  -webkit-backdrop-filter:blur(0);
+  transition:
+    opacity .38s cubic-bezier(.22,1,.36,1),
+    backdrop-filter .38s cubic-bezier(.22,1,.36,1),
+    -webkit-backdrop-filter .38s cubic-bezier(.22,1,.36,1),
+    visibility 0s linear .38s;
+}
+.ai-concierge-backdrop.is-open{
+  opacity:1;
+  visibility:visible;
+  pointer-events:auto;
+  backdrop-filter:blur(4px);
+  -webkit-backdrop-filter:blur(4px);
+  transition-delay:0s;
+}
+
 .ai-concierge-panel{
   position:fixed;
   right:20px;
   bottom:82px;
   z-index:79;
-  width:min(390px,calc(100vw - 24px));
-  max-height:min(680px,calc(100vh - 120px));
-  display:none;
+  width:min(410px,calc(100vw - 24px));
+  max-height:min(700px,calc(100vh - 118px));
+  display:flex;
   flex-direction:column;
   overflow:hidden;
-  border:1px solid #dfe7e2;
-  border-radius:24px;
+  opacity:0;
+  visibility:hidden;
+  pointer-events:none;
+  transform:translateY(34px) scale(.975);
+  transform-origin:bottom right;
+  border:1px solid rgba(223,231,226,.92);
+  border-radius:30px;
   background:#fffdf9;
-  box-shadow:0 24px 70px rgba(24,59,52,.24);
+  box-shadow:0 32px 90px rgba(16,30,27,.30);
+  transition:
+    opacity .34s cubic-bezier(.22,1,.36,1),
+    transform .44s cubic-bezier(.22,1,.36,1),
+    visibility 0s linear .44s;
+  will-change:transform,opacity;
 }
-.ai-concierge-panel.is-open{display:flex}
+.ai-concierge-panel.is-open{
+  opacity:1;
+  visibility:visible;
+  pointer-events:auto;
+  transform:translateY(0) scale(1);
+  transition-delay:0s;
+}
+
+body.ai-concierge-open{
+  overflow:hidden;
+  overscroll-behavior:none;
+}
+
+.ai-concierge-drag-handle{
+  display:none;
+  width:42px;
+  height:5px;
+  margin:10px auto 0;
+  border-radius:999px;
+  background:#cfd8d3;
+  flex:0 0 auto;
+}
+.ai-concierge-panel.is-dragging{
+  transition:none;
+}
+
 .ai-concierge-head{
   display:flex;
   justify-content:space-between;
@@ -159,6 +220,26 @@
     right:12px;
     bottom:12px;
   }
+  .ai-concierge-panel{
+    left:0;
+    right:0;
+    bottom:0;
+    width:100%;
+    max-height:min(84vh,760px);
+    border-radius:30px 30px 0 0;
+    transform:translateY(100%);
+    transform-origin:bottom center;
+  }
+  .ai-concierge-panel.is-open{
+    transform:translateY(0);
+  }
+  .ai-concierge-drag-handle{
+    display:block;
+  }
+  .ai-concierge-actions{
+    grid-template-columns:1fr;
+  }
+}
   .ai-concierge-panel{
     right:12px;
     bottom:74px;

@@ -21,7 +21,8 @@
     ["view website / menu", actionConfig.website?.label || "Visit Website"],
     ["visit website", actionConfig.website?.label || "Visit Website"],
     ["explore →", actionConfig.discover?.label || "Discover →"],
-    ["view details", actionConfig.discover?.label || "Discover →"]
+    ["view details", actionConfig.discover?.label || "Discover →"],
+    ["call", actionConfig.call?.label || "Call"]
   ]);
 
   const applyLabels = (root = document) => {

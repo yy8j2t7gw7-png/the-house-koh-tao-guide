@@ -14,6 +14,10 @@
   launcher.setAttribute("aria-controls", "aiConciergePanel");
   launcher.innerHTML = `<span aria-hidden="true">✦</span><span>${cfg.buttonLabel}</span>`;
 
+  const backdrop = document.createElement("div");
+  backdrop.className = "ai-concierge-backdrop";
+  backdrop.setAttribute("aria-hidden", "true");
+
   const panel = document.createElement("section");
   panel.className = "ai-concierge-panel";
   panel.id = "aiConciergePanel";
@@ -40,6 +44,7 @@
     : "";
 
   panel.innerHTML = `
+    <div class="ai-concierge-drag-handle" aria-hidden="true"></div>
     <div class="ai-concierge-head">
       <div>
         <h2>AI Concierge</h2>
@@ -64,6 +69,7 @@
       </div>
     </div>`;
 
+  document.body.appendChild(backdrop);
   document.body.appendChild(panel);
   document.body.appendChild(launcher);
 
@@ -80,14 +86,32 @@
   const sendButton = panel.querySelector(".ai-concierge-send");
   const response = panel.querySelector(".ai-concierge-response");
 
+  let lastFocusedElement = null;
+  let dragStartY = null;
+  let dragCurrentY = null;
+
   const openPanel = () => {
+    lastFocusedElement = document.activeElement;
+    backdrop.classList.add("is-open");
     panel.classList.add("is-open");
+    document.body.classList.add("ai-concierge-open");
     launcher.setAttribute("aria-expanded", "true");
+
+    window.setTimeout(() => {
+      closeButton.focus();
+    }, 120);
   };
 
   const closePanel = () => {
-    panel.classList.remove("is-open");
+    backdrop.classList.remove("is-open");
+    panel.classList.remove("is-open", "is-dragging");
+    panel.style.transform = "";
+    document.body.classList.remove("ai-concierge-open");
     launcher.setAttribute("aria-expanded", "false");
+
+    if (lastFocusedElement && typeof lastFocusedElement.focus === "function") {
+      window.setTimeout(() => lastFocusedElement.focus(), 80);
+    }
   };
 
   launcher.addEventListener("click", () => {
@@ -95,6 +119,7 @@
   });
 
   closeButton.addEventListener("click", closePanel);
+  backdrop.addEventListener("click", closePanel);
 
   panel.addEventListener("click", (event) => {
     const actionButton = event.target.closest("[data-concierge-action]");
@@ -115,6 +140,42 @@
     }
   });
 
+
+  const resetDrag = () => {
+    dragStartY = null;
+    dragCurrentY = null;
+    panel.classList.remove("is-dragging");
+    panel.style.transform = "";
+  };
+
+  panel.addEventListener("touchstart", (event) => {
+    if (window.innerWidth > 640 || !panel.classList.contains("is-open")) return;
+    if (event.touches.length !== 1) return;
+
+    dragStartY = event.touches[0].clientY;
+    dragCurrentY = dragStartY;
+    panel.classList.add("is-dragging");
+  }, { passive:true });
+
+  panel.addEventListener("touchmove", (event) => {
+    if (dragStartY === null || event.touches.length !== 1) return;
+
+    dragCurrentY = event.touches[0].clientY;
+    const distance = Math.max(0, dragCurrentY - dragStartY);
+    panel.style.transform = `translateY(${distance}px)`;
+  }, { passive:true });
+
+  panel.addEventListener("touchend", () => {
+    if (dragStartY === null) return;
+
+    const distance = Math.max(0, (dragCurrentY ?? dragStartY) - dragStartY);
+    if (distance > 110) {
+      closePanel();
+    } else {
+      resetDrag();
+    }
+  });
+
   const showPrototypeResponse = () => {
     const question = input.value.trim();
     if (!question) return;
@@ -129,5 +190,24 @@
 
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape") closePanel();
+
+    if (event.key === "Tab" && panel.classList.contains("is-open")) {
+      const focusable = [...panel.querySelectorAll(
+        'a[href],button:not([disabled]),input:not([disabled]),textarea:not([disabled]),select:not([disabled])'
+      )].filter((element) => element.offsetParent !== null);
+
+      if (!focusable.length) return;
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
   });
 })();

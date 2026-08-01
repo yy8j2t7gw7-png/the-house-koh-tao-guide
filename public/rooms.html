@@ -59,7 +59,7 @@ a{color:inherit}
 <div class="shell">
 <header class="topbar">
   <a class="brand" href="index.html"><img src="logo.svg" alt="The House Koh Tao"></a>
-  <nav class="nav"><a href="rooms.html">My Room</a><a href="house.html">House Info</a><a href="explore.html">Explore</a><a href="checkout.html">Checkout</a></nav>
+  <nav class="nav"><a href="/rooms.html">My Room</a><a href="/house.html">House Info</a><a href="/practical.html">Practical</a><a href="/explore.html">Explore</a><a href="/emergency.html">Help & Emergency</a><a href="/checkout.html">Checkout</a></nav>
 </header>
 
 <section class="section">
@@ -71,11 +71,13 @@ a{color:inherit}
 
 <footer class="footer">The House – Koh Tao · Simple, comfortable, budget-friendly accommodation in Mae Haad.</footer>
 </div>
-<a class="float-wa" href="https://wa.me/66640973491" target="_blank" rel="noopener">WhatsApp Su</a>
+<a class="float-wa" data-link="houseWhatsapp" target="_blank" rel="noopener">Contact</a>
 <script>
 document.addEventListener('click', e => {
   const a=e.target.closest('a[data-room]');
   if(a){ localStorage.setItem('houseRoom', a.dataset.room); }
 });
 </script>
+<script src="/contacts.js"></script>
+<script src="/guide-app.js"></script>
 </body></html>

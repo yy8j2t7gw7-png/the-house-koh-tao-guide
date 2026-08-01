@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex,nofollow">
-<meta name="description" content="The House Koh Tao guest information">
-<title>Explore Koh Tao | The House – Koh Tao</title>
-<link rel="icon" href="logo.svg">
+<meta name="description" content="The House Guide — Koh Tao">
+<title>Help & Emergency | The House Guide</title>
+<link rel="icon" href="/logo.svg">
 <style>
 :root{
   --ink:#173d35; --green:#1f5b4f; --mint:#eaf4f0; --sand:#f7f3ea;
@@ -53,70 +53,108 @@ a{color:inherit}
  .grid,.gallery{grid-template-columns:1fr}.room-select{grid-template-columns:repeat(3,1fr)}
  .gallery img{height:230px}.brand img{width:165px}
 }
+
+.emergency-card{border:2px solid #c94b45;background:#fff7f6}
+.emergency-card h3,.emergency-card strong{color:#9e2f2a}
+.btn.danger{background:#b83b35}
+.btn.call{min-width:150px}
+.small{font-size:13px;color:var(--muted)}
+.copy-btn{border:0;cursor:pointer;font:inherit}
+.notice{border-left:5px solid var(--green);padding:14px 16px;background:var(--mint);border-radius:10px}
+.quick-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+@media(max-width:650px){.quick-grid{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
 <div class="shell">
 <header class="topbar">
-  <a class="brand" href="index.html"><img src="logo.svg" alt="The House Koh Tao"></a>
+  <a class="brand" href="/"><img src="/logo.svg" alt="The House Koh Tao"></a>
   <nav class="nav"><a href="/rooms.html">My Room</a><a href="/house.html">House Info</a><a href="/practical.html">Practical</a><a href="/explore.html">Explore</a><a href="/emergency.html">Help & Emergency</a><a href="/checkout.html">Checkout</a></nav>
 </header>
 
+<section class="section">
+  <span class="badge">Help when you need it</span>
+  <h1>Help & Emergency</h1>
+  <p class="section-intro">For a serious or life-threatening situation, contact emergency services immediately. For problems related to your room or stay, contact our team.</p>
+  <div class="notice"><strong>When calling:</strong> say that you are on <strong>Koh Tao, Surat Thani</strong>, give your exact location and keep your phone available.</div>
+</section>
 
 <section class="section">
-  <h1>Explore Koh Tao</h1>
-  <p class="section-intro">A few simple recommendations to help you enjoy the island. We will add dedicated photos and more locations later.</p>
-
+  <h2>🚑 Emergency</h2>
   <div class="list">
-    <div class="rule">
-      <strong>🤿 Diving — Roctopus Dive</strong>
-      Professional, friendly and suitable for beginners as well as certified divers. Small groups and a strong focus on safety.
-      <div class="btns">
-        <a class="btn" href="https://maps.app.goo.gl/T7GLBEBPdKPw6PKr6" target="_blank" rel="noopener">Open Roctopus in Google Maps</a>
-      </div>
+    <div class="rule emergency-card">
+      <strong>National Medical Emergency — 1669</strong>
+      Thailand's national emergency medical number.
+      <div class="btns"><a class="btn danger" data-link="medicalNationalCall">Contact</a></div>
     </div>
 
-    <div class="rule">
-      <strong>🏖 Beach — Bamboo Beach Bar</strong>
-      A relaxed beachfront place for swimming, afternoon drinks and sunset.
-      <div class="btns">
-        <a class="btn" href="https://maps.app.goo.gl/o7S5RabCDiktNCcL6" target="_blank" rel="noopener">Open Bamboo Beach Bar in Google Maps</a>
-      </div>
+    <div class="rule emergency-card">
+      <strong>Koh Tao Rescue</strong>
+      Local rescue assistance on Koh Tao.<br>
+      <span class="small" data-text="rescuePhone">+66 87 979 0191</span>
+      <div class="btns"><a class="btn danger" data-link="rescueCall">Contact</a></div>
     </div>
 
-    <div class="rule">
-      <strong>🍹 Bars & evenings — Bamboo Beach Bar</strong>
-      Good for a relaxed afternoon, sunset drinks and selected live music or events.
-      <div class="btns">
-        <a class="btn" href="https://maps.app.goo.gl/o7S5RabCDiktNCcL6" target="_blank" rel="noopener">Open Bamboo Beach Bar in Google Maps</a>
-      </div>
+    <div class="rule emergency-card">
+      <strong>Koh Tao Police Station</strong>
+      Local police assistance.<br>
+      <span class="small" data-text="policePhone">+66 77 456 098</span>
+      <div class="btns"><a class="btn danger" data-link="policeCall">Contact</a></div>
     </div>
 
-    <div class="rule">
-      <strong>🍽 Food & coffee</strong>
-      We will add selected restaurants and cafés here, each with its own photo and Google Maps link.
-    </div>
-
-    <div class="rule">
-      <strong>🛵 Getting around</strong>
-      Scooter rental, taxis and ferry information will be added as individual recommendations.
-    </div>
-
-    <div class="rule">
-      <strong>🌴 More things to do</strong>
-      Beaches, viewpoints, snorkelling, activities and rainy-day ideas will be added gradually.
+    <div class="rule emergency-card">
+      <strong>Tourist Police — 1155</strong>
+      Tourist assistance and multilingual support.
+      <div class="btns"><a class="btn danger" data-link="touristPoliceCall">Contact</a></div>
     </div>
   </div>
 </section>
-<footer class="footer">The House – Koh Tao · Simple, comfortable, budget-friendly accommodation in Mae Haad.</footer>
+
+<section class="section">
+  <h2>🏥 Medical Care</h2>
+  <div class="list">
+    <div class="rule">
+      <strong>Koh Tao Hospital</strong>
+      For medical treatment, minor injuries or if you need to see a doctor.<br>
+      <span class="small" data-text="hospitalPhone">+66 77 456 490</span>
+      <div class="btns">
+        <a class="btn" data-link="hospitalCall">Contact</a>
+        <a class="btn secondary" data-link="hospitalMap" target="_blank" rel="noopener">Open Map</a>
+      </div>
+    </div>
+
+    <div class="rule">
+      <strong>Nearest Pharmacy</strong>
+      Find the closest pharmacy currently available.
+      <div class="btns"><a class="btn secondary" data-link="pharmacyMap" target="_blank" rel="noopener">Open Map</a></div>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <h2>🏠 Need help with your stay?</h2>
+  <p>For keys, lockouts, towels, toilet paper, air conditioning, water, Wi-Fi, check-in, checkout or another issue at The House.</p>
+  <div class="btns">
+    <a class="btn" data-link="houseWhatsapp" target="_blank" rel="noopener">Contact</a>
+    <a class="btn secondary" data-link="houseCall">Call</a>
+  </div>
+</section>
+
+<section class="section info">
+  <h2>🌴 Activities & Bookings</h2>
+  <p>For taxis, scooter rental, ferry tickets, diving, snorkelling, boat trips, fishing, tours or renting and booking anything on Koh Tao.</p>
+  <div class="btns">
+    <a class="btn" data-link="bookingWhatsapp" target="_blank" rel="noopener">Book With Us</a>
+    <a class="btn secondary" data-link="bookingCall">Call</a>
+  </div>
+</section>
+
+<script src="/contacts.js"></script>
+<script src="/guide-app.js"></script>
+
+<footer class="footer">The House Guide · Simple, comfortable, budget-friendly accommodation in Mae Haad.</footer>
 </div>
 <a class="float-wa" data-link="houseWhatsapp" target="_blank" rel="noopener">Contact</a>
-<script>
-document.addEventListener('click', e => {
-  const a=e.target.closest('a[data-room]');
-  if(a){ localStorage.setItem('houseRoom', a.dataset.room); }
-});
-</script>
 <script src="/contacts.js"></script>
 <script src="/guide-app.js"></script>
 </body></html>

@@ -78,6 +78,10 @@ a{color:inherit}
   .explore-grid{grid-template-columns:1fr}
   .explore-card{min-height:240px}
 }
+
+.explore-card.diving-logo-card{background:#087bb4}
+.explore-card.diving-logo-card img{object-fit:contain;padding:22px;box-sizing:border-box;background:#087bb4}
+.explore-card.diving-logo-card::after{background:linear-gradient(180deg,rgba(0,0,0,0),rgba(0,0,0,.58))}
 </style>
 </head>
 <body>
@@ -114,14 +118,16 @@ a{color:inherit}
       </div>
     </a>
     
-    <a class="explore-card" href="https://maps.app.goo.gl/T7GLBEBPdKPw6PKr6" target="_blank" rel="noopener">
-      <img src="/assets/photo-11.jpeg" alt="Diving" loading="lazy">
+    
+    <a class="explore-card diving-logo-card" href="/diving.html">
+      <img src="/assets/diving/roctopus-logo.jpg" alt="Roctopus Dive">
       <div class="explore-card-content">
         <h2>🤿 Diving</h2>
-        <p>Our recommended dive centre and future diving tips for beginners and certified divers.</p>
-        <span class="explore-count">1 recommendation</span>
+        <p>We recommend Roctopus Dive for courses, first dives and certified fun diving.</p>
+        <span class="explore-count">Roctopus Dive</span>
       </div>
     </a>
+
     
     <a class="explore-card placeholder" href="#">
       <img src="/assets/photo-12.jpeg" alt="Viewpoints" loading="lazy">

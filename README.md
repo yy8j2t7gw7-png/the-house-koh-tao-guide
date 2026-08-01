@@ -1,17 +1,18 @@
-# Guest Guide Platform — The House Guide v3.4.0
+# Guest Guide Platform — The House Guide v3.5.0
 
-Adds the Premium Explore Experience:
+Adds the dedicated Roctopus Dive module.
 
-- Large visual category cards
-- Beaches
-- Restaurants
-- Diving
-- Viewpoints
-- Activities
-- Bars & Sunset
-- Shopping & Essentials
-- Transport & Ferries
+Design standard:
+- The official business logo is used as the partner identity and Explore card visual.
+- Detail pages retain real swipeable photo galleries.
+- The Roctopus gallery uses three user-supplied images.
+- Booking is intentionally routed through The House booking team (Fah).
+- No direct Roctopus telephone number is shown.
+- Map and official website remain secondary information buttons.
 
-The Explore page is now the central local-guide hub.
-Completed modules link to their full pages.
-Temporary categories are clearly marked as coming soon.
+Files added:
+- public/diving.html
+- public/assets/diving/roctopus-logo.jpg
+- public/assets/diving/roctopus-team.jpg
+- public/assets/diving/roctopus-heart-dive.jpg
+- public/assets/diving/roctopus-wreck-dive.jpg

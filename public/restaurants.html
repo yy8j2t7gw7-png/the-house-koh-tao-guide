@@ -64,24 +64,32 @@ a{color:inherit}
 .quick-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
 @media(max-width:650px){.quick-grid{grid-template-columns:1fr}}
 
-.restaurant-stack{display:grid;gap:24px}
-.restaurant-card{background:#fff;border:1px solid var(--line);border-radius:22px;overflow:hidden}
-.photo-carousel{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;background:var(--mint)}
-.photo-carousel::-webkit-scrollbar{display:none}
-.photo-carousel img{width:100%;min-width:100%;height:390px;object-fit:cover;scroll-snap-align:start}
-.carousel-dots{text-align:center;padding:9px;background:#fff;color:var(--muted);letter-spacing:7px;font-size:13px}
-.restaurant-body{padding:22px}
-.restaurant-body h2{margin:4px 0 6px}
+.restaurant-overview{display:flex;gap:18px;overflow-x:auto;scroll-snap-type:x mandatory;padding:4px 2px 18px;scrollbar-width:none}
+.restaurant-overview::-webkit-scrollbar{display:none}
+.restaurant-preview{min-width:min(88vw,620px);scroll-snap-align:start;background:#fff;border:1px solid var(--line);border-radius:22px;overflow:hidden}
+.restaurant-preview img{width:100%;height:380px;object-fit:cover;display:block}
+.preview-body{padding:20px}
+.preview-body h2{margin:4px 0 8px}
 .experience{font-weight:800;color:var(--green)}
-.tip-box{border-left:5px solid var(--green);background:var(--mint);padding:14px 16px;border-radius:10px;margin:15px 0}
-.restaurant-meta{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:15px 0}
-.meta-item{background:var(--sand);padding:11px 13px;border-radius:11px}
-.tags{display:flex;flex-wrap:wrap;gap:8px;margin:15px 0}
+.preview-tip{border-left:5px solid var(--green);background:var(--mint);padding:13px 15px;border-radius:10px;margin:14px 0}
+.tags{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0}
 .tag{padding:7px 10px;background:var(--mint);color:var(--green);font-size:13px;font-weight:700;border-radius:999px}
-.ai-note{font-size:12px;color:var(--muted);margin-top:12px}
+.swipe-hint{color:var(--muted);font-size:14px}
+.detail-hero{background:#fff;border:1px solid var(--line);border-radius:22px;overflow:hidden}
+.detail-gallery{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;background:var(--mint)}
+.detail-gallery::-webkit-scrollbar{display:none}
+.detail-gallery img{width:100%;min-width:100%;height:430px;object-fit:cover;scroll-snap-align:start}
+.detail-body{padding:22px}
+.detail-body h1{margin:4px 0 8px}
+.detail-meta{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:16px 0}
+.meta-item{background:var(--sand);padding:12px 14px;border-radius:11px}
+.ai-note{font-size:12px;color:var(--muted);margin-top:14px}
+.back-link{display:inline-flex;align-items:center;gap:8px;margin-bottom:16px;color:var(--green);font-weight:800}
 @media(max-width:650px){
- .photo-carousel img{height:275px}
- .restaurant-meta{grid-template-columns:1fr}
+  .restaurant-preview{min-width:92vw}
+  .restaurant-preview img{height:280px}
+  .detail-gallery img{height:290px}
+  .detail-meta{grid-template-columns:1fr}
 }
 </style>
 </head>
@@ -95,16 +103,17 @@ a{color:inherit}
 <section class="section">
   <span class="badge">Recommended by The House</span>
   <h1>Restaurants</h1>
-  <p class="section-intro">Ten places we enjoy recommending. Swipe directly across each photo gallery to see the exterior, food and atmosphere.</p>
+  <p class="section-intro">Swipe through our restaurant recommendations. Open any card for more photos and full details.</p>
+  <p class="swipe-hint">← Swipe or scroll between restaurants →</p>
 </section>
 
 <section class="section">
-  <div class="restaurant-stack" id="restaurantStack"></div>
+  <div class="restaurant-overview" id="restaurantOverview"></div>
 </section>
 
 <section class="section info">
   <h2>Current information</h2>
-  <p>Opening times, menus and prices can change. Please check the restaurant’s current information before travelling.</p>
+  <p>Opening times, menus and prices can change. Please check the restaurant’s latest information before travelling.</p>
 </section>
 
 <footer class="footer">The House Guide · Restaurants recommended on Koh Tao.</footer>
@@ -116,37 +125,23 @@ a{color:inherit}
 <script src="/restaurants-data.js"></script>
 <script>
 (function(){
-  const root = document.getElementById("restaurantStack");
+  const root = document.getElementById("restaurantOverview");
   const restaurants = window.HOUSE_RESTAURANTS || [];
 
   root.innerHTML = restaurants.map((r) => {
-    const images = r.images.map((src, i) =>
-      `<img src="${src}" alt="${r.name} ${i === 0 ? 'exterior' : i === 1 ? 'food' : 'atmosphere'}" loading="lazy">`
-    ).join("");
-    const tags = r.tags.map(tag => `<span class="tag">${tag}</span>`).join("");
-    const website = r.website
-      ? `<a class="btn secondary" href="${r.website}" target="_blank" rel="noopener">Website / Menu</a>`
-      : "";
-
+    const tags = r.tags.slice(0, 4).map(tag => `<span class="tag">${tag}</span>`).join("");
     return `
-      <article class="restaurant-card">
-        <div class="photo-carousel" aria-label="${r.name} photo gallery">${images}</div>
-        <div class="carousel-dots" aria-hidden="true">● ○ ○</div>
-        <div class="restaurant-body">
+      <article class="restaurant-preview">
+        <img src="${r.images[0]}" alt="${r.name} preview" loading="lazy">
+        <div class="preview-body">
           <span class="experience">${r.experience}</span>
           <h2>${r.name}</h2>
-          <div class="tip-box"><strong>💚 Our Tip</strong><br>${r.tip}</div>
-          <p>${r.description}</p>
-          <div class="restaurant-meta">
-            <div class="meta-item"><strong>Cuisine</strong><br>${r.cuisine}</div>
-            <div class="meta-item"><strong>Price</strong><br>${r.price}</div>
-          </div>
+          <div class="preview-tip"><strong>💚 Our Tip</strong><br>${r.tip}</div>
           <div class="tags">${tags}</div>
           <div class="btns">
-            <a class="btn" href="${r.map}" target="_blank" rel="noopener">Open Map</a>
-            ${website}
+            <a class="btn" href="/restaurant.html?id=${encodeURIComponent(r.slug)}">View Details</a>
+            <a class="btn secondary" href="${r.map}" target="_blank" rel="noopener">Open Map</a>
           </div>
-          <p class="ai-note">Images are original AI-created editorial illustrations inspired by the dining category and atmosphere; they are not documentary photographs of the venue or exact dishes.</p>
         </div>
       </article>
     `;

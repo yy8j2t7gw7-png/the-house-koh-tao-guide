@@ -1,13 +1,17 @@
-# The House Guide v3.2
+# Guest Guide Platform — The House Guide v3.4.0
 
-Adds the Restaurants module with:
-- 10 restaurant recommendations
-- 3 standalone AI-created images per restaurant
-- Real horizontal swipe galleries in the website
-- Experience-based ordering
-- Our Tip, description, cuisine, price and tags
-- Map buttons and selected official websites
+Adds the Premium Explore Experience:
 
-Important image disclosure:
-The restaurant images are original AI editorial illustrations generated for
-the guide. They are not documentary photographs of the real venues or exact dishes.
+- Large visual category cards
+- Beaches
+- Restaurants
+- Diving
+- Viewpoints
+- Activities
+- Bars & Sunset
+- Shopping & Essentials
+- Transport & Ferries
+
+The Explore page is now the central local-guide hub.
+Completed modules link to their full pages.
+Temporary categories are clearly marked as coming soon.

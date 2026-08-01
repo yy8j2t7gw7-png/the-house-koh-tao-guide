@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex,nofollow">
-<meta name="description" content="The House Koh Tao guest information">
-<title>Welcome | The House – Koh Tao</title>
+<meta name="description" content="Restaurant details from The House Guide">
+<title>Restaurant Details | The House Guide</title>
 <link rel="icon" href="/logo.svg">
 <style>
 :root{
@@ -63,6 +63,34 @@ a{color:inherit}
 .notice{border-left:5px solid var(--green);padding:14px 16px;background:var(--mint);border-radius:10px}
 .quick-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
 @media(max-width:650px){.quick-grid{grid-template-columns:1fr}}
+
+.restaurant-overview{display:flex;gap:18px;overflow-x:auto;scroll-snap-type:x mandatory;padding:4px 2px 18px;scrollbar-width:none}
+.restaurant-overview::-webkit-scrollbar{display:none}
+.restaurant-preview{min-width:min(88vw,620px);scroll-snap-align:start;background:#fff;border:1px solid var(--line);border-radius:22px;overflow:hidden}
+.restaurant-preview img{width:100%;height:380px;object-fit:cover;display:block}
+.preview-body{padding:20px}
+.preview-body h2{margin:4px 0 8px}
+.experience{font-weight:800;color:var(--green)}
+.preview-tip{border-left:5px solid var(--green);background:var(--mint);padding:13px 15px;border-radius:10px;margin:14px 0}
+.tags{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0}
+.tag{padding:7px 10px;background:var(--mint);color:var(--green);font-size:13px;font-weight:700;border-radius:999px}
+.swipe-hint{color:var(--muted);font-size:14px}
+.detail-hero{background:#fff;border:1px solid var(--line);border-radius:22px;overflow:hidden}
+.detail-gallery{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;background:var(--mint)}
+.detail-gallery::-webkit-scrollbar{display:none}
+.detail-gallery img{width:100%;min-width:100%;height:430px;object-fit:cover;scroll-snap-align:start}
+.detail-body{padding:22px}
+.detail-body h1{margin:4px 0 8px}
+.detail-meta{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:16px 0}
+.meta-item{background:var(--sand);padding:12px 14px;border-radius:11px}
+.ai-note{font-size:12px;color:var(--muted);margin-top:14px}
+.back-link{display:inline-flex;align-items:center;gap:8px;margin-bottom:16px;color:var(--green);font-weight:800}
+@media(max-width:650px){
+  .restaurant-preview{min-width:92vw}
+  .restaurant-preview img{height:280px}
+  .detail-gallery img{height:290px}
+  .detail-meta{grid-template-columns:1fr}
+}
 </style>
 </head>
 <body>
@@ -72,33 +100,67 @@ a{color:inherit}
   <nav class="nav"><a href="/rooms.html">My Room</a><a href="/house.html">House Info</a><a href="/practical.html">Practical</a><a href="/explore.html">Explore</a><a href="/emergency.html">Help & Emergency</a><a href="/checkout.html">Checkout</a></nav>
 </header>
 
-<section class="hero">
-  <img src="/assets/photo-01.jpeg" alt="The House and Koh Tao">
-  <div class="hero-copy">
-    <span class="badge">Welcome to Koh Tao</span>
-    <h1>A simple, comfortable base in Mae Haad.</h1>
-    <p>The House is a clean, budget-friendly guesthouse close to the ferry pier, restaurants, cafés, dive centres and the beach.</p>
-  </div>
+<section class="section">
+  <a class="back-link" href="/restaurants.html">← Back to restaurants</a>
+  <div id="restaurantDetail"></div>
 </section>
 
-<section class="grid">
- <a class="card" href="/rooms.html"><h3>🛏 My Room</h3><p>Room location, check-in, Wi-Fi and arrival photos.</p></a>
- <a class="card" href="/explore.html"><h3>🌴 Explore Koh Tao</h3><p>Beaches, restaurants, diving, sunset spots and useful island recommendations.</p></a>
- <a class="card" href="/house.html"><h3>🏡 House Information</h3><p>Simple rules and practical information for your stay.</p></a>
- <a class="card" href="/practical.html"><h3>🚕 Practical Information</h3><p>Taxi, ferry tickets, scooter rental, laundry, ATMs and shops.</p></a>
- <a class="card emergency-card" href="/emergency.html"><h3>🚨 Help & Emergency</h3><p>Medical, police, Tourist Police, fire and local help.</p></a>
- <a class="card" href="/checkout.html"><h3>👋 Checkout</h3><p>Checkout time, key return and departure reminders.</p></a>
-</section>
-
-<section class="section info">
- <h2>Everything you need, in one place</h2>
- <p>Check-in is from <strong>2:00 PM</strong>, checkout is by <strong>11:00 AM</strong>, and self check-in is available. For assistance, message Su on WhatsApp.</p>
- <div class="btns"><a class="btn" href="https://maps.app.goo.gl/5MV4j4B1YzyR1SR69" target="_blank" rel="noopener">Open Google Maps</a><a class="btn secondary" href="https://wa.me/66640973491" target="_blank" rel="noopener">Contact Su</a></div>
-</section>
-
-<footer class="footer">The House – Koh Tao · Simple, comfortable, budget-friendly accommodation in Mae Haad.</footer>
+<footer class="footer">The House Guide · Restaurant details.</footer>
 </div>
 <a class="float-wa" data-link="houseWhatsapp" target="_blank" rel="noopener">Contact</a>
+
 <script src="/contacts.js"></script>
 <script src="/guide-app.js"></script>
-</body></html>
+<script src="/restaurants-data.js"></script>
+<script>
+(function(){
+  const params = new URLSearchParams(window.location.search);
+  const id = params.get("id");
+  const restaurant = (window.HOUSE_RESTAURANTS || []).find(r => r.slug === id);
+  const root = document.getElementById("restaurantDetail");
+
+  if (!restaurant) {
+    root.innerHTML = `
+      <section class="section info">
+        <h1>Restaurant not found</h1>
+        <p>Please return to the restaurant list and choose another recommendation.</p>
+        <div class="btns"><a class="btn" href="/restaurants.html">Back to Restaurants</a></div>
+      </section>`;
+    return;
+  }
+
+  document.title = `${restaurant.name} | The House Guide`;
+
+  const images = restaurant.images.map((src, i) =>
+    `<img src="${src}" alt="${restaurant.name} ${i === 0 ? 'exterior' : i === 1 ? 'food' : 'atmosphere'}">`
+  ).join("");
+  const tags = restaurant.tags.map(tag => `<span class="tag">${tag}</span>`).join("");
+  const website = restaurant.website
+    ? `<a class="btn secondary" href="${restaurant.website}" target="_blank" rel="noopener">Website / Menu</a>`
+    : "";
+
+  root.innerHTML = `
+    <article class="detail-hero">
+      <div class="detail-gallery" aria-label="${restaurant.name} photo gallery">${images}</div>
+      <div class="detail-body">
+        <span class="experience">${restaurant.experience}</span>
+        <h1>${restaurant.name}</h1>
+        <div class="preview-tip"><strong>💚 Our Tip</strong><br>${restaurant.tip}</div>
+        <p>${restaurant.description}</p>
+        <div class="detail-meta">
+          <div class="meta-item"><strong>Cuisine</strong><br>${restaurant.cuisine}</div>
+          <div class="meta-item"><strong>Price</strong><br>${restaurant.price}</div>
+        </div>
+        <div class="tags">${tags}</div>
+        <div class="btns">
+          <a class="btn" href="${restaurant.map}" target="_blank" rel="noopener">Open Map</a>
+          ${website}
+        </div>
+        <p class="ai-note">Images are original AI-created editorial illustrations inspired by the dining category and atmosphere; they are not documentary photographs of the venue or exact dishes.</p>
+      </div>
+    </article>
+  `;
+})();
+</script>
+</body>
+</html>

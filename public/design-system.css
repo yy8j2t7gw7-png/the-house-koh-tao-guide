@@ -120,9 +120,10 @@ img{max-width:100%}
 .footer{text-align:center;color:var(--muted);padding:26px 10px;font-size:14px}
 .float-wa{
   position:fixed;
-  right:18px;
+  left:18px;
+  right:auto;
   bottom:18px;
-  z-index:40;
+  z-index:70;
   text-decoration:none;
   padding:13px 17px;
   border-radius:999px;
@@ -130,6 +131,7 @@ img{max-width:100%}
   color:#fff;
   font-weight:800;
   box-shadow:var(--shadow-hover);
+  transition:transform .2s ease,background .2s ease,box-shadow .2s ease;
 }
 .back-link{
   display:inline-flex;
@@ -368,4 +370,18 @@ img{max-width:100%}
   .partner-logo-box{width:130px;height:130px}
   .detail-gallery img{height:300px}
   .feature-list,.detail-meta{grid-template-columns:1fr}
+}
+
+.float-wa:hover{
+  transform:translateY(-2px);
+  background:var(--green-dark);
+  box-shadow:0 18px 42px rgba(24,59,52,.22);
+}
+
+@media(max-width:640px){
+  .float-wa{
+    left:12px;
+    right:auto;
+    bottom:12px;
+  }
 }

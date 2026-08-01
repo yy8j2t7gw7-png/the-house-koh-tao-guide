@@ -67,6 +67,14 @@
   document.body.appendChild(panel);
   document.body.appendChild(launcher);
 
+  const appearanceDelay = Number.isFinite(cfg.appearanceDelayMs)
+    ? cfg.appearanceDelayMs
+    : 5000;
+
+  window.setTimeout(() => {
+    launcher.classList.add("is-visible");
+  }, appearanceDelay);
+
   const closeButton = panel.querySelector(".ai-concierge-close");
   const input = panel.querySelector(".ai-concierge-input");
   const sendButton = panel.querySelector(".ai-concierge-send");

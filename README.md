@@ -1,17 +1,13 @@
-# Guest Guide Platform with AI Concierge — The House v4.3.0
+# Guest Guide Platform with AI Concierge — The House v4.3.1
 
-AI Concierge Foundation
+Floating Action Layout Polish
 
-Added:
-- Floating AI Concierge button on every page
-- Bottom-right placement
-- Slide-up concierge panel
-- Quick actions for beaches, restaurants, diving, transport, bookings and contact
-- Page-aware suggested questions
-- Booking handover to Fah through WhatsApp
-- House-support handover to Su through WhatsApp
-- Prototype question input ready for the future OpenAI connection
-- Responsive mobile layout
-- Accessibility controls for open, close, Escape and keyboard input
-
-This release provides the complete concierge interface without live AI usage or API costs.
+Changes:
+- Moved the permanent Contact Us button to the bottom-left.
+- Kept the Concierge button in the bottom-right.
+- Concierge button appears after a five-second delay.
+- Added a restrained fade-and-rise animation.
+- Shortened the floating button label to “Concierge”.
+- The opened panel still identifies itself as “AI Concierge”.
+- Preserved WhatsApp routing: Contact Us to Su, Book with Us to Fah.
+- Updated mobile spacing so both floating actions remain clear and usable.

@@ -1,7 +1,7 @@
 window.AI_CONCIERGE_CONFIG = {
   "enabled": true,
   "propertyName": "The House",
-  "buttonLabel": "AI Concierge",
+  "buttonLabel": "Concierge",
   "welcomeTitle": "Welcome",
   "welcomeText": "I’m your AI Concierge. I can help you explore Koh Tao, find useful information and connect you with our team.",
   "placeholder": "Ask me anything…",
@@ -72,5 +72,6 @@ window.AI_CONCIERGE_CONFIG = {
       "Where is Koh Tao Hospital?",
       "Contact the house team."
     ]
-  }
+  },
+  "appearanceDelayMs": 5000
 };

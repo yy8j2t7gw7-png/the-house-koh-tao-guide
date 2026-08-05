@@ -1,0 +1,53 @@
+{
+  "title": "Restaurants We Recommend",
+  "description": "A carefully selected collection of places we would confidently suggest to our own friends and guests.",
+  "rankingEnabled": false,
+  "ratingsEnabled": false,
+  "collectionOrder": [
+    "The Gallery Restaurant",
+    "995 Roasted Duck",
+    "Tukta Thai Food",
+    "Long Thai Food",
+    "Thaita Italian Restaurant",
+    "Cafe del Sol",
+    "La Pizzeria da Claudio",
+    "The French Market",
+    "Barracuda Rooftop Restaurant",
+    "Whitening Restaurant",
+    "Seaside Restaurant",
+    "Coconut Monkey",
+    "Big Tree Café",
+    "Da's Sandwiches",
+    "VegetaBowl",
+    "Tree House Café",
+    "Sairee Cottage Restaurant",
+    "Karaweik Burmese Food",
+    "Family Kitchen",
+    "Ananas Restaurant"
+  ],
+  "pageSections": [
+    "Hero",
+    "Logo",
+    "About",
+    "Our Recommendation",
+    "Local Tip",
+    "Perfect For",
+    "Gallery",
+    "Menu",
+    "Actions"
+  ],
+  "menuTypes": [
+    "none",
+    "images",
+    "pdf",
+    "website",
+    "multiple"
+  ],
+  "actionTypes": {
+    "menu": "Menu",
+    "call": "Call",
+    "map": "Open Map",
+    "website": "Visit Website",
+    "booking": "Book with Us"
+  }
+}

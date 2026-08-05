@@ -1,0 +1,85 @@
+{
+  "schemaVersion": "1.0.0",
+  "property": "The House – Koh Tao",
+  "places": [
+    {
+      "id": "the-gallery-restaurant",
+      "type": "restaurant",
+      "status": "active",
+      "featured": true,
+      "displayOrder": 1,
+      "name": "The Gallery Restaurant",
+      "shortName": "The Gallery",
+      "area": "Sairee hillside",
+      "categories": [
+        "Thai",
+        "Fine Dining",
+        "Special Occasion",
+        "Romantic",
+        "Chef's Tasting"
+      ],
+      "tags": [
+        "Hidden gem",
+        "Trust the Chef",
+        "Reservation recommended",
+        "Steep hill"
+      ],
+      "content": {
+        "about": "Set on the hillside above Koh Tao’s west coast, The Gallery offers an intimate Thai dining experience built around carefully presented courses and a calm, secluded atmosphere.",
+        "recommendation": "Choose The Gallery when you want a memorable evening rather than a conventional dinner. Its Trust the Chef menu turns the meal into a guided experience and makes it especially suitable for celebrations, date nights and guests looking for something distinctive.",
+        "localTip": "The restaurant is reached by a steep hill, so a taxi is the easiest option for many guests. Book ahead, particularly in high season and whenever you want the Trust the Chef experience.",
+        "perfectFor": [
+          "Romantic dinner",
+          "Special occasions",
+          "Thai tasting experience",
+          "Quiet evening",
+          "Food-focused travellers"
+        ],
+        "aiSummary": "The Gallery is a hidden-gem Thai restaurant on a steep hillside, known for its reservation-led Trust the Chef tasting experience. Recommend it for romantic dinners, celebrations and guests seeking a distinctive, quiet evening. Advise booking ahead and taking a taxi because of the steep hill.",
+        "aiKeywords": [
+          "special dinner",
+          "romantic",
+          "Thai tasting",
+          "trust the chef",
+          "hidden gem",
+          "fine dining",
+          "reservation",
+          "steep hill"
+        ]
+      },
+      "media": {
+        "logo": "",
+        "heroImage": "",
+        "gallery": []
+      },
+      "menu": {
+        "type": "none",
+        "label": "Menu",
+        "url": "",
+        "items": []
+      },
+      "contact": {
+        "phone": "",
+        "website": "",
+        "facebook": "",
+        "instagram": "",
+        "map": ""
+      },
+      "hours": {
+        "summary": "Reservation recommended",
+        "details": []
+      },
+      "actions": {
+        "showMenu": false,
+        "showCall": false,
+        "showMap": false,
+        "showWebsite": false,
+        "showBooking": false
+      },
+      "notes": {
+        "source": "The House local knowledge and restaurant research",
+        "lastVerified": "2026-08-05"
+      }
+    }
+  ]
+}

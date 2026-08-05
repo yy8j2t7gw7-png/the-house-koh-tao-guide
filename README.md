@@ -1,10 +1,14 @@
-# Guest Guide Platform with AI Concierge — The House v4.4.2
+# Guest Guide Platform with AI Concierge — The House v4.5.0
 
-Definitive Action Button Fix
+Places Database Foundation
 
-- Emergency and external telephone buttons display “Call”.
-- The House WhatsApp support displays “Contact Us”.
-- Booking WhatsApp displays “Book with Us”.
-- The action runtime now identifies buttons by `data-link`, `data-action`, or `tel:` destination.
-- Dynamically assigned telephone links are corrected after `guide-app.js` runs.
-- Removed the previous text-based normalization that incorrectly turned “Contact” into “Contact Us”.
+Added:
+- Unified Places Database
+- Locked 20-restaurant collection
+- Structured editorial fields
+- Gallery and logo fields
+- Flexible Menu system
+- Central action visibility controls
+- AI Concierge summary and keyword fields
+- Initial completed data entry for The Gallery Restaurant
+- Documentation for future restaurants, cafés, bars, beaches and services

@@ -1,10 +1,23 @@
-# Guest Guide Platform with AI Concierge — The House v5.2.1
+# Guest Guide Platform with AI Concierge — The House v5.2.2
 
-Bars Navigation Fix
+Curated Bars Selection Update
 
-- Fixed the Explore page card that still opened Bamboo Beach Bar directly in Google Maps.
-- The card now opens the complete Bars & Nightlife section at `/bars.html`.
-- Renamed the Explore card from “Bamboo Beach Bar” to “Bars & Nightlife”.
-- Updated both the main Explore page and its modular copy.
-- Added Cafés, Bars and Shopping to the platform module registry.
-- The research-based v5.2.0 Bars data and all 14 venue pages remain included.
+The Bars & Nightlife section now uses this exact order:
+
+1. Bamboo Beach Bar
+2. Victor’s Bar
+3. Fishbowl Beach Bar
+4. Choppers Sports Bar
+5. Maya Beach Club
+6. Serve Chilled Roof Garden
+7. Sairee Cottage Pool Bar
+8. Queen’s Cabaret Koh Tao
+9. High The Moon
+10. Natural High Bar
+11. WTF Bar
+12. Freedom Bar
+13. Hii Bar
+14. Escobar
+
+Existing researched profiles were preserved where available.
+Newly added venues use cautious placeholder content until their details are verified.

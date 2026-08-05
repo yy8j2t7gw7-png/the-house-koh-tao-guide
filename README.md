@@ -1,13 +1,9 @@
-# Guest Guide Platform with AI Concierge — The House v4.7.0
+# Guest Guide Platform with AI Concierge — The House v4.7.1
 
-Restaurant Structure Complete
+Gallery Restaurant Loading Fix
 
-- Completed editorial content for all 20 approved restaurants.
-- Added Our Pick to every restaurant detail page.
-- Completed AI summaries and keywords for the full collection.
-- Added a flexible menu renderer supporting images, PDF, website links and multiple menus.
-- Kept clean visual placeholders until approved photos, logos and menus are added.
-- Preserved filters, premium cards, Gallery/Menu tabs and responsive detail pages.
-- Rankings, ratings and scores remain disabled.
-
-The restaurant structure is now ready for the later visual-asset pass.
+- Fixed an infinite MutationObserver loop in the central action-button runtime.
+- The issue was triggered on The Gallery page because it contains a telephone `Call` action.
+- Action labels and `data-action` attributes are now updated only when their values actually differ.
+- The Gallery page now loads normally.
+- Other restaurant pages and action labels remain unchanged.

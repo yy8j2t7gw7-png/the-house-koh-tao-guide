@@ -21,9 +21,10 @@
   ]);
 
   const inferAction = (element) => {
-    if (element.dataset.action) return element.dataset.action;
+    const explicit = element.getAttribute("data-action");
+    if (explicit) return explicit;
 
-    const linkKey = element.dataset.link || "";
+    const linkKey = element.getAttribute("data-link") || "";
     if (linkKey === "houseWhatsapp") return "contact";
     if (linkKey === "bookingWhatsapp") return "booking";
     if (callLinkKeys.has(linkKey)) return "call";
@@ -34,36 +35,47 @@
     return "";
   };
 
+  const applyToElement = (element) => {
+    if (!(element instanceof Element) || !element.matches("a,button")) return;
+
+    const action = inferAction(element);
+    const label = labels[action];
+    if (!action || !label) return;
+
+    // Only write attributes/text when they actually differ. This prevents
+    // the MutationObserver from repeatedly reacting to its own changes.
+    if (element.getAttribute("data-action") !== action) {
+      element.setAttribute("data-action", action);
+    }
+
+    if (element.textContent.trim() !== label) {
+      element.textContent = label;
+    }
+  };
+
   const applyActions = (root = document) => {
-    const elements = [];
+    if (root instanceof Element && root.matches("a,button")) {
+      applyToElement(root);
+    }
 
-    if (root.matches?.("a,button")) elements.push(root);
-    root.querySelectorAll?.("a,button").forEach((element) => elements.push(element));
-
-    elements.forEach((element) => {
-      const action = inferAction(element);
-      if (!action || !labels[action]) return;
-
-      element.dataset.action = action;
-      element.textContent = labels[action];
-    });
+    root.querySelectorAll?.("a,button").forEach(applyToElement);
   };
 
   applyActions();
 
   const observer = new MutationObserver((mutations) => {
-    mutations.forEach((mutation) => {
-      mutation.addedNodes.forEach((node) => {
-        if (node.nodeType === Node.ELEMENT_NODE) applyActions(node);
-      });
-
-      if (
+    for (const mutation of mutations) {
+      if (mutation.type === "childList") {
+        mutation.addedNodes.forEach((node) => {
+          if (node.nodeType === Node.ELEMENT_NODE) applyActions(node);
+        });
+      } else if (
         mutation.type === "attributes" &&
         mutation.target instanceof Element
       ) {
-        applyActions(mutation.target);
+        applyToElement(mutation.target);
       }
-    });
+    }
   });
 
   observer.observe(document.body, {

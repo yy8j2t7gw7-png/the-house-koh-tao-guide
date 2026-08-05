@@ -1,0 +1,1386 @@
+{
+  "schemaVersion": "1.0.0",
+  "property": "The House – Koh Tao",
+  "source": "Uploaded Premium Café Guide to Koh Tao",
+  "cafes": [
+    {
+      "id": "dough-koh-tao",
+      "type": "cafe",
+      "status": "active",
+      "featured": true,
+      "displayOrder": 1,
+      "name": "Dough Koh Tao",
+      "area": "Chalok Baan Kao Bay",
+      "categories": [
+        "Breakfast",
+        "Brunch",
+        "Coffee",
+        "Bakery",
+        "Sourdough",
+        "Desserts."
+      ],
+      "cardDescription": "A contemporary Chalok bakery and brunch café centred on house-made sourdough, croissants, bagels and substantial breakfast plates.",
+      "about": "A contemporary Chalok bakery and brunch café centred on house-made sourdough, croissants, bagels and substantial breakfast plates. It is one of the island’s most polished café openings and is particularly suitable for guests prioritising bakery quality and a full sit-down brunch. Recent coverage describes it as busy in the morning, with queues generally moving quickly. citeturn1view3turn2search0turn11search0",
+      "recommendation": "Choose Dough Koh Tao when you are looking for artisan bakery products and premium brunch..",
+      "localTip": "No permit or dress code. Arrive before approximately 09:00 for the best pastry choice and lowest chance of waiting. Payment methods and scooter-parking arrangements are unspecified.",
+      "ourPick": "Fresh croissants",
+      "perfectFor": [
+        "Breakfast",
+        "Brunch",
+        "Coffee",
+        "Bakery",
+        "Sourdough"
+      ],
+      "hours": "Monday–Sunday, 07:00–22:00. citeturn2search4turn2search24turn11search20",
+      "phone": "",
+      "website": "",
+      "facebook": "https://www.facebook.com/DoughkohTao/",
+      "instagram": "https://www.instagram.com/dough.kohtao/",
+      "menu": {
+        "type": "website",
+        "url": "Instagram",
+        "label": "Menu"
+      },
+      "map": "https://www.google.com/maps/search/?api=1&query=Dough+Koh+Tao",
+      "remoteWork": "**No** — seating is comfortable, but the café’s popularity, table turnover and peak brunch demand make it better for dining than prolonged laptop use.",
+      "familyFriendly": "**Yes** — broad breakfast menu and conventional table seating; highchairs or children’s facilities are unspecified.",
+      "airConditioning": "**Yes**, based on the enclosed contemporary café format; the extent of cooled seating is not published.",
+      "seating": "Indoor and outdoor.",
+      "nearby": [
+        "Chalok Baan Kao Bay",
+        "Shark Bay",
+        "Freedom Beach",
+        "John-Suwan Viewpoint",
+        "Koh Tao Leisure Park."
+      ],
+      "localFacts": "• Bread, bagels and laminated pastries are produced in house. • The café is in Chalok rather than Sairee, making it convenient before Shark Bay or John-Suwan Viewpoint.",
+      "media": {
+        "heroImage": "",
+        "logo": "",
+        "gallery": []
+      },
+      "aiSummary": "Dough Koh Tao: A contemporary Chalok bakery and brunch café centred on house-made sourdough, croissants, bagels and substantial breakfast plates. It is one of the island’s most polished café openings and is particularly suitable for guests prioritising bakery quality and a full sit-down brunch. Recent coverage describes it as busy in the morning, with queues generally moving quickly. citeturn1view3turn2search0turn11search0 Best known for Artisan bakery products and premium brunch.. Signature recommendation: Fresh croissants, Turkish eggs, house sourdough and salmon-ikura bagel..",
+      "aiKeywords": [
+        "breakfast",
+        "brunch",
+        "coffee",
+        "bakery",
+        "sourdough",
+        "desserts."
+      ],
+      "lastVerified": "2026-08-05"
+    },
+    {
+      "id": "the-factory-cafe",
+      "type": "cafe",
+      "status": "active",
+      "featured": true,
+      "displayOrder": 2,
+      "name": "The Factory Cafe",
+      "area": "Sairee Beach",
+      "categories": [
+        "Breakfast",
+        "Brunch",
+        "Coffee",
+        "Bakery",
+        "Vegetarian",
+        "Vegan",
+        "Healthy",
+        "Smoothies."
+      ],
+      "cardDescription": "A wholefood-oriented vegetarian café, bakery and brunch restaurant in south Sairee.",
+      "about": "A wholefood-oriented vegetarian café, bakery and brunch restaurant in south Sairee. It combines an air-conditioned interior with a terrace and offers one of the island’s broadest selections of vegetarian breakfasts, bowls, wraps, smoothies and plant-based baked goods. citeturn2search13turn2search25turn2search36",
+      "recommendation": "Choose The Factory Cafe when you are looking for vegetarian and vegan brunch in a sustainability-focused setting..",
+      "localTip": "No permit required. It becomes busy at breakfast and lunch. Delivery is offered through Kohme; payment methods at the café should be confirmed locally.",
+      "ourPick": "Eggs Benedict",
+      "perfectFor": [
+        "Breakfast",
+        "Brunch",
+        "Coffee",
+        "Bakery",
+        "Vegetarian"
+      ],
+      "hours": "Monday–Sunday, 07:00–18:00; last orders approximately 17:30. citeturn12search21",
+      "phone": "+66 80 956 2891",
+      "website": "",
+      "facebook": "https://www.facebook.com/thefactorycafeth/",
+      "instagram": "https://www.instagram.com/thefactorycafeth/",
+      "menu": {
+        "type": "website",
+        "url": "https://www.kohme.delivery/restaurant?slug=the-factory-cafe",
+        "label": "Menu"
+      },
+      "map": "https://www.google.com/maps/search/?api=1&query=The+Factory+Cafe+Koh+Tao",
+      "remoteWork": "**Yes** — air conditioning, Wi‑Fi, inside tables and longer daytime hours make it practical; avoid the core brunch period.",
+      "familyFriendly": "**Yes**.",
+      "airConditioning": "**Yes**. citeturn2search25",
+      "seating": "Indoor air-conditioned room and outdoor terrace.",
+      "nearby": [
+        "Sairee Beach",
+        "King Rama V Rock",
+        "Sairee walking street",
+        "The Studio",
+        "several dive centres."
+      ],
+      "localFacts": "• Furniture and fittings have used reclaimed or upcycled materials. • The kitchen has historically made sauces, baked items and much of the menu on site.",
+      "media": {
+        "heroImage": "",
+        "logo": "",
+        "gallery": []
+      },
+      "aiSummary": "The Factory Cafe: A wholefood-oriented vegetarian café, bakery and brunch restaurant in south Sairee. It combines an air-conditioned interior with a terrace and offers one of the island’s broadest selections of vegetarian breakfasts, bowls, wraps, smoothies and plant-based baked goods. citeturn2search13turn2search25turn2search36 Best known for Vegetarian and vegan brunch in a sustainability-focused setting.. Signature recommendation: Eggs Benedict, shakshuka, vegan pancakes, burritos and matcha or golden lattes..",
+      "aiKeywords": [
+        "breakfast",
+        "brunch",
+        "coffee",
+        "bakery",
+        "vegetarian",
+        "vegan",
+        "healthy",
+        "smoothies."
+      ],
+      "lastVerified": "2026-08-05"
+    },
+    {
+      "id": "coconut-monkey",
+      "type": "cafe",
+      "status": "active",
+      "featured": true,
+      "displayOrder": 3,
+      "name": "Coconut Monkey",
+      "area": "Mae Haad Beach",
+      "categories": [
+        "Breakfast",
+        "Brunch",
+        "Coffee",
+        "Healthy",
+        "Vegan-friendly",
+        "Smoothies",
+        "Beachfront."
+      ],
+      "cardDescription": "A relaxed café directly on Mae Haad Beach, built around healthy breakfasts, smoothie bowls, vegan dishes and homemade sweet items.",
+      "about": "A relaxed café directly on Mae Haad Beach, built around healthy breakfasts, smoothie bowls, vegan dishes and homemade sweet items. Its beach setting and proximity to the pier make it particularly useful on arrival or departure days when guests have luggage stored nearby. citeturn2search6turn2search14turn12search13",
+      "recommendation": "Choose Coconut Monkey when you are looking for beachfront healthy breakfast and vegan-friendly food..",
+      "localTip": "No permit or formal dress code. Sand, humidity and sea spray are part of the setting. Peak breakfast hours can be busy; telephone information is inconsistent across official channels.",
+      "ourPick": "Overnight oats",
+      "perfectFor": [
+        "Breakfast",
+        "Brunch",
+        "Coffee",
+        "Healthy",
+        "Vegan-friendly"
+      ],
+      "hours": "Monday–Sunday, approximately 08:00–17:00; sunset drinks may continue later on selected days. citeturn2search6turn2search10",
+      "phone": "Facebook lists +66 93 640 4522; Instagram has also displayed +66 92 781 7340",
+      "website": "",
+      "facebook": "https://www.facebook.com/CoconutMonkeyKohTao/",
+      "instagram": "https://www.instagram.com/coconut.monkey/",
+      "menu": {
+        "type": "website",
+        "url": "Menu",
+        "label": "Menu"
+      },
+      "map": "https://www.google.com/maps/search/?api=1&query=Coconut+Monkey+Koh+Tao",
+      "remoteWork": "**Yes** — Wi‑Fi and some sockets are reported, but beach noise and conversation make it unsuitable for confidential calls. citeturn2search30",
+      "familyFriendly": "**Yes** — casual setting and flexible menu; supervise young children beside the beach.",
+      "airConditioning": "**No**.",
+      "seating": "Covered open-air café seating and tables close to or on the beach.",
+      "nearby": [
+        "Mae Haad Beach",
+        "Mae Haad Pier",
+        "Jansom Bay",
+        "King Rama V Rock",
+        "Koh Tao Post Office."
+      ],
+      "localFacts": "• The café has promoted house-made non-dairy milks and a substantial vegan selection. • Some seating has access to electrical sockets, although not every table is work-oriented. citeturn2search30turn12search24",
+      "media": {
+        "heroImage": "",
+        "logo": "",
+        "gallery": []
+      },
+      "aiSummary": "Coconut Monkey: A relaxed café directly on Mae Haad Beach, built around healthy breakfasts, smoothie bowls, vegan dishes and homemade sweet items. Its beach setting and proximity to the pier make it particularly useful on arrival or departure days when guests have luggage stored nearby. citeturn2search6turn2search14turn12search13 Best known for Beachfront healthy breakfast and vegan-friendly food.. Signature recommendation: Overnight oats, smoothie bowls, tofu scramble, rainbow Buddha bowl and vegan banoffee pie..",
+      "aiKeywords": [
+        "breakfast",
+        "brunch",
+        "coffee",
+        "healthy",
+        "vegan-friendly",
+        "smoothies",
+        "beachfront."
+      ],
+      "lastVerified": "2026-08-05"
+    },
+    {
+      "id": "blue-shark",
+      "type": "cafe",
+      "status": "active",
+      "featured": true,
+      "displayOrder": 4,
+      "name": "Blue Shark",
+      "area": "Sairee Beach",
+      "categories": [
+        "Breakfast",
+        "Brunch",
+        "Coffee",
+        "Desserts",
+        "Smoothie bowls",
+        "Poke",
+        "Air-conditioned."
+      ],
+      "cardDescription": "A modern, air-conditioned Sairee brunch café with a large all-day menu spanning bagels, egg dishes, smoothie bowls, pancakes, poke-style plates and desserts.",
+      "about": "A modern, air-conditioned Sairee brunch café with a large all-day menu spanning bagels, egg dishes, smoothie bowls, pancakes, poke-style plates and desserts. It is among the island’s most popular polished brunch venues and is better suited to a defined meal than a long work session. citeturn1view3turn2search31turn12search19",
+      "recommendation": "Choose Blue Shark when you are looking for generous all-day brunch in an air-conditioned dining room..",
+      "localTip": "No permit or dress code. Arrive early or after the main brunch period. Menu pricing is at the upper end of Koh Tao’s café market.",
+      "ourPick": "Avocado and scrambled egg on sourdough",
+      "perfectFor": [
+        "Breakfast",
+        "Brunch",
+        "Coffee",
+        "Desserts",
+        "Smoothie bowls"
+      ],
+      "hours": "Monday–Sunday, 07:00–22:00. citeturn2search19turn12search19",
+      "phone": "+66 61 348 0069",
+      "website": "",
+      "facebook": "https://www.facebook.com/bluesharkkohtao/",
+      "instagram": "https://www.instagram.com/blueshark.kohtao/",
+      "menu": {
+        "type": "website",
+        "url": "no",
+        "label": "Menu"
+      },
+      "map": "https://www.google.com/maps/search/?api=1&query=Blue+Shark+Brunch+Koh+Tao",
+      "remoteWork": "**No** — Wi‑Fi may be available, but high brunch demand, queues and table turnover make extended laptop use inconsiderate at busy times.",
+      "familyFriendly": "**Yes**.",
+      "airConditioning": "**Yes**. citeturn12search19",
+      "seating": "Primarily indoor; any outdoor seating is limited.",
+      "nearby": [
+        "Sairee Beach",
+        "Sairee village",
+        "Queen’s Cabaret",
+        "dive schools and Sairee walking street."
+      ],
+      "localFacts": "• The venue explicitly advertises air conditioning. • It has extended from a breakfast concept into an evening all-day café operation.",
+      "media": {
+        "heroImage": "",
+        "logo": "",
+        "gallery": []
+      },
+      "aiSummary": "Blue Shark: A modern, air-conditioned Sairee brunch café with a large all-day menu spanning bagels, egg dishes, smoothie bowls, pancakes, poke-style plates and desserts. It is among the island’s most popular polished brunch venues and is better suited to a defined meal than a long work session. citeturn1view3turn2search31turn12search19 Best known for Generous all-day brunch in an air-conditioned dining room.. Signature recommendation: Avocado and scrambled egg on sourdough, smoked-salmon bagel, shakshuka and dirty coffee..",
+      "aiKeywords": [
+        "breakfast",
+        "brunch",
+        "coffee",
+        "desserts",
+        "smoothie bowls",
+        "poke",
+        "air-conditioned."
+      ],
+      "lastVerified": "2026-08-05"
+    },
+    {
+      "id": "kuru-kuru",
+      "type": "cafe",
+      "status": "active",
+      "featured": true,
+      "displayOrder": 5,
+      "name": "Kuru Kuru",
+      "area": "Sairee Beach",
+      "categories": [
+        "Breakfast",
+        "Brunch",
+        "Coffee",
+        "Matcha",
+        "Wine",
+        "Concept store",
+        "Evening café."
+      ],
+      "cardDescription": "A hybrid café, restaurant, wine bar and concept store in Sairee, combining speciality-style coffee and brunch with music, imported goods, books, zines and upcycled objects.",
+      "about": "A hybrid café, restaurant, wine bar and concept store in Sairee, combining speciality-style coffee and brunch with music, imported goods, books, zines and upcycled objects. The atmosphere changes during the day, moving from café service into a livelier evening venue. citeturn3search1turn3search13turn3search25",
+      "recommendation": "Choose Kuru Kuru when you are looking for design-led café atmosphere, strong coffee and a day-to-night concept..",
+      "localTip": "No permit. Casual dress is appropriate. Check social media for music events if guests prefer either a lively or a quiet visit.",
+      "ourPick": "Turkish eggs",
+      "perfectFor": [
+        "Breakfast",
+        "Brunch",
+        "Coffee",
+        "Matcha",
+        "Wine"
+      ],
+      "hours": "Monday–Sunday, 07:30–00:00. citeturn3search1turn3search29",
+      "phone": "+66 94 194 5548",
+      "website": "",
+      "facebook": "https://www.facebook.com/61577706672725/",
+      "instagram": "https://www.instagram.com/kurukuru.kohtao/",
+      "menu": {
+        "type": "website",
+        "url": "no",
+        "label": "Menu"
+      },
+      "map": "https://www.google.com/maps/search/?api=1&query=Kuru+Kuru+Koh+Tao",
+      "remoteWork": "**No** — feasible for brief daytime laptop use, but power sockets and work etiquette are unspecified and the venue becomes music-led later.",
+      "familyFriendly": "**Yes, during daytime**; evenings are more adult-oriented.",
+      "airConditioning": "**No confirmed AC**.",
+      "seating": "Indoor/open-front seating and outdoor tables.",
+      "nearby": [
+        "Sairee Beach",
+        "Sairee village",
+        "Queen’s Cabaret",
+        "multiple dive centres."
+      ],
+      "localFacts": "• The retail component features new, used, imported and locally made objects. • The venue periodically hosts DJs or live music and should not be assumed quiet after dark.",
+      "media": {
+        "heroImage": "",
+        "logo": "",
+        "gallery": []
+      },
+      "aiSummary": "Kuru Kuru: A hybrid café, restaurant, wine bar and concept store in Sairee, combining speciality-style coffee and brunch with music, imported goods, books, zines and upcycled objects. The atmosphere changes during the day, moving from café service into a livelier evening venue. citeturn3search1turn3search13turn3search25 Best known for Design-led café atmosphere, strong coffee and a day-to-night concept.. Signature recommendation: Turkish eggs, flat white, matcha and evening wine or cocktails..",
+      "aiKeywords": [
+        "breakfast",
+        "brunch",
+        "coffee",
+        "matcha",
+        "wine",
+        "concept store",
+        "evening café."
+      ],
+      "lastVerified": "2026-08-05"
+    },
+    {
+      "id": "sunrise-specialty-coffee",
+      "type": "cafe",
+      "status": "active",
+      "featured": true,
+      "displayOrder": 6,
+      "name": "Sunrise Specialty Coffee",
+      "area": "Chalok Baan Kao",
+      "categories": [
+        "Speciality coffee",
+        "Pour-over",
+        "Matcha",
+        "Bakery",
+        "Desserts",
+        "Garden café."
+      ],
+      "cardDescription": "A coffee-focused garden café on the road between central Koh Tao and the southern/eastern bays.",
+      "about": "A coffee-focused garden café on the road between central Koh Tao and the southern/eastern bays. It offers espresso, pour-over, several roast profiles, matcha, Thai chocolate and a rotating range of cakes and cookies. A small cooled section provides relief from the heat, while most seating remains garden or open-air. citeturn1view2turn11search14turn11search21",
+      "recommendation": "Choose Sunrise Specialty Coffee when you are looking for carefully prepared speciality coffee..",
+      "localTip": "No permit. Go early for the broadest cake selection. Scooter access is straightforward, but road traffic makes care necessary when entering or leaving.",
+      "ourPick": "Pour-over",
+      "perfectFor": [
+        "Speciality coffee",
+        "Pour-over",
+        "Matcha",
+        "Bakery",
+        "Desserts"
+      ],
+      "hours": "Monday–Sunday, 07:00–16:00. citeturn3search0turn3search6",
+      "phone": "+66 84 359 5681",
+      "website": "",
+      "facebook": "https://www.facebook.com/Sunrisecoffeekohtao/",
+      "instagram": "https://www.instagram.com/sunrisecoffee_kohtao/",
+      "menu": {
+        "type": "website",
+        "url": "https://kindika.com/en/restaurants/juu7cgsl4f76xku",
+        "label": "Menu"
+      },
+      "map": "https://www.google.com/maps/search/?api=1&query=Sunrise+Specialty+Coffee+Koh+Tao",
+      "remoteWork": "**Yes** — solid Wi‑Fi has been reported and the café is calm outside peaks; AC seating is limited and it closes at 16:00. citeturn1view2",
+      "familyFriendly": "**Yes**.",
+      "airConditioning": "**Yes, limited small zone**. citeturn1view2turn11search8",
+      "seating": "Small indoor/cooled area and outdoor garden.",
+      "nearby": [
+        "Chalok Baan Kao",
+        "Aow Leuk access road",
+        "Koh Tao Leisure Park",
+        "Sai Nuan approaches",
+        "Mae Haad."
+      ],
+      "localFacts": "• The café celebrated its fourth anniversary in April 2026. • Guests can often choose among different beans or roast levels rather than a single house espresso. citeturn3search14turn11search21",
+      "media": {
+        "heroImage": "",
+        "logo": "",
+        "gallery": []
+      },
+      "aiSummary": "Sunrise Specialty Coffee: A coffee-focused garden café on the road between central Koh Tao and the southern/eastern bays. It offers espresso, pour-over, several roast profiles, matcha, Thai chocolate and a rotating range of cakes and cookies. A small cooled section provides relief from the heat, while most seating remains garden or open-air. citeturn1view2turn11search14turn11search21 Best known for Carefully prepared speciality coffee.. Signature recommendation: Pour-over, orangepresso, coconut iced latte, matcha Basque cheesecake and Koh Tao chocolate cake..",
+      "aiKeywords": [
+        "speciality coffee",
+        "pour-over",
+        "matcha",
+        "bakery",
+        "desserts",
+        "garden café."
+      ],
+      "lastVerified": "2026-08-05"
+    },
+    {
+      "id": "big-tree-boutique-caf",
+      "type": "cafe",
+      "status": "active",
+      "featured": true,
+      "displayOrder": 7,
+      "name": "Big Tree Boutique Café",
+      "area": "Mae Haad Beach",
+      "categories": [
+        "Breakfast",
+        "Brunch",
+        "Coffee",
+        "Bakery",
+        "Garden",
+        "Working space",
+        "Boutique hotel café."
+      ],
+      "cardDescription": "A family-run garden café attached to Big Tree Boutique Hotel, within walking distance of Mae Haad but screened by dense planting.",
+      "about": "A family-run garden café attached to Big Tree Boutique Hotel, within walking distance of Mae Haad but screened by dense planting. Its shaded setting, house-made products and explicit positioning as a working space make it one of the more practical all-round café choices away from the beach. citeturn3search3turn3search7turn12search12",
+      "recommendation": "Choose Big Tree Boutique Café when you are looking for quiet jungle-style ambience and laptop-friendly seating..",
+      "localTip": "No permit. The shaded garden can attract mosquitoes; repellent is useful. On-site or roadside scooter parking appears available, but capacity is unspecified.",
+      "ourPick": "House cakes",
+      "perfectFor": [
+        "Breakfast",
+        "Brunch",
+        "Coffee",
+        "Bakery",
+        "Garden"
+      ],
+      "hours": "Monday–Sunday, 08:30–17:00. citeturn12search12",
+      "phone": "",
+      "website": "",
+      "facebook": "https://www.facebook.com/bigtree.boutique.tao/",
+      "instagram": "https://www.instagram.com/bigtree.boutiquehotel.cafe/",
+      "menu": {
+        "type": "none",
+        "url": "",
+        "label": "Menu"
+      },
+      "map": "https://www.google.com/maps/search/?api=1&query=Big+Tree+Boutique+Hotel+Cafe+Koh+Tao",
+      "remoteWork": "**Yes** — the café advertises itself as a working space, and a remote-work guide reports strong internet performance. citeturn1view2turn12search12",
+      "familyFriendly": "**Yes** — family-run and garden-based; children’s equipment is unspecified.",
+      "airConditioning": "**No confirmed café AC**; hotel-room AC should not be assumed to apply to café seating.",
+      "seating": "Covered garden and indoor-style seating.",
+      "nearby": [
+        "Mae Haad Beach",
+        "Mae Haad Pier",
+        "Koh Tao Leisure Park",
+        "mini-golf",
+        "Fresh Market",
+        "Jansom Bay approaches."
+      ],
+      "localFacts": "• The hotel and café are family-run. • The venue is approximately a 13-minute walk from Mae Haad Pier according to current accommodation-location data. citeturn12search20",
+      "media": {
+        "heroImage": "",
+        "logo": "",
+        "gallery": []
+      },
+      "aiSummary": "Big Tree Boutique Café: A family-run garden café attached to Big Tree Boutique Hotel, within walking distance of Mae Haad but screened by dense planting. Its shaded setting, house-made products and explicit positioning as a working space make it one of the more practical all-round café choices away from the beach. citeturn3search3turn3search7turn12search12 Best known for Quiet jungle-style ambience and laptop-friendly seating.. Signature recommendation: House cakes, croissants, brunch plates and coffee; exact current signature is unspecified..",
+      "aiKeywords": [
+        "breakfast",
+        "brunch",
+        "coffee",
+        "bakery",
+        "garden",
+        "working space",
+        "boutique hotel café."
+      ],
+      "lastVerified": "2026-08-05"
+    },
+    {
+      "id": "hype-coffee",
+      "type": "cafe",
+      "status": "active",
+      "featured": true,
+      "displayOrder": 8,
+      "name": "Hype Coffee",
+      "area": "Mae Haad Pier",
+      "categories": [
+        "Speciality coffee",
+        "Filter coffee",
+        "Bakery",
+        "Light breakfast",
+        "Remote work."
+      ],
+      "cardDescription": "A Balinese-style coffee shop near Mae Haad, sharing its site with a small roasting operation and serving espresso, filter coffee, pastries and light café food.",
+      "about": "A Balinese-style coffee shop near Mae Haad, sharing its site with a small roasting operation and serving espresso, filter coffee, pastries and light café food. It is especially useful for guests seeking strong coffee and a work-compatible environment close to the pier rather than a full beachfront experience. citeturn3search8turn11search15turn11search30",
+      "recommendation": "Choose Hype Coffee when you are looking for coffee roasted or selected with a more specialist focus and a photogenic bamboo-and-timber interior..",
+      "localTip": "No permit. Morning is preferable for work and photography. Coffee prices have historically started around ฿80–90, although current prices should be checked. citeturn11search15",
+      "ourPick": "Hype Thai-style coffee",
+      "perfectFor": [
+        "Speciality coffee",
+        "Filter coffee",
+        "Bakery",
+        "Light breakfast",
+        "Remote work."
+      ],
+      "hours": "Monday–Sunday, 08:00–17:00. citeturn3search16turn11search12",
+      "phone": "",
+      "website": "",
+      "facebook": "https://www.facebook.com/p/Hype-Coffee-KohTao-100088056404690/",
+      "instagram": "https://www.instagram.com/hypecoffee.kohtao/",
+      "menu": {
+        "type": "website",
+        "url": "no",
+        "label": "Menu"
+      },
+      "map": "https://www.google.com/maps/search/?api=1&query=Hype+Coffee+Koh+Tao",
+      "remoteWork": "**Yes** — rated highly for Wi‑Fi reliability and power resilience; plug availability should still be confirmed on arrival. citeturn1view2turn11search30",
+      "familyFriendly": "**Yes**.",
+      "airConditioning": "**No confirmed AC**; the structure is airy and naturally ventilated.",
+      "seating": "Indoor/open-air and shaded outdoor seating.",
+      "nearby": [
+        "Mae Haad Pier",
+        "Mae Haad Beach",
+        "Big Tree area",
+        "Koh Tao Leisure Park",
+        "Jansom Bay approaches."
+      ],
+      "localFacts": "• Aligner Coffee Roaster has been reported on the same premises. • A specialist remote-work guide notes reliable Wi‑Fi and generator backup. citeturn11search15turn1view2",
+      "media": {
+        "heroImage": "",
+        "logo": "",
+        "gallery": []
+      },
+      "aiSummary": "Hype Coffee: A Balinese-style coffee shop near Mae Haad, sharing its site with a small roasting operation and serving espresso, filter coffee, pastries and light café food. It is especially useful for guests seeking strong coffee and a work-compatible environment close to the pier rather than a full beachfront experience. citeturn3search8turn11search15turn11search30 Best known for Coffee roasted or selected with a more specialist focus and a photogenic bamboo-and-timber interior.. Signature recommendation: Hype Thai-style coffee, iced Americano, filter coffee and bakery items..",
+      "aiKeywords": [
+        "speciality coffee",
+        "filter coffee",
+        "bakery",
+        "light breakfast",
+        "remote work."
+      ],
+      "lastVerified": "2026-08-05"
+    },
+    {
+      "id": "cactus-caf-beach-bar",
+      "type": "cafe",
+      "status": "active",
+      "featured": false,
+      "displayOrder": 9,
+      "name": "Cactus Café & Beach Bar",
+      "area": "Sairee Beach",
+      "categories": [
+        "Breakfast",
+        "Brunch",
+        "Coffee",
+        "Beachfront",
+        "Healthy",
+        "Vegan-friendly",
+        "Bar."
+      ],
+      "cardDescription": "A beachfront café and sunset bar in Sairee with coffee, bagels, smoothie bowls, Mediterranean-style toasts, salads and cocktails.",
+      "about": "A beachfront café and sunset bar in Sairee with coffee, bagels, smoothie bowls, Mediterranean-style toasts, salads and cocktails. Its principal advantage is the setting: guests can move directly between brunch, beach time and sunset drinks without changing venue. citeturn1view3turn4search14turn4search18",
+      "recommendation": "Choose Cactus Café & Beach Bar when you are looking for brunch directly on Sairee Beach..",
+      "localTip": "No permit or formal dress code. Footwear and clothing suitable for sand are preferable. Sunset is the busiest period; scooter parking in central Sairee can be constrained.",
+      "ourPick": "Bagels",
+      "perfectFor": [
+        "Breakfast",
+        "Brunch",
+        "Coffee",
+        "Beachfront",
+        "Healthy"
+      ],
+      "hours": "Monday–Sunday, 08:45–20:00. citeturn4search0turn4search4",
+      "phone": "+66 92 398 0238",
+      "website": "",
+      "facebook": "https://www.facebook.com/cactuskohtao/",
+      "instagram": "https://www.instagram.com/cactuscafekohtao/",
+      "menu": {
+        "type": "website",
+        "url": "https://kindika.com/en/restaurants/d0289u12pjfzgh5/",
+        "label": "Menu"
+      },
+      "map": "https://www.google.com/maps/search/?api=1&query=Cactus+Cafe+Beach+Bar+Koh+Tao",
+      "remoteWork": "**No** — Wi‑Fi is available, but glare, heat, sand, music and social traffic reduce productivity.",
+      "familyFriendly": "**Yes**, particularly for a beach breakfast; direct supervision is required beside the sea.",
+      "airConditioning": "**No**.",
+      "seating": "Covered café area and outdoor beach seating.",
+      "nearby": [
+        "Sairee Beach",
+        "Sairee village",
+        "Queen’s Cabaret",
+        "beach bars and dive centres."
+      ],
+      "localFacts": "• The café is associated with a second venue, Lazy Coconut. • Free Wi‑Fi and outdoor seating are listed, but it remains a leisure rather than a work-led environment. citeturn4search4turn4search27",
+      "media": {
+        "heroImage": "",
+        "logo": "",
+        "gallery": []
+      },
+      "aiSummary": "Cactus Café & Beach Bar: A beachfront café and sunset bar in Sairee with coffee, bagels, smoothie bowls, Mediterranean-style toasts, salads and cocktails. Its principal advantage is the setting: guests can move directly between brunch, beach time and sunset drinks without changing venue. citeturn1view3turn4search14turn4search18 Best known for Brunch directly on Sairee Beach.. Signature recommendation: Bagels, smoothie bowls, “Cactus” fruit shake, dirty coffee and sunset cocktails..",
+      "aiKeywords": [
+        "breakfast",
+        "brunch",
+        "coffee",
+        "beachfront",
+        "healthy",
+        "vegan-friendly",
+        "bar."
+      ],
+      "lastVerified": "2026-08-05"
+    },
+    {
+      "id": "summer-cafe",
+      "type": "cafe",
+      "status": "active",
+      "featured": false,
+      "displayOrder": 10,
+      "name": "Summer Cafe",
+      "area": "North Sairee Beach",
+      "categories": [
+        "Breakfast",
+        "Coffee",
+        "Bakery",
+        "Light meals",
+        "Pet-friendly",
+        "Vegan-friendly."
+      ],
+      "cardDescription": "A small Sairee café and bakery serving homemade dishes, coffee and fresh savoury pastries.",
+      "about": "A small Sairee café and bakery serving homemade dishes, coffee and fresh savoury pastries. It is less formal than the island’s destination brunch cafés and works well for a quieter breakfast, takeaway or short laptop session. citeturn5view0turn1view3",
+      "recommendation": "Choose Summer Cafe when you are looking for handmade Australian-style sausage rolls and an informal, pet-friendly atmosphere..",
+      "localTip": "No permit. The café is compact; avoid occupying a larger table for extended periods at meal times. Daily specials may sell out.",
+      "ourPick": "Fresh sausage roll and coffee.",
+      "perfectFor": [
+        "Breakfast",
+        "Coffee",
+        "Bakery",
+        "Light meals",
+        "Pet-friendly"
+      ],
+      "hours": "Monday–Sunday, 08:00–16:00. citeturn5view0",
+      "phone": "+66 62 563 3104",
+      "website": "https://www.summercafekohtao.com/",
+      "facebook": "https://www.facebook.com/summercafekohtao",
+      "instagram": "https://www.instagram.com/summercafekohtao/",
+      "menu": {
+        "type": "website",
+        "url": "https://www.summercafekohtao.com/specials.html",
+        "label": "Menu"
+      },
+      "map": "https://www.google.com/maps/search/?api=1&query=Summer+Cafe+Koh+Tao",
+      "remoteWork": "**Yes, for light work** — generally quieter than major brunch venues, but seating, sockets and Wi‑Fi specifications are not published.",
+      "familyFriendly": "**Yes**, provided children are comfortable around animals.",
+      "airConditioning": "**No confirmed AC**.",
+      "seating": "Small covered café area and outdoor seating.",
+      "nearby": [
+        "North Sairee Beach",
+        "Koh Tao Gym and Fitness",
+        "Sairee village",
+        "north Sairee dive centres."
+      ],
+      "localFacts": "• The café’s website links to Koh Tao Animal Clinic and Koh Koh Pups. • Resident or visiting animals may be present around the venue. citeturn5view0turn1view3",
+      "media": {
+        "heroImage": "",
+        "logo": "",
+        "gallery": []
+      },
+      "aiSummary": "Summer Cafe: A small Sairee café and bakery serving homemade dishes, coffee and fresh savoury pastries. It is less formal than the island’s destination brunch cafés and works well for a quieter breakfast, takeaway or short laptop session. citeturn5view0turn1view3 Best known for Handmade Australian-style sausage rolls and an informal, pet-friendly atmosphere.. Signature recommendation: Fresh sausage roll and coffee..",
+      "aiKeywords": [
+        "breakfast",
+        "coffee",
+        "bakery",
+        "light meals",
+        "pet-friendly",
+        "vegan-friendly."
+      ],
+      "lastVerified": "2026-08-05"
+    },
+    {
+      "id": "living-juices-yoga",
+      "type": "cafe",
+      "status": "active",
+      "featured": false,
+      "displayOrder": 11,
+      "name": "Living Juices & Yoga",
+      "area": "North Sairee Beach",
+      "categories": [
+        "Healthy",
+        "Juices",
+        "Smoothies",
+        "Breakfast",
+        "Vegan-friendly",
+        "Gluten-free options",
+        "Yoga."
+      ],
+      "cardDescription": "Koh Tao’s established health-food café and yoga studio in north Sairee, serving cold-pressed juices, strong coffee, smoothies, açai bowls, salads and nutrient-focused meals.",
+      "about": "Koh Tao’s established health-food café and yoga studio in north Sairee, serving cold-pressed juices, strong coffee, smoothies, açai bowls, salads and nutrient-focused meals. It suits guests combining breakfast with a morning yoga class or seeking clearly health-led food rather than a conventional cooked brunch. citeturn4search2turn4search6turn10search6",
+      "recommendation": "Choose Living Juices & Yoga when you are looking for fresh juices, açai bowls and daily yoga..",
+      "localTip": "No café permit. Yoga places may require advance messaging and classes can fill. Wear appropriate yoga clothing only for class; ordinary casual dress is sufficient for the café.",
+      "ourPick": "Green juice",
+      "perfectFor": [
+        "Healthy",
+        "Juices",
+        "Smoothies",
+        "Breakfast",
+        "Vegan-friendly"
+      ],
+      "hours": "Monday–Sunday, 08:00–16:00. Yoga schedules vary and should be checked separately. citeturn4search10turn10search18",
+      "phone": "+66 90 916 8967 has appeared in delivery information; messaging the official page is preferable",
+      "website": "",
+      "facebook": "https://www.facebook.com/LivingJuices/",
+      "instagram": "https://www.instagram.com/livingjuices/",
+      "menu": {
+        "type": "website",
+        "url": "Menu",
+        "label": "Menu"
+      },
+      "map": "https://www.google.com/maps/search/?api=1&query=Living+Juices+Yoga+Koh+Tao",
+      "remoteWork": "**No** — open-air seating, street noise and yoga activity make it better for breakfast or a wellness visit than calls or focused work.",
+      "familyFriendly": "**Yes**.",
+      "airConditioning": "**No**.",
+      "seating": "Covered outdoor/terrace café seating.",
+      "nearby": [
+        "North Sairee Beach",
+        "Majestic Spa area",
+        "Sairee village",
+        "dive centres",
+        "Koh Tao Gym."
+      ],
+      "localFacts": "• It describes itself as Koh Tao’s original health-food café. • Morning yoga has commonly been offered at 08:00 and 10:00, subject to schedule changes. citeturn4search2turn4search29",
+      "media": {
+        "heroImage": "",
+        "logo": "",
+        "gallery": []
+      },
+      "aiSummary": "Living Juices & Yoga: Koh Tao’s established health-food café and yoga studio in north Sairee, serving cold-pressed juices, strong coffee, smoothies, açai bowls, salads and nutrient-focused meals. It suits guests combining breakfast with a morning yoga class or seeking clearly health-led food rather than a conventional cooked brunch. citeturn4search2turn4search6turn10search6 Best known for Fresh juices, açai bowls and daily yoga.. Signature recommendation: Green juice, apple-and-kale smoothie, açai bowl and Buddha-style bowl..",
+      "aiKeywords": [
+        "healthy",
+        "juices",
+        "smoothies",
+        "breakfast",
+        "vegan-friendly",
+        "gluten-free options",
+        "yoga."
+      ],
+      "lastVerified": "2026-08-05"
+    },
+    {
+      "id": "zest-coffee-shop",
+      "type": "cafe",
+      "status": "active",
+      "featured": false,
+      "displayOrder": 12,
+      "name": "Zest Coffee Shop",
+      "area": "Mae Haad Beach",
+      "categories": [
+        "Breakfast",
+        "Coffee",
+        "Sandwiches",
+        "Smoothies",
+        "Budget",
+        "Takeaway."
+      ],
+      "cardDescription": "A long-running, low-cost Koh Tao coffee-and-breakfast institution with branches historically operating in Mae Haad and Sairee.",
+      "about": "A long-running, low-cost Koh Tao coffee-and-breakfast institution with branches historically operating in Mae Haad and Sairee. It focuses on straightforward breakfasts, sandwiches, coffee and smoothies rather than contemporary speciality-coffee presentation. citeturn1view1turn4search11turn12search24",
+      "recommendation": "Choose Zest Coffee Shop when you are looking for early, dependable breakfast and substantial takeaway sandwiches..",
+      "localTip": "Check that the intended branch is operating before travelling. Payment methods, current hours and branch-specific menus are unspecified. It is best treated as a practical breakfast stop rather than a destination café.",
+      "ourPick": "Breakfast set",
+      "perfectFor": [
+        "Breakfast",
+        "Coffee",
+        "Sandwiches",
+        "Smoothies",
+        "Budget"
+      ],
+      "hours": "**Unspecified in current primary sources.** The venue is known for opening early; confirm the chosen branch on the day. citeturn12search24",
+      "phone": "+66 77 456 178",
+      "website": "",
+      "facebook": "https://www.facebook.com/Zest-255762929862/",
+      "instagram": "none found.",
+      "menu": {
+        "type": "none",
+        "url": "",
+        "label": "Menu"
+      },
+      "map": "https://www.google.com/maps/search/?api=1&query=Zest+Coffee+Shop+Koh+Tao",
+      "remoteWork": "**No** — compact seating and quick-service trade favour short visits.",
+      "familyFriendly": "**Yes**.",
+      "airConditioning": "**No confirmed AC**.",
+      "seating": "Indoor/open-front; branch layouts differ.",
+      "nearby": [
+        "Mae Haad Beach",
+        "Mae Haad Pier",
+        "post office",
+        "King Rama V Rock",
+        "Jansom Bay access."
+      ],
+      "localFacts": "• Zest is one of the island’s longest-established café names. • The Mae Haad branch is convenient for early ferries and dive departures.",
+      "media": {
+        "heroImage": "",
+        "logo": "",
+        "gallery": []
+      },
+      "aiSummary": "Zest Coffee Shop: A long-running, low-cost Koh Tao coffee-and-breakfast institution with branches historically operating in Mae Haad and Sairee. It focuses on straightforward breakfasts, sandwiches, coffee and smoothies rather than contemporary speciality-coffee presentation. citeturn1view1turn4search11turn12search24 Best known for Early, dependable breakfast and substantial takeaway sandwiches.. Signature recommendation: Breakfast set, yoghurt with fruit and muesli, filled baguette or sandwich and coffee..",
+      "aiKeywords": [
+        "breakfast",
+        "coffee",
+        "sandwiches",
+        "smoothies",
+        "budget",
+        "takeaway."
+      ],
+      "lastVerified": "2026-08-05"
+    },
+    {
+      "id": "the-mango-garden",
+      "type": "cafe",
+      "status": "active",
+      "featured": false,
+      "displayOrder": 13,
+      "name": "The Mango Garden",
+      "area": "Sairee Beach",
+      "categories": [
+        "Breakfast",
+        "Brunch",
+        "Coffee",
+        "Desserts",
+        "Thai fusion",
+        "Fruit",
+        "Dinner."
+      ],
+      "cardDescription": "A mango-themed brunch and dessert café whose menu applies Thai mango to traditional desserts and international café dishes.",
+      "about": "A mango-themed brunch and dessert café whose menu applies Thai mango to traditional desserts and international café dishes. The Koh Tao branch offers all-day breakfast, speciality coffee, dinner and elaborate fruit-based desserts in a polished indoor setting. citeturn6search5turn6search21turn6search25",
+      "recommendation": "Choose The Mango Garden when you are looking for mango sticky rice and mango-based desserts..",
+      "localTip": "No permit. Dessert portions can be substantial and shareable. Peak evening dessert periods may be busy. Current card policy is unspecified.",
+      "ourPick": "Mango sticky rice",
+      "perfectFor": [
+        "Breakfast",
+        "Brunch",
+        "Coffee",
+        "Desserts",
+        "Thai fusion"
+      ],
+      "hours": "Monday–Sunday, 07:00–22:00. citeturn6search1turn6search9",
+      "phone": "+66 83 926 6669 for the Koh Tao branch",
+      "website": "https://www.themangogarden.com/",
+      "facebook": "https://www.facebook.com/themangogarden/",
+      "instagram": "https://www.instagram.com/themangogarden/",
+      "menu": {
+        "type": "website",
+        "url": "official",
+        "label": "Menu"
+      },
+      "map": "https://www.google.com/maps/search/?api=1&query=The+Mango+Garden+Koh+Tao",
+      "remoteWork": "**No** — the venue is designed around dining and dessert traffic rather than prolonged work.",
+      "familyFriendly": "**Yes** — strong appeal for children and non-coffee drinkers.",
+      "airConditioning": "**Yes**.",
+      "seating": "Indoor; outdoor availability is unspecified.",
+      "nearby": [
+        "Sairee Beach",
+        "Sairee village",
+        "Queen’s Cabaret",
+        "Sairee nightlife and dive centres."
+      ],
+      "localFacts": "• The brand was founded in 2015 around the idea of presenting Thai mango in traditional and fusion formats. • The Koh Tao branch is a newer addition to the brand. citeturn6search5turn6search25",
+      "media": {
+        "heroImage": "",
+        "logo": "",
+        "gallery": []
+      },
+      "aiSummary": "The Mango Garden: A mango-themed brunch and dessert café whose menu applies Thai mango to traditional desserts and international café dishes. The Koh Tao branch offers all-day breakfast, speciality coffee, dinner and elaborate fruit-based desserts in a polished indoor setting. citeturn6search5turn6search21turn6search25 Best known for Mango sticky rice and mango-based desserts.. Signature recommendation: Mango sticky rice, mango smoothie, mango pancakes and fusion mango desserts..",
+      "aiKeywords": [
+        "breakfast",
+        "brunch",
+        "coffee",
+        "desserts",
+        "thai fusion",
+        "fruit",
+        "dinner."
+      ],
+      "lastVerified": "2026-08-05"
+    },
+    {
+      "id": "vegetabowl",
+      "type": "cafe",
+      "status": "active",
+      "featured": false,
+      "displayOrder": 14,
+      "name": "VegetaBowl",
+      "area": "Sairee Beach",
+      "categories": [
+        "Vegan",
+        "Vegetarian",
+        "Healthy",
+        "Bowls",
+        "Salads",
+        "Mexican-inspired",
+        "Gluten-free options."
+      ],
+      "cardDescription": "A compact plant-led café in south Sairee specialising in customisable bowls, salads, tacos and sushi burritos.",
+      "about": "A compact plant-led café in south Sairee specialising in customisable bowls, salads, tacos and sushi burritos. Its menu begins as fully vegan, with dairy cheese available as an optional addition, and many items can accommodate gluten-free diners. citeturn1view0turn6search14turn6search26",
+      "recommendation": "Choose VegetaBowl when you are looking for fresh, filling vegan bowls and sushi burritos..",
+      "localTip": "No permit. Hours have historically been flexible, so calling ahead is sensible near closing time. Guests avoiding dairy should decline the optional cheese add-on.",
+      "ourPick": "Falafel bowl",
+      "perfectFor": [
+        "Vegan",
+        "Vegetarian",
+        "Healthy",
+        "Bowls",
+        "Salads"
+      ],
+      "hours": "Monday–Sunday, 11:30–20:00; kitchen commonly closes around 19:30. citeturn6search26turn6search34",
+      "phone": "+66 81 981 9342",
+      "website": "",
+      "facebook": "https://www.facebook.com/vegetabowl/",
+      "instagram": "https://www.instagram.com/vegetabowl_kohtao/",
+      "menu": {
+        "type": "website",
+        "url": "Menu",
+        "label": "Menu"
+      },
+      "map": "https://www.google.com/maps/search/?api=1&query=VegetaBowl+Koh+Tao",
+      "remoteWork": "**No** — compact seating and lunch/dinner demand make it more appropriate for eating than working.",
+      "familyFriendly": "**Yes**, especially for older children comfortable with bowls and plant-based food.",
+      "airConditioning": "**No**.",
+      "seating": "Covered open-air.",
+      "nearby": [
+        "Sairee Beach",
+        "The Factory Cafe",
+        "Nui Bakery",
+        "The Studio",
+        "central Sairee dive centres."
+      ],
+      "localFacts": "• The business opened in 2015 and later moved to its present Sairee location. • Sauces, dressings and nut butters are made in house. citeturn6search14turn6search26",
+      "media": {
+        "heroImage": "",
+        "logo": "",
+        "gallery": []
+      },
+      "aiSummary": "VegetaBowl: A compact plant-led café in south Sairee specialising in customisable bowls, salads, tacos and sushi burritos. Its menu begins as fully vegan, with dairy cheese available as an optional addition, and many items can accommodate gluten-free diners. citeturn1view0turn6search14turn6search26 Best known for Fresh, filling vegan bowls and sushi burritos.. Signature recommendation: Falafel bowl, sushi burrito, tacos and homemade sauces or nut butters..",
+      "aiKeywords": [
+        "vegan",
+        "vegetarian",
+        "healthy",
+        "bowls",
+        "salads",
+        "mexican-inspired",
+        "gluten-free options."
+      ],
+      "lastVerified": "2026-08-05"
+    },
+    {
+      "id": "nui-bakery-sairee",
+      "type": "cafe",
+      "status": "active",
+      "featured": false,
+      "displayOrder": 15,
+      "name": "Nui Bakery Sairee",
+      "area": "Sairee Beach",
+      "categories": [
+        "Bakery",
+        "Breakfast",
+        "Coffee",
+        "Sandwiches",
+        "Sourdough",
+        "Takeaway",
+        "Vegan options."
+      ],
+      "cardDescription": "A Sairee bakery and café producing sourdough, baguettes, ciabatta, pastries, cakes and sandwiches.",
+      "about": "A Sairee bakery and café producing sourdough, baguettes, ciabatta, pastries, cakes and sandwiches. It combines all-day breakfast with takeaway-friendly bread products and is particularly useful for guests assembling food for a beach, dive or viewpoint excursion. citeturn6search15turn6search27turn6search35",
+      "recommendation": "Choose Nui Bakery Sairee when you are looking for daily house-baked bread and substantial sandwiches..",
+      "localTip": "No permit. Bread and popular pastries can sell out. Order takeaway in advance for larger groups or excursion lunches.",
+      "ourPick": "Smoked-salmon avocado ciabatta",
+      "perfectFor": [
+        "Bakery",
+        "Breakfast",
+        "Coffee",
+        "Sandwiches",
+        "Sourdough"
+      ],
+      "hours": "Monday–Sunday, 07:00–21:00; some posts state 07:30 opening. citeturn6search7turn6search19turn6search23",
+      "phone": "+66 63 456 2878",
+      "website": "",
+      "facebook": "https://www.facebook.com/nuibakery/",
+      "instagram": "https://www.instagram.com/nuibakery/",
+      "menu": {
+        "type": "website",
+        "url": "https://menu.taorocket.com/nuibakery",
+        "label": "Menu"
+      },
+      "map": "https://www.google.com/maps/search/?api=1&query=Nui+Bakery+Sairee+Koh+Tao",
+      "remoteWork": "**No** — narrow bakery seating and high takeaway turnover reduce suitability for long stays.",
+      "familyFriendly": "**Yes**.",
+      "airConditioning": "**No confirmed AC**.",
+      "seating": "Indoor/open-front and limited pavement or terrace seating.",
+      "nearby": [
+        "Sairee Beach",
+        "The Factory",
+        "VegetaBowl",
+        "The Studio",
+        "BND Beach Club",
+        "central dive schools."
+      ],
+      "localFacts": "• The bakery produces multiple fermented and multigrain breads. • A second Nui Bakery outlet has operated on Sabai Road. citeturn6search27turn6search31",
+      "media": {
+        "heroImage": "",
+        "logo": "",
+        "gallery": []
+      },
+      "aiSummary": "Nui Bakery Sairee: A Sairee bakery and café producing sourdough, baguettes, ciabatta, pastries, cakes and sandwiches. It combines all-day breakfast with takeaway-friendly bread products and is particularly useful for guests assembling food for a beach, dive or viewpoint excursion. citeturn6search15turn6search27turn6search35 Best known for Daily house-baked bread and substantial sandwiches.. Signature recommendation: Smoked-salmon avocado ciabatta, croissant breakfast sandwich, sourdough and cinnamon rolls..",
+      "aiKeywords": [
+        "bakery",
+        "breakfast",
+        "coffee",
+        "sandwiches",
+        "sourdough",
+        "takeaway",
+        "vegan options."
+      ],
+      "lastVerified": "2026-08-05"
+    },
+    {
+      "id": "caf-culture",
+      "type": "cafe",
+      "status": "active",
+      "featured": false,
+      "displayOrder": 16,
+      "name": "Café Culture",
+      "area": "Sairee Beach",
+      "categories": [
+        "Breakfast",
+        "Brunch",
+        "Coffee",
+        "Sandwiches",
+        "Beachfront",
+        "Vegan options",
+        "All-day café."
+      ],
+      "cardDescription": "A long-established beachside café in central Sairee serving Western breakfasts, panini, sandwiches, salads, burgers and Asian-style bowls.",
+      "about": "A long-established beachside café in central Sairee serving Western breakfasts, panini, sandwiches, salads, burgers and Asian-style bowls. The venue has covered lounge-style seating as well as tables directly on the sand, making it one of the more comfortable beachfront options for a slow breakfast. citeturn7search25turn12search15",
+      "recommendation": "Choose Café Culture when you are looking for coffee and breakfast with an unobstructed Sairee Beach position..",
+      "localTip": "No permit. Order at the counter. Beach tables are exposed to sand, sun and occasional rain; scooter parking is away from the pedestrian beach frontage.",
+      "ourPick": "Eggs Royale",
+      "perfectFor": [
+        "Breakfast",
+        "Brunch",
+        "Coffee",
+        "Sandwiches",
+        "Beachfront"
+      ],
+      "hours": "Published sources differ between approximately 08:00/08:30 and 22:00; kitchen may close earlier. Confirm on the official Facebook page. citeturn12search7turn12search18",
+      "phone": "+66 64 251 4142",
+      "website": "",
+      "facebook": "https://www.facebook.com/p/Cafe-Culture-Koh-Tao-Thailand-100063633997617/",
+      "instagram": "https://www.instagram.com/cafeculturekohtao/",
+      "menu": {
+        "type": "website",
+        "url": "Facebook",
+        "label": "Menu"
+      },
+      "map": "https://www.google.com/maps/search/?api=1&query=Cafe+Culture+Koh+Tao",
+      "remoteWork": "**Yes** — Wi‑Fi and comfortable covered seating are available, but heat, music and mealtime demand favour short sessions outside peaks.",
+      "familyFriendly": "**Yes**; supervise children beside the water.",
+      "airConditioning": "**No**.",
+      "seating": "Covered interior/lounge seating and outdoor beach tables.",
+      "nearby": [
+        "Sairee Beach",
+        "Fifty Six Diving",
+        "Sairee walking street",
+        "Queen’s Cabaret",
+        "beach bars."
+      ],
+      "localFacts": "• Guests order at the kiosk rather than relying on table ordering. • Wi‑Fi is available and the café has historically welcomed guests catching up on emails. citeturn7search25turn12search18",
+      "media": {
+        "heroImage": "",
+        "logo": "",
+        "gallery": []
+      },
+      "aiSummary": "Café Culture: A long-established beachside café in central Sairee serving Western breakfasts, panini, sandwiches, salads, burgers and Asian-style bowls. The venue has covered lounge-style seating as well as tables directly on the sand, making it one of the more comfortable beachfront options for a slow breakfast. citeturn7search25turn12search15 Best known for Coffee and breakfast with an unobstructed Sairee Beach position.. Signature recommendation: Eggs Royale, tuna melt, fresh-bread sandwiches and passionfruit cheesecake..",
+      "aiKeywords": [
+        "breakfast",
+        "brunch",
+        "coffee",
+        "sandwiches",
+        "beachfront",
+        "vegan options",
+        "all-day café."
+      ],
+      "lastVerified": "2026-08-05"
+    },
+    {
+      "id": "koppee-beach-club",
+      "type": "cafe",
+      "status": "active",
+      "featured": false,
+      "displayOrder": 17,
+      "name": "Koppee Beach Club",
+      "area": "Chalok Baan Kao Bay",
+      "categories": [
+        "Coffee",
+        "Breakfast",
+        "Brunch",
+        "Beach club",
+        "Thai",
+        "International",
+        "Cocktails",
+        "Pool."
+      ],
+      "cardDescription": "A beachfront restaurant-café on Chalok Baan Kao Bay with coffee, breakfast, Thai and international food, poolside seating and direct beach access.",
+      "about": "A beachfront restaurant-café on Chalok Baan Kao Bay with coffee, breakfast, Thai and international food, poolside seating and direct beach access. It is more of a half-day leisure venue than a conventional coffee shop and is particularly well suited to families or mixed groups wanting food, swimming and shade in one location. citeturn7search3turn7search27turn7search34",
+      "recommendation": "Choose Koppee Beach Club when you are looking for pool-and-beach setting in quieter Chalok Bay..",
+      "localTip": "No permit for café use; pool-access conditions should be confirmed when ordering. The venue accepts major cards according to its managed listing, but carrying cash remains sensible. citeturn7search34",
+      "ourPick": "Hot latte",
+      "perfectFor": [
+        "Coffee",
+        "Breakfast",
+        "Brunch",
+        "Beach club",
+        "Thai"
+      ],
+      "hours": "Monday–Sunday, 09:00–22:00. citeturn7search3turn7search7",
+      "phone": "+66 92 251 3272",
+      "website": "",
+      "facebook": "https://www.facebook.com/KoppeeKohTao/",
+      "instagram": "https://www.instagram.com/koppeekohtao/",
+      "menu": {
+        "type": "website",
+        "url": "no",
+        "label": "Menu"
+      },
+      "map": "https://www.google.com/maps/search/?api=1&query=Koppee+Beach+Club+Koh+Tao",
+      "remoteWork": "**No** — Wi‑Fi is listed, but pool, beach, live music and leisure traffic make it unsuitable for focused calls. citeturn7search34",
+      "familyFriendly": "**Yes** — one of the guide’s strongest family choices; children require supervision around the pool and sea.",
+      "airConditioning": "**No**.",
+      "seating": "Covered restaurant, poolside seating and beach area.",
+      "nearby": [
+        "Chalok Baan Kao Bay",
+        "Shark Bay",
+        "Freedom Beach",
+        "John-Suwan Viewpoint",
+        "Taa Toh Lagoon."
+      ],
+      "localFacts": "• The venue occupies Chalok Bay rather than the busier Sairee strip. • Earlier island guides noted a green-sea-turtle conservation facility nearby; guests should confirm whether it remains open to viewing. citeturn12search24",
+      "media": {
+        "heroImage": "",
+        "logo": "",
+        "gallery": []
+      },
+      "aiSummary": "Koppee Beach Club: A beachfront restaurant-café on Chalok Baan Kao Bay with coffee, breakfast, Thai and international food, poolside seating and direct beach access. It is more of a half-day leisure venue than a conventional coffee shop and is particularly well suited to families or mixed groups wanting food, swimming and shade in one location. citeturn7search3turn7search27turn7search34 Best known for Pool-and-beach setting in quieter Chalok Bay.. Signature recommendation: Hot latte, breakfast dishes, Thai food and cocktails; exact current signature dish is unspecified..",
+      "aiKeywords": [
+        "coffee",
+        "breakfast",
+        "brunch",
+        "beach club",
+        "thai",
+        "international",
+        "cocktails",
+        "pool."
+      ],
+      "lastVerified": "2026-08-05"
+    },
+    {
+      "id": "blacktip-caf-workspace",
+      "type": "cafe",
+      "status": "active",
+      "featured": false,
+      "displayOrder": 18,
+      "name": "Blacktip Café & Workspace",
+      "area": "Mae Haad",
+      "categories": [
+        "Coffee",
+        "Coworking",
+        "Breakfast",
+        "Healthy",
+        "High-protein",
+        "Burgers",
+        "Wellness",
+        "AC workspace."
+      ],
+      "cardDescription": "A café, restaurant and dedicated coworking facility inland from Mae Haad, designed for guests who need reliable work infrastructure rather than merely a laptop-tolerant café.",
+      "about": "A café, restaurant and dedicated coworking facility inland from Mae Haad, designed for guests who need reliable work infrastructure rather than merely a laptop-tolerant café. The complex includes an air-conditioned work area, outdoor workspace, food service and wellness facilities including sauna and ice bath. citeturn13search3turn13search12turn13search23",
+      "recommendation": "Choose Blacktip Café & Workspace when you are looking for koh Tao’s most complete dedicated coworking café..",
+      "localTip": "No permit is required for the café, but coworking charges or membership conditions may apply. Register before the evening cut-off if working late. Confirm current sauna, ice-bath and workspace prices directly.",
+      "ourPick": "Single-origin drip coffee",
+      "perfectFor": [
+        "Coffee",
+        "Coworking",
+        "Breakfast",
+        "Healthy",
+        "High-protein"
+      ],
+      "hours": "Café/restaurant Monday–Sunday, 09:00–21:30, last orders 20:30; coworking 09:00–00:00, with registration before 21:00. citeturn13search3turn13search12",
+      "phone": "Official website lists +66 81 859 0381; Instagram has also displayed +66 92 680 1285",
+      "website": "https://blacktip-workspace.com/",
+      "facebook": "https://www.facebook.com/blacktipkohtao/",
+      "instagram": "https://www.instagram.com/blacktip_workspace/",
+      "menu": {
+        "type": "website",
+        "url": "https://blacktip-workspace.com/",
+        "label": "Menu"
+      },
+      "map": "https://www.google.com/maps/search/?api=1&query=Blacktip+Cafe+Workspace+Koh+Tao",
+      "remoteWork": "**Yes** — dedicated workspace, AC, desks, plugs and extended hours. This is the least ambiguous work recommendation in the guide.",
+      "familyFriendly": "**Yes**, though the coworking room should be kept quiet; wellness areas require supervision and may have age rules.",
+      "airConditioning": "**Yes**.",
+      "seating": "AC coworking office and outdoor workspace/café seating.",
+      "nearby": [
+        "Mae Haad",
+        "Tanote Bay road",
+        "Aow Leuk road",
+        "Koh Tao Leisure Park",
+        "inland viewpoints and gyms."
+      ],
+      "localFacts": "• The workspace includes standing desks and an AC-cooled indoor office. • Sauna and ice-bath access operate separately from the café. citeturn13search3turn13search23",
+      "media": {
+        "heroImage": "",
+        "logo": "",
+        "gallery": []
+      },
+      "aiSummary": "Blacktip Café & Workspace: A café, restaurant and dedicated coworking facility inland from Mae Haad, designed for guests who need reliable work infrastructure rather than merely a laptop-tolerant café. The complex includes an air-conditioned work area, outdoor workspace, food service and wellness facilities including sauna and ice bath. citeturn13search3turn13search12turn13search23 Best known for Koh Tao’s most complete dedicated coworking café.. Signature recommendation: Single-origin drip coffee, protein-rich meals and smash burgers..",
+      "aiKeywords": [
+        "coffee",
+        "coworking",
+        "breakfast",
+        "healthy",
+        "high-protein",
+        "burgers",
+        "wellness",
+        "ac workspace."
+      ],
+      "lastVerified": "2026-08-05"
+    },
+    {
+      "id": "oasis-restaurant-caf",
+      "type": "cafe",
+      "status": "active",
+      "featured": false,
+      "displayOrder": 19,
+      "name": "Oasis Restaurant Café",
+      "area": "Sairee Beach",
+      "categories": [
+        "Breakfast",
+        "Brunch",
+        "Coffee",
+        "Healthy",
+        "Vegan-friendly",
+        "Pizza",
+        "Pasta",
+        "Kids’ menu",
+        "Remote work."
+      ],
+      "cardDescription": "A large-menu Sairee café-restaurant offering breakfast, smoothie bowls, coffee, salads, pasta, pizza, children’s dishes and evening drinks.",
+      "about": "A large-menu Sairee café-restaurant offering breakfast, smoothie bowls, coffee, salads, pasta, pizza, children’s dishes and evening drinks. Its published air-conditioned working space and long hours make it useful for mixed groups in which some guests need to work while others want a conventional meal. citeturn13search7turn13search16",
+      "recommendation": "Choose Oasis Restaurant Café when you are looking for broad all-day menu, air conditioning and work-compatible seating..",
+      "localTip": "No permit. The low-season menu may be narrower than the online master menu; some dishes were temporarily removed from May 2026. Confirm availability before promising a specific dish to guests. citeturn13search31",
+      "ourPick": "Smoothie bowl",
+      "perfectFor": [
+        "Breakfast",
+        "Brunch",
+        "Coffee",
+        "Healthy",
+        "Vegan-friendly"
+      ],
+      "hours": "Monday–Sunday, 09:00–00:00 under the low-season schedule introduced in May 2026. citeturn13search18",
+      "phone": "+66 65 053 3253",
+      "website": "https://www.oasisrestaurantkohtao.com/",
+      "facebook": "https://www.facebook.com/p/Oasis-Restaurant-Koh-Tao-61560710742984/",
+      "instagram": "https://www.instagram.com/oasis_kohtao/",
+      "menu": {
+        "type": "website",
+        "url": "https://www.oasisrestaurantkohtao.com/online-ordering",
+        "label": "Menu"
+      },
+      "map": "https://www.google.com/maps/search/?api=1&query=Oasis+Restaurant+Koh+Tao",
+      "remoteWork": "**Yes** — AC, Wi‑Fi and a designated working area; choose off-peak hours and order regularly.",
+      "familyFriendly": "**Yes** — children’s menu published.",
+      "airConditioning": "**Yes**.",
+      "seating": "Indoor air-conditioned and outdoor.",
+      "nearby": [
+        "Sairee Beach",
+        "Sairee village",
+        "Queen’s Cabaret",
+        "central dive centres",
+        "gym and yoga studios."
+      ],
+      "localFacts": "• The official site explicitly promotes excellent Wi‑Fi, air conditioning and a working space. • The menu includes a dedicated children’s section. citeturn13search7turn13search16",
+      "media": {
+        "heroImage": "",
+        "logo": "",
+        "gallery": []
+      },
+      "aiSummary": "Oasis Restaurant Café: A large-menu Sairee café-restaurant offering breakfast, smoothie bowls, coffee, salads, pasta, pizza, children’s dishes and evening drinks. Its published air-conditioned working space and long hours make it useful for mixed groups in which some guests need to work while others want a conventional meal. citeturn13search7turn13search16 Best known for Broad all-day menu, air conditioning and work-compatible seating.. Signature recommendation: Smoothie bowl, eggs and toast, Buddha bowl, house-made pasta or pizza; no single official signature identified..",
+      "aiKeywords": [
+        "breakfast",
+        "brunch",
+        "coffee",
+        "healthy",
+        "vegan-friendly",
+        "pizza",
+        "pasta",
+        "kids’ menu",
+        "remote work."
+      ],
+      "lastVerified": "2026-08-05"
+    },
+    {
+      "id": "croissant-ko",
+      "type": "cafe",
+      "status": "active",
+      "featured": false,
+      "displayOrder": 20,
+      "name": "Croissant & Ko",
+      "area": "Chalok Baan Kao Bay",
+      "categories": [
+        "Bakery",
+        "Breakfast",
+        "Coffee",
+        "French",
+        "Gelato",
+        "Pizza",
+        "Pasta",
+        "All-day dining",
+        "Delivery."
+      ],
+      "cardDescription": "An all-day French-influenced bakery and restaurant in Chalok, producing pastries, breads, cakes, gelato and savoury meals.",
+      "about": "An all-day French-influenced bakery and restaurant in Chalok, producing pastries, breads, cakes, gelato and savoury meals. It is broader than a traditional café, extending from breakfast and coffee through pizza, pasta, burgers, wine and late-night delivery. citeturn2search28turn9search5",
+      "recommendation": "Choose Croissant & Ko when you are looking for fresh croissants, French-style bread and unusually long bakery service hours..",
+      "localTip": "No permit or formal dress code. Delivery is available island-wide subject to operating conditions. Guests seeking particular pastries should visit in the morning; late-night service may use a reduced menu.",
+      "ourPick": "Butter croissant",
+      "perfectFor": [
+        "Bakery",
+        "Breakfast",
+        "Coffee",
+        "French",
+        "Gelato"
+      ],
+      "hours": "Monday–Sunday, 07:00–00:00; last delivery or kitchen orders may be earlier. citeturn2search28",
+      "phone": "+66 80 148 8650",
+      "website": "https://croissantandko.com/koh-tao/",
+      "facebook": "https://www.facebook.com/Croissantandkotao/",
+      "instagram": "https://www.instagram.com/croissant_and_ko_tao/",
+      "menu": {
+        "type": "website",
+        "url": "https://croissantandko.com/koh-tao/",
+        "label": "Menu"
+      },
+      "map": "https://maps.app.goo.gl/9BGhVfyXbKxaDPHn9",
+      "remoteWork": "**No** — long hours are convenient, but the venue functions as a busy restaurant and bakery; dedicated plugs and work seating are not published.",
+      "familyFriendly": "**Yes** — broad menu, ice cream and long hours.",
+      "airConditioning": "**No confirmed AC**.",
+      "seating": "Indoor-style dining and outdoor seating.",
+      "nearby": [
+        "Chalok Baan Kao Bay",
+        "Shark Bay",
+        "Freedom Beach",
+        "John-Suwan Viewpoint",
+        "Taa Toh Lagoon."
+      ],
+      "localFacts": "• The business originated on Koh Tao and now also operates on Koh Phangan. • It supplies pastries, breads and desserts wholesale to other hospitality businesses. citeturn2search28",
+      "media": {
+        "heroImage": "",
+        "logo": "",
+        "gallery": []
+      },
+      "aiSummary": "Croissant & Ko: An all-day French-influenced bakery and restaurant in Chalok, producing pastries, breads, cakes, gelato and savoury meals. It is broader than a traditional café, extending from breakfast and coffee through pizza, pasta, burgers, wine and late-night delivery. citeturn2search28turn9search5 Best known for Fresh croissants, French-style bread and unusually long bakery service hours.. Signature recommendation: Butter croissant, pain au chocolat, baguette sandwich, homemade gelato and coconut coffee..",
+      "aiKeywords": [
+        "bakery",
+        "breakfast",
+        "coffee",
+        "french",
+        "gelato",
+        "pizza",
+        "pasta",
+        "all-day dining",
+        "delivery."
+      ],
+      "lastVerified": "2026-08-05"
+    }
+  ]
+}

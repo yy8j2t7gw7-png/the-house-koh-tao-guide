@@ -34,3 +34,9 @@
 .restaurant-gallery img{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:18px;scroll-snap-align:start}
 .detail-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:22px}
 @media(max-width:760px){.restaurant-grid{grid-template-columns:1fr}.restaurant-detail-hero{min-height:290px}.restaurant-detail-title{padding:22px}.place-section{padding:18px}}
+
+.our-pick-box{background:#f3eef8;border-color:#e2d8ec}
+.our-pick-box p{font-size:18px;font-weight:800;color:var(--green);margin-bottom:0}
+.menu-links{display:flex;flex-wrap:wrap;gap:10px}
+.restaurant-card-fallback{padding:22px;text-align:center;background:radial-gradient(circle at 30% 20%,rgba(255,255,255,.18),transparent 35%),linear-gradient(135deg,#183b34,#4f806f)}
+.restaurant-card-fallback::after{content:'Photos coming soon';position:absolute;left:0;right:0;bottom:18px;font-size:12px;letter-spacing:.04em;text-transform:uppercase;opacity:.72}

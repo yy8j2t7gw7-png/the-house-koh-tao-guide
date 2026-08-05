@@ -21,9 +21,14 @@
  const hero=p.media.heroImage?`<img src="${p.media.heroImage}" alt="${p.name}">`:'';
  const gallery=p.media.gallery.length?p.media.gallery.map((src,i)=>`<img src="${src}" alt="${p.name} photo ${i+1}">`).join(''):'<div class="menu-notice">Photos are being prepared for this recommendation.</div>';
  const perfect=p.content.perfectFor.map(x=>`<span class="perfect-pill">${x}</span>`).join('');
- const menu=p.menu.type==='none'
-   ?`<div class="menu-notice">${p.menu.note||'A menu is not currently available.'}</div>`
-   :`<a class="btn" href="${p.menu.url}" target="_blank" rel="noopener">Menu</a>`;
+ const menu=renderMenu(p.menu);
+ function renderMenu(menu){
+   if(!menu||menu.type==='none') return `<div class="menu-notice">${menu?.note||'Menu details will be added when an official menu is available.'}</div>`;
+   if(menu.type==='images'&&Array.isArray(menu.items)&&menu.items.length) return `<div class="restaurant-gallery">${menu.items.map((src,i)=>`<img src="${src}" alt="${p.name} menu page ${i+1}">`).join('')}</div>`;
+   if((menu.type==='pdf'||menu.type==='website')&&menu.url) return `<a class="btn" href="${menu.url}" target="_blank" rel="noopener">Open Menu</a>`;
+   if(menu.type==='multiple'&&Array.isArray(menu.items)&&menu.items.length) return `<div class="menu-links">${menu.items.map(item=>`<a class="btn secondary" href="${item.url}" target="_blank" rel="noopener">${item.label||'Menu'}</a>`).join('')}</div>`;
+   return '<div class="menu-notice">Menu details will be added when available.</div>';
+ }
  const actions=[];
  if(p.actions.showReservation&&p.contact.reservation)actions.push(`<a class="btn" href="${p.contact.reservation}" target="_blank" rel="noopener">Request a Reservation</a>`);
  if(p.actions.showCall&&p.contact.phone)actions.push(`<a class="btn secondary" href="tel:${p.contact.phone}" data-action="call">Call</a>`);
@@ -34,6 +39,7 @@
  <section class="place-section"><h2>About</h2><p>${p.content.about}</p></section>
  <section class="place-section recommendation-box"><h2>Our Recommendation</h2><p>${p.content.recommendation}</p></section>
  <section class="place-section local-tip-box"><h2>Local Tip</h2><p>${p.content.localTip}</p></section>
+ <section class="place-section our-pick-box"><h2>Our Pick</h2><p>${p.ourPick||'Ask the team what they recommend today.'}</p></section>
  <section class="place-section"><h2>Perfect For</h2><div class="perfect-for">${perfect}</div></section>
  <section class="place-section"><div class="media-tabs"><button class="media-tab is-active" data-tab="gallery">Gallery</button><button class="media-tab" data-tab="menu">Menu</button></div>
  <div class="media-panel" data-panel="gallery"><div class="restaurant-gallery">${gallery}</div></div>

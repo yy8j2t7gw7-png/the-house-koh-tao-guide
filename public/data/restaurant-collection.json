@@ -31,6 +31,7 @@
     "About",
     "Our Recommendation",
     "Local Tip",
+    "Our Pick",
     "Perfect For",
     "Gallery",
     "Menu",
@@ -49,5 +50,6 @@
     "map": "Open Map",
     "website": "Visit Website",
     "booking": "Book with Us"
-  }
+  },
+  "editorialStatus": "All 20 restaurant entries completed; visual assets and official menus pending."
 }

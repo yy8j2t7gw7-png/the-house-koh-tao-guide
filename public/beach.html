@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow"><meta name="description" content="Koh Tao beach details from The House Guide">
+<title>Beach | The House Guide</title><link rel="icon" href="/logo.svg">
+<link rel="stylesheet" href="/design-system.css"><link rel="stylesheet" href="/beach-experience.css"><link rel="stylesheet" href="/ai-concierge.css">
+</head><body><div class="shell">
+<header class="topbar"><a class="brand" href="/"><img src="/logo.svg" alt="The House Koh Tao"></a>
+<nav class="nav"><a href="/rooms.html">Your Room</a><a href="/house.html">The House</a><a href="/practical.html">Guest Information</a><a href="/explore.html">Explore</a><a href="/emergency.html">Help & Emergency</a><a href="/checkout.html">Departure</a></nav></header>
+<section class="section"><a class="back-link" href="/beaches.html">← Back to beaches</a><div id="beachDetail"></div></section>
+<footer class="footer">The House Guide · Beach details.</footer></div>
+<a class="float-wa" data-link="houseWhatsapp" target="_blank" rel="noopener" data-action="contact">Contact Us</a>
+<script src="/contacts.js"></script><script src="/guide-app.js"></script>
+<script>
+(async function(){
+ const id=new URLSearchParams(location.search).get('id'), root=document.getElementById('beachDetail');
+ const response=await fetch('/data/beaches.json',{cache:'no-store'}), db=await response.json();
+ const x=db.beaches.find(v=>v.id===id);
+ if(!x){root.innerHTML='<h1>Beach not found</h1><div class="btns"><a class="btn" href="/beaches.html">Back to Beaches</a></div>';return}
+ document.title=`${x.name} | The House Guide`;
+ const hero=x.media.heroImage?`<img src="${x.media.heroImage}" alt="${x.name}">`:'';
+ const gallery=x.media.gallery.length?x.media.gallery.map((src,i)=>`<img src="${src}" alt="${x.name} photo ${i+1}">`).join(''):'<div class="beach-gallery-placeholder">Photos will be added here later.</div>';
+ const perfect=x.perfectFor.map(v=>`<span class="perfect-pill">${v}</span>`).join('');
+ root.innerHTML=`
+ <div class="beach-detail-hero">${hero}<div class="beach-detail-overlay"></div><div class="beach-detail-title"><div>${x.area}</div><h1>${x.name}</h1><p>${x.cardDescription}</p></div></div>
+ <section class="beach-section"><h2>About</h2><p>${x.about}</p></section>
+ <section class="beach-section beach-recommendation"><h2>Our Recommendation</h2><p>${x.recommendation}</p></section>
+ <section class="beach-section beach-tip"><h2>Local Tip</h2><p>${x.localTip}</p></section>
+ <section class="beach-section"><h2>Perfect For</h2><div class="perfect-for">${perfect}</div></section>
+ <section class="beach-section"><h2>Access</h2><p>${x.access}</p></section>
+ <section class="beach-section beach-safety"><h2>Conditions & Safety</h2><p>${x.conditions}</p><p>Sea conditions, access arrangements and charges can change. Check locally before travelling and never enter the water when conditions exceed your ability.</p></section>
+ <section class="beach-section"><h2>Gallery</h2><div class="beach-gallery">${gallery}</div></section>
+ <div class="beach-actions"><a class="btn" href="${x.map}" target="_blank" rel="noopener">Open Map</a></div>`;
+})();
+</script>
+<script src="/module-registry.js"></script><script src="/platform-actions.js"></script><script src="/platform-action-runtime.js"></script>
+<script src="/ai-concierge-config.js"></script><script src="/ai-concierge.js"></script></body></html>

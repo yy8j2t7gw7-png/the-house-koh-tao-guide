@@ -2,7 +2,7 @@ window.GUEST_GUIDE_MODULES = {
   "platform": {
     "name": "Guest Guide Platform with AI Concierge",
     "client": "The House – Koh Tao",
-    "version": "4.7.1"
+    "version": "4.8.0"
   },
   "modules": {
     "house": {

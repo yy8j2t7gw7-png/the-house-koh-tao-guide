@@ -1,0 +1,34 @@
+
+.beach-notice{padding:16px 18px;border-left:4px solid var(--green);border-radius:14px;background:#edf6f2;margin:18px 0;color:var(--text)}
+.beach-filters{display:flex;gap:8px;overflow-x:auto;padding:4px 0 14px;scrollbar-width:none}
+.beach-filters::-webkit-scrollbar{display:none}
+.beach-filter{flex:0 0 auto;border:1px solid var(--line);background:#fff;color:var(--green);padding:9px 13px;border-radius:999px;font:inherit;font-weight:800;cursor:pointer}
+.beach-filter.is-active{background:var(--green);color:#fff;border-color:var(--green)}
+.beach-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+.beach-card{overflow:hidden;border:1px solid var(--line);border-radius:24px;background:#fff;box-shadow:var(--shadow);transition:transform .2s ease,box-shadow .2s ease}
+.beach-card:hover{transform:translateY(-3px);box-shadow:var(--shadow-hover)}
+.beach-card-media{position:relative;aspect-ratio:16/10;overflow:hidden;background:linear-gradient(135deg,#176b72,#66a69c)}
+.beach-card-media img{width:100%;height:100%;object-fit:cover}
+.beach-card-fallback{position:absolute;inset:0;display:grid;place-items:center;font-size:54px;color:#fff}
+.beach-card-body{padding:18px}
+.beach-card h2{margin:0 0 7px;font-size:23px}
+.beach-card p{margin:0 0 13px;color:var(--muted)}
+.beach-area{font-size:13px;font-weight:800;color:var(--green);margin-bottom:8px}
+.beach-detail-hero{position:relative;min-height:340px;border-radius:28px;overflow:hidden;background:linear-gradient(135deg,#176b72,#66a69c);display:flex;align-items:flex-end}
+.beach-detail-hero img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.beach-detail-overlay{position:absolute;inset:0;background:linear-gradient(180deg,rgba(8,24,20,.04),rgba(8,24,20,.78))}
+.beach-detail-title{position:relative;z-index:1;padding:28px;color:#fff}
+.beach-detail-title h1{margin:0 0 6px;color:#fff}
+.beach-detail-title p{margin:0;color:rgba(255,255,255,.9)}
+.beach-section{margin-top:22px;padding:22px;border:1px solid var(--line);border-radius:22px;background:#fff}
+.beach-section h2{margin-top:0}
+.beach-recommendation{background:#edf6f2}
+.beach-tip{background:#fff8e9}
+.beach-safety{background:#f8eeee;border-color:#e7cccc}
+.perfect-for{display:flex;flex-wrap:wrap;gap:9px}
+.perfect-pill{padding:9px 12px;border-radius:999px;background:#edf6f2;color:var(--green);font-weight:800;font-size:14px}
+.beach-gallery{display:grid;grid-auto-flow:column;grid-auto-columns:min(82%,520px);gap:12px;overflow-x:auto;scroll-snap-type:x mandatory;padding-bottom:8px}
+.beach-gallery img{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:18px;scroll-snap-align:start}
+.beach-gallery-placeholder{min-height:220px;border-radius:18px;background:linear-gradient(135deg,#edf6f2,#d9ebe6);display:grid;place-items:center;text-align:center;padding:24px;color:var(--green);font-weight:800}
+.beach-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:22px}
+@media(max-width:760px){.beach-grid{grid-template-columns:1fr}.beach-detail-hero{min-height:290px}.beach-detail-title{padding:22px}.beach-section{padding:18px}}

@@ -1,0 +1,885 @@
+{
+  "schemaVersion": "1.0.0",
+  "property": "The House – Koh Tao",
+  "editorialPolicy": {
+    "rankingsEnabled": false,
+    "ratingsEnabled": false,
+    "safetyNote": "Conditions, access and fees can change. Guests should check locally before travelling."
+  },
+  "beaches": [
+    {
+      "id": "sairee-beach",
+      "name": "Sairee Beach",
+      "area": "West coast",
+      "categories": [
+        "Sunset",
+        "Easy Access",
+        "Restaurants Nearby",
+        "Social"
+      ],
+      "cardDescription": "Koh Tao’s longest and liveliest beach, known for west-coast sunsets, easy access and plenty of places to eat and drink.",
+      "about": "Sairee Beach is the island’s main west-coast beach and the easiest choice when you want a full beach day without travelling far. The long shoreline is backed by restaurants, cafés, dive centres and bars, while the evening sunset is one of Koh Tao’s best-known daily rituals.",
+      "recommendation": "Choose Sairee for convenience, atmosphere and sunset. It works especially well for guests who want to combine swimming and relaxing with food, drinks or an evening in the island’s busiest village.",
+      "localTip": "The beach changes character through the day. Visit earlier for a quieter walk or swim, then return near sunset for the atmosphere.",
+      "perfectFor": [
+        "Sunset",
+        "First beach day",
+        "Restaurants nearby",
+        "Easy access",
+        "Social atmosphere"
+      ],
+      "access": "Easy road and walking access from Sairee village.",
+      "conditions": "The water is generally shallow close to shore. Conditions and visibility vary with weather and tide.",
+      "type": "beach",
+      "status": "active",
+      "featured": true,
+      "displayOrder": 1,
+      "media": {
+        "heroImage": "",
+        "gallery": []
+      },
+      "map": "https://www.google.com/maps/search/?api=1&query=Sairee+Beach+Koh+Tao",
+      "aiSummary": "Sairee Beach is recommended for sunset, first beach day, restaurants nearby, easy access, social atmosphere. The beach changes character through the day. Visit earlier for a quieter walk or swim, then return near sunset for the atmosphere.",
+      "aiKeywords": [
+        "sunset",
+        "easy access",
+        "restaurants nearby",
+        "social",
+        "sunset",
+        "first beach day",
+        "restaurants nearby",
+        "easy access",
+        "social atmosphere"
+      ],
+      "lastVerified": "2026-08-05"
+    },
+    {
+      "id": "mae-haad-bay",
+      "name": "Mae Haad Bay",
+      "area": "West coast and ferry village",
+      "categories": [
+        "Easy Access",
+        "Snorkelling",
+        "Pier Area",
+        "Convenient"
+      ],
+      "cardDescription": "The island’s ferry gateway, with convenient swimming areas, restaurants and a small wreck that attracts snorkellers.",
+      "about": "Mae Haad is best known as Koh Tao’s arrival point, but the bay also has useful stretches of beach on either side of the piers. It is one of the easiest places to combine a swim with practical errands, lunch or a ferry-day schedule.",
+      "recommendation": "Mae Haad is not the island’s most secluded bay, but it is one of the most practical. It is a good choice when you want an uncomplicated swim close to town or have limited time before departure.",
+      "localTip": "Stay clear of ferry traffic and use the quieter beach sections away from the active piers.",
+      "perfectFor": [
+        "Arrival or departure day",
+        "Convenience",
+        "Short visit",
+        "Nearby food",
+        "Easy access"
+      ],
+      "access": "Very easy access from Mae Haad village.",
+      "conditions": "Boat traffic is active near the piers. Swim only in suitable areas away from ferry movements.",
+      "type": "beach",
+      "status": "active",
+      "featured": true,
+      "displayOrder": 2,
+      "media": {
+        "heroImage": "",
+        "gallery": []
+      },
+      "map": "https://www.google.com/maps/search/?api=1&query=Mae+Haad+Bay+Koh+Tao",
+      "aiSummary": "Mae Haad Bay is recommended for arrival or departure day, convenience, short visit, nearby food, easy access. Stay clear of ferry traffic and use the quieter beach sections away from the active piers.",
+      "aiKeywords": [
+        "easy access",
+        "snorkelling",
+        "pier area",
+        "convenient",
+        "arrival or departure day",
+        "convenience",
+        "short visit",
+        "nearby food",
+        "easy access"
+      ],
+      "lastVerified": "2026-08-05"
+    },
+    {
+      "id": "chalok-baan-kao-bay",
+      "name": "Chalok Baan Kao Bay",
+      "area": "South coast",
+      "categories": [
+        "Relaxed",
+        "Shallow Water",
+        "Families",
+        "Restaurants Nearby"
+      ],
+      "cardDescription": "A wide, laid-back southern bay with shallow water and a quieter village atmosphere.",
+      "about": "Chalok Baan Kao is a broad south-coast bay backed by one of Koh Tao’s quieter villages. The water is often shallow, and the surrounding area provides restaurants, cafés, accommodation and access to several smaller beaches.",
+      "recommendation": "Choose Chalok when you want a relaxed village beach rather than Sairee’s energy. It is particularly convenient for guests staying in the south or planning to combine several nearby beaches in one day.",
+      "localTip": "Low tide can make the bay very shallow. It is better for relaxing and walking than serious swimming at certain times.",
+      "perfectFor": [
+        "Relaxed afternoon",
+        "Families",
+        "South-island exploring",
+        "Shallow water",
+        "Nearby cafés"
+      ],
+      "access": "Easy road access through Chalok village.",
+      "conditions": "Water depth changes noticeably with the tide.",
+      "type": "beach",
+      "status": "active",
+      "featured": true,
+      "displayOrder": 3,
+      "media": {
+        "heroImage": "",
+        "gallery": []
+      },
+      "map": "https://www.google.com/maps/search/?api=1&query=Chalok+Baan+Kao+Bay+Koh+Tao",
+      "aiSummary": "Chalok Baan Kao Bay is recommended for relaxed afternoon, families, south-island exploring, shallow water, nearby cafés. Low tide can make the bay very shallow. It is better for relaxing and walking than serious swimming at certain times.",
+      "aiKeywords": [
+        "relaxed",
+        "shallow water",
+        "families",
+        "restaurants nearby",
+        "relaxed afternoon",
+        "families",
+        "south-island exploring",
+        "shallow water",
+        "nearby cafés"
+      ],
+      "lastVerified": "2026-08-05"
+    },
+    {
+      "id": "freedom-beach",
+      "name": "Freedom Beach",
+      "area": "Southern tip",
+      "categories": [
+        "Scenic",
+        "Swimming",
+        "Relaxed",
+        "Popular"
+      ],
+      "cardDescription": "A compact, picturesque southern beach shaded by trees and connected to coastal walking paths.",
+      "about": "Freedom Beach is a small, attractive cove at Koh Tao’s southern end. Its clear water, shady edge and dramatic coastal surroundings make it one of the island’s most photographed beach stops.",
+      "recommendation": "Freedom Beach is ideal when you want a beautiful, manageable beach rather than a long open shoreline. It combines well with nearby Taa Toh, Chalok Bay and the southern viewpoints.",
+      "localTip": "Arrive earlier for a quieter experience. Access or parking charges may apply, so carry some cash.",
+      "perfectFor": [
+        "Swimming",
+        "Couples",
+        "Photography",
+        "Southern beach day",
+        "Shade"
+      ],
+      "access": "Road access followed by a short walk. Fees may apply.",
+      "conditions": "The beach is small and can feel busy at popular times.",
+      "type": "beach",
+      "status": "active",
+      "featured": true,
+      "displayOrder": 4,
+      "media": {
+        "heroImage": "",
+        "gallery": []
+      },
+      "map": "https://www.google.com/maps/search/?api=1&query=Freedom+Beach+Koh+Tao",
+      "aiSummary": "Freedom Beach is recommended for swimming, couples, photography, southern beach day, shade. Arrive earlier for a quieter experience. Access or parking charges may apply, so carry some cash.",
+      "aiKeywords": [
+        "scenic",
+        "swimming",
+        "relaxed",
+        "popular",
+        "swimming",
+        "couples",
+        "photography",
+        "southern beach day",
+        "shade"
+      ],
+      "lastVerified": "2026-08-05"
+    },
+    {
+      "id": "taa-toh-beach",
+      "name": "Taa Toh Beach",
+      "area": "South coast",
+      "categories": [
+        "Small Cove",
+        "Relaxed",
+        "Swimming",
+        "Scenic"
+      ],
+      "cardDescription": "A small southern cove that pairs naturally with Freedom Beach and the coastal trail.",
+      "about": "Taa Toh is a small beach tucked into Koh Tao’s southern coastline. It feels more intimate than the island’s larger bays and is best enjoyed as part of a relaxed southern beach-hopping day.",
+      "recommendation": "Visit Taa Toh when you prefer compact coves and coastal scenery. It is particularly useful as a second stop rather than an entire day’s destination.",
+      "localTip": "Combine it with Freedom Beach and the nearby coastal paths instead of making a separate trip.",
+      "perfectFor": [
+        "Beach hopping",
+        "Couples",
+        "Quiet break",
+        "Swimming",
+        "Coastal walks"
+      ],
+      "access": "Reached from the southern road and footpaths.",
+      "conditions": "Space is limited and access conditions can change.",
+      "type": "beach",
+      "status": "active",
+      "featured": true,
+      "displayOrder": 5,
+      "media": {
+        "heroImage": "",
+        "gallery": []
+      },
+      "map": "https://www.google.com/maps/search/?api=1&query=Taa+Toh+Beach+Koh+Tao",
+      "aiSummary": "Taa Toh Beach is recommended for beach hopping, couples, quiet break, swimming, coastal walks. Combine it with Freedom Beach and the nearby coastal paths instead of making a separate trip.",
+      "aiKeywords": [
+        "small cove",
+        "relaxed",
+        "swimming",
+        "scenic",
+        "beach hopping",
+        "couples",
+        "quiet break",
+        "swimming",
+        "coastal walks"
+      ],
+      "lastVerified": "2026-08-05"
+    },
+    {
+      "id": "shark-bay",
+      "name": "Shark Bay (Thian Og)",
+      "area": "Southeast coast",
+      "categories": [
+        "Snorkelling",
+        "Marine Life",
+        "Scenic",
+        "Swimming"
+      ],
+      "cardDescription": "A pale-sand bay known for snorkelling opportunities and the possibility of seeing blacktip reef sharks and turtles.",
+      "about": "Shark Bay, also called Thian Og Bay, is one of Koh Tao’s best-known snorkelling locations. The broad bay combines pale sand and clear water with the possibility of encountering blacktip reef sharks and sea turtles in their natural environment.",
+      "recommendation": "Choose Shark Bay when marine life is your priority. Wildlife sightings are never guaranteed, but the bay offers one of the island’s most distinctive snorkelling experiences when conditions are calm.",
+      "localTip": "Go early, move quietly and keep a respectful distance from all wildlife. Never chase, touch or feed turtles or sharks.",
+      "perfectFor": [
+        "Snorkelling",
+        "Marine life",
+        "Strong swimmers",
+        "Scenic bay",
+        "Early mornings"
+      ],
+      "access": "Access varies by route and may pass through resort property. Fees may apply.",
+      "conditions": "Snorkelling quality depends on wind, waves and visibility. Wildlife sightings are not guaranteed.",
+      "type": "beach",
+      "status": "active",
+      "featured": true,
+      "displayOrder": 6,
+      "media": {
+        "heroImage": "",
+        "gallery": []
+      },
+      "map": "https://www.google.com/maps/search/?api=1&query=Shark+Bay+%28Thian+Og%29+Koh+Tao",
+      "aiSummary": "Shark Bay (Thian Og) is recommended for snorkelling, marine life, strong swimmers, scenic bay, early mornings. Go early, move quietly and keep a respectful distance from all wildlife. Never chase, touch or feed turtles or sharks.",
+      "aiKeywords": [
+        "snorkelling",
+        "marine life",
+        "scenic",
+        "swimming",
+        "snorkelling",
+        "marine life",
+        "strong swimmers",
+        "scenic bay",
+        "early mornings"
+      ],
+      "lastVerified": "2026-08-05"
+    },
+    {
+      "id": "aow-leuk-bay",
+      "name": "Aow Leuk Bay",
+      "area": "Southeast coast",
+      "categories": [
+        "Snorkelling",
+        "Swimming",
+        "Scenic",
+        "Popular"
+      ],
+      "cardDescription": "A wide turquoise bay with easy shore snorkelling and a classic tropical-beach setting.",
+      "about": "Aow Leuk is one of Koh Tao’s most recognisable bays, framed by green hills and granite rocks. Its broad beach and accessible water make it popular for swimming, snorkelling and beginner underwater experiences when conditions are suitable.",
+      "recommendation": "Aow Leuk is one of the strongest all-round choices for guests who want a scenic beach and straightforward snorkelling from shore.",
+      "localTip": "Carry cash because an access fee may apply. Check the sea before entering, as the southeast coast can become rough in certain winds.",
+      "perfectFor": [
+        "Swimming",
+        "Snorkelling",
+        "First-time visitors",
+        "Scenic beach",
+        "Half-day trip"
+      ],
+      "access": "Road access with a walk to the beach. Fees may apply.",
+      "conditions": "Avoid entering when waves or currents look uncomfortable.",
+      "type": "beach",
+      "status": "active",
+      "featured": true,
+      "displayOrder": 7,
+      "media": {
+        "heroImage": "",
+        "gallery": []
+      },
+      "map": "https://www.google.com/maps/search/?api=1&query=Aow+Leuk+Bay+Koh+Tao",
+      "aiSummary": "Aow Leuk Bay is recommended for swimming, snorkelling, first-time visitors, scenic beach, half-day trip. Carry cash because an access fee may apply. Check the sea before entering, as the southeast coast can become rough in certain winds.",
+      "aiKeywords": [
+        "snorkelling",
+        "swimming",
+        "scenic",
+        "popular",
+        "swimming",
+        "snorkelling",
+        "first-time visitors",
+        "scenic beach",
+        "half-day trip"
+      ],
+      "lastVerified": "2026-08-05"
+    },
+    {
+      "id": "tanote-bay",
+      "name": "Tanote Bay",
+      "area": "East coast",
+      "categories": [
+        "Snorkelling",
+        "Adventure",
+        "Swimming",
+        "Scenic"
+      ],
+      "cardDescription": "An adventurous east-coast bay known for clear water, granite boulders and energetic snorkelling.",
+      "about": "Tanote Bay is a dramatic east-coast beach surrounded by hills and large granite rocks. It is popular with snorkellers and confident swimmers, and its boulder-strewn setting gives it a more adventurous character than the west-coast beaches.",
+      "recommendation": "Choose Tanote when you want active time in the water and a more rugged setting. It is one of Koh Tao’s most memorable bays when the east coast is calm.",
+      "localTip": "The road is steep in places. Take a taxi if you are not an experienced scooter rider, and never jump from rocks unless you have independently checked current safety conditions.",
+      "perfectFor": [
+        "Snorkelling",
+        "Adventure",
+        "Confident swimmers",
+        "Photography",
+        "East-coast exploring"
+      ],
+      "access": "Steep road access; taxi recommended for inexperienced riders.",
+      "conditions": "East-coast conditions can change quickly. Check wind and waves before travelling.",
+      "type": "beach",
+      "status": "active",
+      "featured": true,
+      "displayOrder": 8,
+      "media": {
+        "heroImage": "",
+        "gallery": []
+      },
+      "map": "https://www.google.com/maps/search/?api=1&query=Tanote+Bay+Koh+Tao",
+      "aiSummary": "Tanote Bay is recommended for snorkelling, adventure, confident swimmers, photography, east-coast exploring. The road is steep in places. Take a taxi if you are not an experienced scooter rider, and never jump from rocks unless you have independently checked current safety conditions.",
+      "aiKeywords": [
+        "snorkelling",
+        "adventure",
+        "swimming",
+        "scenic",
+        "snorkelling",
+        "adventure",
+        "confident swimmers",
+        "photography",
+        "east-coast exploring"
+      ],
+      "lastVerified": "2026-08-05"
+    },
+    {
+      "id": "hin-wong-bay",
+      "name": "Hin Wong Bay",
+      "area": "Northeast coast",
+      "categories": [
+        "Snorkelling",
+        "Rocky Bay",
+        "Remote",
+        "Marine Life"
+      ],
+      "cardDescription": "A rocky northeast bay with granite formations and rewarding snorkelling in calm conditions.",
+      "about": "Hin Wong Bay has a rugged coastline of granite rocks rather than a broad sandy beach. Its clear water and underwater life make it appealing to confident snorkellers who prefer less conventional beach settings.",
+      "recommendation": "Visit Hin Wong for snorkelling and scenery, not for a classic day on soft sand. It is best suited to guests comfortable with rocky entries and deeper water.",
+      "localTip": "Reef shoes can make the rocky entry more comfortable. Avoid the trip when the northeast coast is windy or rough.",
+      "perfectFor": [
+        "Snorkelling",
+        "Confident swimmers",
+        "Rocky scenery",
+        "Quiet escape",
+        "Marine life"
+      ],
+      "access": "Steep road access; entry to the water can be rocky.",
+      "conditions": "Only enter when the bay is calm and visibility is suitable.",
+      "type": "beach",
+      "status": "active",
+      "featured": false,
+      "displayOrder": 9,
+      "media": {
+        "heroImage": "",
+        "gallery": []
+      },
+      "map": "https://www.google.com/maps/search/?api=1&query=Hin+Wong+Bay+Koh+Tao",
+      "aiSummary": "Hin Wong Bay is recommended for snorkelling, confident swimmers, rocky scenery, quiet escape, marine life. Reef shoes can make the rocky entry more comfortable. Avoid the trip when the northeast coast is windy or rough.",
+      "aiKeywords": [
+        "snorkelling",
+        "rocky bay",
+        "remote",
+        "marine life",
+        "snorkelling",
+        "confident swimmers",
+        "rocky scenery",
+        "quiet escape",
+        "marine life"
+      ],
+      "lastVerified": "2026-08-05"
+    },
+    {
+      "id": "mango-bay",
+      "name": "Mango Bay",
+      "area": "North coast",
+      "categories": [
+        "Remote",
+        "Snorkelling",
+        "Boat Trip",
+        "Scenic"
+      ],
+      "cardDescription": "A remote northern bay with clear water and snorkelling, commonly reached by boat.",
+      "about": "Mango Bay sits on Koh Tao’s remote north coast. The sheltered-looking bay, granite surroundings and clear water have long made it a stop on snorkelling and island boat trips.",
+      "recommendation": "Mango Bay is a good choice when you want to reach a more remote part of Koh Tao without relying on a difficult road journey. It fits naturally into a round-island boat day.",
+      "localTip": "Boat access is usually the simplest option. Confirm any landing or access charges with your operator.",
+      "perfectFor": [
+        "Boat trips",
+        "Snorkelling",
+        "Remote scenery",
+        "Half-day adventure",
+        "Photography"
+      ],
+      "access": "Boat access is generally easiest; land access can be difficult.",
+      "conditions": "Access and snorkelling depend on weather and sea conditions.",
+      "type": "beach",
+      "status": "active",
+      "featured": false,
+      "displayOrder": 10,
+      "media": {
+        "heroImage": "",
+        "gallery": []
+      },
+      "map": "https://www.google.com/maps/search/?api=1&query=Mango+Bay+Koh+Tao",
+      "aiSummary": "Mango Bay is recommended for boat trips, snorkelling, remote scenery, half-day adventure, photography. Boat access is usually the simplest option. Confirm any landing or access charges with your operator.",
+      "aiKeywords": [
+        "remote",
+        "snorkelling",
+        "boat trip",
+        "scenic",
+        "boat trips",
+        "snorkelling",
+        "remote scenery",
+        "half-day adventure",
+        "photography"
+      ],
+      "lastVerified": "2026-08-05"
+    },
+    {
+      "id": "sai-daeng-beach",
+      "name": "Sai Daeng Beach",
+      "area": "Southeast coast",
+      "categories": [
+        "Snorkelling",
+        "Scenic",
+        "Relaxed",
+        "Marine Life"
+      ],
+      "cardDescription": "A scenic southeast beach with offshore views and snorkelling access when the sea is calm.",
+      "about": "Sai Daeng is a smaller southeast-coast beach with views towards Shark Island. It offers a relaxed resort-beach atmosphere and can provide enjoyable snorkelling in suitable conditions.",
+      "recommendation": "Choose Sai Daeng if you want a quieter southeast-coast alternative with attractive views and the option to snorkel from shore.",
+      "localTip": "The open-water route towards Shark Island is only for highly experienced swimmers in safe conditions. Most guests should remain close to shore.",
+      "perfectFor": [
+        "Snorkelling",
+        "Quiet beach time",
+        "Scenic views",
+        "Couples",
+        "Half-day trip"
+      ],
+      "access": "Road and resort access; confirm current conditions and any fees.",
+      "conditions": "The southeast coast may be exposed to wind and waves.",
+      "type": "beach",
+      "status": "active",
+      "featured": false,
+      "displayOrder": 11,
+      "media": {
+        "heroImage": "",
+        "gallery": []
+      },
+      "map": "https://www.google.com/maps/search/?api=1&query=Sai+Daeng+Beach+Koh+Tao",
+      "aiSummary": "Sai Daeng Beach is recommended for snorkelling, quiet beach time, scenic views, couples, half-day trip. The open-water route towards Shark Island is only for highly experienced swimmers in safe conditions. Most guests should remain close to shore.",
+      "aiKeywords": [
+        "snorkelling",
+        "scenic",
+        "relaxed",
+        "marine life",
+        "snorkelling",
+        "quiet beach time",
+        "scenic views",
+        "couples",
+        "half-day trip"
+      ],
+      "lastVerified": "2026-08-05"
+    },
+    {
+      "id": "sai-nuan-beach",
+      "name": "Sai Nuan Beach",
+      "area": "Southwest coast",
+      "categories": [
+        "Quiet",
+        "Relaxed",
+        "Snorkelling",
+        "Old Koh Tao"
+      ],
+      "cardDescription": "A quieter southwest beach with a relaxed, old-island atmosphere and simple shore snorkelling.",
+      "about": "Sai Nuan is a small southwest-coast beach known for its easygoing atmosphere and more traditional Koh Tao feel. It is a welcome contrast to the island’s developed village beaches.",
+      "recommendation": "Sai Nuan suits guests who value simplicity, shade and a slower beach experience over extensive facilities.",
+      "localTip": "Wear suitable footwear for the walk and bring what you need, as services can be limited.",
+      "perfectFor": [
+        "Quiet time",
+        "Couples",
+        "Relaxed snorkelling",
+        "Walking",
+        "Old Koh Tao atmosphere"
+      ],
+      "access": "Usually reached by walking trail or boat; route conditions may vary.",
+      "conditions": "Facilities and access can change, so confirm locally before setting out.",
+      "type": "beach",
+      "status": "active",
+      "featured": false,
+      "displayOrder": 12,
+      "media": {
+        "heroImage": "",
+        "gallery": []
+      },
+      "map": "https://www.google.com/maps/search/?api=1&query=Sai+Nuan+Beach+Koh+Tao",
+      "aiSummary": "Sai Nuan Beach is recommended for quiet time, couples, relaxed snorkelling, walking, old koh tao atmosphere. Wear suitable footwear for the walk and bring what you need, as services can be limited.",
+      "aiKeywords": [
+        "quiet",
+        "relaxed",
+        "snorkelling",
+        "old koh tao",
+        "quiet time",
+        "couples",
+        "relaxed snorkelling",
+        "walking",
+        "old koh tao atmosphere"
+      ],
+      "lastVerified": "2026-08-05"
+    },
+    {
+      "id": "june-juea-bay",
+      "name": "June Juea Bay",
+      "area": "Southwest coast",
+      "categories": [
+        "Quiet",
+        "Sunset",
+        "Remote",
+        "Scenic"
+      ],
+      "cardDescription": "A small southwest bay valued for quiet surroundings and west-facing evening light.",
+      "about": "June Juea is a compact southwest-coast bay that feels removed from Koh Tao’s busy villages. Its position makes it appealing for a peaceful afternoon and late-day light.",
+      "recommendation": "Visit June Juea when your priority is quiet rather than facilities. It works best for guests who are comfortable exploring smaller, less serviced bays.",
+      "localTip": "Confirm the current access route before travelling and bring water, cash and suitable footwear.",
+      "perfectFor": [
+        "Quiet afternoon",
+        "Sunset",
+        "Couples",
+        "Remote feel",
+        "Photography"
+      ],
+      "access": "Access may involve resort paths, walking or boat transport.",
+      "conditions": "Services are limited and access can change.",
+      "type": "beach",
+      "status": "active",
+      "featured": false,
+      "displayOrder": 13,
+      "media": {
+        "heroImage": "",
+        "gallery": []
+      },
+      "map": "https://www.google.com/maps/search/?api=1&query=June+Juea+Bay+Koh+Tao",
+      "aiSummary": "June Juea Bay is recommended for quiet afternoon, sunset, couples, remote feel, photography. Confirm the current access route before travelling and bring water, cash and suitable footwear.",
+      "aiKeywords": [
+        "quiet",
+        "sunset",
+        "remote",
+        "scenic",
+        "quiet afternoon",
+        "sunset",
+        "couples",
+        "remote feel",
+        "photography"
+      ],
+      "lastVerified": "2026-08-05"
+    },
+    {
+      "id": "jansom-bay",
+      "name": "Jansom Bay",
+      "area": "Southwest of Mae Haad",
+      "categories": [
+        "Small Cove",
+        "Snorkelling",
+        "Convenient",
+        "Scenic"
+      ],
+      "cardDescription": "A compact private-feeling cove close to Mae Haad, with clear water and rocky surroundings.",
+      "about": "Jansom Bay is a small cove just beyond Mae Haad’s southern edge. Its sheltered shape and rocky setting make it feel surprisingly removed from the ferry village despite the short distance.",
+      "recommendation": "Jansom is useful when you want a smaller, scenic cove without travelling to the far side of the island.",
+      "localTip": "Access rules and charges have changed over time. Confirm locally before visiting and carry cash.",
+      "perfectFor": [
+        "Short trip",
+        "Snorkelling",
+        "Couples",
+        "Near Mae Haad",
+        "Small cove"
+      ],
+      "access": "Access is controlled through private property and may involve a fee.",
+      "conditions": "Confirm that public access is available before making the trip.",
+      "type": "beach",
+      "status": "active",
+      "featured": false,
+      "displayOrder": 14,
+      "media": {
+        "heroImage": "",
+        "gallery": []
+      },
+      "map": "https://www.google.com/maps/search/?api=1&query=Jansom+Bay+Koh+Tao",
+      "aiSummary": "Jansom Bay is recommended for short trip, snorkelling, couples, near mae haad, small cove. Access rules and charges have changed over time. Confirm locally before visiting and carry cash.",
+      "aiKeywords": [
+        "small cove",
+        "snorkelling",
+        "convenient",
+        "scenic",
+        "short trip",
+        "snorkelling",
+        "couples",
+        "near mae haad",
+        "small cove"
+      ],
+      "lastVerified": "2026-08-05"
+    },
+    {
+      "id": "koh-nang-yuan",
+      "name": "Koh Nang Yuan",
+      "area": "Northwest offshore island",
+      "categories": [
+        "Day Trip",
+        "Viewpoint",
+        "Snorkelling",
+        "Iconic"
+      ],
+      "cardDescription": "Koh Tao’s iconic offshore day trip, known for its sandbar, turquoise water and hilltop viewpoint.",
+      "about": "Koh Nang Yuan is a small group of islands connected by a distinctive sandbar just off Koh Tao’s northwest coast. The viewpoint and surrounding water make it one of the area’s most recognisable excursions.",
+      "recommendation": "Choose Nang Yuan for a classic Koh Tao day-trip experience combining a viewpoint, beach time and snorkelling. It is especially worthwhile for first-time visitors.",
+      "localTip": "Go early to enjoy cooler conditions and fewer day-trip groups. Entrance rules, fees and restrictions apply, so follow staff instructions.",
+      "perfectFor": [
+        "First-time visitors",
+        "Viewpoint",
+        "Snorkelling",
+        "Photography",
+        "Day trip"
+      ],
+      "access": "Reached by longtail boat or organised tour. Entrance fees and site rules apply.",
+      "conditions": "The island can become busy and boat service depends on weather.",
+      "type": "beach",
+      "status": "active",
+      "featured": false,
+      "displayOrder": 15,
+      "media": {
+        "heroImage": "",
+        "gallery": []
+      },
+      "map": "https://www.google.com/maps/search/?api=1&query=Koh+Nang+Yuan+Koh+Tao",
+      "aiSummary": "Koh Nang Yuan is recommended for first-time visitors, viewpoint, snorkelling, photography, day trip. Go early to enjoy cooler conditions and fewer day-trip groups. Entrance rules, fees and restrictions apply, so follow staff instructions.",
+      "aiKeywords": [
+        "day trip",
+        "viewpoint",
+        "snorkelling",
+        "iconic",
+        "first-time visitors",
+        "viewpoint",
+        "snorkelling",
+        "photography",
+        "day trip"
+      ],
+      "lastVerified": "2026-08-05"
+    },
+    {
+      "id": "laem-thian",
+      "name": "Laem Thian",
+      "area": "East coast",
+      "categories": [
+        "Remote",
+        "Hiking",
+        "Adventure",
+        "Rocky Coast"
+      ],
+      "cardDescription": "A remote east-coast destination for adventurous visitors prepared for a demanding journey.",
+      "about": "Laem Thian is an isolated east-coast location with rocky scenery and a sense of abandonment that attracts hikers and adventurous island explorers. It is not a conventional serviced beach.",
+      "recommendation": "Laem Thian is only for guests who actively want a remote adventure. It should not be presented as an easy beach outing.",
+      "localTip": "Do not attempt the route alone or late in the day. Confirm trail conditions locally, carry sufficient water and turn back if conditions are uncertain.",
+      "perfectFor": [
+        "Experienced hikers",
+        "Adventure",
+        "Remote scenery",
+        "Photography",
+        "Exploration"
+      ],
+      "access": "Demanding trail or boat access; no simple road approach.",
+      "conditions": "Remote area with limited or no services. Weather and trail conditions are important.",
+      "type": "beach",
+      "status": "active",
+      "featured": false,
+      "displayOrder": 16,
+      "media": {
+        "heroImage": "",
+        "gallery": []
+      },
+      "map": "https://www.google.com/maps/search/?api=1&query=Laem+Thian+Koh+Tao",
+      "aiSummary": "Laem Thian is recommended for experienced hikers, adventure, remote scenery, photography, exploration. Do not attempt the route alone or late in the day. Confirm trail conditions locally, carry sufficient water and turn back if conditions are uncertain.",
+      "aiKeywords": [
+        "remote",
+        "hiking",
+        "adventure",
+        "rocky coast",
+        "experienced hikers",
+        "adventure",
+        "remote scenery",
+        "photography",
+        "exploration"
+      ],
+      "lastVerified": "2026-08-05"
+    },
+    {
+      "id": "lighthouse-bay",
+      "name": "Lighthouse Bay",
+      "area": "North coast",
+      "categories": [
+        "Remote",
+        "Boat Trip",
+        "Snorkelling",
+        "Adventure"
+      ],
+      "cardDescription": "A remote northern bay generally best approached by boat or as part of an adventurous excursion.",
+      "about": "Lighthouse Bay lies on Koh Tao’s remote north coast. It appeals to visitors who want less-developed coastal scenery and are comfortable with limited facilities.",
+      "recommendation": "Treat Lighthouse Bay as an adventure destination rather than a simple beach visit. Boat access is often the most practical choice.",
+      "localTip": "Confirm access and sea conditions with a reputable local operator before leaving.",
+      "perfectFor": [
+        "Boat trips",
+        "Adventure",
+        "Remote scenery",
+        "Snorkelling",
+        "Experienced explorers"
+      ],
+      "access": "Boat access is generally preferable; land routes can be demanding.",
+      "conditions": "No dependable services. Visit only in suitable conditions.",
+      "type": "beach",
+      "status": "active",
+      "featured": false,
+      "displayOrder": 17,
+      "media": {
+        "heroImage": "",
+        "gallery": []
+      },
+      "map": "https://www.google.com/maps/search/?api=1&query=Lighthouse+Bay+Koh+Tao",
+      "aiSummary": "Lighthouse Bay is recommended for boat trips, adventure, remote scenery, snorkelling, experienced explorers. Confirm access and sea conditions with a reputable local operator before leaving.",
+      "aiKeywords": [
+        "remote",
+        "boat trip",
+        "snorkelling",
+        "adventure",
+        "boat trips",
+        "adventure",
+        "remote scenery",
+        "snorkelling",
+        "experienced explorers"
+      ],
+      "lastVerified": "2026-08-05"
+    },
+    {
+      "id": "lang-khai-bay",
+      "name": "Lang Khai Bay",
+      "area": "East coast",
+      "categories": [
+        "Remote",
+        "Rocky Bay",
+        "Snorkelling",
+        "Quiet"
+      ],
+      "cardDescription": "A less-visited east-coast bay with rocky surroundings and a remote atmosphere.",
+      "about": "Lang Khai is one of Koh Tao’s quieter east-coast bays. It has a rugged character and is better suited to confident explorers than guests looking for a fully serviced sandy beach.",
+      "recommendation": "Choose Lang Khai for solitude and east-coast scenery when the sea is calm.",
+      "localTip": "Check the road, access arrangements and wind conditions before setting out.",
+      "perfectFor": [
+        "Quiet escape",
+        "Snorkelling",
+        "Rocky scenery",
+        "Adventure",
+        "Experienced riders"
+      ],
+      "access": "Road access can be steep or difficult and may pass through private property.",
+      "conditions": "Only recommended when east-coast conditions are calm.",
+      "type": "beach",
+      "status": "active",
+      "featured": false,
+      "displayOrder": 18,
+      "media": {
+        "heroImage": "",
+        "gallery": []
+      },
+      "map": "https://www.google.com/maps/search/?api=1&query=Lang+Khai+Bay+Koh+Tao",
+      "aiSummary": "Lang Khai Bay is recommended for quiet escape, snorkelling, rocky scenery, adventure, experienced riders. Check the road, access arrangements and wind conditions before setting out.",
+      "aiKeywords": [
+        "remote",
+        "rocky bay",
+        "snorkelling",
+        "quiet",
+        "quiet escape",
+        "snorkelling",
+        "rocky scenery",
+        "adventure",
+        "experienced riders"
+      ],
+      "lastVerified": "2026-08-05"
+    },
+    {
+      "id": "mao-bay",
+      "name": "Mao Bay",
+      "area": "East coast",
+      "categories": [
+        "Remote",
+        "Boat Trip",
+        "Adventure",
+        "Quiet"
+      ],
+      "cardDescription": "A remote and little-developed bay for visitors seeking a genuine off-the-beaten-path excursion.",
+      "about": "Mao Bay is among Koh Tao’s more remote coastal destinations. It has very limited infrastructure and is primarily relevant to boat trips or experienced explorers.",
+      "recommendation": "Mao Bay is not essential for a first visit, but it adds real variety for returning guests who want to explore beyond the island’s familiar beaches.",
+      "localTip": "Use a knowledgeable boat operator or obtain reliable local access advice before travelling.",
+      "perfectFor": [
+        "Remote exploration",
+        "Boat trips",
+        "Returning visitors",
+        "Quiet scenery",
+        "Adventure"
+      ],
+      "access": "Boat access is usually the most realistic option.",
+      "conditions": "No dependable facilities. Conditions and access should be confirmed locally.",
+      "type": "beach",
+      "status": "active",
+      "featured": false,
+      "displayOrder": 19,
+      "media": {
+        "heroImage": "",
+        "gallery": []
+      },
+      "map": "https://www.google.com/maps/search/?api=1&query=Mao+Bay+Koh+Tao",
+      "aiSummary": "Mao Bay is recommended for remote exploration, boat trips, returning visitors, quiet scenery, adventure. Use a knowledgeable boat operator or obtain reliable local access advice before travelling.",
+      "aiKeywords": [
+        "remote",
+        "boat trip",
+        "adventure",
+        "quiet",
+        "remote exploration",
+        "boat trips",
+        "returning visitors",
+        "quiet scenery",
+        "adventure"
+      ],
+      "lastVerified": "2026-08-05"
+    }
+  ]
+}

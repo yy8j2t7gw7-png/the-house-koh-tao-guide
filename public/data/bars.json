@@ -1,0 +1,862 @@
+{
+  "schemaVersion": "1.0.0",
+  "property": "The House – Koh Tao",
+  "editorialPolicy": {
+    "rankingsEnabled": false,
+    "ratingsEnabled": false,
+    "safety": "Never drink and ride. Arrange a taxi or walk where safe. Event schedules and opening hours can change."
+  },
+  "bars": [
+    {
+      "id": "bamboo-beach-bar",
+      "name": "Bamboo Beach Bar",
+      "area": "Mae Haad Beach",
+      "categories": [
+        "Sunset",
+        "Beachfront",
+        "Live Music",
+        "DJ Events",
+        "Relaxed"
+      ],
+      "cardDescription": "A laid-back beachfront sunset bar near Mae Haad Pier, known for island atmosphere, music events and a welcoming local crowd.",
+      "about": "Bamboo Beach Bar sits directly on Mae Haad Beach, only a short distance from the ferry pier. The setting is informal and relaxed, with sunset views, beach seating and a programme of selected live-music and DJ events.",
+      "recommendation": "Choose Bamboo when you want a friendly beach bar away from the busiest part of Sairee. It is especially convenient before or after a ferry and for guests staying at The House.",
+      "localTip": "Bamboo currently does not serve food. Guests of The House may leave luggage there free of charge every day after check-out, which is particularly useful while waiting for a later ferry.",
+      "ourPick": "A cold drink at sunset",
+      "perfectFor": [
+        "Sunset drinks",
+        "Relaxed beach atmosphere",
+        "Live music",
+        "DJ events",
+        "Near the pier"
+      ],
+      "hours": "Event times and opening hours vary; check the latest social update",
+      "phone": "",
+      "website": "",
+      "facebook": "",
+      "instagram": "",
+      "map": "https://www.google.com/maps/search/?api=1&query=Bamboo+Beach+Bar+Koh+Tao",
+      "music": "Live music and selected DJ events",
+      "food": "No food at present",
+      "familyFriendly": "Suitable earlier in the day; evening events are more adult-oriented",
+      "setting": "Beachfront, open-air",
+      "nearby": [
+        "Mae Haad Pier",
+        "Mae Haad Beach",
+        "The House",
+        "Koh Tao Post Office"
+      ],
+      "type": "bar",
+      "status": "active",
+      "featured": true,
+      "displayOrder": 1,
+      "media": {
+        "heroImage": "",
+        "logo": "",
+        "gallery": []
+      },
+      "aiSummary": "Bamboo Beach Bar in Mae Haad Beach is recommended for sunset drinks, relaxed beach atmosphere, live music, dj events, near the pier. Bamboo currently does not serve food. Guests of The House may leave luggage there free of charge every day after check-out, which is particularly useful while waiting for a later ferry.",
+      "aiKeywords": [
+        "beachfront",
+        "dj events",
+        "live music",
+        "near the pier",
+        "relaxed",
+        "relaxed beach atmosphere",
+        "sunset",
+        "sunset drinks"
+      ],
+      "lastVerified": "2026-08-05"
+    },
+    {
+      "id": "fizz-beach-club",
+      "name": "FIZZ Beach Club",
+      "area": "Sairee Beach",
+      "categories": [
+        "Sunset",
+        "Beachfront",
+        "Cocktails",
+        "DJ",
+        "Lounge"
+      ],
+      "cardDescription": "A long-established Sairee sunset lounge with beanbags on the sand, cocktails, food and chilled evening music.",
+      "about": "FIZZ has been part of Sairee’s sunset scene since 2007. Guests can sit in the restaurant, on the deck or directly on the beach while enjoying cocktails, wine, food and DJ-led music.",
+      "recommendation": "Choose FIZZ for a polished but relaxed sunset drink where dinner can naturally continue into the evening.",
+      "localTip": "Arrive before sunset if you want a front-row beanbag or beach table.",
+      "ourPick": "Espresso Martini at sunset",
+      "perfectFor": [
+        "Sunset",
+        "Couples",
+        "Cocktails",
+        "Beach lounging",
+        "Chilled DJs"
+      ],
+      "hours": "Daily, approximately 16:00–01:00",
+      "phone": "+66831490801",
+      "website": "",
+      "facebook": "",
+      "instagram": "",
+      "map": "https://www.google.com/maps/search/?api=1&query=FIZZ+Beach+Club+Koh+Tao",
+      "music": "Chilled DJs and selected events",
+      "food": "Thai and international food available",
+      "familyFriendly": "Earlier evening is suitable; later hours are more adult-oriented",
+      "setting": "Beachfront, deck and indoor seating",
+      "nearby": [
+        "Sairee Beach",
+        "Silver Sands Resort",
+        "Sairee walking street"
+      ],
+      "type": "bar",
+      "status": "active",
+      "featured": true,
+      "displayOrder": 2,
+      "media": {
+        "heroImage": "",
+        "logo": "",
+        "gallery": []
+      },
+      "aiSummary": "FIZZ Beach Club in Sairee Beach is recommended for sunset, couples, cocktails, beach lounging, chilled djs. Arrive before sunset if you want a front-row beanbag or beach table.",
+      "aiKeywords": [
+        "beach lounging",
+        "beachfront",
+        "chilled djs",
+        "cocktails",
+        "couples",
+        "dj",
+        "lounge",
+        "sunset"
+      ],
+      "lastVerified": "2026-08-05"
+    },
+    {
+      "id": "fishbowl-beach-bar",
+      "name": "Fishbowl Beach Bar",
+      "area": "Sairee Beach",
+      "categories": [
+        "Nightlife",
+        "Beachfront",
+        "Live Music",
+        "Party",
+        "Social"
+      ],
+      "cardDescription": "One of Koh Tao’s best-known beach-party venues, with sunset drinks, nightly live music and a lively late-night crowd.",
+      "about": "Fishbowl is a long-running Sairee beach bar inside Ban’s Diving Resort. It moves from sunset drinks and beach games into nightly live music and a busier party atmosphere.",
+      "recommendation": "Choose Fishbowl when you want a social night, live music and a classic Koh Tao backpacker beach-bar experience.",
+      "localTip": "It becomes considerably louder and busier later in the evening. Visit earlier if you want the setting without the full party atmosphere.",
+      "ourPick": "Sunset drink followed by live music",
+      "perfectFor": [
+        "Meeting people",
+        "Live music",
+        "Beach nightlife",
+        "Groups",
+        "Late nights"
+      ],
+      "hours": "Typically open from afternoon until late; check current hours",
+      "phone": "",
+      "website": "https://www.bansdivingresort.com/en/resort/facilities/restaurants-outlets/",
+      "facebook": "",
+      "instagram": "",
+      "map": "https://www.google.com/maps/search/?api=1&query=Fishbowl+Beach+Bar+Koh+Tao",
+      "music": "Nightly live music and party programming",
+      "food": "Food available through the resort outlets",
+      "familyFriendly": "Not recommended for children later at night",
+      "setting": "Beachfront, open-air",
+      "nearby": [
+        "Sairee Beach",
+        "Ban’s Diving Resort",
+        "Sairee village"
+      ],
+      "type": "bar",
+      "status": "active",
+      "featured": true,
+      "displayOrder": 3,
+      "media": {
+        "heroImage": "",
+        "logo": "",
+        "gallery": []
+      },
+      "aiSummary": "Fishbowl Beach Bar in Sairee Beach is recommended for meeting people, live music, beach nightlife, groups, late nights. It becomes considerably louder and busier later in the evening. Visit earlier if you want the setting without the full party atmosphere.",
+      "aiKeywords": [
+        "beach nightlife",
+        "beachfront",
+        "groups",
+        "late nights",
+        "live music",
+        "meeting people",
+        "nightlife",
+        "party",
+        "social"
+      ],
+      "lastVerified": "2026-08-05"
+    },
+    {
+      "id": "choppers-sports-bar",
+      "name": "Choppers Sports Bar",
+      "area": "Sairee Village",
+      "categories": [
+        "Sports",
+        "Live Music",
+        "Pub",
+        "Nightlife",
+        "Food"
+      ],
+      "cardDescription": "Koh Tao’s established sports-bar hub, with multiple screens, live music, pub food and regular social events.",
+      "about": "Choppers is a two-storey sports and entertainment venue in central Sairee. It shows major international sporting events across numerous screens and also hosts live bands, DJs, quizzes, jam nights and the Koh Tao Pub Crawl.",
+      "recommendation": "Choose Choppers when a live sporting event is your priority or when your group wants pub food and entertainment in one central venue.",
+      "localTip": "Check the weekly schedule because the atmosphere changes significantly between sports nights, pub-crawl evenings and open-mic events.",
+      "ourPick": "A draught beer during a live match",
+      "perfectFor": [
+        "Live sports",
+        "Pub food",
+        "Live music",
+        "Groups",
+        "Social nights"
+      ],
+      "hours": "Opening times vary with sports fixtures and events",
+      "phone": "+66878886362",
+      "website": "https://www.chopperskohtao.com/",
+      "facebook": "",
+      "instagram": "",
+      "map": "https://www.google.com/maps/search/?api=1&query=Choppers+Sports+Bar+Koh+Tao",
+      "music": "Live bands, DJs, quizzes and jam nights",
+      "food": "Pub food and grill menu",
+      "familyFriendly": "Suitable for sports and meals earlier; later events are adult-oriented",
+      "setting": "Two-storey indoor/open-front sports bar",
+      "nearby": [
+        "Sairee Beach",
+        "Sairee walking street",
+        "Queen’s Cabaret"
+      ],
+      "type": "bar",
+      "status": "active",
+      "featured": true,
+      "displayOrder": 4,
+      "media": {
+        "heroImage": "",
+        "logo": "",
+        "gallery": []
+      },
+      "aiSummary": "Choppers Sports Bar in Sairee Village is recommended for live sports, pub food, live music, groups, social nights. Check the weekly schedule because the atmosphere changes significantly between sports nights, pub-crawl evenings and open-mic events.",
+      "aiKeywords": [
+        "food",
+        "groups",
+        "live music",
+        "live sports",
+        "nightlife",
+        "pub",
+        "pub food",
+        "social nights",
+        "sports"
+      ],
+      "lastVerified": "2026-08-05"
+    },
+    {
+      "id": "lotus-beach-bar",
+      "name": "Lotus Beach Bar",
+      "area": "Sairee Beach",
+      "categories": [
+        "Beachfront",
+        "Fire Show",
+        "Nightlife",
+        "Sunset",
+        "Party"
+      ],
+      "cardDescription": "A classic Sairee beach bar known for sunset drinks, fire shows and a lively nighttime atmosphere.",
+      "about": "Lotus is one of the traditional names associated with Sairee Beach nightlife. Its beachfront position makes it an easy stop for sunset before the evening becomes louder and more energetic.",
+      "recommendation": "Choose Lotus for a recognisable Sairee beach-bar experience with fire entertainment and a social crowd.",
+      "localTip": "Fire shows should always be watched from a safe distance, particularly when the beach is crowded.",
+      "ourPick": "A sunset beer before the fire show",
+      "perfectFor": [
+        "Fire shows",
+        "Beach nightlife",
+        "Groups",
+        "Sunset",
+        "Late evening"
+      ],
+      "hours": "Check current opening and fire-show times",
+      "phone": "",
+      "website": "",
+      "facebook": "",
+      "instagram": "",
+      "map": "https://www.google.com/maps/search/?api=1&query=Lotus+Beach+Bar+Koh+Tao",
+      "music": "Party music and fire-show entertainment",
+      "food": "Food availability varies",
+      "familyFriendly": "Earlier sunset period may be suitable; late night is not recommended for children",
+      "setting": "Beachfront, open-air",
+      "nearby": [
+        "Sairee Beach",
+        "Sairee village",
+        "Beachfront restaurants"
+      ],
+      "type": "bar",
+      "status": "active",
+      "featured": true,
+      "displayOrder": 5,
+      "media": {
+        "heroImage": "",
+        "logo": "",
+        "gallery": []
+      },
+      "aiSummary": "Lotus Beach Bar in Sairee Beach is recommended for fire shows, beach nightlife, groups, sunset, late evening. Fire shows should always be watched from a safe distance, particularly when the beach is crowded.",
+      "aiKeywords": [
+        "beach nightlife",
+        "beachfront",
+        "fire show",
+        "fire shows",
+        "groups",
+        "late evening",
+        "nightlife",
+        "party",
+        "sunset"
+      ],
+      "lastVerified": "2026-08-05"
+    },
+    {
+      "id": "sandbar-beachclub",
+      "name": "Sandbar Beachclub",
+      "area": "Sairee Beach",
+      "categories": [
+        "Wine",
+        "Cocktails",
+        "Beachfront",
+        "Dinner",
+        "Relaxed"
+      ],
+      "cardDescription": "A European-inspired beachfront restaurant and wine bar with signature cocktails, quality wines and regular tasting events.",
+      "about": "Sandbar combines a beach-club setting with a more food- and wine-focused identity. Its in-house sommelier, imported wines and refined cocktail programme make it distinct from the island’s louder party bars.",
+      "recommendation": "Choose Sandbar for wine, cocktails and a relaxed beachfront evening where conversation and food matter more than dancing.",
+      "localTip": "Wine-tasting events are commonly held on Wednesdays; confirm and reserve ahead when interested.",
+      "ourPick": "A glass of wine selected by the sommelier",
+      "perfectFor": [
+        "Wine lovers",
+        "Couples",
+        "Dinner drinks",
+        "Beachfront",
+        "Conversation"
+      ],
+      "hours": "Daily, approximately 09:00–23:00",
+      "phone": "",
+      "website": "https://www.sandbarkohtao.com/",
+      "facebook": "",
+      "instagram": "",
+      "map": "https://www.google.com/maps/search/?api=1&query=Sandbar+Beachclub+Koh+Tao",
+      "music": "Relaxed beach-club atmosphere and selected events",
+      "food": "European-inspired food and seafood",
+      "familyFriendly": "Yes for meals and early evening",
+      "setting": "Beachfront restaurant and wine bar",
+      "nearby": [
+        "Sairee Beach",
+        "Sairee walking street",
+        "Central Sairee"
+      ],
+      "type": "bar",
+      "status": "active",
+      "featured": true,
+      "displayOrder": 6,
+      "media": {
+        "heroImage": "",
+        "logo": "",
+        "gallery": []
+      },
+      "aiSummary": "Sandbar Beachclub in Sairee Beach is recommended for wine lovers, couples, dinner drinks, beachfront, conversation. Wine-tasting events are commonly held on Wednesdays; confirm and reserve ahead when interested.",
+      "aiKeywords": [
+        "beachfront",
+        "cocktails",
+        "conversation",
+        "couples",
+        "dinner",
+        "dinner drinks",
+        "relaxed",
+        "wine",
+        "wine lovers"
+      ],
+      "lastVerified": "2026-08-05"
+    },
+    {
+      "id": "maya-beach-club",
+      "name": "Maya Beach Club",
+      "area": "South Sairee Beach",
+      "categories": [
+        "Beach Club",
+        "DJ",
+        "Sunset",
+        "Cocktails",
+        "Daytime"
+      ],
+      "cardDescription": "A relaxed south-Sairee beach club with loungers, ocean views, sunset cocktails and regular DJ sessions.",
+      "about": "Maya sits inside AC2 Resort at the quieter southern end of Sairee Beach. It works as a daytime and sunset beach club, with loungers, drinks and music that remains more relaxed than the island’s late-night party venues.",
+      "recommendation": "Choose Maya for a daytime beach-club atmosphere or a chilled sunset session with music.",
+      "localTip": "Check event listings because special DJ nights can create a very different atmosphere from an ordinary afternoon.",
+      "ourPick": "A sunset cocktail from a beach lounger",
+      "perfectFor": [
+        "Daytime drinks",
+        "Sunset",
+        "DJs",
+        "Beach loungers",
+        "Groups"
+      ],
+      "hours": "Approximately 12:00–21:00; verify current schedule",
+      "phone": "",
+      "website": "",
+      "facebook": "",
+      "instagram": "",
+      "map": "https://www.google.com/maps/search/?api=1&query=Maya+Beach+Club+Koh+Tao",
+      "music": "Sunset DJ sessions and selected electronic-music events",
+      "food": "Light food and resort dining may be available",
+      "familyFriendly": "Generally suitable during daytime",
+      "setting": "Beachfront day club",
+      "nearby": [
+        "Sairee Beach",
+        "AC2 Resort",
+        "Mae Haad walking route"
+      ],
+      "type": "bar",
+      "status": "active",
+      "featured": true,
+      "displayOrder": 7,
+      "media": {
+        "heroImage": "",
+        "logo": "",
+        "gallery": []
+      },
+      "aiSummary": "Maya Beach Club in South Sairee Beach is recommended for daytime drinks, sunset, djs, beach loungers, groups. Check event listings because special DJ nights can create a very different atmosphere from an ordinary afternoon.",
+      "aiKeywords": [
+        "beach club",
+        "beach loungers",
+        "cocktails",
+        "daytime",
+        "daytime drinks",
+        "dj",
+        "djs",
+        "groups",
+        "sunset"
+      ],
+      "lastVerified": "2026-08-05"
+    },
+    {
+      "id": "serve-chilled-roof-garden",
+      "name": "Serve Chilled Roof Garden",
+      "area": "Mae Haad",
+      "categories": [
+        "Rooftop",
+        "Sunset",
+        "Cocktails",
+        "Quiet",
+        "Mocktails"
+      ],
+      "cardDescription": "A calm Mae Haad rooftop with 180-degree ocean views, creative cocktails, mocktails and conversation-friendly music.",
+      "about": "Serve Chilled is designed as an alternative to noisy nightlife. The open-air roof garden overlooks Mae Haad Bay and focuses on well-made cocktails, fresh-fruit mocktails, sunset and relaxed music.",
+      "recommendation": "Choose Serve Chilled for a quiet sunset drink, date night or an evening where you want to talk rather than compete with loud music.",
+      "localTip": "Clear nights may include telescope viewing. Sunset happy hours commonly run until 19:00.",
+      "ourPick": "One of the signature tropical cocktails",
+      "perfectFor": [
+        "Quiet drinks",
+        "Sunset",
+        "Couples",
+        "Cocktails",
+        "Mocktails"
+      ],
+      "hours": "Daily, approximately 16:30–00:00",
+      "phone": "+66980785813",
+      "website": "",
+      "facebook": "https://www.facebook.com/profile.php?id=100094240206241",
+      "instagram": "",
+      "map": "https://www.google.com/maps/search/?api=1&query=Serve+Chilled+Roof+Garden+Koh+Tao",
+      "music": "Soul, funk and reggae at conversation-friendly volume",
+      "food": "Finger food; delivery from other venues may be possible",
+      "familyFriendly": "Suitable earlier in the evening",
+      "setting": "Open-air rooftop",
+      "nearby": [
+        "Mae Haad Bay",
+        "Mae Haad Pier",
+        "The House"
+      ],
+      "type": "bar",
+      "status": "active",
+      "featured": true,
+      "displayOrder": 8,
+      "media": {
+        "heroImage": "",
+        "logo": "",
+        "gallery": []
+      },
+      "aiSummary": "Serve Chilled Roof Garden in Mae Haad is recommended for quiet drinks, sunset, couples, cocktails, mocktails. Clear nights may include telescope viewing. Sunset happy hours commonly run until 19:00.",
+      "aiKeywords": [
+        "cocktails",
+        "couples",
+        "mocktails",
+        "quiet",
+        "quiet drinks",
+        "rooftop",
+        "sunset"
+      ],
+      "lastVerified": "2026-08-05"
+    },
+    {
+      "id": "sairee-cottage-pool-bar",
+      "name": "Sairee Cottage Pool Bar",
+      "area": "Sairee Beach",
+      "categories": [
+        "Pool",
+        "Beachfront",
+        "Sunset",
+        "Cocktails",
+        "Relaxed"
+      ],
+      "cardDescription": "A relaxed beachfront pool bar suited to afternoon drinks, sunset cocktails and an easy start to the evening.",
+      "about": "Sairee Cottage Pool Bar combines a beachfront setting with poolside seating and a calmer atmosphere than the nearby party venues.",
+      "recommendation": "Choose it when you want a relaxed drink near the beach without committing to a full nightlife venue.",
+      "localTip": "Confirm whether pool use is available to non-resort guests and whether a minimum spend applies.",
+      "ourPick": "A tropical cocktail around sunset",
+      "perfectFor": [
+        "Poolside drinks",
+        "Sunset",
+        "Relaxed afternoons",
+        "Couples",
+        "Early evening"
+      ],
+      "hours": "Check current resort hours",
+      "phone": "",
+      "website": "",
+      "facebook": "",
+      "instagram": "",
+      "map": "https://www.google.com/maps/search/?api=1&query=Sairee+Cottage+Pool+Bar+Koh+Tao",
+      "music": "Relaxed background music",
+      "food": "Restaurant menu available nearby",
+      "familyFriendly": "Yes during daytime with close pool supervision",
+      "setting": "Poolside and beachfront",
+      "nearby": [
+        "Sairee Beach",
+        "Sairee Cottage Resort",
+        "Central Sairee"
+      ],
+      "type": "bar",
+      "status": "active",
+      "featured": false,
+      "displayOrder": 9,
+      "media": {
+        "heroImage": "",
+        "logo": "",
+        "gallery": []
+      },
+      "aiSummary": "Sairee Cottage Pool Bar in Sairee Beach is recommended for poolside drinks, sunset, relaxed afternoons, couples, early evening. Confirm whether pool use is available to non-resort guests and whether a minimum spend applies.",
+      "aiKeywords": [
+        "beachfront",
+        "cocktails",
+        "couples",
+        "early evening",
+        "pool",
+        "poolside drinks",
+        "relaxed",
+        "relaxed afternoons",
+        "sunset"
+      ],
+      "lastVerified": "2026-08-05"
+    },
+    {
+      "id": "high-bar",
+      "name": "High Bar",
+      "area": "Chalok hillside",
+      "categories": [
+        "Viewpoint",
+        "Sunset",
+        "Relaxed",
+        "Hillside",
+        "Couples"
+      ],
+      "cardDescription": "A hillside bar above Chalok Baan Kao with panoramic views and a peaceful, laid-back atmosphere.",
+      "about": "High Bar is positioned above Chalok Baan Kao and is best known for its elevated coastal view. It is more about scenery and slowing down than nightlife.",
+      "recommendation": "Choose High Bar for a quiet drink with a view, especially when exploring the south of Koh Tao.",
+      "localTip": "The route is elevated; use a taxi if you are not fully confident riding a scooter on steep roads.",
+      "ourPick": "A simple drink while taking in the view",
+      "perfectFor": [
+        "Views",
+        "Couples",
+        "Quiet evenings",
+        "South Koh Tao",
+        "Sunset atmosphere"
+      ],
+      "hours": "Check current opening hours",
+      "phone": "",
+      "website": "https://www.highbar.asia/",
+      "facebook": "",
+      "instagram": "",
+      "map": "https://www.google.com/maps/search/?api=1&query=High+Bar+Koh+Tao",
+      "music": "Laid-back background music",
+      "food": "Availability varies",
+      "familyFriendly": "Earlier hours may be suitable",
+      "setting": "Hillside terrace",
+      "nearby": [
+        "Chalok Baan Kao Bay",
+        "Freedom Beach",
+        "John-Suwan Viewpoint"
+      ],
+      "type": "bar",
+      "status": "active",
+      "featured": false,
+      "displayOrder": 10,
+      "media": {
+        "heroImage": "",
+        "logo": "",
+        "gallery": []
+      },
+      "aiSummary": "High Bar in Chalok hillside is recommended for views, couples, quiet evenings, south koh tao, sunset atmosphere. The route is elevated; use a taxi if you are not fully confident riding a scooter on steep roads.",
+      "aiKeywords": [
+        "couples",
+        "hillside",
+        "quiet evenings",
+        "relaxed",
+        "south koh tao",
+        "sunset",
+        "sunset atmosphere",
+        "viewpoint",
+        "views"
+      ],
+      "lastVerified": "2026-08-05"
+    },
+    {
+      "id": "natural-high-bar",
+      "name": "Natural High Bar",
+      "area": "South Koh Tao hillside",
+      "categories": [
+        "Viewpoint",
+        "Relaxed",
+        "Hillside",
+        "Sunset",
+        "Alternative"
+      ],
+      "cardDescription": "A rustic hillside bar with wide views and a relaxed alternative-island atmosphere.",
+      "about": "Natural High is known for its elevated outlook and informal setting. It is most suitable for guests seeking scenery, music and a slower pace away from the main nightlife strip.",
+      "recommendation": "Choose Natural High for a relaxed hillside stop rather than a conventional cocktail bar.",
+      "localTip": "The road can be steep or uneven. Avoid riding after drinking and arrange safe transport.",
+      "ourPick": "A sunset drink with the panoramic view",
+      "perfectFor": [
+        "Views",
+        "Alternative atmosphere",
+        "Sunset",
+        "Relaxed groups",
+        "Hillside"
+      ],
+      "hours": "Check current social updates",
+      "phone": "",
+      "website": "",
+      "facebook": "",
+      "instagram": "",
+      "map": "https://www.google.com/maps/search/?api=1&query=Natural+High+Bar+Koh+Tao",
+      "music": "Relaxed and alternative",
+      "food": "Limited food may be available",
+      "familyFriendly": "Not a primary family recommendation",
+      "setting": "Rustic hillside terrace",
+      "nearby": [
+        "Chalok",
+        "Aow Leuk road",
+        "Southern viewpoints"
+      ],
+      "type": "bar",
+      "status": "active",
+      "featured": false,
+      "displayOrder": 11,
+      "media": {
+        "heroImage": "",
+        "logo": "",
+        "gallery": []
+      },
+      "aiSummary": "Natural High Bar in South Koh Tao hillside is recommended for views, alternative atmosphere, sunset, relaxed groups, hillside. The road can be steep or uneven. Avoid riding after drinking and arrange safe transport.",
+      "aiKeywords": [
+        "alternative",
+        "alternative atmosphere",
+        "hillside",
+        "relaxed",
+        "relaxed groups",
+        "sunset",
+        "viewpoint",
+        "views"
+      ],
+      "lastVerified": "2026-08-05"
+    },
+    {
+      "id": "good-vibe-bar",
+      "name": "Good Vibe Bar",
+      "area": "Koh Tao",
+      "categories": [
+        "Live Music",
+        "Jam Sessions",
+        "Social",
+        "Relaxed",
+        "Local"
+      ],
+      "cardDescription": "A music-focused local bar associated with jam sessions, open-mic evenings and an easygoing social crowd.",
+      "about": "Good Vibe Bar is centred on participation and live music rather than a polished beach-club format. It attracts musicians, island residents and visitors who prefer an informal night.",
+      "recommendation": "Choose Good Vibe for live music, open sessions and a more local social atmosphere.",
+      "localTip": "Check the current event schedule; the best night to visit is when a jam or live performance is confirmed.",
+      "ourPick": "A drink during a live jam session",
+      "perfectFor": [
+        "Live music",
+        "Musicians",
+        "Meeting locals",
+        "Open mic",
+        "Relaxed nights"
+      ],
+      "hours": "Event-led; check current schedule",
+      "phone": "",
+      "website": "",
+      "facebook": "",
+      "instagram": "",
+      "map": "https://www.google.com/maps/search/?api=1&query=Good+Vibe+Bar+Koh+Tao",
+      "music": "Live bands, open mic and jam sessions",
+      "food": "Availability varies",
+      "familyFriendly": "Depends on the event and time",
+      "setting": "Informal local bar",
+      "nearby": [
+        "Central Koh Tao",
+        "Mae Haad",
+        "Sairee access"
+      ],
+      "type": "bar",
+      "status": "active",
+      "featured": false,
+      "displayOrder": 12,
+      "media": {
+        "heroImage": "",
+        "logo": "",
+        "gallery": []
+      },
+      "aiSummary": "Good Vibe Bar in Koh Tao is recommended for live music, musicians, meeting locals, open mic, relaxed nights. Check the current event schedule; the best night to visit is when a jam or live performance is confirmed.",
+      "aiKeywords": [
+        "jam sessions",
+        "live music",
+        "local",
+        "meeting locals",
+        "musicians",
+        "open mic",
+        "relaxed",
+        "relaxed nights",
+        "social"
+      ],
+      "lastVerified": "2026-08-05"
+    },
+    {
+      "id": "the-beach-club-haadtien",
+      "name": "The Beach Club by Haadtien",
+      "area": "Shark Bay",
+      "categories": [
+        "Beach Club",
+        "Resort",
+        "Cocktails",
+        "Scenic",
+        "Daytime"
+      ],
+      "cardDescription": "A resort-based beach-club experience overlooking Shark Bay, combining drinks, dining and a polished tropical setting.",
+      "about": "The Beach Club is part of Haadtien’s Shark Bay resort complex. It offers an elevated, more polished beach-club environment with resort dining, drinks and access to one of Koh Tao’s most scenic bays.",
+      "recommendation": "Choose it for a special daytime or early-evening resort experience rather than local nightlife.",
+      "localTip": "Confirm day-visitor access, transport and any minimum-spend or entrance conditions before travelling.",
+      "ourPick": "A cocktail overlooking Shark Bay",
+      "perfectFor": [
+        "Resort day",
+        "Couples",
+        "Scenic drinks",
+        "Shark Bay",
+        "Relaxed luxury"
+      ],
+      "hours": "Confirm current resort and day-visitor hours",
+      "phone": "+6677456580",
+      "website": "https://www.haadtienbeachclub.com/",
+      "facebook": "",
+      "instagram": "",
+      "map": "https://www.google.com/maps/search/?api=1&query=Haadtien+Beach+Club+Koh+Tao",
+      "music": "Resort and beach-club atmosphere",
+      "food": "Full resort dining available",
+      "familyFriendly": "Yes, subject to resort policies",
+      "setting": "Resort beach club overlooking Shark Bay",
+      "nearby": [
+        "Shark Bay",
+        "Sai Daeng Beach",
+        "Chalok Baan Kao"
+      ],
+      "type": "bar",
+      "status": "active",
+      "featured": false,
+      "displayOrder": 13,
+      "media": {
+        "heroImage": "",
+        "logo": "",
+        "gallery": []
+      },
+      "aiSummary": "The Beach Club by Haadtien in Shark Bay is recommended for resort day, couples, scenic drinks, shark bay, relaxed luxury. Confirm day-visitor access, transport and any minimum-spend or entrance conditions before travelling.",
+      "aiKeywords": [
+        "beach club",
+        "cocktails",
+        "couples",
+        "daytime",
+        "relaxed luxury",
+        "resort",
+        "resort day",
+        "scenic",
+        "scenic drinks",
+        "shark bay"
+      ],
+      "lastVerified": "2026-08-05"
+    },
+    {
+      "id": "sun-suwan-360-bar",
+      "name": "Sun Suwan 360 Bar",
+      "area": "South Koh Tao viewpoint",
+      "categories": [
+        "Viewpoint",
+        "Sunset",
+        "Panoramic",
+        "Relaxed",
+        "Photography"
+      ],
+      "cardDescription": "A viewpoint bar offering broad southern-island panoramas and a quiet place to pause during a day of exploring.",
+      "about": "Sun Suwan 360 is primarily about the elevated view rather than nightlife. It provides a scenic stop for drinks while exploring Koh Tao’s southern viewpoints and beaches.",
+      "recommendation": "Choose it for panoramic scenery and photographs, preferably before dark.",
+      "localTip": "Access can be steep. Visit in daylight, wear secure footwear and arrange safe transport.",
+      "ourPick": "A cold drink while enjoying the 360-degree view",
+      "perfectFor": [
+        "Panoramic views",
+        "Photography",
+        "Daytime exploring",
+        "Couples",
+        "South Koh Tao"
+      ],
+      "hours": "Check current access and opening times",
+      "phone": "",
+      "website": "",
+      "facebook": "",
+      "instagram": "",
+      "map": "https://www.google.com/maps/search/?api=1&query=Sun+Suwan+360+Bar+Koh+Tao",
+      "music": "Relaxed background atmosphere",
+      "food": "Limited refreshments",
+      "familyFriendly": "Suitable with close supervision around viewpoint edges",
+      "setting": "Elevated viewpoint bar",
+      "nearby": [
+        "John-Suwan Viewpoint",
+        "Freedom Beach",
+        "Chalok Baan Kao Bay"
+      ],
+      "type": "bar",
+      "status": "active",
+      "featured": false,
+      "displayOrder": 14,
+      "media": {
+        "heroImage": "",
+        "logo": "",
+        "gallery": []
+      },
+      "aiSummary": "Sun Suwan 360 Bar in South Koh Tao viewpoint is recommended for panoramic views, photography, daytime exploring, couples, south koh tao. Access can be steep. Visit in daylight, wear secure footwear and arrange safe transport.",
+      "aiKeywords": [
+        "couples",
+        "daytime exploring",
+        "panoramic",
+        "panoramic views",
+        "photography",
+        "relaxed",
+        "south koh tao",
+        "sunset",
+        "viewpoint"
+      ],
+      "lastVerified": "2026-08-05"
+    }
+  ]
+}

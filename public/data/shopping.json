@@ -1,0 +1,1229 @@
+{
+  "schemaVersion": "1.0.0",
+  "property": "The House – Koh Tao",
+  "source": "Uploaded Shopping & Essentials on Koh Tao research report",
+  "editorialPolicy": {
+    "rankingsEnabled": false,
+    "ratingsEnabled": false,
+    "note": "Hours, stock, payment methods and access can change. Confirm important details on the day."
+  },
+  "items": [
+    {
+      "id": "smile-mart-supermarket",
+      "type": "essential",
+      "status": "active",
+      "featured": true,
+      "displayOrder": 1,
+      "name": "Smile Mart (Supermarket)",
+      "category": "Supermarkets",
+      "categories": [
+        "Supermarkets",
+        "24 Hours",
+        "Cards",
+        "Fresh Produce"
+      ],
+      "area": "Sairee Beach (~200 m away)",
+      "cardDescription": "A 24-hour supermarket in Sairee (Hin Wong Bay Road) stocking a wide range of Western and Asian groceries, plus dairy, bread, toiletries and homewares. It has a dedicated alcohol aisle but no fresh produce",
+      "about": "A 24-hour supermarket in Sairee (Hin Wong Bay Road) stocking a wide range of Western and Asian groceries, plus dairy, bread, toiletries and homewares. It has a dedicated alcohol aisle but no fresh produce",
+      "recommendation": "Choose Smile Mart (Supermarket) when you need being the only full-service Sairee supermarket (open 24/7) with convenience items on Koh Tao.",
+      "localTip": "Always open, but aisles can be narrow. Take a flashlight at night – aisles not all well-lit. Prices are fixed (no haggling). Bring your own bag (plastic bags are sold at checkout)",
+      "ourPick": "packaged foods",
+      "perfectFor": [
+        "Supermarkets",
+        "being the only full-service Sairee supermarket (open 24/7) with convenience items",
+        "Tourists",
+        "Long-term residents"
+      ],
+      "priceLevel": "$–$$",
+      "hours": "24/7",
+      "phone": "(no public number)",
+      "website": "",
+      "facebook": "",
+      "instagram": "",
+      "map": "https://www.google.com/maps/search/?api=1&query=Smile+Mart+%28Supermarket%29+Koh+Tao",
+      "delivery": "No",
+      "payment": "Cash, Thai bank ATM, credit cards at register",
+      "english": "Yes (staff usually speak some English)",
+      "wheelchair": "Partial (level entrance)",
+      "airConditioning": "Yes",
+      "parking": "Limited street parking (scooters at curb)",
+      "touristFriendly": "Yes",
+      "residentFriendly": "Yes",
+      "localFact": "Popular late-night stock-up for alcohol",
+      "nearby": [
+        "Sairee Beach (~200 m away)"
+      ],
+      "media": {
+        "heroImage": "",
+        "logo": "",
+        "gallery": []
+      },
+      "aiSummary": "Smile Mart (Supermarket): A 24-hour supermarket in Sairee (Hin Wong Bay Road) stocking a wide range of Western and Asian groceries, plus dairy, bread, toiletries and homewares. It has a dedicated alcohol aisle but no fresh produce Best known for being the only full-service Sairee supermarket (open 24/7) with convenience items. Practical tip: Always open, but aisles can be narrow. Take a flashlight at night – aisles not all well-lit. Prices are fixed (no haggling). Bring your own bag (plastic bags are sold at checkout)",
+      "aiKeywords": [
+        "supermarkets",
+        "24 hours",
+        "cards",
+        "fresh produce"
+      ],
+      "lastVerified": "2026-08-05"
+    },
+    {
+      "id": "pen-wholesale-supermarket",
+      "type": "essential",
+      "status": "active",
+      "featured": true,
+      "displayOrder": 2,
+      "name": "Pen Wholesale (Supermarket)",
+      "category": "Supermarkets",
+      "categories": [
+        "Supermarkets",
+        "Cards",
+        "Fresh Produce"
+      ],
+      "area": "Mae Haad Beach",
+      "cardDescription": "A large “wholesale-style” supermarket on Mae Haad main road (opposite Pods). It carries a very wide range of goods: fresh fruits and vegetables, meats, dairy, baked goods, as well as toiletries, beauty products,...",
+      "about": "A large “wholesale-style” supermarket on Mae Haad main road (opposite Pods). It carries a very wide range of goods: fresh fruits and vegetables, meats, dairy, baked goods, as well as toiletries, beauty products, hardware and pet supplies",
+      "recommendation": "Choose Pen Wholesale (Supermarket) when you need complete one-stop shopping (food, pet, home, hardware, booze) on the island on Koh Tao.",
+      "localTip": "Go mid-week mornings to avoid crowds. Many price tags are in Thai (ask staff for English help if needed)",
+      "ourPick": "groceries (incl. fresh produce)",
+      "perfectFor": [
+        "Supermarkets",
+        "complete one-stop shopping (food, pet, home, hardware, booze) on the island",
+        "Tourists",
+        "Long-term residents"
+      ],
+      "priceLevel": "$–$$",
+      "hours": "~8 am–9 pm (daily)",
+      "phone": "(not listed)",
+      "website": "",
+      "facebook": "",
+      "instagram": "",
+      "map": "https://www.google.com/maps/search/?api=1&query=Pen+Wholesale+%28Supermarket%29+Koh+Tao",
+      "delivery": "No (in-store only)",
+      "payment": "Cash and Thai cards (largest stores accept major credit cards)",
+      "english": "Yes (Thai owners, but English generally spoken)",
+      "wheelchair": "Partial (steps at entrance)",
+      "airConditioning": "Yes",
+      "parking": "On-street scooters",
+      "touristFriendly": "Yes",
+      "residentFriendly": "Yes",
+      "localFact": "Same chain that supplies many local shops",
+      "nearby": [
+        "Mae Haad Beach",
+        "Darawan Temple"
+      ],
+      "media": {
+        "heroImage": "",
+        "logo": "",
+        "gallery": []
+      },
+      "aiSummary": "Pen Wholesale (Supermarket): A large “wholesale-style” supermarket on Mae Haad main road (opposite Pods). It carries a very wide range of goods: fresh fruits and vegetables, meats, dairy, baked goods, as well as toiletries, beauty products, hardware and pet supplies Best known for complete one-stop shopping (food, pet, home, hardware, booze) on the island. Practical tip: Go mid-week mornings to avoid crowds. Many price tags are in Thai (ask staff for English help if needed)",
+      "aiKeywords": [
+        "supermarkets",
+        "cards",
+        "fresh produce"
+      ],
+      "lastVerified": "2026-08-05"
+    },
+    {
+      "id": "pods-supermarket",
+      "type": "essential",
+      "status": "active",
+      "featured": true,
+      "displayOrder": 3,
+      "name": "Pods (Supermarket)",
+      "category": "Supermarkets",
+      "categories": [
+        "Supermarkets",
+        "Fresh Produce"
+      ],
+      "area": "Bangkok Bank",
+      "cardDescription": "A Mae Haad “freshmart” on the main road between the upper and lower village. Pods specializes in fresh food: it’s the only Koh Tao market with a butcher counter, and sells a large variety of fresh meats, local...",
+      "about": "A Mae Haad “freshmart” on the main road between the upper and lower village. Pods specializes in fresh food: it’s the only Koh Tao market with a butcher counter, and sells a large variety of fresh meats, local fruits/vegetables, dairy and freshly baked breads",
+      "recommendation": "Choose Pods (Supermarket) when you need its fresh meat counter and bakery on Koh Tao.",
+      "localTip": "Best to shop in morning for freshest produce. If self-catering, ask staff for cuts of meat by weight (prices fixed)",
+      "ourPick": "fresh chicken",
+      "perfectFor": [
+        "Supermarkets",
+        "its fresh meat counter and bakery",
+        "Tourists",
+        "Long-term residents"
+      ],
+      "priceLevel": "$–$$",
+      "hours": "~8 am–9 pm (daily)",
+      "phone": "(not listed)",
+      "website": "",
+      "facebook": "",
+      "instagram": "",
+      "map": "https://www.google.com/maps/search/?api=1&query=Pods+%28Supermarket%29+Koh+Tao",
+      "delivery": "No",
+      "payment": "Cash, Thai bank cards (small surcharge may apply)",
+      "english": "Yes",
+      "wheelchair": "Yes (flat)",
+      "airConditioning": "Yes",
+      "parking": "Curbside (street only)",
+      "touristFriendly": "Yes",
+      "residentFriendly": "Yes",
+      "localFact": "A hub for self-catering guests",
+      "nearby": [
+        "Bangkok Bank",
+        "Krungsri Bank"
+      ],
+      "media": {
+        "heroImage": "",
+        "logo": "",
+        "gallery": []
+      },
+      "aiSummary": "Pods (Supermarket): A Mae Haad “freshmart” on the main road between the upper and lower village. Pods specializes in fresh food: it’s the only Koh Tao market with a butcher counter, and sells a large variety of fresh meats, local fruits/vegetables, dairy and freshly baked breads Best known for its fresh meat counter and bakery. Practical tip: Best to shop in morning for freshest produce. If self-catering, ask staff for cuts of meat by weight (prices fixed)",
+      "aiKeywords": [
+        "supermarkets",
+        "fresh produce"
+      ],
+      "lastVerified": "2026-08-05"
+    },
+    {
+      "id": "chaiwat-supermarket-supermarket",
+      "type": "essential",
+      "status": "active",
+      "featured": true,
+      "displayOrder": 4,
+      "name": "ChaiWat Supermarket (Supermarket)",
+      "category": "Supermarkets",
+      "categories": [
+        "Supermarkets"
+      ],
+      "area": "Mae Haad Post Office",
+      "cardDescription": "A traditional Thai-style general store in Mae Haad (near the post office). It is packed floor-to-ceiling (“Aladdin’s cave”) with homewares, furniture, stationery, plus a huge range of toiletries, foodstuffs, tobacco...",
+      "about": "A traditional Thai-style general store in Mae Haad (near the post office). It is packed floor-to-ceiling (“Aladdin’s cave”) with homewares, furniture, stationery, plus a huge range of toiletries, foodstuffs, tobacco and booze",
+      "recommendation": "Choose ChaiWat Supermarket (Supermarket) when you need being a one-stop Thai bazaar – find almost anything here on Koh Tao.",
+      "localTip": "Most items are fixed-price; bargaining not expected. Visit early to avoid crowds. Photography allowed (some shopkeepers mind, so ask first)",
+      "ourPick": "kitchenware",
+      "perfectFor": [
+        "Supermarkets",
+        "being a one-stop Thai bazaar – find almost anything here",
+        "Tourists",
+        "Long-term residents"
+      ],
+      "priceLevel": "$–$$",
+      "hours": "~7:30 am–8 pm (daily)",
+      "phone": "(no official listing)",
+      "website": "",
+      "facebook": "",
+      "instagram": "",
+      "map": "https://www.google.com/maps/search/?api=1&query=ChaiWat+Supermarket+%28Supermarket%29+Koh+Tao",
+      "delivery": "No",
+      "payment": "Cash, often PromptPay/QR; some card",
+      "english": "Limited (few English labels, but staff help)",
+      "wheelchair": "No (steps)",
+      "airConditioning": "Yes",
+      "parking": "Street/scooter parking outside",
+      "touristFriendly": "Yes",
+      "residentFriendly": "Yes",
+      "localFact": "Owner Pi Lek (Lek’s Chaiwat) is a long-time islander (see Phanganist interview for her story)",
+      "nearby": [
+        "Mae Haad Post Office",
+        "Pods Freshmart"
+      ],
+      "media": {
+        "heroImage": "",
+        "logo": "",
+        "gallery": []
+      },
+      "aiSummary": "ChaiWat Supermarket (Supermarket): A traditional Thai-style general store in Mae Haad (near the post office). It is packed floor-to-ceiling (“Aladdin’s cave”) with homewares, furniture, stationery, plus a huge range of toiletries, foodstuffs, tobacco and booze Best known for being a one-stop Thai bazaar – find almost anything here. Practical tip: Most items are fixed-price; bargaining not expected. Visit early to avoid crowds. Photography allowed (some shopkeepers mind, so ask first)",
+      "aiKeywords": [
+        "supermarkets"
+      ],
+      "lastVerified": "2026-08-05"
+    },
+    {
+      "id": "aukotan-supermarket",
+      "type": "essential",
+      "status": "active",
+      "featured": true,
+      "displayOrder": 5,
+      "name": "Aukotan (Supermarket)",
+      "category": "Supermarkets",
+      "categories": [
+        "Supermarkets",
+        "Cash Preferred",
+        "Fresh Produce"
+      ],
+      "area": "Chalok Pier",
+      "cardDescription": "The only supermarket in Chalok Baan Kao (southwest village). It stocks an extensive, eclectic range of goods: food, alcohol, toiletries and medical supplies, and an extensive hardware section",
+      "about": "The only supermarket in Chalok Baan Kao (southwest village). It stocks an extensive, eclectic range of goods: food, alcohol, toiletries and medical supplies, and an extensive hardware section",
+      "recommendation": "Choose Aukotan (Supermarket) when you need “you can find anything” – from frozen foods and snacks to lightbulbs and tape on Koh Tao.",
+      "localTip": "Typically quiet until late afternoon. If coming from Sairee/Mae Haad, note only small-currency stock; plan accordingly",
+      "ourPick": "general grocery items (no fresh produce)",
+      "perfectFor": [
+        "Supermarkets",
+        "“you can find anything” – from frozen foods and snacks to lightbulbs and tape",
+        "Tourists",
+        "Long-term residents"
+      ],
+      "priceLevel": "$–$$",
+      "hours": "~8 am–8 pm (daily)",
+      "phone": "(no listing)",
+      "website": "",
+      "facebook": "",
+      "instagram": "",
+      "map": "https://www.google.com/maps/search/?api=1&query=Aukotan+%28Supermarket%29+Koh+Tao",
+      "delivery": "No",
+      "payment": "Cash primarily (PromptPay QR common)",
+      "english": "Limited, but staff speak some English",
+      "wheelchair": "Partial (small step)",
+      "airConditioning": "Yes",
+      "parking": "Street (scooters)",
+      "touristFriendly": "Yes",
+      "residentFriendly": "Yes",
+      "localFact": "A lifeline for Chalok residents (supermarket plus small market stalls nearby)",
+      "nearby": [
+        "Chalok Pier",
+        "Ban’s Resort"
+      ],
+      "media": {
+        "heroImage": "",
+        "logo": "",
+        "gallery": []
+      },
+      "aiSummary": "Aukotan (Supermarket): The only supermarket in Chalok Baan Kao (southwest village). It stocks an extensive, eclectic range of goods: food, alcohol, toiletries and medical supplies, and an extensive hardware section Best known for “you can find anything” – from frozen foods and snacks to lightbulbs and tape. Practical tip: Typically quiet until late afternoon. If coming from Sairee/Mae Haad, note only small-currency stock; plan accordingly",
+      "aiKeywords": [
+        "supermarkets",
+        "cash preferred",
+        "fresh produce"
+      ],
+      "lastVerified": "2026-08-05"
+    },
+    {
+      "id": "7-eleven-chain-convenience-stores",
+      "type": "essential",
+      "status": "active",
+      "featured": true,
+      "displayOrder": 6,
+      "name": "7-Eleven (Chain convenience stores)",
+      "category": "Convenience",
+      "categories": [
+        "Convenience",
+        "24 Hours"
+      ],
+      "area": "Conveniently in or near town centers",
+      "cardDescription": "Ubiquitous 24-hour mini-marts in every village (Mae Haad, Sairee, Chalok) that carry snacks, drinks, toiletries, and basic groceries",
+      "about": "Ubiquitous 24-hour mini-marts in every village (Mae Haad, Sairee, Chalok) that carry snacks, drinks, toiletries, and basic groceries",
+      "recommendation": "Choose 7-Eleven (Chain convenience stores) when you need always-open convenience – cold drinks, ready meals (sandwiches, salads), instant noodles, ice cream, and ATMs (each outlet has 24-hour ATM) on Koh Tao.",
+      "localTip": "Avoid peak meal times (noon/6pm) when locals queue for ready food. Bring cash or Thai card – some smaller stores may not accept foreign cards. Watch for 15% beer tax (price-printed includes it)",
+      "ourPick": "snack foods",
+      "perfectFor": [
+        "Convenience",
+        "always-open convenience – cold drinks, ready meals (sandwiches, salads), instant noodles, ice cream, and ATMs (each outlet has 24-hour ATM)",
+        "Tourists",
+        "Long-term residents"
+      ],
+      "priceLevel": "$ (tends to be slightly higher than supermarkets)",
+      "hours": "24/7",
+      "phone": "(none)",
+      "website": "",
+      "facebook": "",
+      "instagram": "",
+      "map": "https://www.google.com/maps/search/?api=1&query=7-Eleven+%28Chain+convenience+stores%29+Koh+Tao",
+      "delivery": "Yes (via 7-Eleven app in Thailand)",
+      "payment": "Cash, Thai debit/credit, PromptPay/QR",
+      "english": "Some English on labels; staff often speak minimal English",
+      "wheelchair": "Yes (ramp available in newer stores)",
+      "airConditioning": "Yes",
+      "parking": "Scooter parking in front (no car parking)",
+      "touristFriendly": "Yes",
+      "residentFriendly": "Yes",
+      "localFact": "Each store has an outside ATM (all major ATM cards work; standard Thai fee ~220฿)",
+      "nearby": [
+        "Conveniently in or near town centers"
+      ],
+      "media": {
+        "heroImage": "",
+        "logo": "",
+        "gallery": []
+      },
+      "aiSummary": "7-Eleven (Chain convenience stores): Ubiquitous 24-hour mini-marts in every village (Mae Haad, Sairee, Chalok) that carry snacks, drinks, toiletries, and basic groceries Best known for always-open convenience – cold drinks, ready meals (sandwiches, salads), instant noodles, ice cream, and ATMs (each outlet has 24-hour ATM). Practical tip: Avoid peak meal times (noon/6pm) when locals queue for ready food. Bring cash or Thai card – some smaller stores may not accept foreign cards. Watch for 15% beer tax (price-printed includes it)",
+      "aiKeywords": [
+        "convenience",
+        "24 hours"
+      ],
+      "lastVerified": "2026-08-05"
+    },
+    {
+      "id": "mae-haad-fresh-market",
+      "type": "essential",
+      "status": "active",
+      "featured": true,
+      "displayOrder": 7,
+      "name": "Mae Haad Fresh Market",
+      "category": "Fresh Market",
+      "categories": [
+        "Fresh Market",
+        "Cash Preferred",
+        "Fresh Produce"
+      ],
+      "area": "Pier",
+      "cardDescription": "A traditional Thai wet market in Mae Haad (near the village center). Opens very early (around 5–6 am) and closes by late afternoon. **Short description:** Several open-air stalls sell the day’s catch, fresh cuts of...",
+      "about": "A traditional Thai wet market in Mae Haad (near the village center). Opens very early (around 5–6 am) and closes by late afternoon. **Short description:** Several open-air stalls sell the day’s catch, fresh cuts of pork/chicken, and a variety of local fruits and vegetables",
+      "recommendation": "Choose Mae Haad Fresh Market when you need bargain-priced tropical produce and seafood on Koh Tao.",
+      "localTip": "Best before 10 am for largest selection. Carry small change (no change from large notes). Feel free to ask prices before picking goods. Bring your own bag or basket",
+      "ourPick": "Live/fresh seafood",
+      "perfectFor": [
+        "Fresh Market",
+        "bargain-priced tropical produce and seafood",
+        "Tourists",
+        "Long-term residents"
+      ],
+      "priceLevel": "$ (very low local prices)",
+      "hours": "~5 am–4 pm (hours vary by stall)",
+      "phone": "",
+      "website": "",
+      "facebook": "",
+      "instagram": "",
+      "map": "https://www.google.com/maps/search/?api=1&query=Mae+Haad+Fresh+Market+Koh+Tao",
+      "delivery": "No",
+      "payment": "Cash only (small vendors)",
+      "english": "Limited (vendors usually speak only basic English/Thai)",
+      "wheelchair": "Partial (crowded, uneven ground)",
+      "airConditioning": "No",
+      "parking": "Motorbike parking around",
+      "touristFriendly": "Yes (for cooking at home)",
+      "residentFriendly": "Yes",
+      "localFact": "Known locally as Natthapol Market, run mostly by women",
+      "nearby": [
+        "Pier",
+        "Monkeyhill viewpoint"
+      ],
+      "media": {
+        "heroImage": "",
+        "logo": "",
+        "gallery": []
+      },
+      "aiSummary": "Mae Haad Fresh Market: A traditional Thai wet market in Mae Haad (near the village center). Opens very early (around 5–6 am) and closes by late afternoon. **Short description:** Several open-air stalls sell the day’s catch, fresh cuts of pork/chicken, and a variety of local fruits and vegetables Best known for bargain-priced tropical produce and seafood. Practical tip: Best before 10 am for largest selection. Carry small change (no change from large notes). Feel free to ask prices before picking goods. Bring your own bag or basket",
+      "aiKeywords": [
+        "fresh market",
+        "cash preferred",
+        "fresh produce"
+      ],
+      "lastVerified": "2026-08-05"
+    },
+    {
+      "id": "red-pharmacy-sairee",
+      "type": "essential",
+      "status": "active",
+      "featured": true,
+      "displayOrder": 8,
+      "name": "Red Pharmacy (Sairee)",
+      "category": "Pharmacies",
+      "categories": [
+        "Pharmacies",
+        "Cards"
+      ],
+      "area": "Ya Nui Viewpoint trail start",
+      "cardDescription": "A large pharmacy on Sairee Road (in Sairee village). **Short description:** Stocked like a drugstore, selling medicines, first-aid, vitamins, baby supplies and high-quality skin products",
+      "about": "A large pharmacy on Sairee Road (in Sairee village). **Short description:** Stocked like a drugstore, selling medicines, first-aid, vitamins, baby supplies and high-quality skin products",
+      "recommendation": "Choose Red Pharmacy (Sairee) when you need well-stocked shelves and helpful English-speaking pharmacists on Koh Tao.",
+      "localTip": "Avoid traveling without it – Thai pharmacies can sell basic antibiotics without prescription. If unsure about a medication, ask (they often help without a prescription for common ailments)",
+      "ourPick": "Prescription and OTC meds (painkillers",
+      "perfectFor": [
+        "Pharmacies",
+        "well-stocked shelves and helpful English-speaking pharmacists",
+        "Tourists",
+        "Long-term residents"
+      ],
+      "priceLevel": "$ (pharma prices; more expensive than 7-Eleven)",
+      "hours": "~9 am–9 pm (varies by outlet)",
+      "phone": "(no public number)",
+      "website": "",
+      "facebook": "",
+      "instagram": "",
+      "map": "https://www.google.com/maps/search/?api=1&query=Red+Pharmacy+%28Sairee%29+Koh+Tao",
+      "delivery": "No (in-store only)",
+      "payment": "Cash; credit cards accepted",
+      "english": "Yes (staff are used to tourists)",
+      "wheelchair": "Partial (step into shop)",
+      "airConditioning": "Yes",
+      "parking": "Scooter/foot only",
+      "touristFriendly": "Yes",
+      "residentFriendly": "Yes",
+      "localFact": "One of only a few full pharmacies; others are small shopfronts",
+      "nearby": [
+        "Ya Nui Viewpoint trail start"
+      ],
+      "media": {
+        "heroImage": "",
+        "logo": "",
+        "gallery": []
+      },
+      "aiSummary": "Red Pharmacy (Sairee): A large pharmacy on Sairee Road (in Sairee village). **Short description:** Stocked like a drugstore, selling medicines, first-aid, vitamins, baby supplies and high-quality skin products Best known for well-stocked shelves and helpful English-speaking pharmacists. Practical tip: Avoid traveling without it – Thai pharmacies can sell basic antibiotics without prescription. If unsure about a medication, ask (they often help without a prescription for common ailments)",
+      "aiKeywords": [
+        "pharmacies",
+        "cards"
+      ],
+      "lastVerified": "2026-08-05"
+    },
+    {
+      "id": "px-jamsai-pharmacy-sairee",
+      "type": "essential",
+      "status": "active",
+      "featured": true,
+      "displayOrder": 9,
+      "name": "PX Jamsai Pharmacy (Sairee)",
+      "category": "Pharmacies",
+      "categories": [
+        "Pharmacies",
+        "Near Pier"
+      ],
+      "area": "Sairee Beach",
+      "cardDescription": "A smaller pharmacy also on Sairee Road near 7-Eleven. **Short description:** Local family-run pharmacy with basic medicines, first aid and skin care items",
+      "about": "A smaller pharmacy also on Sairee Road near 7-Eleven. **Short description:** Local family-run pharmacy with basic medicines, first aid and skin care items",
+      "recommendation": "Choose PX Jamsai Pharmacy (Sairee) when you need convenient location (near the ferry pier) and friendly service on Koh Tao.",
+      "localTip": "If one pharmacy is busy, try the other – pharmacists on Koh Tao may be very busy with long lines. Bring your own face mask/sanitiser (common sale item)",
+      "ourPick": "Similar to Red Pharmacy (OTC meds",
+      "perfectFor": [
+        "Pharmacies",
+        "convenient location (near the ferry pier) and friendly service",
+        "Tourists",
+        "Long-term residents"
+      ],
+      "priceLevel": "$–$$ (similar to Red)",
+      "hours": "~8 am–8 pm (check locally)",
+      "phone": "(no listing)",
+      "website": "",
+      "facebook": "",
+      "instagram": "",
+      "map": "https://www.google.com/maps/search/?api=1&query=PX+Jamsai+Pharmacy+%28Sairee%29+Koh+Tao",
+      "delivery": "No",
+      "payment": "Cash, cards",
+      "english": "Limited (basic English OK)",
+      "wheelchair": "No (one step)",
+      "airConditioning": "Yes",
+      "parking": "Pedestrian access",
+      "touristFriendly": "Yes",
+      "residentFriendly": "Yes",
+      "localFact": "Named after the owner (Miss Jamsai)",
+      "nearby": [
+        "Sairee Beach",
+        "7-Eleven"
+      ],
+      "media": {
+        "heroImage": "",
+        "logo": "",
+        "gallery": []
+      },
+      "aiSummary": "PX Jamsai Pharmacy (Sairee): A smaller pharmacy also on Sairee Road near 7-Eleven. **Short description:** Local family-run pharmacy with basic medicines, first aid and skin care items Best known for convenient location (near the ferry pier) and friendly service. Practical tip: If one pharmacy is busy, try the other – pharmacists on Koh Tao may be very busy with long lines. Bring your own face mask/sanitiser (common sale item)",
+      "aiKeywords": [
+        "pharmacies",
+        "near pier"
+      ],
+      "lastVerified": "2026-08-05"
+    },
+    {
+      "id": "bangkok-bank-branch-atm-mae-haad",
+      "type": "essential",
+      "status": "active",
+      "featured": true,
+      "displayOrder": 10,
+      "name": "Bangkok Bank (Branch & ATM, Mae Haad)",
+      "category": "Money",
+      "categories": [
+        "Money"
+      ],
+      "area": "Krungsri Bank",
+      "cardDescription": "The main Bangkok Bank branch in Mae Haad (near post office). **Short description:** Full-service bank with currency exchange counter",
+      "about": "The main Bangkok Bank branch in Mae Haad (near post office). **Short description:** Full-service bank with currency exchange counter",
+      "recommendation": "Choose Bangkok Bank (Branch & ATM, Mae Haad) when you need foreign exchange (open slightly later) and multiple ATMs outside on Koh Tao.",
+      "localTip": "Best to arrive by 4pm to use exchange (if not, Krungsri next door opens later on weekdays). Keep in mind Thai banks charge ~220฿ for foreign ATM withdrawals (plus your bank’s fee)",
+      "ourPick": "ATM withdrawals",
+      "perfectFor": [
+        "Money",
+        "Foreign exchange (open slightly later) and multiple ATMs outside",
+        "Tourists",
+        "Long-term residents"
+      ],
+      "priceLevel": "N/A",
+      "hours": "9:00–17:00 (M–F); exchange desk til ~19:00",
+      "phone": "+66 77 456235 (branch)",
+      "website": "https://www.bangkokbank.com",
+      "facebook": "",
+      "instagram": "",
+      "map": "https://www.google.com/maps/search/?api=1&query=Bangkok+Bank+%28Branch+%26+ATM%2C+Mae+Haad%29+Koh+Tao",
+      "delivery": "",
+      "payment": "N/A",
+      "english": "Yes (staff speak English)",
+      "wheelchair": "Yes (ramp)",
+      "airConditioning": "Yes",
+      "parking": "Street in front",
+      "touristFriendly": "Yes",
+      "residentFriendly": "Yes",
+      "localFact": "Western Union counter inside (relays to major banks)",
+      "nearby": [
+        "Krungsri Bank"
+      ],
+      "media": {
+        "heroImage": "",
+        "logo": "",
+        "gallery": []
+      },
+      "aiSummary": "Bangkok Bank (Branch & ATM, Mae Haad): The main Bangkok Bank branch in Mae Haad (near post office). **Short description:** Full-service bank with currency exchange counter Best known for Foreign exchange (open slightly later) and multiple ATMs outside. Practical tip: Best to arrive by 4pm to use exchange (if not, Krungsri next door opens later on weekdays). Keep in mind Thai banks charge ~220฿ for foreign ATM withdrawals (plus your bank’s fee)",
+      "aiKeywords": [
+        "money"
+      ],
+      "lastVerified": "2026-08-05"
+    },
+    {
+      "id": "krungsri-bank-bbl-kasikornbank",
+      "type": "essential",
+      "status": "active",
+      "featured": false,
+      "displayOrder": 11,
+      "name": "Krungsri Bank (BBL/KASIKORNBANK)",
+      "category": "Money",
+      "categories": [
+        "Money",
+        "24 Hours"
+      ],
+      "area": "Mae Haad Post Office",
+      "cardDescription": "A Mae Haad branch of Bank of Ayudhya (Krungsri) next to Bangkok Bank. **Short description:** Traditional brick-and-mortar branch with ATM and a money-exchange window",
+      "about": "A Mae Haad branch of Bank of Ayudhya (Krungsri) next to Bangkok Bank. **Short description:** Traditional brick-and-mortar branch with ATM and a money-exchange window",
+      "recommendation": "Choose Krungsri Bank (BBL/KASIKORNBANK) when you need accepting Thai account holders and giving late exchange (till ~6 pm) on Koh Tao.",
+      "localTip": "Use these ATMs before evening to avoid running out of cash (only limited 24/7 ATMs on island). Exchange rates on Koh Tao may be slightly worse than Samui (shop around)",
+      "ourPick": "ATMs",
+      "perfectFor": [
+        "Money",
+        "Accepting Thai account holders and giving late exchange (till ~6 pm)",
+        "Tourists",
+        "Long-term residents"
+      ],
+      "priceLevel": "N/A",
+      "hours": "9:00–16:30 (M–F); currency exchange till ~18:00",
+      "phone": "+66 77 456xxx (info)",
+      "website": "https://www.krungsri.com",
+      "facebook": "",
+      "instagram": "",
+      "map": "https://www.google.com/maps/search/?api=1&query=Krungsri+Bank+%28BBL%2FKASIKORNBANK%29+Koh+Tao",
+      "delivery": "N/A",
+      "payment": "N/A",
+      "english": "Yes",
+      "wheelchair": "Yes",
+      "airConditioning": "Yes",
+      "parking": "Street",
+      "touristFriendly": "Yes",
+      "residentFriendly": "Yes",
+      "localFact": "Sometimes busier than BB on late afternoons (due to exchange services)",
+      "nearby": [
+        "Mae Haad Post Office"
+      ],
+      "media": {
+        "heroImage": "",
+        "logo": "",
+        "gallery": []
+      },
+      "aiSummary": "Krungsri Bank (BBL/KASIKORNBANK): A Mae Haad branch of Bank of Ayudhya (Krungsri) next to Bangkok Bank. **Short description:** Traditional brick-and-mortar branch with ATM and a money-exchange window Best known for Accepting Thai account holders and giving late exchange (till ~6 pm). Practical tip: Use these ATMs before evening to avoid running out of cash (only limited 24/7 ATMs on island). Exchange rates on Koh Tao may be slightly worse than Samui (shop around)",
+      "aiKeywords": [
+        "money",
+        "24 hours"
+      ],
+      "lastVerified": "2026-08-05"
+    },
+    {
+      "id": "thanachart-bank-mae-haad",
+      "type": "essential",
+      "status": "active",
+      "featured": false,
+      "displayOrder": 12,
+      "name": "Thanachart Bank (Mae Haad)",
+      "category": "Money",
+      "categories": [
+        "Money",
+        "Near Pier"
+      ],
+      "area": "Marine Conservation Stop",
+      "cardDescription": "A branch of Thanachart near the junction up the hill from the pier. **Short description:** The first bank encountered from the pier on the “up road”",
+      "about": "A branch of Thanachart near the junction up the hill from the pier. **Short description:** The first bank encountered from the pier on the “up road”",
+      "recommendation": "Choose Thanachart Bank (Mae Haad) when you need serving both locals and tourists; currency exchange till ~16:30 on Koh Tao.",
+      "localTip": "Arrive early (closed weekends and after 4pm). For Thai baht, there are also moneychangers around Sairee (but banks are more trustworthy)",
+      "ourPick": "ATM",
+      "perfectFor": [
+        "Money",
+        "Serving both locals and tourists; currency exchange till ~16:30",
+        "Tourists",
+        "Long-term residents"
+      ],
+      "priceLevel": "N/A",
+      "hours": "9:00–16:00 (M–F); exchange till 16:30",
+      "phone": "+66 77 456xxx",
+      "website": "https://www.thanachart.com",
+      "facebook": "",
+      "instagram": "",
+      "map": "https://www.google.com/maps/search/?api=1&query=Thanachart+Bank+%28Mae+Haad%29+Koh+Tao",
+      "delivery": "N/A",
+      "payment": "N/A",
+      "english": "Yes",
+      "wheelchair": "Yes",
+      "airConditioning": "Yes",
+      "parking": "Street (scooters)",
+      "touristFriendly": "Yes",
+      "residentFriendly": "Yes",
+      "localFact": "Often has better exchange rates on USD (check signage)",
+      "nearby": [
+        "Marine Conservation Stop"
+      ],
+      "media": {
+        "heroImage": "",
+        "logo": "",
+        "gallery": []
+      },
+      "aiSummary": "Thanachart Bank (Mae Haad): A branch of Thanachart near the junction up the hill from the pier. **Short description:** The first bank encountered from the pier on the “up road” Best known for Serving both locals and tourists; currency exchange till ~16:30. Practical tip: Arrive early (closed weekends and after 4pm). For Thai baht, there are also moneychangers around Sairee (but banks are more trustworthy)",
+      "aiKeywords": [
+        "money",
+        "near pier"
+      ],
+      "lastVerified": "2026-08-05"
+    },
+    {
+      "id": "self-service-launderettes-mae-haad",
+      "type": "essential",
+      "status": "active",
+      "featured": false,
+      "displayOrder": 13,
+      "name": "Self-service Launderettes (Mae Haad)",
+      "category": "Laundry",
+      "categories": [
+        "Laundry"
+      ],
+      "area": "Local markets or supermarkets",
+      "cardDescription": "Scattered machines near Mae Haad (e.g. beside Chumporn Fresh Mart near ChaiWat). **Short description:** Coin-operated washers (8–14 kg) for self-service laundry",
+      "about": "Scattered machines near Mae Haad (e.g. beside Chumporn Fresh Mart near ChaiWat). **Short description:** Coin-operated washers (8–14 kg) for self-service laundry",
+      "recommendation": "Choose Self-service Launderettes (Mae Haad) when you need cheap washes (50–80 THB/machine) without mixing with others’ laundry on Koh Tao.",
+      "localTip": "Bring your own detergent. Machines may be temperamental; have backup detergent and extra coins. Remember to hand-wash delicates separately",
+      "ourPick": "Wash & spin (no detergent)",
+      "perfectFor": [
+        "Laundry",
+        "Cheap washes (50–80 THB/machine) without mixing with others’ laundry",
+        "Tourists",
+        "Long-term residents"
+      ],
+      "priceLevel": "$ (per load)",
+      "hours": "Typically 6:00–21:00",
+      "phone": "N/A",
+      "website": "",
+      "facebook": "",
+      "instagram": "",
+      "map": "https://www.google.com/maps/search/?api=1&query=Self-service+Launderettes+%28Mae+Haad%29+Koh+Tao",
+      "delivery": "N/A",
+      "payment": "Coins (no cash/CC)",
+      "english": "Minimal",
+      "wheelchair": "Yes",
+      "airConditioning": "No",
+      "parking": "Street",
+      "touristFriendly": "Yes (if packing light)",
+      "residentFriendly": "Yes",
+      "localFact": "Few exist; marked by green “Coin Laundry” logos",
+      "nearby": [
+        "Local markets or supermarkets"
+      ],
+      "media": {
+        "heroImage": "",
+        "logo": "",
+        "gallery": []
+      },
+      "aiSummary": "Self-service Launderettes (Mae Haad): Scattered machines near Mae Haad (e.g. beside Chumporn Fresh Mart near ChaiWat). **Short description:** Coin-operated washers (8–14 kg) for self-service laundry Best known for Cheap washes (50–80 THB/machine) without mixing with others’ laundry. Practical tip: Bring your own detergent. Machines may be temperamental; have backup detergent and extra coins. Remember to hand-wash delicates separately",
+      "aiKeywords": [
+        "laundry"
+      ],
+      "lastVerified": "2026-08-05"
+    },
+    {
+      "id": "ais-shop-sairee",
+      "type": "essential",
+      "status": "active",
+      "featured": false,
+      "displayOrder": 14,
+      "name": "AIS Shop (Sairee)",
+      "category": "Mobile & SIM",
+      "categories": [
+        "Mobile & SIM"
+      ],
+      "area": "The Beermasons bar",
+      "cardDescription": "An official AIS telephone network store in Sairee (near Sairee Junction). **Short description:** Sells AIS tourist SIM cards, top-up vouchers, and phone accessories",
+      "about": "An official AIS telephone network store in Sairee (near Sairee Junction). **Short description:** Sells AIS tourist SIM cards, top-up vouchers, and phone accessories",
+      "recommendation": "Choose AIS Shop (Sairee) when you need easy purchase of SIM cards (passport required) and friendly support on Koh Tao.",
+      "localTip": "Compare plans with AIS staff; promotions often cheaper than 7-Eleven top-ups. After purchase, top-up via AIS kiosks or scan PromptPay",
+      "ourPick": "AIS prepaid SIMs (data/voice plans)",
+      "perfectFor": [
+        "Mobile & SIM",
+        "Easy purchase of SIM cards (passport required) and friendly support",
+        "Tourists",
+        "Long-term residents"
+      ],
+      "priceLevel": "$ (SIM+data typically 49–299 THB)",
+      "hours": "9:00–20:00 (typically daily)",
+      "phone": "+66 1699 (AIS call center)",
+      "website": "https://www.ais.th",
+      "facebook": "",
+      "instagram": "",
+      "map": "https://www.google.com/maps/search/?api=1&query=AIS+Shop+%28Sairee%29+Koh+Tao",
+      "delivery": "No (in-store only)",
+      "payment": "Cash, Thai cards",
+      "english": "Yes (staff assist tourists)",
+      "wheelchair": "Yes",
+      "airConditioning": "Yes",
+      "parking": "Street",
+      "touristFriendly": "Yes",
+      "residentFriendly": "Yes",
+      "localFact": "Will copy your passport and write down your number (required by Thai law)",
+      "nearby": [
+        "The Beermasons bar"
+      ],
+      "media": {
+        "heroImage": "",
+        "logo": "",
+        "gallery": []
+      },
+      "aiSummary": "AIS Shop (Sairee): An official AIS telephone network store in Sairee (near Sairee Junction). **Short description:** Sells AIS tourist SIM cards, top-up vouchers, and phone accessories Best known for Easy purchase of SIM cards (passport required) and friendly support. Practical tip: Compare plans with AIS staff; promotions often cheaper than 7-Eleven top-ups. After purchase, top-up via AIS kiosks or scan PromptPay",
+      "aiKeywords": [
+        "mobile & sim"
+      ],
+      "lastVerified": "2026-08-05"
+    },
+    {
+      "id": "techno-mania-mae-haad",
+      "type": "essential",
+      "status": "active",
+      "featured": false,
+      "displayOrder": 15,
+      "name": "Techno Mania (Mae Haad)",
+      "category": "Mobile & SIM",
+      "categories": [
+        "Mobile & SIM"
+      ],
+      "area": "Lotus Viewpoint",
+      "cardDescription": "A well-known computer and electronics shop on Mae Haad (near School junction). **Short description:** Sells computers, electronics accessories, and mobile devices",
+      "about": "A well-known computer and electronics shop on Mae Haad (near School junction). **Short description:** Sells computers, electronics accessories, and mobile devices",
+      "recommendation": "Choose Techno Mania (Mae Haad) when you need computer repairs and selling unlocked phones/chargers on Koh Tao.",
+      "localTip": "If buying a new phone, expect high markup; better to order online or bring from mainland. You can top up SIMs here too (especially True/DTAC)",
+      "ourPick": "Laptop/computer parts",
+      "perfectFor": [
+        "Mobile & SIM",
+        "Computer repairs and selling unlocked phones/chargers",
+        "Tourists",
+        "Long-term residents"
+      ],
+      "priceLevel": "$–$$ (electronics can be expensive on-island)",
+      "hours": "~9:00–20:00",
+      "phone": "+66 77 456xxx (info)",
+      "website": "",
+      "facebook": "",
+      "instagram": "",
+      "map": "https://www.google.com/maps/search/?api=1&query=Techno+Mania+%28Mae+Haad%29+Koh+Tao",
+      "delivery": "No",
+      "payment": "Cash or Thai card",
+      "english": "Limited (mostly Thai, but friendly)",
+      "wheelchair": "No (step entrance)",
+      "airConditioning": "Yes",
+      "parking": "Street",
+      "touristFriendly": "Yes",
+      "residentFriendly": "Yes",
+      "localFact": "Often the only place to fix a broken laptop on the island",
+      "nearby": [
+        "Lotus Viewpoint"
+      ],
+      "media": {
+        "heroImage": "",
+        "logo": "",
+        "gallery": []
+      },
+      "aiSummary": "Techno Mania (Mae Haad): A well-known computer and electronics shop on Mae Haad (near School junction). **Short description:** Sells computers, electronics accessories, and mobile devices Best known for Computer repairs and selling unlocked phones/chargers. Practical tip: If buying a new phone, expect high markup; better to order online or bring from mainland. You can top up SIMs here too (especially True/DTAC)",
+      "aiKeywords": [
+        "mobile & sim"
+      ],
+      "lastVerified": "2026-08-05"
+    },
+    {
+      "id": "s-s-water-delivery",
+      "type": "essential",
+      "status": "active",
+      "featured": false,
+      "displayOrder": 16,
+      "name": "S&S Water Delivery",
+      "category": "Water",
+      "categories": [
+        "Water",
+        "Delivery"
+      ],
+      "area": "N/A (home delivery only)",
+      "cardDescription": "An eco-friendly water service on Koh Tao. **Short description:** Delivers 5-litre glass-bottled drinking water (and soda water) in 24-bottle crates, collected from a factory on the mainland",
+      "about": "An eco-friendly water service on Koh Tao. **Short description:** Delivers 5-litre glass-bottled drinking water (and soda water) in 24-bottle crates, collected from a factory on the mainland",
+      "recommendation": "Choose S&S Water Delivery when you need using reusable glass bottles to eliminate plastic waste on Koh Tao.",
+      "localTip": "You pay a 200 THB refundable crate deposit (returned when you give back crates). Plan orders in advance (runs 700+ crates/month island-wide). Refill cycle is usually 2–3 days",
+      "ourPick": "Drinking water (24×620 ml bottles for 140 THB) and soda water (24×620 ml for 210 THB)",
+      "perfectFor": [
+        "Water",
+        "Using reusable glass bottles to eliminate plastic waste",
+        "Tourists",
+        "Long-term residents"
+      ],
+      "priceLevel": "$ (above, ~0.75 THB/litre plus deposit)",
+      "hours": "By appointment (typically 8:00–17:00)",
+      "phone": "Thai +66 85 791 4610; English +66 92 323 7545",
+      "website": "",
+      "facebook": "https://www.facebook.com/sswaterkoh",
+      "instagram": "",
+      "map": "https://www.google.com/maps/search/?api=1&query=S%26S+Water+Delivery+Koh+Tao",
+      "delivery": "Yes – call or message to schedule delivery",
+      "payment": "Cash or PromptPay on delivery",
+      "english": "Yes (staff are bilingual)",
+      "wheelchair": "N/A (delivery service)",
+      "airConditioning": "N/A",
+      "parking": "N/A",
+      "touristFriendly": "Yes (anyone staying)",
+      "residentFriendly": "Yes (many long-term users)",
+      "localFact": "Founded after a 2017 landfill fire to reduce plastic; also offers recycling pickup with deliveries",
+      "nearby": [
+        "N/A (home delivery only)"
+      ],
+      "media": {
+        "heroImage": "",
+        "logo": "",
+        "gallery": []
+      },
+      "aiSummary": "S&S Water Delivery: An eco-friendly water service on Koh Tao. **Short description:** Delivers 5-litre glass-bottled drinking water (and soda water) in 24-bottle crates, collected from a factory on the mainland Best known for Using reusable glass bottles to eliminate plastic waste. Practical tip: You pay a 200 THB refundable crate deposit (returned when you give back crates). Plan orders in advance (runs 700+ crates/month island-wide). Refill cycle is usually 2–3 days",
+      "aiKeywords": [
+        "water",
+        "delivery"
+      ],
+      "lastVerified": "2026-08-05"
+    },
+    {
+      "id": "oli-s-motorbike-rentals-mae-haad",
+      "type": "essential",
+      "status": "active",
+      "featured": false,
+      "displayOrder": 17,
+      "name": "Oli’s Motorbike Rentals (Mae Haad)",
+      "category": "Scooter Rental",
+      "categories": [
+        "Scooter Rental",
+        "Near Pier"
+      ],
+      "area": "Chumphon Fresh Mart",
+      "cardDescription": "A top-rated scooter rental company located near the ferry pier. **Short description:** Offers 125cc and 160cc automatic scooters for rent, with insurance options",
+      "about": "A top-rated scooter rental company located near the ferry pier. **Short description:** Offers 125cc and 160cc automatic scooters for rent, with insurance options",
+      "recommendation": "Choose Oli’s Motorbike Rentals (Mae Haad) when you need no passport deposit policy (only a photo+deposit) on Koh Tao.",
+      "localTip": "Best time to pick up a returned scooter is around 10 am (many are returned then). Inspect bike carefully and take photos of any existing scratches. Wear helmets (by law) and keep deposit (2,000 ฿ or ID) ready",
+      "ourPick": "Honda Click 125cc/160cc scooters; also helmets and crash insurance packages",
+      "perfectFor": [
+        "Scooter Rental",
+        "No passport deposit policy (only a photo+deposit)",
+        "Tourists",
+        "Long-term residents"
+      ],
+      "priceLevel": "$$ (around 300–350 ฿/day for 125cc with basic insurance)",
+      "hours": "8:00–19:00 (often open later; contact for 24/7 pick-up)",
+      "phone": "+66 98 357 8178",
+      "website": "https://www.bikerentalkohtao.com",
+      "facebook": "",
+      "instagram": "",
+      "map": "https://www.google.com/maps/search/?api=1&query=Oli%E2%80%99s+Motorbike+Rentals+%28Mae+Haad%29+Koh+Tao",
+      "delivery": "",
+      "payment": "Cash or Thai credit card",
+      "english": "Yes (Western-run; staff speak fluent English)",
+      "wheelchair": "N/A",
+      "airConditioning": "N/A",
+      "parking": "Free parking for scooters outside",
+      "touristFriendly": "Yes",
+      "residentFriendly": "Yes (locals may also rent)",
+      "localFact": "Includes a free snorkel mask set with rental for guests",
+      "nearby": [
+        "Chumphon Fresh Mart"
+      ],
+      "media": {
+        "heroImage": "",
+        "logo": "",
+        "gallery": []
+      },
+      "aiSummary": "Oli’s Motorbike Rentals (Mae Haad): A top-rated scooter rental company located near the ferry pier. **Short description:** Offers 125cc and 160cc automatic scooters for rent, with insurance options Best known for No passport deposit policy (only a photo+deposit). Practical tip: Best time to pick up a returned scooter is around 10 am (many are returned then). Inspect bike carefully and take photos of any existing scratches. Wear helmets (by law) and keep deposit (2,000 ฿ or ID) ready",
+      "aiKeywords": [
+        "scooter rental",
+        "near pier"
+      ],
+      "lastVerified": "2026-08-05"
+    },
+    {
+      "id": "jitsin-petrol-station-sairee-branch",
+      "type": "essential",
+      "status": "active",
+      "featured": false,
+      "displayOrder": 18,
+      "name": "Jitsin Petrol Station (Sairee Branch)",
+      "category": "Fuel",
+      "categories": [
+        "Fuel",
+        "24 Hours",
+        "Cards"
+      ],
+      "area": "Sairee School",
+      "cardDescription": "The main 24-hour fuel station on the west side (at the Sairee school junction). **Short description:** Open 24/7, sells petrol and diesel",
+      "about": "The main 24-hour fuel station on the west side (at the Sairee school junction). **Short description:** Open 24/7, sells petrol and diesel",
+      "recommendation": "Choose Jitsin Petrol Station (Sairee Branch) when you need convenient late-night refueling when traveling between beaches on Koh Tao.",
+      "localTip": "Use credit card to track spending. It gets busy at sunset; plan accordingly. If islands appear busy, lines may form by pump",
+      "ourPick": "Unleaded 91",
+      "perfectFor": [
+        "Fuel",
+        "Convenient late-night refueling when traveling between beaches",
+        "Tourists",
+        "Long-term residents"
+      ],
+      "priceLevel": "$ (set by government; fluctuates monthly)",
+      "hours": "24h",
+      "phone": "+66 77 456604",
+      "website": "",
+      "facebook": "",
+      "instagram": "",
+      "map": "https://www.google.com/maps/search/?api=1&query=Jitsin+Petrol+Station+%28Sairee+Branch%29+Koh+Tao",
+      "delivery": "No",
+      "payment": "Cash, credit cards (Visa/Master)",
+      "english": "Minimal (fill-up at pump or pay inside)",
+      "wheelchair": "Yes (flat ground)",
+      "airConditioning": "No (outdoor pumps)",
+      "parking": "Generous (cars/scooters)",
+      "touristFriendly": "Yes",
+      "residentFriendly": "Yes",
+      "localFact": "Also sells boat fuel jerrycans (expensive by comparison)",
+      "nearby": [
+        "Sairee School"
+      ],
+      "media": {
+        "heroImage": "",
+        "logo": "",
+        "gallery": []
+      },
+      "aiSummary": "Jitsin Petrol Station (Sairee Branch): The main 24-hour fuel station on the west side (at the Sairee school junction). **Short description:** Open 24/7, sells petrol and diesel Best known for Convenient late-night refueling when traveling between beaches. Practical tip: Use credit card to track spending. It gets busy at sunset; plan accordingly. If islands appear busy, lines may form by pump",
+      "aiKeywords": [
+        "fuel",
+        "24 hours",
+        "cards"
+      ],
+      "lastVerified": "2026-08-05"
+    },
+    {
+      "id": "jitsin-petrol-station-mae-haad-branch",
+      "type": "essential",
+      "status": "active",
+      "featured": false,
+      "displayOrder": 19,
+      "name": "Jitsin Petrol Station (Mae Haad Branch)",
+      "category": "Fuel",
+      "categories": [
+        "Fuel",
+        "24 Hours",
+        "Cards",
+        "Near Pier"
+      ],
+      "area": "Mae Haad Pier",
+      "cardDescription": "The 24-hour fuel station near Mae Haad Pier. **Short description:** Round-the-clock petrol station at the north end of town",
+      "about": "The 24-hour fuel station near Mae Haad Pier. **Short description:** Round-the-clock petrol station at the north end of town",
+      "recommendation": "Choose Jitsin Petrol Station (Mae Haad Branch) when you need refueling before/after ferry trips on Koh Tao.",
+      "localTip": "You may need to hand pump – ask attendant for help if unsure. Always remember to turn engine off while refueling",
+      "ourPick": "Petrol 91/95 and diesel",
+      "perfectFor": [
+        "Fuel",
+        "Refueling before/after ferry trips",
+        "Tourists",
+        "Long-term residents"
+      ],
+      "priceLevel": "$ (government price)",
+      "hours": "24h (typically)",
+      "phone": "+66 77 456605",
+      "website": "",
+      "facebook": "",
+      "instagram": "",
+      "map": "https://www.google.com/maps/search/?api=1&query=Jitsin+Petrol+Station+%28Mae+Haad+Branch%29+Koh+Tao",
+      "delivery": "",
+      "payment": "Cash, credit cards",
+      "english": "Minimal",
+      "wheelchair": "Yes",
+      "airConditioning": "No",
+      "parking": "Limited (small)",
+      "touristFriendly": "Yes",
+      "residentFriendly": "Yes",
+      "localFact": "Next to Cham’s kitchen and 7-Eleven",
+      "nearby": [
+        "Mae Haad Pier",
+        "dive shops"
+      ],
+      "media": {
+        "heroImage": "",
+        "logo": "",
+        "gallery": []
+      },
+      "aiSummary": "Jitsin Petrol Station (Mae Haad Branch): The 24-hour fuel station near Mae Haad Pier. **Short description:** Round-the-clock petrol station at the north end of town Best known for Refueling before/after ferry trips. Practical tip: You may need to hand pump – ask attendant for help if unsure. Always remember to turn engine off while refueling",
+      "aiKeywords": [
+        "fuel",
+        "24 hours",
+        "cards",
+        "near pier"
+      ],
+      "lastVerified": "2026-08-05"
+    },
+    {
+      "id": "may-co-general-store-sairee",
+      "type": "essential",
+      "status": "active",
+      "featured": false,
+      "displayOrder": 20,
+      "name": "May & Co. General Store (Sairee)",
+      "category": "Clothing & Souvenirs",
+      "categories": [
+        "Clothing & Souvenirs"
+      ],
+      "area": "Sairee Beach",
+      "cardDescription": "A boutique gift and fashion store in Sairee. **Short description:** Trendy shop selling beachwear, accessories and locally made gift sets",
+      "about": "A boutique gift and fashion store in Sairee. **Short description:** Trendy shop selling beachwear, accessories and locally made gift sets",
+      "recommendation": "Choose May & Co. General Store (Sairee) when you need elegant Thai-inspired souvenirs and curated home-goods (e.g. scented products, candles) on Koh Tao.",
+      "localTip": "Good place for last-minute gifts – many items are pre-wrapped. Keep track of your souvenirs (shopkeepers gift-wrap to prevent theft in busy crowds)",
+      "ourPick": "Women’s clothing",
+      "perfectFor": [
+        "Clothing & Souvenirs",
+        "Elegant Thai-inspired souvenirs and curated home-goods (e.g. scented products, candles)",
+        "Tourists",
+        "Long-term residents"
+      ],
+      "priceLevel": "$$ (higher-end gifts)",
+      "hours": "~10:00–22:00",
+      "phone": "+66 81 XXXXXXX",
+      "website": "",
+      "facebook": "",
+      "instagram": "",
+      "map": "https://www.google.com/maps/search/?api=1&query=May+%26+Co.+General+Store+%28Sairee%29+Koh+Tao",
+      "delivery": "No",
+      "payment": "Cash, cards",
+      "english": "Yes",
+      "wheelchair": "Yes (shop is ground-level)",
+      "airConditioning": "Yes",
+      "parking": "Pedestrian area (walk only)",
+      "touristFriendly": "Yes",
+      "residentFriendly": "Yes (fashionable locals)",
+      "localFact": "Caters to luxury resorts and fine-dining clientele",
+      "nearby": [
+        "Sairee Beach"
+      ],
+      "media": {
+        "heroImage": "",
+        "logo": "",
+        "gallery": []
+      },
+      "aiSummary": "May & Co. General Store (Sairee): A boutique gift and fashion store in Sairee. **Short description:** Trendy shop selling beachwear, accessories and locally made gift sets Best known for Elegant Thai-inspired souvenirs and curated home-goods (e.g. scented products, candles). Practical tip: Good place for last-minute gifts – many items are pre-wrapped. Keep track of your souvenirs (shopkeepers gift-wrap to prevent theft in busy crowds)",
+      "aiKeywords": [
+        "clothing & souvenirs"
+      ],
+      "lastVerified": "2026-08-05"
+    },
+    {
+      "id": "flipflop-treacle-sairee",
+      "type": "essential",
+      "status": "active",
+      "featured": false,
+      "displayOrder": 21,
+      "name": "Flipflop & Treacle (Sairee)",
+      "category": "Clothing & Souvenirs",
+      "categories": [
+        "Clothing & Souvenirs"
+      ],
+      "area": "Central Festival Bar",
+      "cardDescription": "A small boutique on Sairee Walking Street. **Short description:** Specializes in original beachwear designs for men and women",
+      "about": "A small boutique on Sairee Walking Street. **Short description:** Specializes in original beachwear designs for men and women",
+      "recommendation": "Choose Flipflop & Treacle (Sairee) when you need colorful bikinis, boardshorts and casual apparel made on Koh Tao on Koh Tao.",
+      "localTip": "Try on sizes carefully – Thai cuts can run small. Sign up for their social media for occasional shop promos",
+      "ourPick": "Swimwear",
+      "perfectFor": [
+        "Clothing & Souvenirs",
+        "Colorful bikinis, boardshorts and casual apparel made on Koh Tao",
+        "Tourists",
+        "Long-term residents"
+      ],
+      "priceLevel": "$$ (designer brand)",
+      "hours": "11:00–21:00 daily",
+      "phone": "+66 81 XXXXXXX",
+      "website": "https://flipflopandtreacle.com",
+      "facebook": "",
+      "instagram": "",
+      "map": "https://www.google.com/maps/search/?api=1&query=Flipflop+%26+Treacle+%28Sairee%29+Koh+Tao",
+      "delivery": "Yes (website ships internationally)",
+      "payment": "Cash, cards",
+      "english": "Yes",
+      "wheelchair": "Yes (flat entrance)",
+      "airConditioning": "Yes",
+      "parking": "Walk",
+      "touristFriendly": "Yes",
+      "residentFriendly": "Yes (fashion-forward)",
+      "localFact": "Founded by expats, uses eco-friendly fabrics",
+      "nearby": [
+        "Central Festival Bar"
+      ],
+      "media": {
+        "heroImage": "",
+        "logo": "",
+        "gallery": []
+      },
+      "aiSummary": "Flipflop & Treacle (Sairee): A small boutique on Sairee Walking Street. **Short description:** Specializes in original beachwear designs for men and women Best known for Colorful bikinis, boardshorts and casual apparel made on Koh Tao. Practical tip: Try on sizes carefully – Thai cuts can run small. Sign up for their social media for occasional shop promos",
+      "aiKeywords": [
+        "clothing & souvenirs"
+      ],
+      "lastVerified": "2026-08-05"
+    },
+    {
+      "id": "head-watersports-mae-haad",
+      "type": "essential",
+      "status": "active",
+      "featured": false,
+      "displayOrder": 22,
+      "name": "HEAD Watersports (Mae Haad)",
+      "category": "Beach & Dive Equipment",
+      "categories": [
+        "Beach & Dive Equipment"
+      ],
+      "area": "Mae Haad Beach",
+      "cardDescription": "A sports shop on Mae Haad beach road. **Short description:** Sells snorkeling, paddle boarding, and dive accessories",
+      "about": "A sports shop on Mae Haad beach road. **Short description:** Sells snorkeling, paddle boarding, and dive accessories",
+      "recommendation": "Choose HEAD Watersports (Mae Haad) when you need wide range of snorkel sets, masks and fins on Koh Tao.",
+      "localTip": "If gear is expensive, consider renting at a dive center. Check equipment carefully for fit (masks and fins sizing)",
+      "ourPick": "Snorkel gear",
+      "perfectFor": [
+        "Beach & Dive Equipment",
+        "Wide range of snorkel sets, masks and fins",
+        "Tourists",
+        "Long-term residents"
+      ],
+      "priceLevel": "$$ (mid-range)",
+      "hours": "8:00–19:00",
+      "phone": "+66 77 456XXX",
+      "website": "",
+      "facebook": "",
+      "instagram": "",
+      "map": "https://www.google.com/maps/search/?api=1&query=HEAD+Watersports+%28Mae+Haad%29+Koh+Tao",
+      "delivery": "No",
+      "payment": "Cash, cards",
+      "english": "Yes",
+      "wheelchair": "Yes",
+      "airConditioning": "Yes",
+      "parking": "Street",
+      "touristFriendly": "Yes (for snorkel gear)",
+      "residentFriendly": "Yes (water-sports enthusiasts)",
+      "localFact": "Often rents SUP/kayaks hourly",
+      "nearby": [
+        "Mae Haad Beach"
+      ],
+      "media": {
+        "heroImage": "",
+        "logo": "",
+        "gallery": []
+      },
+      "aiSummary": "HEAD Watersports (Mae Haad): A sports shop on Mae Haad beach road. **Short description:** Sells snorkeling, paddle boarding, and dive accessories Best known for Wide range of snorkel sets, masks and fins. Practical tip: If gear is expensive, consider renting at a dive center. Check equipment carefully for fit (masks and fins sizing)",
+      "aiKeywords": [
+        "beach & dive equipment"
+      ],
+      "lastVerified": "2026-08-05"
+    }
+  ]
+}

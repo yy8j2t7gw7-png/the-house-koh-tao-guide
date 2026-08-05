@@ -1,73 +1,44 @@
 <!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex,nofollow">
 <meta name="description" content="Restaurants recommended by The House on Koh Tao">
-<title>Restaurants | The House Guide</title>
-<link rel="icon" href="/logo.svg">
-<link rel="stylesheet" href="/design-system.css">
-<link rel="stylesheet" href="/ai-concierge.css">
-</head>
-<body>
-<div class="shell">
-<header class="topbar">
-  <a class="brand" href="/"><img src="/logo.svg" alt="The House Koh Tao"></a>
-  <nav class="nav">
-    <a href="/rooms.html">Your Room</a>
-    <a href="/house.html">The House</a>
-    <a href="/practical.html">Guest Information</a>
-    <a href="/explore.html">Explore</a>
-    <a href="/emergency.html">Help & Emergency</a>
-    <a href="/checkout.html">Departure</a>
-  </nav>
-</header>
-
-<section class="section">
-  <a class="back-link" href="/explore.html">← Back to Explore</a>
-  <h1>Restaurants</h1>
-  <p class="section-intro">Great food often becomes one of the best memories of a trip. Swipe through the places we would happily recommend to our own friends and family.</p>
-  <p class="swipe-hint">← Swipe or scroll between restaurants →</p>
-</section>
-
-<section class="section">
-  <div class="swipe-row" id="restaurantOverview"></div>
-</section>
-
-<footer class="footer">The House Guide · Restaurants on Koh Tao.</footer>
-</div>
+<title>Restaurants We Recommend | The House Guide</title>
+<link rel="icon" href="/logo.svg"><link rel="stylesheet" href="/design-system.css">
+<link rel="stylesheet" href="/restaurant-experience.css"><link rel="stylesheet" href="/ai-concierge.css">
+</head><body><div class="shell">
+<header class="topbar"><a class="brand" href="/"><img src="/logo.svg" alt="The House Koh Tao"></a>
+<nav class="nav"><a href="/rooms.html">Your Room</a><a href="/house.html">The House</a><a href="/practical.html">Guest Information</a><a href="/explore.html">Explore</a><a href="/emergency.html">Help & Emergency</a><a href="/checkout.html">Departure</a></nav></header>
+<section class="section"><a class="back-link" href="/explore.html">← Back to Explore</a>
+<h1>Restaurants We Recommend</h1>
+<p class="section-intro">A carefully selected collection of places we would confidently suggest to our own friends and guests. There are no rankings or scores—only different experiences for different moments.</p>
+<div class="restaurant-filters" id="restaurantFilters"></div></section>
+<section class="section"><div class="restaurant-grid" id="restaurantGrid"></div></section>
+<footer class="footer">The House Guide · Restaurants on Koh Tao.</footer></div>
 <a class="float-wa" data-link="houseWhatsapp" target="_blank" rel="noopener" data-action="contact">Contact Us</a>
-<script src="/contacts.js"></script>
-<script src="/guide-app.js"></script>
-<script src="/restaurants-data.js"></script>
+<script src="/contacts.js"></script><script src="/guide-app.js"></script>
 <script>
-(function(){
-  const root = document.getElementById("restaurantOverview");
-  const restaurants = window.HOUSE_RESTAURANTS || [];
-  root.innerHTML = restaurants.map((r) => {
-    const tags = r.tags.slice(0,3).map(tag => `<span class="tag">${tag}</span>`).join("");
-    return `
-      <article class="swipe-card">
-        <div class="swipe-card-visual">
-          <img src="${r.images[0]}" alt="${r.name}">
-        </div>
-        <div class="swipe-card-copy">
-          <h2>${r.name}</h2>
-          <p>${r.tip}</p>
-          <div class="tags">${tags}</div>
-          <div class="btns">
-            <a class="btn" href="/restaurant.html?id=${encodeURIComponent(r.slug)}">Discover →</a>
-          </div>
-        </div>
-      </article>`;
-  }).join("");
+(async function(){
+ const response=await fetch('/data/places.json',{cache:'no-store'}); const db=await response.json();
+ const places=db.places.filter(p=>p.type==='restaurant'&&p.status==='active').sort((a,b)=>a.displayOrder-b.displayOrder);
+ const filters=['All','Thai','Italian','Seafood','Breakfast','Vegetarian','Romantic','Beachfront','Budget Friendly'];
+ const filterRoot=document.getElementById('restaurantFilters'), grid=document.getElementById('restaurantGrid');
+ function initials(name){return name.split(/\s+/).filter(Boolean).slice(0,2).map(w=>w[0]).join('').toUpperCase()}
+ function render(active='All'){
+   const shown=active==='All'?places:places.filter(p=>p.categories.some(c=>c.toLowerCase().includes(active.toLowerCase())));
+   grid.innerHTML=shown.map(p=>{
+     const media=p.media.heroImage?`<img src="${p.media.heroImage}" alt="${p.name}">`:`<div class="restaurant-card-fallback">${initials(p.name)}</div>`;
+     const tags=p.content.perfectFor.slice(0,3).map(x=>`<span class="tag">${x}</span>`).join('');
+     return `<article class="restaurant-card"><div class="restaurant-card-media">${media}</div><div class="restaurant-card-body">
+       <div class="place-area">${p.area}</div><h2>${p.name}</h2><p>${p.cardDescription}</p>
+       <div class="tags">${tags}</div><div class="btns"><a class="btn" href="/restaurant.html?id=${encodeURIComponent(p.id)}">View Restaurant →</a></div>
+     </div></article>`;
+   }).join('');
+ }
+ filterRoot.innerHTML=filters.map((f,i)=>`<button class="filter-chip ${i===0?'is-active':''}" data-filter="${f}">${f}</button>`).join('');
+ filterRoot.addEventListener('click',e=>{const b=e.target.closest('[data-filter]');if(!b)return;filterRoot.querySelectorAll('.filter-chip').forEach(x=>x.classList.remove('is-active'));b.classList.add('is-active');render(b.dataset.filter)});
+ render();
 })();
 </script>
-<script src="/module-registry.js"></script>
-<script src="/platform-actions.js"></script>
-<script src="/platform-action-runtime.js"></script>
-<script src="/ai-concierge-config.js"></script>
-<script src="/ai-concierge.js"></script>
-</body>
-</html>
+<script src="/module-registry.js"></script><script src="/platform-actions.js"></script><script src="/platform-action-runtime.js"></script>
+<script src="/ai-concierge-config.js"></script><script src="/ai-concierge.js"></script></body></html>

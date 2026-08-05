@@ -1,93 +1,46 @@
 <!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="robots" content="noindex,nofollow">
-<meta name="description" content="Restaurant details from The House Guide">
-<title>Restaurant Details | The House Guide</title>
-<link rel="icon" href="/logo.svg">
-<link rel="stylesheet" href="/design-system.css">
-<link rel="stylesheet" href="/ai-concierge.css">
-</head>
-<body>
-<div class="shell">
-<header class="topbar">
-  <a class="brand" href="/"><img src="/logo.svg" alt="The House Koh Tao"></a>
-  <nav class="nav">
-    <a href="/rooms.html">Your Room</a>
-    <a href="/house.html">The House</a>
-    <a href="/practical.html">Guest Information</a>
-    <a href="/explore.html">Explore</a>
-    <a href="/emergency.html">Help & Emergency</a>
-    <a href="/checkout.html">Departure</a>
-  </nav>
-</header>
-
-<section class="section">
-  <a class="back-link" href="/restaurants.html">← Back to restaurants</a>
-  <div id="restaurantDetail"></div>
-</section>
-
-<footer class="footer">The House Guide · Restaurant details.</footer>
-</div>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow"><meta name="description" content="Restaurant details from The House Guide">
+<title>Restaurant | The House Guide</title><link rel="icon" href="/logo.svg">
+<link rel="stylesheet" href="/design-system.css"><link rel="stylesheet" href="/restaurant-experience.css"><link rel="stylesheet" href="/ai-concierge.css">
+</head><body><div class="shell">
+<header class="topbar"><a class="brand" href="/"><img src="/logo.svg" alt="The House Koh Tao"></a>
+<nav class="nav"><a href="/rooms.html">Your Room</a><a href="/house.html">The House</a><a href="/practical.html">Guest Information</a><a href="/explore.html">Explore</a><a href="/emergency.html">Help & Emergency</a><a href="/checkout.html">Departure</a></nav></header>
+<section class="section"><a class="back-link" href="/restaurants.html">← Back to restaurants</a><div id="restaurantDetail"></div></section>
+<footer class="footer">The House Guide · Restaurant details.</footer></div>
 <a class="float-wa" data-link="houseWhatsapp" target="_blank" rel="noopener" data-action="contact">Contact Us</a>
-<script src="/contacts.js"></script>
-<script src="/guide-app.js"></script>
-<script src="/restaurants-data.js"></script>
+<script src="/contacts.js"></script><script src="/guide-app.js"></script>
 <script>
-(function(){
-  const id = new URLSearchParams(window.location.search).get("id");
-  const r = (window.HOUSE_RESTAURANTS || []).find(item => item.slug === id);
-  const root = document.getElementById("restaurantDetail");
-
-  if(!r){
-    root.innerHTML = `<h1>Restaurant not found</h1><div class="btns"><a class="btn" href="/restaurants.html">Back to Restaurants</a></div>`;
-    return;
-  }
-
-  document.title = `${r.name} | The House Guide`;
-  const images = r.images.map((src, i) =>
-    `<img src="${src}" alt="${r.name} ${i === 0 ? 'arrival' : i === 1 ? 'food' : 'atmosphere'}">`
-  ).join("");
-  const tags = r.tags.map(tag => `<span class="tag">${tag}</span>`).join("");
-  const website = r.website
-    ? `<a class="btn secondary" href="${r.website}" target="_blank" rel="noopener">Visit Website</a>`
-    : "";
-
-  root.innerHTML = `
-    <div class="partner-header">
-      <div>
-        <h1>${r.name}</h1>
-        <p class="section-intro">${r.experience}</p>
-      </div>
-    </div>
-
-    <div class="tip-box"><strong>Why it is worth your time</strong><br>${r.tip}</div>
-    <p>${r.description}</p>
-
-    <h2>A closer look</h2>
-    <p class="swipe-hint">← Swipe across the photos →</p>
-    <div class="detail-gallery">${images}</div>
-
-    <div class="detail-meta">
-      <div class="meta-item"><strong>Cuisine</strong><br>${r.cuisine}</div>
-      <div class="meta-item"><strong>Price</strong><br>${r.price}</div>
-    </div>
-    <div class="tags">${tags}</div>
-    <div class="btns">
-      <a class="btn" href="${r.map}" target="_blank" rel="noopener">Open Map</a>
-      ${website}
-    </div>
-    <p class="ai-note">Restaurant illustrations are AI-created editorial visuals and are not exact documentary photographs of the venue or dishes.</p>
-  `;
+(async function(){
+ const id=new URLSearchParams(location.search).get('id'), root=document.getElementById('restaurantDetail');
+ const response=await fetch('/data/places.json',{cache:'no-store'}), db=await response.json();
+ const p=db.places.find(x=>x.id===id&&x.type==='restaurant');
+ if(!p){root.innerHTML='<h1>Restaurant not found</h1><div class="btns"><a class="btn" href="/restaurants.html">Back to Restaurants</a></div>';return}
+ document.title=`${p.name} | The House Guide`;
+ const hero=p.media.heroImage?`<img src="${p.media.heroImage}" alt="${p.name}">`:'';
+ const gallery=p.media.gallery.length?p.media.gallery.map((src,i)=>`<img src="${src}" alt="${p.name} photo ${i+1}">`).join(''):'<div class="menu-notice">Photos are being prepared for this recommendation.</div>';
+ const perfect=p.content.perfectFor.map(x=>`<span class="perfect-pill">${x}</span>`).join('');
+ const menu=p.menu.type==='none'
+   ?`<div class="menu-notice">${p.menu.note||'A menu is not currently available.'}</div>`
+   :`<a class="btn" href="${p.menu.url}" target="_blank" rel="noopener">Menu</a>`;
+ const actions=[];
+ if(p.actions.showReservation&&p.contact.reservation)actions.push(`<a class="btn" href="${p.contact.reservation}" target="_blank" rel="noopener">Request a Reservation</a>`);
+ if(p.actions.showCall&&p.contact.phone)actions.push(`<a class="btn secondary" href="tel:${p.contact.phone}" data-action="call">Call</a>`);
+ if(p.actions.showMap&&p.contact.map)actions.push(`<a class="btn secondary" href="${p.contact.map}" target="_blank" rel="noopener">Open Map</a>`);
+ if(p.actions.showWebsite&&p.contact.website)actions.push(`<a class="btn secondary" href="${p.contact.website}" target="_blank" rel="noopener">Visit Website</a>`);
+ root.innerHTML=`
+ <div class="restaurant-detail-hero">${hero}<div class="restaurant-detail-overlay"></div><div class="restaurant-detail-title"><div>${p.area}</div><h1>${p.name}</h1><p>${p.cardDescription}</p></div></div>
+ <section class="place-section"><h2>About</h2><p>${p.content.about}</p></section>
+ <section class="place-section recommendation-box"><h2>Our Recommendation</h2><p>${p.content.recommendation}</p></section>
+ <section class="place-section local-tip-box"><h2>Local Tip</h2><p>${p.content.localTip}</p></section>
+ <section class="place-section"><h2>Perfect For</h2><div class="perfect-for">${perfect}</div></section>
+ <section class="place-section"><div class="media-tabs"><button class="media-tab is-active" data-tab="gallery">Gallery</button><button class="media-tab" data-tab="menu">Menu</button></div>
+ <div class="media-panel" data-panel="gallery"><div class="restaurant-gallery">${gallery}</div></div>
+ <div class="media-panel" data-panel="menu" hidden>${menu}</div></section>
+ <div class="detail-actions">${actions.join('')}</div>`;
+ root.addEventListener('click',e=>{const b=e.target.closest('[data-tab]');if(!b)return;root.querySelectorAll('.media-tab').forEach(x=>x.classList.toggle('is-active',x===b));root.querySelectorAll('.media-panel').forEach(x=>x.hidden=x.dataset.panel!==b.dataset.tab)});
 })();
 </script>
-<script src="/module-registry.js"></script>
-<script src="/platform-actions.js"></script>
-<script src="/platform-action-runtime.js"></script>
-<script src="/ai-concierge-config.js"></script>
-<script src="/ai-concierge.js"></script>
-<script src="/places-loader.js"></script>
-</body>
-</html>
+<script src="/module-registry.js"></script><script src="/platform-actions.js"></script><script src="/platform-action-runtime.js"></script>
+<script src="/ai-concierge-config.js"></script><script src="/ai-concierge.js"></script></body></html>

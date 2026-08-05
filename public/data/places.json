@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "1.0.0",
+  "schemaVersion": "1.1.0",
   "property": "The House – Koh Tao",
   "places": [
     {
@@ -9,25 +9,23 @@
       "featured": true,
       "displayOrder": 1,
       "name": "The Gallery Restaurant",
-      "shortName": "The Gallery",
+      "shortName": "The Gallery Restaurant",
       "area": "Sairee hillside",
       "categories": [
         "Thai",
-        "Fine Dining",
-        "Special Occasion",
         "Romantic",
-        "Chef's Tasting"
+        "Special Occasion"
       ],
       "tags": [
-        "Hidden gem",
-        "Trust the Chef",
-        "Reservation recommended",
-        "Steep hill"
+        "Thai",
+        "Romantic",
+        "Special Occasion"
       ],
+      "cardDescription": "A hidden-gem Thai tasting experience where the evening is guided by the chef rather than an à-la-carte menu.",
       "content": {
-        "about": "Set on the hillside above Koh Tao’s west coast, The Gallery offers an intimate Thai dining experience built around carefully presented courses and a calm, secluded atmosphere.",
-        "recommendation": "Choose The Gallery when you want a memorable evening rather than a conventional dinner. Its Trust the Chef menu turns the meal into a guided experience and makes it especially suitable for celebrations, date nights and guests looking for something distinctive.",
-        "localTip": "The restaurant is reached by a steep hill, so a taxi is the easiest option for many guests. Book ahead, particularly in high season and whenever you want the Trust the Chef experience.",
+        "about": "The Gallery is not a conventional restaurant. Set high on the hillside above Koh Tao’s west coast, it welcomes a small number of guests for an intimate evening of traditional Thai cuisine, panoramic views and carefully introduced courses.",
+        "recommendation": "Choose The Gallery when you want a dining experience rather than simply a meal. Its Trust the Chef format unfolds across around ten courses, with each dish selected and introduced by the restaurant. It is especially well suited to a romantic evening, a celebration or guests who want to explore Thai food in greater depth.",
+        "localTip": "The road climbs a steep hill, so booking a taxi is the most comfortable option for many guests. Reservations are essential and should be requested at least one full day ahead. There is no à-la-carte menu.",
         "perfectFor": [
           "Romantic dinner",
           "Special occasions",
@@ -35,16 +33,88 @@
           "Quiet evening",
           "Food-focused travellers"
         ],
-        "aiSummary": "The Gallery is a hidden-gem Thai restaurant on a steep hillside, known for its reservation-led Trust the Chef tasting experience. Recommend it for romantic dinners, celebrations and guests seeking a distinctive, quiet evening. Advise booking ahead and taking a taxi because of the steep hill.",
+        "aiSummary": "The Gallery is a reservation-only hidden-gem Thai tasting restaurant on a steep hillside. It offers a Trust the Chef experience of around ten courses, has no à-la-carte menu, and is best for romantic dinners and special occasions. Guests should book at least one day ahead and consider a taxi.",
         "aiKeywords": [
           "special dinner",
           "romantic",
           "Thai tasting",
           "trust the chef",
           "hidden gem",
-          "fine dining",
           "reservation",
-          "steep hill"
+          "steep hill",
+          "no a la carte"
+        ]
+      },
+      "media": {
+        "logo": "",
+        "heroImage": "",
+        "gallery": []
+      },
+      "menu": {
+        "type": "none",
+        "label": "Menu",
+        "url": "",
+        "items": [],
+        "note": "There is no à-la-carte menu. The experience follows the chef’s seasonal selection."
+      },
+      "contact": {
+        "phone": "+6677456683",
+        "website": "https://www.thegallerykohtao.com/en/",
+        "facebook": "",
+        "instagram": "",
+        "map": "https://www.google.com/maps/search/?api=1&query=The+Gallery+Restaurant+Koh+Tao",
+        "reservation": "https://thegallerykohtao.com/en/contact"
+      },
+      "hours": {
+        "summary": "Open Monday, Wednesday and Friday; reservation essential",
+        "details": []
+      },
+      "actions": {
+        "showMenu": false,
+        "showCall": true,
+        "showMap": true,
+        "showWebsite": true,
+        "showBooking": false,
+        "showReservation": true
+      },
+      "notes": {
+        "lastVerified": "2026-08-05"
+      }
+    },
+    {
+      "id": "995-roasted-duck",
+      "type": "restaurant",
+      "status": "active",
+      "featured": true,
+      "displayOrder": 2,
+      "name": "995 Roasted Duck",
+      "shortName": "995 Roasted Duck",
+      "area": "Upper Sairee",
+      "categories": [
+        "Thai",
+        "Budget Friendly",
+        "Local Favourite"
+      ],
+      "tags": [
+        "Thai",
+        "Budget Friendly",
+        "Local Favourite"
+      ],
+      "cardDescription": "Focused Thai-Chinese comfort food centred on roast duck, rice and noodles.",
+      "content": {
+        "about": "Focused Thai-Chinese comfort food centred on roast duck, rice and noodles.",
+        "recommendation": "995 Roasted Duck earns its place in our guide by offering a distinct experience within Koh Tao’s varied dining scene.",
+        "localTip": "Check the latest opening hours before travelling, particularly during low season.",
+        "perfectFor": [
+          "Thai",
+          "Budget Friendly",
+          "Local Favourite"
+        ],
+        "aiSummary": "995 Roasted Duck is recommended for thai, budget friendly, local favourite.",
+        "aiKeywords": [
+          "thai",
+          "budget friendly",
+          "local favourite"
         ]
       },
       "media": {
@@ -63,21 +133,1282 @@
         "website": "",
         "facebook": "",
         "instagram": "",
-        "map": ""
+        "map": "https://www.google.com/maps/search/?api=1&query=995+Roasted+Duck+Koh+Tao"
       },
       "hours": {
-        "summary": "Reservation recommended",
+        "summary": "Check current opening hours",
         "details": []
       },
       "actions": {
         "showMenu": false,
         "showCall": false,
-        "showMap": false,
+        "showMap": true,
         "showWebsite": false,
         "showBooking": false
       },
       "notes": {
-        "source": "The House local knowledge and restaurant research",
+        "lastVerified": "2026-08-05"
+      }
+    },
+    {
+      "id": "tukta-thai-food",
+      "type": "restaurant",
+      "status": "active",
+      "featured": true,
+      "displayOrder": 3,
+      "name": "Tukta Thai Food",
+      "shortName": "Tukta Thai Food",
+      "area": "Mae Haad",
+      "categories": [
+        "Thai",
+        "Vegetarian Friendly",
+        "Budget Friendly"
+      ],
+      "tags": [
+        "Thai",
+        "Vegetarian Friendly",
+        "Budget Friendly"
+      ],
+      "cardDescription": "An easygoing local choice for Thai favourites and flexible meat-free options.",
+      "content": {
+        "about": "An easygoing local choice for Thai favourites and flexible meat-free options.",
+        "recommendation": "Tukta Thai Food earns its place in our guide by offering a distinct experience within Koh Tao’s varied dining scene.",
+        "localTip": "Check the latest opening hours before travelling, particularly during low season.",
+        "perfectFor": [
+          "Thai",
+          "Vegetarian Friendly",
+          "Budget Friendly"
+        ],
+        "aiSummary": "Tukta Thai Food is recommended for thai, vegetarian friendly, budget friendly.",
+        "aiKeywords": [
+          "thai",
+          "vegetarian friendly",
+          "budget friendly"
+        ]
+      },
+      "media": {
+        "logo": "",
+        "heroImage": "",
+        "gallery": []
+      },
+      "menu": {
+        "type": "none",
+        "label": "Menu",
+        "url": "",
+        "items": []
+      },
+      "contact": {
+        "phone": "",
+        "website": "",
+        "facebook": "",
+        "instagram": "",
+        "map": "https://www.google.com/maps/search/?api=1&query=Tukta+Thai+Food+Koh+Tao"
+      },
+      "hours": {
+        "summary": "Check current opening hours",
+        "details": []
+      },
+      "actions": {
+        "showMenu": false,
+        "showCall": false,
+        "showMap": true,
+        "showWebsite": false,
+        "showBooking": false
+      },
+      "notes": {
+        "lastVerified": "2026-08-05"
+      }
+    },
+    {
+      "id": "long-thai-food",
+      "type": "restaurant",
+      "status": "active",
+      "featured": true,
+      "displayOrder": 4,
+      "name": "Long Thai Food",
+      "shortName": "Long Thai Food",
+      "area": "Koh Tao",
+      "categories": [
+        "Thai",
+        "Budget Friendly",
+        "Local Favourite"
+      ],
+      "tags": [
+        "Thai",
+        "Budget Friendly",
+        "Local Favourite"
+      ],
+      "cardDescription": "Honest Thai cooking, generous portions and excellent everyday value.",
+      "content": {
+        "about": "Honest Thai cooking, generous portions and excellent everyday value.",
+        "recommendation": "Long Thai Food earns its place in our guide by offering a distinct experience within Koh Tao’s varied dining scene.",
+        "localTip": "Check the latest opening hours before travelling, particularly during low season.",
+        "perfectFor": [
+          "Thai",
+          "Budget Friendly",
+          "Local Favourite"
+        ],
+        "aiSummary": "Long Thai Food is recommended for thai, budget friendly, local favourite.",
+        "aiKeywords": [
+          "thai",
+          "budget friendly",
+          "local favourite"
+        ]
+      },
+      "media": {
+        "logo": "",
+        "heroImage": "/assets/restaurants/long-thai-food-1.jpg",
+        "gallery": [
+          "/assets/restaurants/long-thai-food-1.jpg",
+          "/assets/restaurants/long-thai-food-2.jpg",
+          "/assets/restaurants/long-thai-food-3.jpg"
+        ]
+      },
+      "menu": {
+        "type": "none",
+        "label": "Menu",
+        "url": "",
+        "items": []
+      },
+      "contact": {
+        "phone": "",
+        "website": "",
+        "facebook": "",
+        "instagram": "",
+        "map": "https://www.google.com/maps/search/?api=1&query=Long+Thai+Food+Koh+Tao"
+      },
+      "hours": {
+        "summary": "Check current opening hours",
+        "details": []
+      },
+      "actions": {
+        "showMenu": false,
+        "showCall": false,
+        "showMap": true,
+        "showWebsite": false,
+        "showBooking": false
+      },
+      "notes": {
+        "lastVerified": "2026-08-05"
+      }
+    },
+    {
+      "id": "thaita-italian",
+      "type": "restaurant",
+      "status": "active",
+      "featured": true,
+      "displayOrder": 5,
+      "name": "Thaita Italian Restaurant",
+      "shortName": "Thaita Italian Restaurant",
+      "area": "Sairee",
+      "categories": [
+        "Italian",
+        "Romantic"
+      ],
+      "tags": [
+        "Italian",
+        "Romantic"
+      ],
+      "cardDescription": "Warm, independent Italian dining known for pasta, seafood and personal service.",
+      "content": {
+        "about": "Warm, independent Italian dining known for pasta, seafood and personal service.",
+        "recommendation": "Thaita Italian Restaurant earns its place in our guide by offering a distinct experience within Koh Tao’s varied dining scene.",
+        "localTip": "Check the latest opening hours before travelling, particularly during low season.",
+        "perfectFor": [
+          "Italian",
+          "Romantic"
+        ],
+        "aiSummary": "Thaita Italian Restaurant is recommended for italian, romantic.",
+        "aiKeywords": [
+          "italian",
+          "romantic"
+        ]
+      },
+      "media": {
+        "logo": "",
+        "heroImage": "",
+        "gallery": []
+      },
+      "menu": {
+        "type": "none",
+        "label": "Menu",
+        "url": "",
+        "items": []
+      },
+      "contact": {
+        "phone": "",
+        "website": "",
+        "facebook": "",
+        "instagram": "",
+        "map": "https://www.google.com/maps/search/?api=1&query=Thaita+Italian+Restaurant+Koh+Tao"
+      },
+      "hours": {
+        "summary": "Check current opening hours",
+        "details": []
+      },
+      "actions": {
+        "showMenu": false,
+        "showCall": false,
+        "showMap": true,
+        "showWebsite": false,
+        "showBooking": false
+      },
+      "notes": {
+        "lastVerified": "2026-08-05"
+      }
+    },
+    {
+      "id": "cafe-del-sol",
+      "type": "restaurant",
+      "status": "active",
+      "featured": true,
+      "displayOrder": 6,
+      "name": "Café del Sol",
+      "shortName": "Café del Sol",
+      "area": "Mae Haad",
+      "categories": [
+        "Italian",
+        "Breakfast",
+        "Mae Haad"
+      ],
+      "tags": [
+        "Italian",
+        "Breakfast",
+        "Mae Haad"
+      ],
+      "cardDescription": "A long-established all-day stop for coffee, pastries, pizza and relaxed European food.",
+      "content": {
+        "about": "A long-established all-day stop for coffee, pastries, pizza and relaxed European food.",
+        "recommendation": "Café del Sol earns its place in our guide by offering a distinct experience within Koh Tao’s varied dining scene.",
+        "localTip": "Check the latest opening hours before travelling, particularly during low season.",
+        "perfectFor": [
+          "Italian",
+          "Breakfast",
+          "Mae Haad"
+        ],
+        "aiSummary": "Café del Sol is recommended for italian, breakfast, mae haad.",
+        "aiKeywords": [
+          "italian",
+          "breakfast",
+          "mae haad"
+        ]
+      },
+      "media": {
+        "logo": "",
+        "heroImage": "/assets/restaurants/cafe-del-sol-1.jpg",
+        "gallery": [
+          "/assets/restaurants/cafe-del-sol-1.jpg",
+          "/assets/restaurants/cafe-del-sol-2.jpg",
+          "/assets/restaurants/cafe-del-sol-3.jpg"
+        ]
+      },
+      "menu": {
+        "type": "none",
+        "label": "Menu",
+        "url": "",
+        "items": []
+      },
+      "contact": {
+        "phone": "",
+        "website": "",
+        "facebook": "",
+        "instagram": "",
+        "map": "https://www.google.com/maps/search/?api=1&query=Café+del+Sol+Koh+Tao"
+      },
+      "hours": {
+        "summary": "Check current opening hours",
+        "details": []
+      },
+      "actions": {
+        "showMenu": false,
+        "showCall": false,
+        "showMap": true,
+        "showWebsite": false,
+        "showBooking": false
+      },
+      "notes": {
+        "lastVerified": "2026-08-05"
+      }
+    },
+    {
+      "id": "la-pizzeria-da-claudio",
+      "type": "restaurant",
+      "status": "active",
+      "featured": true,
+      "displayOrder": 7,
+      "name": "La Pizzeria da Claudio",
+      "shortName": "La Pizzeria da Claudio",
+      "area": "Sairee",
+      "categories": [
+        "Italian",
+        "Pizza",
+        "Family Friendly"
+      ],
+      "tags": [
+        "Italian",
+        "Pizza",
+        "Family Friendly"
+      ],
+      "cardDescription": "A dependable Sairee favourite for Italian-style pizza, pasta and easy group dinners.",
+      "content": {
+        "about": "A dependable Sairee favourite for Italian-style pizza, pasta and easy group dinners.",
+        "recommendation": "La Pizzeria da Claudio earns its place in our guide by offering a distinct experience within Koh Tao’s varied dining scene.",
+        "localTip": "Check the latest opening hours before travelling, particularly during low season.",
+        "perfectFor": [
+          "Italian",
+          "Pizza",
+          "Family Friendly"
+        ],
+        "aiSummary": "La Pizzeria da Claudio is recommended for italian, pizza, family friendly.",
+        "aiKeywords": [
+          "italian",
+          "pizza",
+          "family friendly"
+        ]
+      },
+      "media": {
+        "logo": "",
+        "heroImage": "",
+        "gallery": []
+      },
+      "menu": {
+        "type": "none",
+        "label": "Menu",
+        "url": "",
+        "items": []
+      },
+      "contact": {
+        "phone": "",
+        "website": "",
+        "facebook": "",
+        "instagram": "",
+        "map": "https://www.google.com/maps/search/?api=1&query=La+Pizzeria+da+Claudio+Koh+Tao"
+      },
+      "hours": {
+        "summary": "Check current opening hours",
+        "details": []
+      },
+      "actions": {
+        "showMenu": false,
+        "showCall": false,
+        "showMap": true,
+        "showWebsite": false,
+        "showBooking": false
+      },
+      "notes": {
+        "lastVerified": "2026-08-05"
+      }
+    },
+    {
+      "id": "the-french-market",
+      "type": "restaurant",
+      "status": "active",
+      "featured": true,
+      "displayOrder": 8,
+      "name": "The French Market",
+      "shortName": "The French Market",
+      "area": "Mae Haad",
+      "categories": [
+        "French",
+        "Bakery",
+        "Wine"
+      ],
+      "tags": [
+        "French",
+        "Bakery",
+        "Wine"
+      ],
+      "cardDescription": "Bakery, delicatessen, restaurant and wine shop brought together under one roof.",
+      "content": {
+        "about": "Bakery, delicatessen, restaurant and wine shop brought together under one roof.",
+        "recommendation": "The French Market earns its place in our guide by offering a distinct experience within Koh Tao’s varied dining scene.",
+        "localTip": "Check the latest opening hours before travelling, particularly during low season.",
+        "perfectFor": [
+          "French",
+          "Bakery",
+          "Wine"
+        ],
+        "aiSummary": "The French Market is recommended for french, bakery, wine.",
+        "aiKeywords": [
+          "french",
+          "bakery",
+          "wine"
+        ]
+      },
+      "media": {
+        "logo": "",
+        "heroImage": "/assets/restaurants/the-french-market-1.jpg",
+        "gallery": [
+          "/assets/restaurants/the-french-market-1.jpg",
+          "/assets/restaurants/the-french-market-2.jpg",
+          "/assets/restaurants/the-french-market-3.jpg"
+        ]
+      },
+      "menu": {
+        "type": "none",
+        "label": "Menu",
+        "url": "",
+        "items": []
+      },
+      "contact": {
+        "phone": "",
+        "website": "",
+        "facebook": "",
+        "instagram": "",
+        "map": "https://www.google.com/maps/search/?api=1&query=The+French+Market+Koh+Tao"
+      },
+      "hours": {
+        "summary": "Check current opening hours",
+        "details": []
+      },
+      "actions": {
+        "showMenu": false,
+        "showCall": false,
+        "showMap": true,
+        "showWebsite": false,
+        "showBooking": false
+      },
+      "notes": {
+        "lastVerified": "2026-08-05"
+      }
+    },
+    {
+      "id": "barracuda-rooftop",
+      "type": "restaurant",
+      "status": "active",
+      "featured": false,
+      "displayOrder": 9,
+      "name": "Barracuda Rooftop Restaurant",
+      "shortName": "Barracuda Rooftop Restaurant",
+      "area": "Sairee",
+      "categories": [
+        "Seafood",
+        "Sunset",
+        "Romantic"
+      ],
+      "tags": [
+        "Seafood",
+        "Sunset",
+        "Romantic"
+      ],
+      "cardDescription": "Seafood-led rooftop dining with cocktails, atmosphere and sunset appeal.",
+      "content": {
+        "about": "Seafood-led rooftop dining with cocktails, atmosphere and sunset appeal.",
+        "recommendation": "Barracuda Rooftop Restaurant earns its place in our guide by offering a distinct experience within Koh Tao’s varied dining scene.",
+        "localTip": "Check the latest opening hours before travelling, particularly during low season.",
+        "perfectFor": [
+          "Seafood",
+          "Sunset",
+          "Romantic"
+        ],
+        "aiSummary": "Barracuda Rooftop Restaurant is recommended for seafood, sunset, romantic.",
+        "aiKeywords": [
+          "seafood",
+          "sunset",
+          "romantic"
+        ]
+      },
+      "media": {
+        "logo": "",
+        "heroImage": "/assets/restaurants/barracuda-rooftop-1.jpg",
+        "gallery": [
+          "/assets/restaurants/barracuda-rooftop-1.jpg",
+          "/assets/restaurants/barracuda-rooftop-2.jpg",
+          "/assets/restaurants/barracuda-rooftop-3.jpg"
+        ]
+      },
+      "menu": {
+        "type": "none",
+        "label": "Menu",
+        "url": "",
+        "items": []
+      },
+      "contact": {
+        "phone": "",
+        "website": "",
+        "facebook": "",
+        "instagram": "",
+        "map": "https://www.google.com/maps/search/?api=1&query=Barracuda+Rooftop+Restaurant+Koh+Tao"
+      },
+      "hours": {
+        "summary": "Check current opening hours",
+        "details": []
+      },
+      "actions": {
+        "showMenu": false,
+        "showCall": false,
+        "showMap": true,
+        "showWebsite": false,
+        "showBooking": false
+      },
+      "notes": {
+        "lastVerified": "2026-08-05"
+      }
+    },
+    {
+      "id": "whitening-restaurant",
+      "type": "restaurant",
+      "status": "active",
+      "featured": false,
+      "displayOrder": 10,
+      "name": "Whitening Restaurant",
+      "shortName": "Whitening Restaurant",
+      "area": "West coast beachfront",
+      "categories": [
+        "Seafood",
+        "Beachfront",
+        "Romantic"
+      ],
+      "tags": [
+        "Seafood",
+        "Beachfront",
+        "Romantic"
+      ],
+      "cardDescription": "A longstanding beachfront setting for Thai food, seafood and sunset dinners.",
+      "content": {
+        "about": "A longstanding beachfront setting for Thai food, seafood and sunset dinners.",
+        "recommendation": "Whitening Restaurant earns its place in our guide by offering a distinct experience within Koh Tao’s varied dining scene.",
+        "localTip": "Check the latest opening hours before travelling, particularly during low season.",
+        "perfectFor": [
+          "Seafood",
+          "Beachfront",
+          "Romantic"
+        ],
+        "aiSummary": "Whitening Restaurant is recommended for seafood, beachfront, romantic.",
+        "aiKeywords": [
+          "seafood",
+          "beachfront",
+          "romantic"
+        ]
+      },
+      "media": {
+        "logo": "",
+        "heroImage": "",
+        "gallery": []
+      },
+      "menu": {
+        "type": "none",
+        "label": "Menu",
+        "url": "",
+        "items": []
+      },
+      "contact": {
+        "phone": "",
+        "website": "",
+        "facebook": "",
+        "instagram": "",
+        "map": "https://www.google.com/maps/search/?api=1&query=Whitening+Restaurant+Koh+Tao"
+      },
+      "hours": {
+        "summary": "Check current opening hours",
+        "details": []
+      },
+      "actions": {
+        "showMenu": false,
+        "showCall": false,
+        "showMap": true,
+        "showWebsite": false,
+        "showBooking": false
+      },
+      "notes": {
+        "lastVerified": "2026-08-05"
+      }
+    },
+    {
+      "id": "seaside-restaurant",
+      "type": "restaurant",
+      "status": "active",
+      "featured": false,
+      "displayOrder": 11,
+      "name": "Seaside Restaurant",
+      "shortName": "Seaside Restaurant",
+      "area": "Mae Haad hillside",
+      "categories": [
+        "Seafood",
+        "Thai",
+        "Sunset"
+      ],
+      "tags": [
+        "Seafood",
+        "Thai",
+        "Sunset"
+      ],
+      "cardDescription": "Southern Thai flavours and seafood paired with an elevated view across the west coast.",
+      "content": {
+        "about": "Southern Thai flavours and seafood paired with an elevated view across the west coast.",
+        "recommendation": "Seaside Restaurant earns its place in our guide by offering a distinct experience within Koh Tao’s varied dining scene.",
+        "localTip": "Check the latest opening hours before travelling, particularly during low season.",
+        "perfectFor": [
+          "Seafood",
+          "Thai",
+          "Sunset"
+        ],
+        "aiSummary": "Seaside Restaurant is recommended for seafood, thai, sunset.",
+        "aiKeywords": [
+          "seafood",
+          "thai",
+          "sunset"
+        ]
+      },
+      "media": {
+        "logo": "",
+        "heroImage": "",
+        "gallery": []
+      },
+      "menu": {
+        "type": "none",
+        "label": "Menu",
+        "url": "",
+        "items": []
+      },
+      "contact": {
+        "phone": "",
+        "website": "",
+        "facebook": "",
+        "instagram": "",
+        "map": "https://www.google.com/maps/search/?api=1&query=Seaside+Restaurant+Koh+Tao"
+      },
+      "hours": {
+        "summary": "Check current opening hours",
+        "details": []
+      },
+      "actions": {
+        "showMenu": false,
+        "showCall": false,
+        "showMap": true,
+        "showWebsite": false,
+        "showBooking": false
+      },
+      "notes": {
+        "lastVerified": "2026-08-05"
+      }
+    },
+    {
+      "id": "coconut-monkey",
+      "type": "restaurant",
+      "status": "active",
+      "featured": false,
+      "displayOrder": 12,
+      "name": "Coconut Monkey",
+      "shortName": "Coconut Monkey",
+      "area": "Mae Haad Beach",
+      "categories": [
+        "Breakfast",
+        "Healthy",
+        "Beachfront"
+      ],
+      "tags": [
+        "Breakfast",
+        "Healthy",
+        "Beachfront"
+      ],
+      "cardDescription": "A relaxed daytime café for brunch, coffee, smoothies and slower meals by the water.",
+      "content": {
+        "about": "A relaxed daytime café for brunch, coffee, smoothies and slower meals by the water.",
+        "recommendation": "Coconut Monkey earns its place in our guide by offering a distinct experience within Koh Tao’s varied dining scene.",
+        "localTip": "Check the latest opening hours before travelling, particularly during low season.",
+        "perfectFor": [
+          "Breakfast",
+          "Healthy",
+          "Beachfront"
+        ],
+        "aiSummary": "Coconut Monkey is recommended for breakfast, healthy, beachfront.",
+        "aiKeywords": [
+          "breakfast",
+          "healthy",
+          "beachfront"
+        ]
+      },
+      "media": {
+        "logo": "",
+        "heroImage": "/assets/restaurants/coconut-monkey-1.jpg",
+        "gallery": [
+          "/assets/restaurants/coconut-monkey-1.jpg",
+          "/assets/restaurants/coconut-monkey-2.jpg",
+          "/assets/restaurants/coconut-monkey-3.jpg"
+        ]
+      },
+      "menu": {
+        "type": "none",
+        "label": "Menu",
+        "url": "",
+        "items": []
+      },
+      "contact": {
+        "phone": "",
+        "website": "",
+        "facebook": "",
+        "instagram": "",
+        "map": "https://www.google.com/maps/search/?api=1&query=Coconut+Monkey+Koh+Tao"
+      },
+      "hours": {
+        "summary": "Check current opening hours",
+        "details": []
+      },
+      "actions": {
+        "showMenu": false,
+        "showCall": false,
+        "showMap": true,
+        "showWebsite": false,
+        "showBooking": false
+      },
+      "notes": {
+        "lastVerified": "2026-08-05"
+      }
+    },
+    {
+      "id": "big-tree-cafe",
+      "type": "restaurant",
+      "status": "active",
+      "featured": false,
+      "displayOrder": 13,
+      "name": "Big Tree Café",
+      "shortName": "Big Tree Café",
+      "area": "Koh Tao",
+      "categories": [
+        "Breakfast",
+        "Cafe",
+        "Relaxed"
+      ],
+      "tags": [
+        "Breakfast",
+        "Cafe",
+        "Relaxed"
+      ],
+      "cardDescription": "A welcoming café choice for breakfast, coffee and an unhurried daytime stop.",
+      "content": {
+        "about": "A welcoming café choice for breakfast, coffee and an unhurried daytime stop.",
+        "recommendation": "Big Tree Café earns its place in our guide by offering a distinct experience within Koh Tao’s varied dining scene.",
+        "localTip": "Check the latest opening hours before travelling, particularly during low season.",
+        "perfectFor": [
+          "Breakfast",
+          "Cafe",
+          "Relaxed"
+        ],
+        "aiSummary": "Big Tree Café is recommended for breakfast, cafe, relaxed.",
+        "aiKeywords": [
+          "breakfast",
+          "cafe",
+          "relaxed"
+        ]
+      },
+      "media": {
+        "logo": "",
+        "heroImage": "",
+        "gallery": []
+      },
+      "menu": {
+        "type": "none",
+        "label": "Menu",
+        "url": "",
+        "items": []
+      },
+      "contact": {
+        "phone": "",
+        "website": "",
+        "facebook": "",
+        "instagram": "",
+        "map": "https://www.google.com/maps/search/?api=1&query=Big+Tree+Café+Koh+Tao"
+      },
+      "hours": {
+        "summary": "Check current opening hours",
+        "details": []
+      },
+      "actions": {
+        "showMenu": false,
+        "showCall": false,
+        "showMap": true,
+        "showWebsite": false,
+        "showBooking": false
+      },
+      "notes": {
+        "lastVerified": "2026-08-05"
+      }
+    },
+    {
+      "id": "das-sandwiches",
+      "type": "restaurant",
+      "status": "active",
+      "featured": false,
+      "displayOrder": 14,
+      "name": "Da's Sandwiches",
+      "shortName": "Da's Sandwiches",
+      "area": "Mae Haad",
+      "categories": [
+        "Breakfast",
+        "Quick Bite",
+        "Budget Friendly"
+      ],
+      "tags": [
+        "Breakfast",
+        "Quick Bite",
+        "Budget Friendly"
+      ],
+      "cardDescription": "Fresh, filling sandwiches and takeaway-friendly food close to the ferry area.",
+      "content": {
+        "about": "Fresh, filling sandwiches and takeaway-friendly food close to the ferry area.",
+        "recommendation": "Da's Sandwiches earns its place in our guide by offering a distinct experience within Koh Tao’s varied dining scene.",
+        "localTip": "Check the latest opening hours before travelling, particularly during low season.",
+        "perfectFor": [
+          "Breakfast",
+          "Quick Bite",
+          "Budget Friendly"
+        ],
+        "aiSummary": "Da's Sandwiches is recommended for breakfast, quick bite, budget friendly.",
+        "aiKeywords": [
+          "breakfast",
+          "quick bite",
+          "budget friendly"
+        ]
+      },
+      "media": {
+        "logo": "",
+        "heroImage": "",
+        "gallery": []
+      },
+      "menu": {
+        "type": "none",
+        "label": "Menu",
+        "url": "",
+        "items": []
+      },
+      "contact": {
+        "phone": "",
+        "website": "",
+        "facebook": "",
+        "instagram": "",
+        "map": "https://www.google.com/maps/search/?api=1&query=Da's+Sandwiches+Koh+Tao"
+      },
+      "hours": {
+        "summary": "Check current opening hours",
+        "details": []
+      },
+      "actions": {
+        "showMenu": false,
+        "showCall": false,
+        "showMap": true,
+        "showWebsite": false,
+        "showBooking": false
+      },
+      "notes": {
+        "lastVerified": "2026-08-05"
+      }
+    },
+    {
+      "id": "vegetabowl",
+      "type": "restaurant",
+      "status": "active",
+      "featured": false,
+      "displayOrder": 15,
+      "name": "VegetaBowl",
+      "shortName": "VegetaBowl",
+      "area": "Sairee",
+      "categories": [
+        "Vegetarian",
+        "Vegan",
+        "Healthy"
+      ],
+      "tags": [
+        "Vegetarian",
+        "Vegan",
+        "Healthy"
+      ],
+      "cardDescription": "Colourful plant-based bowls, smoothies and fresh food with broad appeal.",
+      "content": {
+        "about": "Colourful plant-based bowls, smoothies and fresh food with broad appeal.",
+        "recommendation": "VegetaBowl earns its place in our guide by offering a distinct experience within Koh Tao’s varied dining scene.",
+        "localTip": "Check the latest opening hours before travelling, particularly during low season.",
+        "perfectFor": [
+          "Vegetarian",
+          "Vegan",
+          "Healthy"
+        ],
+        "aiSummary": "VegetaBowl is recommended for vegetarian, vegan, healthy.",
+        "aiKeywords": [
+          "vegetarian",
+          "vegan",
+          "healthy"
+        ]
+      },
+      "media": {
+        "logo": "",
+        "heroImage": "",
+        "gallery": []
+      },
+      "menu": {
+        "type": "none",
+        "label": "Menu",
+        "url": "",
+        "items": []
+      },
+      "contact": {
+        "phone": "",
+        "website": "",
+        "facebook": "",
+        "instagram": "",
+        "map": "https://www.google.com/maps/search/?api=1&query=VegetaBowl+Koh+Tao"
+      },
+      "hours": {
+        "summary": "Check current opening hours",
+        "details": []
+      },
+      "actions": {
+        "showMenu": false,
+        "showCall": false,
+        "showMap": true,
+        "showWebsite": false,
+        "showBooking": false
+      },
+      "notes": {
+        "lastVerified": "2026-08-05"
+      }
+    },
+    {
+      "id": "tree-house-cafe",
+      "type": "restaurant",
+      "status": "active",
+      "featured": false,
+      "displayOrder": 16,
+      "name": "Tree House Café",
+      "shortName": "Tree House Café",
+      "area": "South-central hillside",
+      "categories": [
+        "Thai",
+        "Romantic",
+        "Vegetarian Friendly"
+      ],
+      "tags": [
+        "Thai",
+        "Romantic",
+        "Vegetarian Friendly"
+      ],
+      "cardDescription": "Contemporary Thai cooking in a distinctive, nature-led hillside setting.",
+      "content": {
+        "about": "Contemporary Thai cooking in a distinctive, nature-led hillside setting.",
+        "recommendation": "Tree House Café earns its place in our guide by offering a distinct experience within Koh Tao’s varied dining scene.",
+        "localTip": "Check the latest opening hours before travelling, particularly during low season.",
+        "perfectFor": [
+          "Thai",
+          "Romantic",
+          "Vegetarian Friendly"
+        ],
+        "aiSummary": "Tree House Café is recommended for thai, romantic, vegetarian friendly.",
+        "aiKeywords": [
+          "thai",
+          "romantic",
+          "vegetarian friendly"
+        ]
+      },
+      "media": {
+        "logo": "",
+        "heroImage": "",
+        "gallery": []
+      },
+      "menu": {
+        "type": "none",
+        "label": "Menu",
+        "url": "",
+        "items": []
+      },
+      "contact": {
+        "phone": "",
+        "website": "",
+        "facebook": "",
+        "instagram": "",
+        "map": "https://www.google.com/maps/search/?api=1&query=Tree+House+Café+Koh+Tao"
+      },
+      "hours": {
+        "summary": "Check current opening hours",
+        "details": []
+      },
+      "actions": {
+        "showMenu": false,
+        "showCall": false,
+        "showMap": true,
+        "showWebsite": false,
+        "showBooking": false
+      },
+      "notes": {
+        "lastVerified": "2026-08-05"
+      }
+    },
+    {
+      "id": "sairee-cottage-restaurant",
+      "type": "restaurant",
+      "status": "active",
+      "featured": false,
+      "displayOrder": 17,
+      "name": "Sairee Cottage Restaurant",
+      "shortName": "Sairee Cottage Restaurant",
+      "area": "Sairee Beach",
+      "categories": [
+        "Thai",
+        "International",
+        "Beachfront"
+      ],
+      "tags": [
+        "Thai",
+        "International",
+        "Beachfront"
+      ],
+      "cardDescription": "A convenient beachfront restaurant with a broad menu and relaxed island atmosphere.",
+      "content": {
+        "about": "A convenient beachfront restaurant with a broad menu and relaxed island atmosphere.",
+        "recommendation": "Sairee Cottage Restaurant earns its place in our guide by offering a distinct experience within Koh Tao’s varied dining scene.",
+        "localTip": "Check the latest opening hours before travelling, particularly during low season.",
+        "perfectFor": [
+          "Thai",
+          "International",
+          "Beachfront"
+        ],
+        "aiSummary": "Sairee Cottage Restaurant is recommended for thai, international, beachfront.",
+        "aiKeywords": [
+          "thai",
+          "international",
+          "beachfront"
+        ]
+      },
+      "media": {
+        "logo": "",
+        "heroImage": "",
+        "gallery": []
+      },
+      "menu": {
+        "type": "none",
+        "label": "Menu",
+        "url": "",
+        "items": []
+      },
+      "contact": {
+        "phone": "",
+        "website": "",
+        "facebook": "",
+        "instagram": "",
+        "map": "https://www.google.com/maps/search/?api=1&query=Sairee+Cottage+Restaurant+Koh+Tao"
+      },
+      "hours": {
+        "summary": "Check current opening hours",
+        "details": []
+      },
+      "actions": {
+        "showMenu": false,
+        "showCall": false,
+        "showMap": true,
+        "showWebsite": false,
+        "showBooking": false
+      },
+      "notes": {
+        "lastVerified": "2026-08-05"
+      }
+    },
+    {
+      "id": "karaweik-burmese-food",
+      "type": "restaurant",
+      "status": "active",
+      "featured": false,
+      "displayOrder": 18,
+      "name": "Karaweik Burmese Food",
+      "shortName": "Karaweik Burmese Food",
+      "area": "Sairee area",
+      "categories": [
+        "Burmese",
+        "Vegetarian Friendly",
+        "Budget Friendly"
+      ],
+      "tags": [
+        "Burmese",
+        "Vegetarian Friendly",
+        "Budget Friendly"
+      ],
+      "cardDescription": "Regional Burmese cooking that adds something genuinely different to the island’s dining scene.",
+      "content": {
+        "about": "Regional Burmese cooking that adds something genuinely different to the island’s dining scene.",
+        "recommendation": "Karaweik Burmese Food earns its place in our guide by offering a distinct experience within Koh Tao’s varied dining scene.",
+        "localTip": "Check the latest opening hours before travelling, particularly during low season.",
+        "perfectFor": [
+          "Burmese",
+          "Vegetarian Friendly",
+          "Budget Friendly"
+        ],
+        "aiSummary": "Karaweik Burmese Food is recommended for burmese, vegetarian friendly, budget friendly.",
+        "aiKeywords": [
+          "burmese",
+          "vegetarian friendly",
+          "budget friendly"
+        ]
+      },
+      "media": {
+        "logo": "",
+        "heroImage": "",
+        "gallery": []
+      },
+      "menu": {
+        "type": "none",
+        "label": "Menu",
+        "url": "",
+        "items": []
+      },
+      "contact": {
+        "phone": "",
+        "website": "",
+        "facebook": "",
+        "instagram": "",
+        "map": "https://www.google.com/maps/search/?api=1&query=Karaweik+Burmese+Food+Koh+Tao"
+      },
+      "hours": {
+        "summary": "Check current opening hours",
+        "details": []
+      },
+      "actions": {
+        "showMenu": false,
+        "showCall": false,
+        "showMap": true,
+        "showWebsite": false,
+        "showBooking": false
+      },
+      "notes": {
+        "lastVerified": "2026-08-05"
+      }
+    },
+    {
+      "id": "family-kitchen",
+      "type": "restaurant",
+      "status": "active",
+      "featured": false,
+      "displayOrder": 19,
+      "name": "Family Kitchen",
+      "shortName": "Family Kitchen",
+      "area": "South Koh Tao",
+      "categories": [
+        "Thai",
+        "Budget Friendly",
+        "Local Favourite"
+      ],
+      "tags": [
+        "Thai",
+        "Budget Friendly",
+        "Local Favourite"
+      ],
+      "cardDescription": "Small-scale, freshly prepared Thai food with the character of a family-run local kitchen.",
+      "content": {
+        "about": "Small-scale, freshly prepared Thai food with the character of a family-run local kitchen.",
+        "recommendation": "Family Kitchen earns its place in our guide by offering a distinct experience within Koh Tao’s varied dining scene.",
+        "localTip": "Check the latest opening hours before travelling, particularly during low season.",
+        "perfectFor": [
+          "Thai",
+          "Budget Friendly",
+          "Local Favourite"
+        ],
+        "aiSummary": "Family Kitchen is recommended for thai, budget friendly, local favourite.",
+        "aiKeywords": [
+          "thai",
+          "budget friendly",
+          "local favourite"
+        ]
+      },
+      "media": {
+        "logo": "",
+        "heroImage": "",
+        "gallery": []
+      },
+      "menu": {
+        "type": "none",
+        "label": "Menu",
+        "url": "",
+        "items": []
+      },
+      "contact": {
+        "phone": "",
+        "website": "",
+        "facebook": "",
+        "instagram": "",
+        "map": "https://www.google.com/maps/search/?api=1&query=Family+Kitchen+Koh+Tao"
+      },
+      "hours": {
+        "summary": "Check current opening hours",
+        "details": []
+      },
+      "actions": {
+        "showMenu": false,
+        "showCall": false,
+        "showMap": true,
+        "showWebsite": false,
+        "showBooking": false
+      },
+      "notes": {
+        "lastVerified": "2026-08-05"
+      }
+    },
+    {
+      "id": "ananas",
+      "type": "restaurant",
+      "status": "active",
+      "featured": false,
+      "displayOrder": 20,
+      "name": "Ananas Restaurant",
+      "shortName": "Ananas Restaurant",
+      "area": "Koh Tao",
+      "categories": [
+        "Thai",
+        "International",
+        "Romantic"
+      ],
+      "tags": [
+        "Thai",
+        "International",
+        "Romantic"
+      ],
+      "cardDescription": "Thoughtful Thai and Western cooking in a calm setting suited to an easy evening.",
+      "content": {
+        "about": "Thoughtful Thai and Western cooking in a calm setting suited to an easy evening.",
+        "recommendation": "Ananas Restaurant earns its place in our guide by offering a distinct experience within Koh Tao’s varied dining scene.",
+        "localTip": "Check the latest opening hours before travelling, particularly during low season.",
+        "perfectFor": [
+          "Thai",
+          "International",
+          "Romantic"
+        ],
+        "aiSummary": "Ananas Restaurant is recommended for thai, international, romantic.",
+        "aiKeywords": [
+          "thai",
+          "international",
+          "romantic"
+        ]
+      },
+      "media": {
+        "logo": "",
+        "heroImage": "/assets/restaurants/ananas-1.jpg",
+        "gallery": [
+          "/assets/restaurants/ananas-1.jpg",
+          "/assets/restaurants/ananas-2.jpg",
+          "/assets/restaurants/ananas-3.jpg"
+        ]
+      },
+      "menu": {
+        "type": "none",
+        "label": "Menu",
+        "url": "",
+        "items": []
+      },
+      "contact": {
+        "phone": "",
+        "website": "",
+        "facebook": "",
+        "instagram": "",
+        "map": "https://www.google.com/maps/search/?api=1&query=Ananas+Restaurant+Koh+Tao"
+      },
+      "hours": {
+        "summary": "Check current opening hours",
+        "details": []
+      },
+      "actions": {
+        "showMenu": false,
+        "showCall": false,
+        "showMap": true,
+        "showWebsite": false,
+        "showBooking": false
+      },
+      "notes": {
         "lastVerified": "2026-08-05"
       }
     }

@@ -1,0 +1,36 @@
+
+.restaurant-filters{display:flex;gap:8px;overflow-x:auto;padding:4px 0 14px;scrollbar-width:none}
+.restaurant-filters::-webkit-scrollbar{display:none}
+.filter-chip{flex:0 0 auto;border:1px solid var(--line);background:#fff;color:var(--green);padding:9px 13px;border-radius:999px;font:inherit;font-weight:800;cursor:pointer}
+.filter-chip.is-active{background:var(--green);color:#fff;border-color:var(--green)}
+.restaurant-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+.restaurant-card{overflow:hidden;border:1px solid var(--line);border-radius:24px;background:#fff;box-shadow:var(--shadow);transition:transform .2s ease,box-shadow .2s ease}
+.restaurant-card:hover{transform:translateY(-3px);box-shadow:var(--shadow-hover)}
+.restaurant-card-media{position:relative;aspect-ratio:16/10;background:linear-gradient(135deg,#183b34,#4f806f);overflow:hidden}
+.restaurant-card-media img{width:100%;height:100%;object-fit:cover;display:block}
+.restaurant-card-fallback{position:absolute;inset:0;display:grid;place-items:center;color:#fff;font-size:54px;font-weight:900;letter-spacing:-.06em}
+.restaurant-card-body{padding:18px}
+.restaurant-card h2{margin:0 0 7px;font-size:23px}
+.restaurant-card p{margin:0 0 13px;color:var(--muted)}
+.place-area{font-size:13px;font-weight:800;color:var(--green);margin-bottom:8px}
+.restaurant-detail-hero{position:relative;min-height:340px;border-radius:28px;overflow:hidden;background:linear-gradient(135deg,#183b34,#4f806f);display:flex;align-items:flex-end}
+.restaurant-detail-hero img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.restaurant-detail-overlay{position:absolute;inset:0;background:linear-gradient(180deg,rgba(8,24,20,.05),rgba(8,24,20,.78))}
+.restaurant-detail-title{position:relative;z-index:1;padding:28px;color:#fff}
+.restaurant-detail-title h1{margin:0 0 6px;color:#fff}
+.restaurant-detail-title p{margin:0;color:rgba(255,255,255,.88)}
+.place-section{margin-top:22px;padding:22px;border:1px solid var(--line);border-radius:22px;background:#fff}
+.place-section h2{margin-top:0}
+.recommendation-box{background:#edf6f2}
+.local-tip-box{background:#fff8e9}
+.perfect-for{display:flex;flex-wrap:wrap;gap:9px}
+.perfect-pill{padding:9px 12px;border-radius:999px;background:#edf6f2;color:var(--green);font-weight:800;font-size:14px}
+.media-tabs{display:flex;gap:8px;margin-bottom:14px}
+.media-tab{border:1px solid var(--line);background:#fff;padding:10px 14px;border-radius:999px;font:inherit;font-weight:800;cursor:pointer}
+.media-tab.is-active{background:var(--green);color:#fff}
+.media-panel[hidden]{display:none}
+.menu-notice{padding:18px;border-radius:16px;background:#f6f3ec;color:var(--text)}
+.restaurant-gallery{display:grid;grid-auto-flow:column;grid-auto-columns:min(82%,520px);gap:12px;overflow-x:auto;scroll-snap-type:x mandatory;padding-bottom:8px}
+.restaurant-gallery img{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:18px;scroll-snap-align:start}
+.detail-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:22px}
+@media(max-width:760px){.restaurant-grid{grid-template-columns:1fr}.restaurant-detail-hero{min-height:290px}.restaurant-detail-title{padding:22px}.place-section{padding:18px}}

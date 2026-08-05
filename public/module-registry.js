@@ -2,7 +2,7 @@ window.GUEST_GUIDE_MODULES = {
   "platform": {
     "name": "Guest Guide Platform with AI Concierge",
     "client": "The House – Koh Tao",
-    "version": "5.2.0"
+    "version": "5.2.1"
   },
   "modules": {
     "house": {
@@ -24,6 +24,21 @@ window.GUEST_GUIDE_MODULES = {
       "enabled": true,
       "label": "Restaurants",
       "entry": "/restaurants.html"
+    },
+    "cafes": {
+      "enabled": true,
+      "label": "Cafés",
+      "entry": "/cafes.html"
+    },
+    "bars": {
+      "enabled": true,
+      "label": "Bars & Nightlife",
+      "entry": "/bars.html"
+    },
+    "shopping": {
+      "enabled": true,
+      "label": "Shopping & Essentials",
+      "entry": "/shopping.html"
     },
     "diving": {
       "enabled": true,

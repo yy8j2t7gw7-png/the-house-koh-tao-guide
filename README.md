@@ -1,11 +1,10 @@
-# Guest Guide Platform with AI Concierge — The House v5.2.0
+# Guest Guide Platform with AI Concierge — The House v5.2.1
 
-Bars & Nightlife — Research Rebuild
+Bars Navigation Fix
 
-- Rebuilt the complete Bars & Nightlife module from the uploaded research report.
-- Added 14 researched venues.
-- Added beach bars, sunset venues, DJs, live music, sports, rooftops, beach clubs, viewpoint bars, nightlife and cabaret.
-- Added detailed venue pages with signature drinks, food, atmosphere, music, happy hour, price, payment, dress code, accessibility and parking.
-- Added concierge advice, maps, contact actions, AI metadata and future image placeholders.
-- Bamboo Beach Bar includes free luggage storage for The House guests after check-out and clearly states that no food is currently served.
-- No rankings, ratings or scores.
+- Fixed the Explore page card that still opened Bamboo Beach Bar directly in Google Maps.
+- The card now opens the complete Bars & Nightlife section at `/bars.html`.
+- Renamed the Explore card from “Bamboo Beach Bar” to “Bars & Nightlife”.
+- Updated both the main Explore page and its modular copy.
+- Added Cafés, Bars and Shopping to the platform module registry.
+- The research-based v5.2.0 Bars data and all 14 venue pages remain included.

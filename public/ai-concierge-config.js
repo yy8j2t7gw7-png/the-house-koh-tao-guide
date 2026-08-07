@@ -44,9 +44,9 @@ window.AI_CONCIERGE_CONFIG = {
   ],
   "pagePrompts": {
     "activities.html": [
-      "Which dive school is best for me?",
-      "I am a complete beginner — what should I choose?",
-      "Tell me about freediving."
+      "Which activity is best for me today?",
+      "Where should I snorkel today?",
+      "Should I choose a shared boat or private boat?"
     ],
     "activity.html": [
       "Is this suitable for a beginner?",

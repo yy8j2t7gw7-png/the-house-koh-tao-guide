@@ -1,11 +1,13 @@
-# Guest Guide Platform with AI Concierge — The House v5.2.3
+# Guest Guide Platform with AI Concierge — The House v5.3.0
 
-Final Research-Based Bars & Nightlife Update
+Activities & Experiences — Diving + Freediving
 
-- Updated the approved 14-venue Bars & Nightlife list from the uploaded concierge research.
-- Replaced 12 venue profiles with detailed research-based content.
-- Preserved the requested order.
-- Added descriptions, atmosphere, music, crowd, drinks, food, happy hours, events, nearby places and concierge guidance.
-- Added social links, maps, opening hours, payment, reservations, dress code, accessibility and parking where provided.
-- Freedom Bar and Hii Bar were not covered by the uploaded research; their cautious placeholder profiles remain until researched.
-- Bamboo Beach Bar states that no food is currently served and that The House guests may leave luggage after checkout while waiting for the ferry.
+- Added a new Activities & Experiences landing page with search and filters.
+- Added 10 fact-checked diving profiles and 2 freediving profiles.
+- Added individual activity detail pages with visitor information, prices, booking, safety, practical details, concierge notes and verification sources.
+- Roctopus Dive is correctly identified as Dive RAID International and remains The House preferred diving recommendation.
+- Added comparison context for RAID, SSI and PADI centres without rankings or ratings.
+- Updated Explore so Activities opens the new Activities module and Shopping opens the Shopping module.
+- Updated the module registry and AI Concierge quick actions/prompts.
+- All operational facts are treated as last verified 7 August 2026 and should be reconfirmed before booking.
+- Next planned Activities releases: snorkelling/boat trips/Koh Nang Yuan, then viewpoints/adventure, then wellness/night/rainy-day content.

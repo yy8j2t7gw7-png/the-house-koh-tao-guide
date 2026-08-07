@@ -31,9 +31,10 @@ window.AI_CONCIERGE_CONFIG = {
       "href": "/practical.html"
     },
     {
-      "label": "Book Activities",
+      "label": "Activities",
       "icon": "🎟",
-      "type": "booking"
+      "type": "link",
+      "href": "/activities.html"
     },
     {
       "label": "Contact Us",
@@ -42,6 +43,16 @@ window.AI_CONCIERGE_CONFIG = {
     }
   ],
   "pagePrompts": {
+    "activities.html": [
+      "Which dive school is best for me?",
+      "I am a complete beginner — what should I choose?",
+      "Tell me about freediving."
+    ],
+    "activity.html": [
+      "Is this suitable for a beginner?",
+      "What should I bring?",
+      "How do I book this?"
+    ],
     "diving.html": [
       "Tell me about learning to dive.",
       "Which course is right for a beginner?",

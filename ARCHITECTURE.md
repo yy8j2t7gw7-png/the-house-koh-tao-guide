@@ -14,7 +14,7 @@ The platform is organized as configurable modules.
 - Departure
 - Bookings
 - Transport
-- Activities
+- Activities (dedicated `/activities.html` module)
 
 ## Planned modules
 

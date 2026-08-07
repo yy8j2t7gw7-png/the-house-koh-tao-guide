@@ -1,13 +1,13 @@
-# Guest Guide Platform with AI Concierge — The House v5.3.2
+# Guest Guide Platform with AI Concierge — The House v5.3.3
 
-Activities & Experiences — Adventure, Viewpoints & Climbing
+Activities Completion + House Booking Routing
 
-- Extends v5.3.1 with 12 fact-checked activity profiles.
-- Adds Beach Experiences, Kayaking, Paddleboarding (SUP), Hiking & Viewpoints, and Rock Climbing.
-- Adds John-Suwan, Fraggle Rock, Two View / West Coast Ridge, Mango Viewpoint and Love Koh Tao.
-- Correctly treats Love Koh Tao as an east-facing sunrise/morning viewpoint, not a sunset viewpoint.
-- Adds coastal kayaking and Sairee sunset SUP with weather/wind safety guidance.
-- Adds Goodtime outdoor rock climbing and The Bunker indoor climbing where present in the research.
-- Activities search/filter navigation now covers all categories delivered through v5.3.2.
-- Wet granite, steep trails and difficult scooter approaches are explicitly treated as safety constraints, especially after rain.
-- All operational information is treated as last verified 7 August 2026 and should be reconfirmed where marked.
+- Adds 15 researched profiles across Yoga & Wellness, Muay Thai, Massage & Spa, Cooking Classes, Wildlife, Photography, Night Activities and Rainy-Day activities.
+- Activities now contain 49 structured experience profiles.
+- Applies a global booking rule to every activity: activity enquiries are routed through The House Concierge (Fah).
+- Public activity pages no longer show direct operator call, email, website or social booking buttons.
+- Primary booking CTA is “Book with The House Concierge” via Fah WhatsApp (+66 96 274 1424), with an optional Call Fah button.
+- Operator contact/source information remains stored in structured data for internal verification and AI context but is not used as the public booking CTA.
+- Self-guided activities still provide an Open Map action.
+- Adds rainy-day indoor climbing and preserves the research rule that wet viewpoints, outdoor climbing, exposed kayaking/SUP and rough-sea snorkelling are not appropriate rain backups.
+- All volatile operational facts remain last verified 7 August 2026 and should be reconfirmed when booking.

@@ -45,8 +45,8 @@ window.AI_CONCIERGE_CONFIG = {
   "pagePrompts": {
     "activities.html": [
       "Which activity is best for me today?",
-      "Where should I snorkel today?",
-      "Should I choose a shared boat or private boat?"
+      "Which viewpoint should I visit?",
+      "What is a good active experience if the sea is calm?"
     ],
     "activity.html": [
       "Is this suitable for a beginner?",

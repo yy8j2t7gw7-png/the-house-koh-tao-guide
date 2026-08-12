@@ -43,8 +43,9 @@ Do not force or invent fields unsupported by authoritative research.
 - Design for phones first.
 - Keep cards scannable and put detailed information on detail pages.
 - Use consistent buttons and labels across modules.
-- Preserve a clear route back to Explore and home.
+- Preserve a clear route home. Keep Explore source intact while the live `EXPLORE_ENABLED` switch is off; restore its navigation only after the planned rebuild is reviewed.
 - Do not expose operator-direct booking actions for concierge-booked services.
+- Keep the shared language selector available on every guest-facing operational page and secure registration flow. Owner administration remains English.
 
 ## Contact routing
 
@@ -84,6 +85,9 @@ The concierge must:
 - keep contact destinations and safety-critical actions deterministic rather than model-generated
 - require owner approval before a learned answer becomes active
 - redact and minimize stored guest-question data
+- answer in the guest's selected language while leaving deterministic safety and contact routing under server control
+
+For accidents and urgent medical situations, present Koh Tao Rescue first because the team knows the island and local access points, then present Thailand's national medical emergency number 1669 as the second immediate option. Keep both actions visible and distinct.
 
 Model access uses the server-side `OPENAI_API_KEY` secret. Learning review uses `CONCIERGE_ADMIN_TOKEN`, and session pseudonymization should use `CONCIERGE_HASH_SALT`. Never expose these values in public code or a release archive. The deterministic engine must remain usable if model access is absent or unavailable.
 

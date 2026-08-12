@@ -1,4 +1,4 @@
-# Guest Guide Platform with AI Concierge — The House v5.6.2
+# Guest Guide Platform with AI Concierge — The House v5.7.0
 
 The House – Koh Tao guest guide is a production-oriented, mobile-first digital guest guide and concierge platform. It combines property information, curated island guidance, structured place and activity data, and centralized contact and booking routes.
 
@@ -17,6 +17,23 @@ The House – Koh Tao guest guide is a production-oriented, mobile-first digital
 - Model-powered, room-aware AI Concierge with controlled learning
 
 The Activities module contains 49 structured profiles covering diving, freediving, snorkelling, boat trips, beach experiences, kayaking, paddleboarding, hiking, viewpoints, climbing, yoga, Muay Thai, massage, cooking, wildlife, photography, night activities and rainy-day options.
+
+## v5.7.0 release focus
+
+- Adds one persistent, easy-to-find language selector across all 41 guest pages and the secure registration form.
+- Supports English, Thai, Simplified Chinese, Russian, German, French and Spanish throughout the operational guest journey: welcome, rooms, House information, practical information, help and emergencies, departure, secure registration and concierge controls.
+- Deliberately leaves Explore page content and structured Explore records in English until the planned Explore rebuild; the shared header and concierge remain language-aware there.
+- Removes Explore from the live guest navigation and redirects direct Explore page visits to the welcome page while keeping all source pages, records and assets intact behind the `EXPLORE_ENABLED` feature switch.
+- Keeps the protected owner operations dashboard in English and never sends its text to the translation service.
+- Gives navigation, actions, emergency labels, concierge controls and passport privacy/status wording reviewed built-in translations.
+- Translates longer approved operational content through a protected Worker endpoint and stores each approved result in a shared Durable Object cache, avoiding repeated model charges for the same text.
+- Limits the translation endpoint to approved public project text, excludes guest chat messages and uses OpenAI Responses with strict structured output and `store: false`.
+- Makes the concierge respect the guest's explicitly selected language, including deterministic approved answers.
+- Adds a compact mobile menu so the full navigation and language control remain available on phones.
+- Retains all v5.6.2 concierge recommendations, registration reliability and contact-routing safeguards.
+- For accidents and urgent medical situations, consistently offers Koh Tao Rescue first and Thailand's national medical emergency number 1669 second.
+
+Explore can be restored later by setting the Cloudflare Worker variable `EXPLORE_ENABLED` to `true` and redeploying after the rebuilt content has been reviewed.
 
 ## v5.6.2 release focus
 

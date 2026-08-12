@@ -2,7 +2,7 @@
 
 ## Purpose and current scope
 
-The House requires passport information for guest and overnight-visitor TM30 Immigration accommodation registration. v5.6.2 provides a private passport-image workflow and a prominent welcome-page registration entry point so guests do not send the document through the AI Concierge or as a WhatsApp attachment.
+The House requires passport information for guest and overnight-visitor TM30 Immigration accommodation registration. v5.7.0 provides a private passport-image workflow, a prominent welcome-page registration entry point and a seven-language secure form so guests do not send the document through the AI Concierge or as a WhatsApp attachment.
 
 The current authoritative House information confirms the passport-photo requirement. It does not contain the exact structured TM30 field list. The alternative manual-details form must therefore remain disabled until that authoritative field specification is supplied. Do not guess legal or Immigration fields.
 

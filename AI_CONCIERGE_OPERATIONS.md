@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The v5.6.2 concierge combines three layers:
+The v5.7.0 concierge combines three layers:
 
 1. Deterministic safety and operational rules for emergencies, lost keys, fees, booking policy and human routing.
 2. Server-side model reasoning over approved House knowledge plus targeted retrieval from the existing Activities, Restaurants, Cafés, Beaches, Bars and Shopping records.
@@ -15,6 +15,20 @@ The default GPT-5.6 reasoning effort is `medium`. The retrieval layer sends only
 ## Required production secrets
 
 Configure secrets on the existing Cloudflare Worker. Never place their values in Git, public JavaScript, JSON, URLs, screenshots or release archives.
+
+## Guest-language operations
+
+v5.7.0 supports English, Thai, Simplified Chinese, Russian, German, French and Spanish for the operational guest journey. Essential navigation, emergency, passport and concierge controls have reviewed built-in translations. Longer approved operational text is translated through `/api/i18n/translate` using strict structured output with `store: false` and cached in the existing Durable Object.
+
+- `OPENAI_TRANSLATION_MODEL` defaults to `gpt-5.6`.
+- `OPENAI_TRANSLATION_REASONING_EFFORT` defaults to `low`.
+- Only approved public project text may be sent to the translation endpoint.
+- Guest-authored chat messages and the owner dashboard are excluded.
+- Explore content translation is deferred.
+
+The release sets `EXPLORE_ENABLED=false`. This removes Explore from live navigation and redirects direct Explore routes while preserving every source page, record and asset. Set it to `true` and redeploy only after the later Explore rebuild is reviewed.
+
+For accidents and urgent medical situations, the guest is offered both immediate contacts in a fixed order: Koh Tao Rescue first because the team knows the island and local access points, then Thailand's national medical emergency number 1669.
 
 ### `OPENAI_API_KEY`
 

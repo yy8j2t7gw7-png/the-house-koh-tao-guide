@@ -85,6 +85,16 @@ export class ConciergeStore extends DurableObject {
           deleted_at TEXT NOT NULL DEFAULT ''
         );
         CREATE INDEX IF NOT EXISTS passport_uploads_status ON passport_uploads(status, arrival_at, expires_at);
+
+        CREATE TABLE IF NOT EXISTS translation_cache (
+          cache_key TEXT PRIMARY KEY,
+          language TEXT NOT NULL,
+          source_hash TEXT NOT NULL,
+          translation TEXT NOT NULL,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS translation_cache_language ON translation_cache(language, updated_at);
       `);
     });
   }
@@ -333,6 +343,48 @@ export class ConciergeStore extends DurableObject {
       now,
       cleanText(id, 100)
     );
+    return { ok: true };
+  }
+
+  async getTranslations(cacheKeys) {
+    const keys = Array.isArray(cacheKeys)
+      ? cacheKeys.map((key) => cleanText(key, 100)).filter(Boolean).slice(0, 24)
+      : [];
+    if (!keys.length) return {};
+    const placeholders = keys.map(() => "?").join(",");
+    const result = {};
+    for (const row of rows(this.ctx.storage.sql.exec(
+      `SELECT cache_key AS cacheKey, translation FROM translation_cache WHERE cache_key IN (${placeholders})`,
+      ...keys
+    ))) {
+      result[row.cacheKey] = row.translation;
+    }
+    return result;
+  }
+
+  async saveTranslations(entries) {
+    const now = new Date().toISOString();
+    for (const entry of Array.isArray(entries) ? entries.slice(0, 24) : []) {
+      const cacheKey = cleanText(entry.cacheKey, 100);
+      const language = cleanText(entry.language, 12);
+      const sourceHash = cleanText(entry.sourceHash, 64);
+      const translation = cleanText(entry.translation, 1800);
+      if (!cacheKey || !language || !sourceHash || !translation) continue;
+      this.ctx.storage.sql.exec(
+        `INSERT INTO translation_cache
+         (cache_key, language, source_hash, translation, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?)
+         ON CONFLICT(cache_key) DO UPDATE SET
+           translation = excluded.translation,
+           updated_at = excluded.updated_at`,
+        cacheKey,
+        language,
+        sourceHash,
+        translation,
+        now,
+        now
+      );
+    }
     return { ok: true };
   }
 

@@ -1,6 +1,6 @@
 # Product Roadmap
 
-Baseline: v5.6.2
+Baseline: v5.7.0
 
 ## Completed
 
@@ -41,8 +41,11 @@ Baseline: v5.6.2
 - [x] Guest-friendly TM30 purpose and passport-data treatment explanation
 - [x] Authenticated owner download, immediate deletion and 14-day scheduled cleanup
 - [x] Pending-arrival passport request and manual-reminder queue
+- [x] Seven-language operational guest interface across welcome, rooms, House information, practical information, emergencies, departure, secure registration and AI Concierge
+- [x] Reviewed multilingual safety, passport and operational controls
+- [x] Protected approved-content translation cache without guest-message translation
 
-## Current priority — v5.6.x Operational Concierge Launch
+## Current priority — v5.7.x Operational Concierge Launch
 
 The concierge must be useful to real guests before further Explore expansion.
 
@@ -79,7 +82,8 @@ Su and Fah currently use ordinary WhatsApp. The current release therefore uses p
 
 - [x] Push the v5.5.0 release to the existing hosting workflow
 - [x] Confirm `/api/concierge/status` reports AI and learning enabled
-- [ ] Deploy v5.6.2 and confirm live recommendations, booking wording and registration entry point
+- [ ] Deploy v5.7.0 and confirm live language switching, recommendations, booking wording and registration entry point
+- [ ] Test all seven languages on guest phones and review real guest feedback for wording refinements
 - [ ] Verify the protected `/concierge-admin` review workflow
 - [ ] Verify the live room links, including Room 7
 - [ ] Test the concierge on guest phones
@@ -126,7 +130,10 @@ Requires carefully verified research.
 
 Do not begin this phase until the concierge and operational support flows are working reliably for real guests.
 
+Live status: disabled through `EXPLORE_ENABLED=false`. Existing pages, data and media are preserved in source for reactivation after the rebuild.
+
 - [ ] Cross-module recommendation engine
+- [ ] Translate rebuilt Explore content and structured Explore records into all seven supported guest languages
 - [ ] Hidden gems and local tips
 - [ ] Seasonal and weather-aware advice
 - [ ] Best for couples, families and rainy days

@@ -176,11 +176,12 @@ export function actionsForHandoff(handoff, question = "") {
     property_emergency: [
       { label: "Call Emergency Support", type: "route", route: "propertyEmergencyCall", style: "danger" },
       { label: "Send Urgent Message", type: "route", route: "propertyEmergencyWhatsapp", message: "URGENT property problem at The House, {roomLabel}: {question}", style: "danger" },
+      { label: "Call Koh Tao Rescue", type: "route", route: "rescueCall", style: "danger" },
       { label: "Call Medical Emergency 1669", type: "route", route: "medicalNationalCall" }
     ],
     medical_emergency: [
-      { label: "Call Medical Emergency 1669", type: "route", route: "medicalNationalCall", style: "danger" },
-      { label: "Call Koh Tao Rescue", type: "route", route: "rescueCall" }
+      { label: "Call Koh Tao Rescue", type: "route", route: "rescueCall", style: "danger" },
+      { label: "Call Medical Emergency 1669", type: "route", route: "medicalNationalCall", style: "danger" }
     ]
   };
   return actions[handoff] || [];

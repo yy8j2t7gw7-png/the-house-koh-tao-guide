@@ -2,6 +2,34 @@
 
 All notable changes to The House – Koh Tao guest guide are recorded here.
 
+## v5.7.0 — Seven-Language Guest Experience
+
+### Added
+
+- Global guest language selector for English, Thai, Simplified Chinese, Russian, German, French and Spanish.
+- Shared localization runtime for the welcome, room, House information, practical information, help and emergency, departure, AI Concierge and secure passport experiences.
+- Reviewed built-in translations for navigation, actions, emergency labels, concierge controls and passport purpose, privacy, consent, validation and upload-status wording.
+- Protected translation API for longer approved project content using strict structured model output and `store: false`.
+- Shared translation cache in the existing Durable Object so an approved source string is translated once per language and reused for all guests.
+- Explicit selected-language context in concierge requests, including deterministic approved answers.
+- Mobile menu and persistent language access on smaller screens.
+- Automated localization checks covering all seven language codes, guest/admin separation, approved-source translation and rejection of arbitrary guest text.
+
+### Privacy and safety
+
+- Guest-authored concierge messages are excluded from the page-translation pipeline.
+- The translation endpoint accepts only source text found in approved public pages, scripts and structured datasets.
+- The owner operations dashboard remains English and is not connected to guest localization.
+- Proper names, phone numbers, prices, fees, times, URLs and room numbers are preserved by the translation contract.
+- English approved source remains visible if translation is temporarily unavailable.
+- Accident and urgent medical guidance now offers Koh Tao Rescue first because the team knows the island and local access points, followed by Thailand's national medical emergency number 1669 as the second immediate option.
+
+### Deferred
+
+- Explore is removed from the live guest navigation and direct Explore page requests redirect to the welcome page.
+- All Explore source pages, structured Activities, Restaurants, Cafés, Beaches, Bars and Shopping records, and media remain intact behind the disabled `EXPLORE_ENABLED` feature switch for the later rebuild.
+- Existing approved Explore records remain available to AI Concierge reasoning, but live answers do not expose links to disabled Explore pages.
+
 ## v5.6.2 — Registration Button Reliability
 
 ### Fixed

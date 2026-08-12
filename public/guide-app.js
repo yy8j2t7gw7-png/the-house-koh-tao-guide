@@ -1,3 +1,29 @@
+(function loadHouseI18n() {
+  if (window.HOUSE_I18N || window.HOUSE_I18N_LOADING) return;
+  window.HOUSE_I18N_LOADING = true;
+  const script = document.createElement("script");
+  script.src = "/i18n.js";
+  script.onload = () => { window.HOUSE_I18N_LOADING = false; };
+  script.onerror = () => { window.HOUSE_I18N_LOADING = false; };
+  document.head.appendChild(script);
+})();
+
+(function loadGuestFeatures() {
+  window.HOUSE_FEATURES = { explore: false, ...(window.HOUSE_FEATURES || {}) };
+  document.documentElement.classList.add("explore-disabled");
+  fetch("/api/features", { headers: { accept: "application/json" } })
+    .then((response) => response.ok ? response.json() : Promise.reject(new Error("Feature config unavailable.")))
+    .then((features) => {
+      window.HOUSE_FEATURES.explore = Boolean(features.exploreEnabled);
+      document.documentElement.classList.toggle("explore-enabled", window.HOUSE_FEATURES.explore);
+      document.documentElement.classList.toggle("explore-disabled", !window.HOUSE_FEATURES.explore);
+      window.dispatchEvent(new CustomEvent("house:features-ready", { detail: window.HOUSE_FEATURES }));
+    })
+    .catch(() => {
+      // Explore remains safely hidden when live feature configuration is unavailable.
+    });
+})();
+
 (function () {
   const cfg = window.HOUSE_GUIDE;
   if (!cfg) return;

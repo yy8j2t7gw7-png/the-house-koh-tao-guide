@@ -12,8 +12,9 @@ import {
 } from "./concierge-core.js";
 import { handlePassportAdminRequest } from "./passport-api.js";
 import { retrieveApprovedProjectKnowledge } from "./project-knowledge.js";
+import { LANGUAGE_NAMES, translateApprovedTexts, validLanguage } from "./i18n-api.js";
 
-const RELEASE = "5.6.2";
+const RELEASE = "5.7.0";
 const ROOM_OPTIONS = new Set(["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11"]);
 const MAX_HISTORY_ITEMS = 10;
 const MAX_QUESTION_LENGTH = 800;
@@ -179,14 +180,16 @@ function bangkokContext() {
   }).format(new Date());
 }
 
-function systemInstructions({ knowledge, approvedKnowledge, projectKnowledge, room }) {
+function systemInstructions({ knowledge, approvedKnowledge, projectKnowledge, room, language }) {
+  const responseLanguage = LANGUAGE_NAMES[language] || LANGUAGE_NAMES.en;
   const roomContext = room
     ? `The guest selected Room ${room}. Treat this as useful context but NOT as proof of identity or an active stay.`
     : "The guest has not selected a room. Ask for it only when room-specific operational help is needed.";
   return `You are the private digital concierge for The House – Koh Tao, a guesthouse in Thailand.
 
 VOICE AND LANGUAGE
-- Answer in the same language as the guest whenever possible.
+- Answer in ${responseLanguage}. This is the language explicitly selected by the guest.
+- Keep business and place names in their approved form. Do not translate names, numbers, prices, times or contact details.
 - Sound like a calm, professional hotel concierge: neutral, practical, concise and never promotional.
 - Preserve names, numbers, fees and times exactly as stated in approved knowledge.
 
@@ -208,7 +211,7 @@ ABSOLUTE SAFETY AND OPERATIONS RULES
 - Selecting a room is never sufficient identity verification for protected access.
 - A lost key has a 500 THB replacement fee. Protected spare-key access is not active in this release.
 - Major leaks, flooding, dangerous electrical problems, fire/smoke or serious property damage require property_emergency handoff immediately.
-- Serious or life-threatening medical situations require medical_emergency handoff and the number 1669.
+- Accidents and serious or life-threatening medical situations require medical_emergency handoff. Offer Koh Tao Rescue first because they know the island and local access points, and also offer Thailand's national medical emergency number 1669.
 - Routine stay needs such as towels, cleaning, lost keys and room problems use stay_support.
 - Activities, transport, rentals, tours and services that The House can arrange use booking. Never suggest booking directly with an operator.
 - Never discuss internal commercial arrangements, referral terms, revenue or how The House may benefit from a booking. Keep the answer focused on helping the guest arrange what they need.
@@ -260,11 +263,11 @@ function validateModelResult(value) {
   };
 }
 
-async function callOpenAI({ env, question, history, knowledge, approvedKnowledge, projectKnowledge, room }) {
+async function callOpenAI({ env, question, history, knowledge, approvedKnowledge, projectKnowledge, room, language }) {
   const requestBody = {
     model: env.OPENAI_MODEL || "gpt-5.6",
     store: false,
-    instructions: systemInstructions({ knowledge, approvedKnowledge, projectKnowledge, room }),
+    instructions: systemInstructions({ knowledge, approvedKnowledge, projectKnowledge, room, language }),
     input: [
       ...history.map((item) => ({ role: item.role, content: item.content })),
       { role: "user", content: question }
@@ -347,6 +350,16 @@ function finalizeResult(result) {
   return { ...result, answer, handoff, actions };
 }
 
+function applyLiveFeaturePolicy(result, env) {
+  const exploreIsLive = String(env.EXPLORE_ENABLED || "").toLowerCase() === "true";
+  if (exploreIsLive) return result;
+  const actions = (result.actions || []).filter((action) => {
+    const href = String(action?.href || "");
+    return !/^\/(?:activities|activity|bars|bar|beaches|beach|cafes|cafe|diving|explore|restaurants|restaurant|shopping|shop)\.html(?:[?#]|$)/i.test(href);
+  });
+  return { ...result, actions };
+}
+
 async function enforceRateLimit(env, sessionId) {
   if (!env.CONCIERGE_RATE_LIMITER?.limit) return true;
   const result = await env.CONCIERGE_RATE_LIMITER.limit({ key: `guest:${sessionId}` });
@@ -395,6 +408,7 @@ export async function handleConciergeRequest(request, env, ctx) {
     : sanitizedQuestion;
   const sessionId = validSessionId(body.sessionId);
   const room = validRoom(body.room);
+  const language = validLanguage(body.language) || "en";
   const history = cleanHistory(body.history);
   if (!sessionId || question.length < 2 || question.length > MAX_QUESTION_LENGTH) {
     return json({ error: "invalid_request" }, 400);
@@ -440,7 +454,7 @@ export async function handleConciergeRequest(request, env, ctx) {
       const retrievalQuestion = [...history.slice(-2).map((item) => item.content), question].join(" ");
       const projectKnowledge = await retrieveApprovedProjectKnowledge(request, env, retrievalQuestion);
       result = {
-        ...(await callOpenAI({ env, question, history, knowledge, approvedKnowledge, projectKnowledge, room })),
+        ...(await callOpenAI({ env, question, history, knowledge, approvedKnowledge, projectKnowledge, room, language })),
         source: "ai"
       };
     } catch (_error) {
@@ -452,6 +466,16 @@ export async function handleConciergeRequest(request, env, ctx) {
     result = deterministicResult(fallbackMatch, fallbackMatch.matched ? "approved-fallback" : "fallback");
   }
   result = finalizeResult(result);
+  result = applyLiveFeaturePolicy(result, env);
+
+  if (language !== "en" && result.source !== "ai") {
+    try {
+      const [translatedAnswer] = await translateApprovedTexts(env, language, [result.answer]);
+      result = { ...result, answer: translatedAnswer };
+    } catch (_error) {
+      // The approved English answer remains available if translation is temporarily unavailable.
+    }
+  }
 
   let interactionId = null;
   if (store) {
@@ -471,6 +495,7 @@ export async function handleConciergeRequest(request, env, ctx) {
     learningGap: result.learningGap,
     actions: result.actions,
     source: result.source,
+    language,
     interactionId
   });
 }

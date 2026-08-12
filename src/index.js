@@ -5,7 +5,36 @@ import {
   handleFeedbackRequest
 } from "./concierge-api.js";
 import { cleanupPassportUploads, handlePassportGuestRequest } from "./passport-api.js";
+import { handleTranslationRequest } from "./i18n-api.js";
 export { ConciergeStore } from "./concierge-store.js";
+
+const EXPLORE_PAGE_PATTERN = /^\/(?:explore|activities|activity|diving|bars|bar|beaches|beach|cafes|cafe|restaurants|restaurant|shopping|shop)(?:\.html)?\/?$/;
+const EXPLORE_MODULE_PATTERN = /^\/modules\/(?:explore|activities|diving|bars|beaches|cafes|restaurants|shopping)\//;
+
+function exploreEnabled(env) {
+  return String(env.EXPLORE_ENABLED || "").toLowerCase() === "true";
+}
+
+function json(data, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: {
+      "content-type": "application/json; charset=utf-8",
+      "cache-control": "public, max-age=60",
+      "x-content-type-options": "nosniff"
+    }
+  });
+}
+
+function withoutExploreNavigation(response) {
+  const contentType = response.headers.get("content-type") || "";
+  if (!response.ok || !contentType.includes("text/html")) return response;
+  return new HTMLRewriter()
+    .on('.nav a[href="/explore.html"],a.card[href="/explore.html"]', {
+      element(element) { element.remove(); }
+    })
+    .transform(response);
+}
 
 async function privateAsset(request, env, path) {
   const assetUrl = new URL(path, request.url);
@@ -29,6 +58,10 @@ export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
 
+    if (url.pathname === "/api/features" && request.method === "GET") {
+      return json({ exploreEnabled: exploreEnabled(env) });
+    }
+
     if (url.pathname === "/api/concierge/status" && request.method === "GET") {
       return conciergeStatus(env);
     }
@@ -39,6 +72,10 @@ export default {
 
     if (url.pathname === "/api/concierge/feedback") {
       return handleFeedbackRequest(request, env);
+    }
+
+    if (url.pathname === "/api/i18n/translate") {
+      return handleTranslationRequest(request, env);
     }
 
     if (url.pathname === "/api/passport-upload" || url.pathname === "/api/passport-upload/session") {
@@ -60,13 +97,18 @@ export default {
       });
     }
 
+    if (!exploreEnabled(env) && (EXPLORE_PAGE_PATTERN.test(url.pathname) || EXPLORE_MODULE_PATTERN.test(url.pathname))) {
+      return Response.redirect(new URL("/", request.url).toString(), 302);
+    }
+
     if (/^\/room\/(1|2|3|4|5|6|7|8|9|10|11)\/?$/.test(url.pathname)) {
       const roomPageUrl = new URL("/room.html", url);
       const assetRequest = new Request(roomPageUrl.toString(), {
         method: "GET",
         headers: request.headers,
       });
-      return env.ASSETS.fetch(assetRequest);
+      const response = await env.ASSETS.fetch(assetRequest);
+      return exploreEnabled(env) ? response : withoutExploreNavigation(response);
     }
 
     if (url.pathname === "/room" || url.pathname === "/room/") {
@@ -75,7 +117,8 @@ export default {
         method: "GET",
         headers: request.headers,
       });
-      return env.ASSETS.fetch(assetRequest);
+      const response = await env.ASSETS.fetch(assetRequest);
+      return exploreEnabled(env) ? response : withoutExploreNavigation(response);
     }
 
     if (url.pathname === "/concierge-admin" || url.pathname === "/concierge-admin/" || url.pathname === "/concierge-admin.html") {
@@ -86,7 +129,8 @@ export default {
       return privateAsset(request, env, "/passport-upload.html");
     }
 
-    return env.ASSETS.fetch(request);
+    const response = await env.ASSETS.fetch(request);
+    return exploreEnabled(env) ? response : withoutExploreNavigation(response);
   },
   async scheduled(_controller, env, ctx) {
     ctx.waitUntil(cleanupPassportUploads(env));

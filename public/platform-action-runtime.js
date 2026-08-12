@@ -1,14 +1,21 @@
 (function () {
   const actions = window.GUEST_GUIDE_ACTIONS || {};
 
-  const labels = {
+  const sourceLabels = {
     contact: actions.contact?.label || "Contact Us",
     booking: actions.booking?.label || "Book with Us",
     bookingCall: actions.bookingCall?.label || "Call Us",
+    rescueCall: "Call Koh Tao Rescue",
+    medicalEmergencyCall: "Call Medical Emergency 1669",
     call: actions.call?.label || "Call",
     map: actions.map?.label || "Open Map",
     website: actions.website?.label || "Visit Website",
     discover: actions.discover?.label || "Discover →"
+  };
+
+  const localizedLabel = (action) => {
+    const source = sourceLabels[action];
+    return window.HOUSE_I18N?.t(source) || source;
   };
 
   const callLinkKeys = new Set([
@@ -25,6 +32,8 @@
     if (linkKey === "houseWhatsapp") return "contact";
     if (linkKey === "bookingWhatsapp") return "booking";
     if (linkKey === "bookingCall") return "bookingCall";
+    if (linkKey === "rescueCall") return "rescueCall";
+    if (linkKey === "medicalNationalCall") return "medicalEmergencyCall";
     if (callLinkKeys.has(linkKey)) return "call";
 
     const explicit = element.getAttribute("data-action");
@@ -40,7 +49,7 @@
     if (!(element instanceof Element) || !element.matches("a,button")) return;
 
     const action = inferAction(element);
-    const label = labels[action];
+    const label = localizedLabel(action);
     if (!action || !label) return;
 
     // Only write attributes/text when they actually differ. This prevents
@@ -63,6 +72,7 @@
   };
 
   applyActions();
+  window.addEventListener("house:i18n-ready", () => applyActions());
 
   const observer = new MutationObserver((mutations) => {
     for (const mutation of mutations) {

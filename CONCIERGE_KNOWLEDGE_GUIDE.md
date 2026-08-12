@@ -64,7 +64,7 @@ Supported route keys include:
 - `houseWhatsapp` and `houseCall`
 - `bookingWhatsapp` and `bookingCall`
 - `propertyEmergencyWhatsapp` and `propertyEmergencyCall`
-- `medicalNationalCall`, `hospitalCall` and `hospitalMap`
+- `rescueCall`, `medicalNationalCall`, `hospitalCall` and `hospitalMap`
 - `pharmacyMap`, `atmMap`, `supermarketMap` and `laundryMap`
 
 ## Routing rules
@@ -72,8 +72,8 @@ Supported route keys include:
 - Routine stay requests are handled by the concierge first and handed to Su only when a person must act.
 - House-arranged bookings hand off to the booking contact.
 - Urgent property problems use the separate property-emergency role.
-- Medical or personal emergencies use the verified emergency routes.
-- Explore recommendations remain outside the live question engine until their answers are explicitly prepared and approved.
+- Accidents and urgent medical situations offer Koh Tao Rescue first and medical emergency number 1669 second.
+- Explore recommendations may use preserved approved records for concierge reasoning, but live Explore navigation and page links remain disabled while `EXPLORE_ENABLED=false`.
 
 ## Room awareness
 

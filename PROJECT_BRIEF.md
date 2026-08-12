@@ -20,7 +20,9 @@ The product should feel like a competent hotel concierge in a guest’s pocket, 
 
 ### Current state
 
-Current release: v5.6.2.
+Current release: v5.7.0.
+
+The live release prioritizes the operational guest journey and AI Concierge. It supports seven guest languages. Explore is disabled through a reversible deployment feature switch; all Explore source content remains preserved for the final content phase.
 
 Existing content areas:
 

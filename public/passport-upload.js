@@ -12,12 +12,16 @@
   history.replaceState(null, "", "/passport-upload");
 
   function showStatus(message, type = "") {
-    status.textContent = message;
+    const translated = window.HOUSE_I18N?.t(message) || message;
+    status.textContent = translated;
+    if (translated !== message) status.dataset.i18nSkip = "true";
+    else delete status.dataset.i18nSkip;
     status.className = `passport-status${type ? ` is-${type}` : ""}`;
   }
 
   function bangkokDate(value) {
-    return new Date(value).toLocaleString("en-GB", {
+    const locales = { en: "en-GB", th: "th-TH", "zh-CN": "zh-CN", ru: "ru-RU", de: "de-DE", fr: "fr-FR", es: "es-ES" };
+    return new Date(value).toLocaleString(locales[window.HOUSE_I18N?.language] || "en-GB", {
       timeZone: "Asia/Bangkok",
       dateStyle: "medium",
       timeStyle: "short"
@@ -43,9 +47,9 @@
       const response = await request("/api/passport-upload/session", { method: "POST" });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || "invalid_or_expired_link");
-      document.getElementById("passportRoom").textContent = `Room ${data.room}`;
-      document.getElementById("passportExpiry").textContent = `Link expires: ${bangkokDate(data.expiresAt)}`;
-      document.getElementById("passportRetention").textContent = `Automatic deletion: ${data.retentionDays} days after upload`;
+      document.getElementById("passportRoom").textContent = window.HOUSE_I18N?.format("Room {room}", { room: data.room }) || `Room ${data.room}`;
+      document.getElementById("passportExpiry").textContent = window.HOUSE_I18N?.format("Link expires: {date}", { date: bangkokDate(data.expiresAt) }) || `Link expires: ${bangkokDate(data.expiresAt)}`;
+      document.getElementById("passportRetention").textContent = window.HOUSE_I18N?.format("Automatic deletion: {days} days after upload", { days: data.retentionDays }) || `Automatic deletion: ${data.retentionDays} days after upload`;
       form.hidden = false;
       showStatus("Your private link is valid. Choose the passport image when you are ready.", "success");
     } catch (_error) {
@@ -78,7 +82,7 @@
       window.sessionStorage.removeItem(tokenStorageKey);
       fileInput.value = "";
       form.hidden = true;
-      showStatus(`Thank you. The passport image for Room ${data.room} was received securely. This one-time link is now closed.`, "success");
+      showStatus(window.HOUSE_I18N?.format("Thank you. The passport image for Room {room} was received securely. This one-time link is now closed.", { room: data.room }) || `Thank you. The passport image for Room ${data.room} was received securely. This one-time link is now closed.`, "success");
     } catch (error) {
       const messages = {
         unsupported_file_type: "That file is not a supported passport image. Please choose a JPEG, PNG, WebP or HEIC image.",

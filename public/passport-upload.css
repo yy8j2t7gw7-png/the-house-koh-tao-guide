@@ -11,7 +11,7 @@
 *{box-sizing:border-box}
 body{margin:0;background:linear-gradient(180deg,#f7f2e8 0,#f3f7f4 100%);color:var(--passport-ink)}
 .passport-shell{width:min(760px,calc(100% - 28px));margin:0 auto;padding:26px 0 64px}
-.passport-brand{display:flex;align-items:center;gap:13px;margin-bottom:18px}
+.passport-brand{position:relative;display:flex;align-items:center;gap:13px;margin-bottom:18px;padding-right:190px}
 .passport-brand img{width:58px;height:58px;padding:8px;border:1px solid var(--passport-line);border-radius:17px;background:#fff;object-fit:contain}
 .passport-brand span,.passport-brand strong{display:block}
 .passport-brand span{margin-bottom:2px;color:var(--passport-muted);font-size:11px;font-weight:900;letter-spacing:.1em;text-transform:uppercase}
@@ -46,9 +46,13 @@ body{margin:0;background:linear-gradient(180deg,#f7f2e8 0,#f3f7f4 100%);color:va
 #passportSubmit{width:100%;min-height:50px;border:0;border-radius:14px;background:var(--passport-accent);color:#fff;font:inherit;font-weight:900;cursor:pointer}
 #passportSubmit:disabled{opacity:.58;cursor:wait}
 .passport-help{margin:18px 0 0;color:var(--passport-muted);font-size:12px;line-height:1.5}
+.passport-brand .language-switcher{position:absolute;right:0;top:7px}
 @media(max-width:600px){
   .passport-shell{width:min(100% - 18px,760px);padding-top:10px}
   .passport-card{border-radius:22px}
   .passport-session{grid-template-columns:1fr}
   .registration-methods{grid-template-columns:1fr}
+  .passport-brand{padding-right:118px}
+  .passport-brand .language-switcher-label{display:none}
+  .passport-brand .language-switcher select{max-width:100px}
 }

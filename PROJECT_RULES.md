@@ -119,7 +119,9 @@ Public interface rules:
 
 ## Current baseline
 
-Current release: v5.6.2.
+Current release: v5.7.0.
+
+Explore is intentionally disabled in the live v5.7.0 release. Do not delete its pages, structured records or media. Restore it only after the planned Explore rebuild and review by changing the protected deployment feature variable.
 
 Completed content modules:
 

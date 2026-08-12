@@ -21,7 +21,9 @@ Understand the existing architecture before modifying it.
 
 ## Current baseline
 
-The current release is v5.6.2. Completed modules include House Information, Restaurants, Cafés, Beaches, Bars & Nightlife, Shopping & Essentials, Activities & Experiences, and the hybrid room-aware AI Concierge with targeted approved-data retrieval, deterministic safety fallback and controlled owner-reviewed learning.
+The current release is v5.7.0. Completed modules include House Information, Restaurants, Cafés, Beaches, Bars & Nightlife, Shopping & Essentials, Activities & Experiences, the seven-language guest interface, and the hybrid room-aware AI Concierge with targeted approved-data retrieval, deterministic safety fallback and controlled owner-reviewed learning.
+
+The live v5.7.0 deployment sets `EXPLORE_ENABLED=false`: Explore navigation and routes are hidden from guests, but every page, structured record and asset remains in source. Do not delete them. The operational guest pages, secure registration and AI Concierge support English, Thai, Simplified Chinese, Russian, German, French and Spanish. Accident guidance offers Koh Tao Rescue first and 1669 second.
 
 Do not regress or replace completed modules.
 
@@ -57,7 +59,7 @@ Major water leaks, flooding, dangerous electrical problems and serious property 
 
 Su and Fah currently use ordinary WhatsApp. Automatic server-sent notifications require a future WhatsApp Business Platform integration. The current release uses prefilled human handoff messages.
 
-v5.6.2 includes a separate private passport-image flow for required TM30 guest registration and a prominent required-registration entry point on the welcome page. Read `PASSPORT_DATA_OPERATIONS.md`. It requires a private R2 bucket and `PASSPORT_TOKEN_PEPPER` before production activation. Passport content must never enter the model, learning queue, public assets or WhatsApp. The manual-details alternative is intentionally blocked until the authoritative TM30 field list is supplied.
+v5.7.0 includes a separate seven-language private passport-image flow for required TM30 guest registration and a prominent required-registration entry point on the welcome page. Read `PASSPORT_DATA_OPERATIONS.md`. It requires a private R2 bucket and `PASSPORT_TOKEN_PEPPER` before production activation. Passport content must never enter the model, learning queue, public assets or WhatsApp. The manual-details alternative is intentionally blocked until the authoritative TM30 field list is supplied.
 
 ## Development method
 
@@ -65,7 +67,7 @@ Continue from `ROADMAP.md`. Implement the next coherent, unblocked milestone com
 
 ## Next planned milestone
 
-Activate and verify the v5.6.x production concierge by deploying the Worker, testing the private registration flow and establishing the owner review routine. Then add approved stay answers as they are supplied. Secure guest verification, protected spare-key delivery, a confirmed 24/7 property-emergency contact and a staff-notification channel remain future operational milestones. Transport and other Explore modules remain deferred.
+Activate and verify the v5.7.x production concierge by deploying the Worker, testing all seven guest languages and the private registration flow, and establishing the owner review routine. Then add approved stay answers as they are supplied. Secure guest verification, protected spare-key delivery, a confirmed 24/7 property-emergency contact and a staff-notification channel remain future operational milestones. Transport and other Explore modules remain deferred.
 
 ## Media
 

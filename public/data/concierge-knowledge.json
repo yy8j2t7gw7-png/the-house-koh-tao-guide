@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0.0",
-  "release": "5.6.2",
+  "release": "5.7.0",
   "language": "en",
   "updated": "2026-08-12",
   "scope": "Verified accommodation, room, house-rule, support, booking and emergency answers for guests of The House – Koh Tao.",
@@ -691,7 +691,7 @@
         "something is burning",
         "serious property damage"
       ],
-      "answer": "This sounds like an urgent property problem. Move away from wet electrical equipment or any immediate danger and call emergency property support now. The concierge has included your room in the support message. If anyone is injured or in immediate medical danger, call 1669.",
+      "answer": "This sounds like an urgent property problem. Move away from wet electrical equipment or any immediate danger and call emergency property support now. The concierge has included your room in the support message. If anyone is injured or in immediate medical danger, call Koh Tao Rescue first because they know the island and local access points; you can also call 1669.",
       "actions": [
         {
           "label": "Call Emergency Support",
@@ -706,7 +706,13 @@
           "message": "URGENT: I am staying in {roomLabel}. There is a serious property problem: {question}"
         },
         {
-          "label": "Medical Emergency 1669",
+          "label": "Call Koh Tao Rescue",
+          "type": "route",
+          "route": "rescueCall",
+          "style": "danger"
+        },
+        {
+          "label": "Call Medical Emergency 1669",
           "type": "route",
           "route": "medicalNationalCall"
         }
@@ -721,22 +727,29 @@
         "life threatening emergency",
         "need an ambulance",
         "call an ambulance",
+        "I had an accident",
+        "I was in an accident",
+        "had an accident",
+        "scooter accident",
+        "motorbike accident",
+        "I crashed",
         "serious injury",
         "cannot breathe",
         "urgent medical help"
       ],
-      "answer": "For a serious or life-threatening medical emergency, call Thailand's national medical emergency number 1669 immediately. Say that you are on Koh Tao, Surat Thani, explain your exact location and keep your phone nearby.",
+      "answer": "For an accident or serious medical emergency, call Koh Tao Rescue first because they know the island and local access points. You can also call Thailand's national medical emergency number 1669. Say that you are on Koh Tao, Surat Thani, explain your exact location and keep your phone nearby.",
       "actions": [
         {
-          "label": "Call 1669 Now",
+          "label": "Call Koh Tao Rescue",
           "type": "route",
-          "route": "medicalNationalCall",
+          "route": "rescueCall",
           "style": "danger"
         },
         {
-          "label": "Emergency Information",
-          "type": "link",
-          "href": "/emergency.html"
+          "label": "Call Medical Emergency 1669",
+          "type": "route",
+          "route": "medicalNationalCall",
+          "style": "danger"
         }
       ]
     },
@@ -752,7 +765,7 @@
         "medical care",
         "see a doctor"
       ],
-      "answer": "Koh Tao Hospital provides medical treatment on the island. For a serious or life-threatening emergency, call 1669 instead.",
+      "answer": "Koh Tao Hospital provides medical treatment on the island. For a serious or life-threatening emergency, call Koh Tao Rescue first because they know the island and local access points; you can also call 1669.",
       "actions": [
         {
           "label": "Call Koh Tao Hospital",

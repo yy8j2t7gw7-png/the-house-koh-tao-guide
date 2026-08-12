@@ -138,6 +138,9 @@
     }
     let href = action.href || routeMap()[action.route] || "";
     if (!href) return null;
+    if (window.HOUSE_FEATURES?.explore === false && /^\/(?:activities|activity|bars|bar|beaches|beach|cafes|cafe|diving|explore|restaurants|restaurant|shopping|shop)\.html(?:[?#]|$)/i.test(href)) {
+      return null;
+    }
     if (action.message && /https:\/\/wa\.me\//i.test(href)) {
       const message = encodeURIComponent(interpolate(action.message, context));
       href += `${href.includes("?") ? "&" : "?"}text=${message}`;
@@ -278,8 +281,10 @@
   function appendMessage(role, text, actions = [], question = "", metadata = {}) {
     const message = document.createElement("article");
     message.className = `ai-concierge-message is-${role}`;
+    if (role === "guest") message.dataset.i18nSkip = "true";
     const bubble = document.createElement("div");
     bubble.className = "ai-concierge-bubble";
+    if (metadata.localized) bubble.dataset.i18nSkip = "true";
     bubble.textContent = interpolate(text, contextValues(question));
     message.appendChild(bubble);
 
@@ -393,7 +398,8 @@
         room: selectedRoom || "",
         sessionId,
         history,
-        page: currentPage
+        page: currentPage,
+        language: window.HOUSE_I18N?.language || window.localStorage.getItem("houseGuideLanguage") || "en"
       })
     });
     const result = await response.json().catch(() => ({}));
@@ -422,7 +428,10 @@
       result.answer,
       result.actions,
       question,
-      { interactionId: result.interactionId }
+      {
+        interactionId: result.interactionId,
+        localized: result.language && result.language !== "en"
+      }
     );
     rememberExchange(question, result.answer);
   }

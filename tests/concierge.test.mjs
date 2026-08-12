@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { readFile } from "node:fs/promises";
+import vm from "node:vm";
 import {
   handleAdminRequest,
   handleConciergeRequest,
@@ -13,6 +14,7 @@ import {
   sanitizeQuestion
 } from "../src/concierge-core.js";
 import { retrieveApprovedProjectKnowledge } from "../src/project-knowledge.js";
+import { handleTranslationRequest } from "../src/i18n-api.js";
 import knowledge from "../public/data/concierge-knowledge.json" with { type: "json" };
 import activities from "../public/data/activities.json" with { type: "json" };
 import bars from "../public/data/bars.json" with { type: "json" };
@@ -104,9 +106,14 @@ function createEnvironment(overrides = {}) {
             "/data/places.json": places,
             "/data/shopping.json": shopping
           }[pathname];
-          return data
-            ? new Response(JSON.stringify(data), { headers: { "content-type": "application/json" } })
-            : new Response("Not found", { status: 404 });
+          if (data) return new Response(JSON.stringify(data), { headers: { "content-type": "application/json" } });
+          try {
+            const relative = pathname.replace(/^\//, "");
+            const source = await readFile(new URL(`../public/${relative}`, import.meta.url), "utf8");
+            return new Response(source, { headers: { "content-type": "text/plain" } });
+          } catch (_error) {
+            return new Response("Not found", { status: 404 });
+          }
         }
       },
       CONCIERGE_STORE: { getByName: () => store },
@@ -151,6 +158,19 @@ test("critical guest requests stay deterministic and room-aware", async () => {
   assert.equal(store.interactions[0].learningGap, false);
 });
 
+test("medical emergencies offer Koh Tao Rescue first and 1669 second", async () => {
+  const { env } = createEnvironment({ OPENAI_API_KEY: "not-used" });
+  const response = await handleConciergeRequest(guestRequest("I had an accident"), env);
+  const body = await response.json();
+  assert.equal(response.status, 200);
+  assert.equal(body.intentId, "medical_emergency");
+  assert.equal(body.handoff, "medical_emergency");
+  assert.match(body.answer, /Koh Tao Rescue first/i);
+  assert.match(body.answer, /1669/);
+  assert.equal(body.actions[0].route, "rescueCall");
+  assert.equal(body.actions[1].route, "medicalNationalCall");
+});
+
 test("activity booking uses guest-service wording and the House booking route", async () => {
   const { env } = createEnvironment({ OPENAI_API_KEY: "not-used" });
   const response = await handleConciergeRequest(
@@ -182,8 +202,8 @@ test("The House recommendations answer Roctopus and Bamboo directly", async () =
   assert.match(diving.answer, /small groups, personal attention/);
   assert.match(diving.answer, /dive team in the shop/);
   assert.doesNotMatch(diving.answer, /\b(?:PADI|RAID|certification|training agency)\b/i);
-  assert.equal(diving.actions[0].href, "/activity.html?id=roctopus-dive");
-  assert.equal(diving.actions[1].route, "bookingWhatsapp");
+  assert.equal(diving.actions.some((action) => action.href === "/activity.html?id=roctopus-dive"), false);
+  assert.equal(diving.actions[0].route, "bookingWhatsapp");
 
   const barResponse = await handleConciergeRequest(
     guestRequest("Which bar do you recommend?"),
@@ -193,7 +213,7 @@ test("The House recommendations answer Roctopus and Bamboo directly", async () =
   assert.equal(bar.source, "approved");
   assert.equal(bar.intentId, "recommended_sunset_bar");
   assert.match(bar.answer, /Bamboo Beach Bar/);
-  assert.equal(bar.actions[0].href, "/bar.html?id=bamboo-beach-bar");
+  assert.equal(bar.actions.some((action) => action.href === "/bar.html?id=bamboo-beach-bar"), false);
 });
 
 test("retrieval connects the AI to approved activity, bar and island records", async () => {
@@ -338,6 +358,142 @@ test("main and room welcome pages make required registration prominent", async (
   assert.match(registrationForm, /Option 2 — Enter the required details/);
   assert.match(registrationForm, /exact required TM30 fields/);
   assert.equal(room, canonicalRoom);
+});
+
+test("guest localization supports seven languages and keeps the owner dashboard English", async () => {
+  const [runtime, guideApp, passport, admin] = await Promise.all([
+    readFile(new URL("../public/i18n.js", import.meta.url), "utf8"),
+    readFile(new URL("../public/guide-app.js", import.meta.url), "utf8"),
+    readFile(new URL("../public/passport-upload.html", import.meta.url), "utf8"),
+    readFile(new URL("../public/concierge-admin.html", import.meta.url), "utf8")
+  ]);
+  for (const code of ["en", "th", "zh-CN", "ru", "de", "fr", "es"]) {
+    assert.match(runtime, new RegExp(`code: "${code.replace("-", "\\-")}"`));
+  }
+  assert.match(runtime, /\.language-switcher/);
+  assert.match(runtime, /\.language-floating-button/);
+  assert.match(runtime, /\.ai-concierge-message\.is-guest/);
+  assert.match(guideApp, /src = "\/i18n\.js"/);
+  assert.match(passport, /src="\/i18n\.js"/);
+  assert.doesNotMatch(admin, /src="\/i18n\.js"/);
+  assert.match(runtime, /exploreContentDeferred/);
+  assert.match(runtime, /element\.closest\("\.section,\.footer"\)/);
+});
+
+test("critical emergency and registration wording is reviewed in every guest language", async () => {
+  const runtime = await readFile(new URL("../public/i18n.js", import.meta.url), "utf8");
+  const criticalSources = [
+    "Call Koh Tao Rescue",
+    "Call Medical Emergency 1669",
+    "Why we need it",
+    "Automatic deletion: 14 days after upload"
+  ];
+
+  for (const language of ["en", "th", "zh-CN", "ru", "de", "fr", "es"]) {
+    const storage = {
+      getItem(key) { return key === "houseGuideLanguage" ? language : null; },
+      setItem() {}
+    };
+    const sandbox = {
+      window: {
+        localStorage: storage,
+        addEventListener() {},
+        dispatchEvent() {},
+        location: { reload() {} }
+      },
+      document: {
+        documentElement: { lang: "" },
+        readyState: "loading",
+        addEventListener() {}
+      },
+      location: { pathname: "/emergency.html" },
+      navigator: { language, languages: [language] },
+      CustomEvent: class CustomEvent {},
+      URLSearchParams,
+      setTimeout,
+      clearTimeout,
+      console
+    };
+    vm.runInNewContext(runtime, sandbox);
+    const i18n = sandbox.window.HOUSE_I18N;
+    assert.equal(i18n.language, language);
+    assert.equal(sandbox.document.documentElement.lang, language);
+    for (const source of criticalSources) {
+      const translated = i18n.t(source);
+      assert.ok(translated, `${source} is empty for ${language}`);
+      if (language !== "en") assert.notEqual(translated, source, `${source} is not localized for ${language}`);
+    }
+    assert.match(i18n.t("Call Medical Emergency 1669"), /1669/);
+    assert.match(i18n.t("Automatic deletion: 14 days after upload"), /14/);
+  }
+});
+
+test("guest emergency page keeps Rescue first and 1669 second with distinct actions", async () => {
+  const [rootPage, canonicalPage, actionRuntime] = await Promise.all([
+    readFile(new URL("../public/emergency.html", import.meta.url), "utf8"),
+    readFile(new URL("../public/modules/emergency/emergency.html", import.meta.url), "utf8"),
+    readFile(new URL("../public/platform-action-runtime.js", import.meta.url), "utf8")
+  ]);
+  assert.equal(rootPage, canonicalPage);
+  assert.ok(rootPage.indexOf("data-link=\"rescueCall\"") < rootPage.indexOf("data-link=\"medicalNationalCall\""));
+  assert.match(rootPage, />Call Koh Tao Rescue<\/a>/);
+  assert.match(rootPage, />Call Medical Emergency 1669<\/a>/);
+  assert.match(actionRuntime, /linkKey === "rescueCall"/);
+  assert.match(actionRuntime, /linkKey === "medicalNationalCall"/);
+});
+
+test("Explore stays in source but is disabled in the live guest release", async () => {
+  const [exploreSource, guideApp, css, workerSource, workerConfig] = await Promise.all([
+    readFile(new URL("../public/explore.html", import.meta.url), "utf8"),
+    readFile(new URL("../public/guide-app.js", import.meta.url), "utf8"),
+    readFile(new URL("../public/design-system.css", import.meta.url), "utf8"),
+    readFile(new URL("../src/index.js", import.meta.url), "utf8"),
+    readFile(new URL("../wrangler.jsonc", import.meta.url), "utf8")
+  ]);
+  assert.match(exploreSource, /Explore Koh Tao/);
+  assert.match(guideApp, /explore: false/);
+  assert.match(css, /html:not\(\.explore-enabled\).*explore\.html/s);
+  assert.match(workerSource, /EXPLORE_PAGE_PATTERN/);
+  assert.match(workerSource, /Response\.redirect\(new URL\("\/", request\.url\)/);
+  assert.equal(JSON.parse(workerConfig).vars.EXPLORE_ENABLED, "false");
+});
+
+test("translation endpoint accepts approved page text and rejects arbitrary guest text", async () => {
+  const { env } = createEnvironment({ OPENAI_API_KEY: "test-key" });
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (_url, options) => {
+    const request = JSON.parse(options.body);
+    const entries = JSON.parse(request.input[0].content).entries;
+    return new Response(JSON.stringify({
+      output: [{
+        type: "message",
+        content: [{
+          type: "output_text",
+          text: JSON.stringify({ translations: entries.map((entry) => ({ id: entry.id, text: "Bienvenido" })) })
+        }]
+      }]
+    }), { status: 200, headers: { "content-type": "application/json" } });
+  };
+  try {
+    const approvedRequest = new Request("https://guide.example/api/i18n/translate", {
+      method: "POST",
+      headers: { "content-type": "application/json", "cf-connecting-ip": "203.0.113.8" },
+      body: JSON.stringify({ language: "es", page: "/index.html", texts: ["Welcome to Koh Tao"] })
+    });
+    const approvedResponse = await handleTranslationRequest(approvedRequest, env);
+    assert.equal(approvedResponse.status, 200);
+    assert.deepEqual((await approvedResponse.json()).translations, ["Bienvenido"]);
+
+    const guestTextRequest = new Request("https://guide.example/api/i18n/translate", {
+      method: "POST",
+      headers: { "content-type": "application/json", "cf-connecting-ip": "203.0.113.8" },
+      body: JSON.stringify({ language: "fr", page: "/index.html", texts: ["My private guest message"] })
+    });
+    const guestTextResponse = await handleTranslationRequest(guestTextRequest, env);
+    assert.equal(guestTextResponse.status, 403);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });
 
 test("model responses use structured output and deterministic handoff actions", async () => {

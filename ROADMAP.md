@@ -1,6 +1,6 @@
 # Product Roadmap
 
-Baseline: v5.5.1
+Baseline: v5.6.0
 
 ## Completed
 
@@ -17,6 +17,9 @@ Baseline: v5.5.1
 - [x] Public scooter-rental booking routed through The House
 - [x] Stay support routed to Su and House-arranged bookings routed to Fah
 - [x] Private commercial terminology removed from guest-facing booking answers
+- [x] Existing approved Activities, Restaurants, Cafés, Beaches, Bars and Shopping data connected to the AI Concierge
+- [x] Roctopus Dive and Bamboo Beach Bar preferred recommendations available as direct approved answers
+- [x] Required passport registration made prominent on main and room-specific welcome pages
 - [x] Working structured Concierge v1 question-and-answer engine
 - [x] Room-aware concierge context and room selection
 - [x] Room 7 added downstairs below Rooms 5 and 6
@@ -74,7 +77,7 @@ Su and Fah currently use ordinary WhatsApp. The current release therefore uses p
 
 - [x] Push the v5.5.0 release to the existing hosting workflow
 - [x] Confirm `/api/concierge/status` reports AI and learning enabled
-- [ ] Deploy v5.5.1 and confirm the live booking answer uses only guest-service wording
+- [ ] Deploy v5.6.0 and confirm live recommendations, booking wording and registration entry point
 - [ ] Verify the protected `/concierge-admin` review workflow
 - [ ] Verify the live room links, including Room 7
 - [ ] Test the concierge on guest phones

@@ -1,5 +1,7 @@
 # Concierge Knowledge Guide
 
+The concierge combines deterministic operational answers in `public/data/concierge-knowledge.json` with question-targeted records from the approved Activities, Restaurants, Cafés, Beaches, Bars and Shopping datasets. `src/project-knowledge.js` selects and compacts only relevant records before model reasoning; operator contact details are not included in that model context.
+
 The production concierge uses approved question-and-answer records from `public/data/concierge-knowledge.json` plus a private owner-approved knowledge overlay. Deterministic matching keeps common and safety-critical answers predictable, while the optional server-side model handles natural multilingual wording and contextual follow-ups. The approved deterministic engine remains usable without an API key.
 
 ## Owner review workflow

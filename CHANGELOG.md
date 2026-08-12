@@ -2,6 +2,29 @@
 
 All notable changes to The House – Koh Tao guest guide are recorded here.
 
+## v5.6.0 — Full Approved-Knowledge Concierge Integration
+
+### Added
+
+- Targeted server-side retrieval across the existing approved Activities, Restaurants, Cafés, Beaches, Bars and Shopping datasets.
+- Compact record selection that gives GPT-5.6 the most relevant approved project facts without sending operator contact details or the complete data collection on every request.
+- Direct approved recommendation for Roctopus Dive as The House’s preferred dive school, accurately identifying it as RAID rather than PADI.
+- Direct approved recommendation for Bamboo Beach Bar for a relaxed beachfront sunset in Mae Haad.
+- Prominent Required Guest Registration sections on both the main welcome page and every room-specific welcome page, with TM30 purpose, privacy treatment, 14-day deletion and a concierge action to request the private room-bound upload link.
+- Guest-registration quick action inside the concierge and room-aware secure-link request wording.
+- Retrieval and deterministic regression tests for Roctopus, Bamboo Beach Bar and required passport registration.
+
+### Changed
+
+- GPT-5.6 reasoning effort increased from `low` to `medium`; targeted retrieval controls input size and protects the existing monthly budget.
+- Existing Explore data is now available to concierge reasoning while new Explore interface and itinerary expansion remains deferred.
+- The v5.5.1 guest-facing booking-language privacy fix is included in this release.
+
+### Safety
+
+- The welcome page never authorizes an upload from room selection alone. Actual passport upload still requires the private, expiring, room-bound, single-use link created by an owner.
+- Retrieved project records exclude operator booking contacts from model context; guest actions continue to use deterministic House routes.
+
 ## v5.5.1 — Guest-Facing Booking Language Privacy
 
 ### Fixed

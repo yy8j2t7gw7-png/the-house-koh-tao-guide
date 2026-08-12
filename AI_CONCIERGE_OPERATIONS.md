@@ -2,13 +2,15 @@
 
 ## Purpose
 
-The v5.5.1 concierge combines three layers:
+The v5.6.0 concierge combines three layers:
 
 1. Deterministic safety and operational rules for emergencies, lost keys, fees, booking policy and human routing.
-2. Server-side model reasoning over approved House knowledge for natural language, multilingual questions and conversational follow-ups.
+2. Server-side model reasoning over approved House knowledge plus targeted retrieval from the existing Activities, Restaurants, Cafés, Beaches, Bars and Shopping records.
 3. A controlled learning queue that records knowledge gaps and negative feedback for owner review.
 
 The model cannot publish its own facts. An owner must approve or edit every knowledge addition before it becomes active.
+
+The default GPT-5.6 reasoning effort is `medium`. The retrieval layer sends only the most relevant approved records for each question rather than the full data collection, preserving answer quality while controlling input size and cost.
 
 ## Required production secrets
 

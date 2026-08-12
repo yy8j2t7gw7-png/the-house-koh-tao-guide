@@ -20,7 +20,7 @@ The product should feel like a competent hotel concierge in a guest’s pocket, 
 
 ### Current state
 
-Current release: v5.5.1.
+Current release: v5.6.0.
 
 Existing content areas:
 
@@ -56,7 +56,7 @@ Unknown questions and negative feedback enter a private, privacy-minimized learn
 
 The owner area also creates private passport-image requests for required TM30 guest registration. Guests receive a one-time room-bound link, a clear purpose explanation and a short-retention privacy summary. Passport files remain completely separate from the AI system. Pending requests form the manual reminder queue until an outbound messaging integration is approved.
 
-Explore recommendations and new destination modules are deferred until the concierge is online, reliable and easy to extend.
+New Explore interface and content expansion remains deferred. The concierge may already retrieve and reason over the existing approved Activities, Restaurants, Cafés, Beaches, Bars and Shopping records.
 
 ### Property emergencies and spare keys
 

@@ -1,4 +1,4 @@
-# Guest Guide Platform with AI Concierge — The House v5.5.1
+# Guest Guide Platform with AI Concierge — The House v5.6.0
 
 The House – Koh Tao guest guide is a production-oriented, mobile-first digital guest guide and concierge platform. It combines property information, curated island guidance, structured place and activity data, and centralized contact and booking routes.
 
@@ -18,8 +18,12 @@ The House – Koh Tao guest guide is a production-oriented, mobile-first digital
 
 The Activities module contains 49 structured profiles covering diving, freediving, snorkelling, boat trips, beach experiences, kayaking, paddleboarding, hiking, viewpoints, climbing, yoga, Muay Thai, massage, cooking, wildlife, photography, night activities and rainy-day options.
 
-## v5.5.1 release focus
+## v5.6.0 release focus
 
+- Connects the server-side concierge to targeted records from all existing approved Activities, Restaurants, Cafés, Beaches, Bars and Shopping data.
+- Adds direct approved answers identifying Roctopus Dive as The House’s preferred dive-school recommendation and Bamboo Beach Bar as the recommended relaxed beachfront-sunset choice.
+- Raises the configured GPT-5.6 reasoning effort from low to medium while limiting retrieval to the most relevant records for cost control.
+- Adds a prominent Required Guest Registration section to the main and room-specific welcome pages, plus a concierge quick action for requesting a private room-bound passport link.
 - Removes private commercial terminology from every guest-facing booking answer and adds a server-side disclosure guard.
 - Adds a protected server-side OpenAI Responses API integration using strict structured output.
 - Gives the model all approved accommodation knowledge while retaining deterministic safety rules and an on-device fallback engine.
@@ -36,7 +40,7 @@ The Activities module contains 49 structured profiles covering diving, freedivin
 
 The concierge loads approved content from `public/data/concierge-knowledge.json`. High-confidence and safety-critical questions use deterministic answers. Other questions use the server-side model when `OPENAI_API_KEY` is configured.
 
-The model receives only approved House knowledge and optional owner-approved additions. It is instructed to answer in the guest's language, use conversation context and admit when an answer is not confirmed. Unsupported Explore recommendations are not invented.
+The model receives approved House knowledge, relevant existing project records and optional owner-approved additions. It is instructed to answer in the guest's language, use conversation context and admit when an answer is not confirmed. Unsupported recommendations are not invented.
 
 If the API key is missing, an upstream request fails or output does not match the required schema, the device-safe deterministic engine answers instead. The guest interface therefore remains usable during model outages.
 
@@ -113,6 +117,7 @@ The core deterministic concierge works safely before these secrets are configure
 
 - Cloudflare Worker entry point: `src/index.js`
 - Server-side concierge controller: `src/concierge-api.js`
+- Approved project-data retrieval: `src/project-knowledge.js`
 - Deterministic safety and matching logic: `src/concierge-core.js`
 - Persistent learning store: `src/concierge-store.js`
 - Static application: `public/`

@@ -1,5 +1,5 @@
 window.AI_CONCIERGE_CONFIG = {
-  "release": "5.5.1",
+  "release": "5.6.0",
   "enabled": true,
   "propertyName": "The House",
   "buttonLabel": "Concierge",
@@ -39,6 +39,12 @@ window.AI_CONCIERGE_CONFIG = {
   },
   "quickActions": [
     {
+      "label": "Guest registration",
+      "icon": "🛂",
+      "type": "prompt",
+      "prompt": "I need my secure passport registration link."
+    },
+    {
       "label": "Check-in",
       "icon": "🕑",
       "type": "prompt",
@@ -77,6 +83,7 @@ window.AI_CONCIERGE_CONFIG = {
   ],
   "pagePrompts": {
     "index.html": [
+      "I need my secure passport registration link.",
       "What time is check-in?",
       "What is the Wi-Fi password?",
       "Where is The House?"

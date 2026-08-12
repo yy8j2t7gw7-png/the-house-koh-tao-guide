@@ -11,8 +11,9 @@ import {
   shouldUseDeterministic
 } from "./concierge-core.js";
 import { handlePassportAdminRequest } from "./passport-api.js";
+import { retrieveApprovedProjectKnowledge } from "./project-knowledge.js";
 
-const RELEASE = "5.5.1";
+const RELEASE = "5.6.0";
 const ROOM_OPTIONS = new Set(["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11"]);
 const MAX_HISTORY_ITEMS = 10;
 const MAX_QUESTION_LENGTH = 800;
@@ -178,7 +179,7 @@ function bangkokContext() {
   }).format(new Date());
 }
 
-function systemInstructions({ knowledge, approvedKnowledge, room }) {
+function systemInstructions({ knowledge, approvedKnowledge, projectKnowledge, room }) {
   const roomContext = room
     ? `The guest selected Room ${room}. Treat this as useful context but NOT as proof of identity or an active stay.`
     : "The guest has not selected a room. Ask for it only when room-specific operational help is needed.";
@@ -193,6 +194,10 @@ AUTHORITATIVE KNOWLEDGE
 - Use only the APPROVED KNOWLEDGE below for property facts, local facts, policies, contact routing and recommendations.
 - Never use unverified model memory to add an answer. If the approved material does not support the answer, say so clearly, set learning_gap=true and offer the suitable human handoff.
 - Owner-approved entries are equally authoritative.
+- RETRIEVED APPROVED PROJECT RECORDS contain the most relevant existing activity, restaurant, café, beach, bar and shopping records for this question.
+- When a retrieved record is relevant, use it instead of claiming that no confirmed recommendation exists.
+- When asked for a general recommendation, lead with a record explicitly marked preferredByTheHouse=true. Otherwise choose by the guest's stated constraints and explain the fit without claiming every alternative is inferior.
+- Treat hours, prices, availability, schedules and conditions as changeable. Mention verification when the record or question requires current confirmation.
 - The current Bangkok date and time is ${bangkokContext()}.
 - ${roomContext}
 
@@ -217,7 +222,10 @@ OUTPUT DECISIONS
 - Return only the required structured response.
 
 APPROVED KNOWLEDGE
-${serializeKnowledge(knowledge, approvedKnowledge)}`;
+${serializeKnowledge(knowledge, approvedKnowledge)}
+
+RETRIEVED APPROVED PROJECT RECORDS
+${JSON.stringify(projectKnowledge || [])}`;
 }
 
 function extractOutputText(responseBody) {
@@ -251,17 +259,17 @@ function validateModelResult(value) {
   };
 }
 
-async function callOpenAI({ env, question, history, knowledge, approvedKnowledge, room }) {
+async function callOpenAI({ env, question, history, knowledge, approvedKnowledge, projectKnowledge, room }) {
   const requestBody = {
     model: env.OPENAI_MODEL || "gpt-5.6",
     store: false,
-    instructions: systemInstructions({ knowledge, approvedKnowledge, room }),
+    instructions: systemInstructions({ knowledge, approvedKnowledge, projectKnowledge, room }),
     input: [
       ...history.map((item) => ({ role: item.role, content: item.content })),
       { role: "user", content: question }
     ],
-    reasoning: { effort: env.OPENAI_REASONING_EFFORT || "low" },
-    max_output_tokens: 700,
+    reasoning: { effort: env.OPENAI_REASONING_EFFORT || "medium" },
+    max_output_tokens: 2400,
     text: {
       format: {
         type: "json_schema",
@@ -424,8 +432,10 @@ export async function handleConciergeRequest(request, env, ctx) {
     result = deterministicResult(match);
   } else if (env.OPENAI_API_KEY) {
     try {
+      const retrievalQuestion = [...history.slice(-2).map((item) => item.content), question].join(" ");
+      const projectKnowledge = await retrieveApprovedProjectKnowledge(request, env, retrievalQuestion);
       result = {
-        ...(await callOpenAI({ env, question, history, knowledge, approvedKnowledge, room })),
+        ...(await callOpenAI({ env, question, history, knowledge, approvedKnowledge, projectKnowledge, room })),
         source: "ai"
       };
     } catch (_error) {

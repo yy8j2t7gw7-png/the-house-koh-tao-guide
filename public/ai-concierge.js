@@ -525,13 +525,23 @@
   });
 
   document.addEventListener("click", (event) => {
+    const promptTrigger = event.target.closest("[data-concierge-prompt]");
+    if (promptTrigger && !panel.contains(promptTrigger)) {
+      event.preventDefault();
+      openPanel({ askRoom: true });
+      submitQuestion(promptTrigger.dataset.conciergePrompt);
+      return;
+    }
     const contactLink = event.target.closest('[data-action="contact"],[data-link="houseWhatsapp"]');
     if (!contactLink || panel.contains(contactLink) || contactLink.dataset.conciergeHumanHandoff) return;
     event.preventDefault();
     openPanel({ askRoom: true });
   }, true);
 
-  window.addEventListener("house:open-concierge", () => openPanel());
+  window.addEventListener("house:open-concierge", (event) => {
+    openPanel({ askRoom: Boolean(event.detail?.askRoom) });
+    if (event.detail?.prompt) submitQuestion(event.detail.prompt);
+  });
 
   const resetDrag = () => {
     dragStartY = null;

@@ -62,6 +62,12 @@ a{color:inherit}
 .copy-btn{border:0;cursor:pointer;font:inherit}
 .notice{border-left:5px solid var(--green);padding:14px 16px;background:var(--mint);border-radius:10px}
 .quick-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.registration-required{margin:0 0 24px;padding:22px;border:2px solid var(--green);border-radius:20px;background:linear-gradient(135deg,#eaf4f0,#fff);box-shadow:0 10px 30px rgba(23,61,53,.10)}
+.registration-required h2{margin:5px 0 8px;color:var(--ink);font-size:clamp(25px,4vw,34px);line-height:1.15}
+.registration-required p{margin:7px 0;color:var(--text)}
+.registration-required .required-label{display:inline-flex;padding:6px 10px;border-radius:999px;background:var(--ink);color:#fff;font-size:12px;font-weight:800;letter-spacing:.04em;text-transform:uppercase}
+.registration-required .privacy-line{font-size:14px;color:var(--muted)}
+.registration-required button{font:inherit}
 @media(max-width:650px){.quick-grid{grid-template-columns:1fr}}
 </style>
 <link rel="stylesheet" href="/design-system.css">
@@ -81,6 +87,17 @@ a{color:inherit}
     <h1>Welcome to The House.</h1>
     <p>Your island base in Mae Haad — close to the ferry pier, the beach and everything you need for an easy stay on Koh Tao.</p>
   </div>
+</section>
+
+<section class="registration-required" aria-labelledby="registrationTitle">
+  <span class="required-label">Required guest registration</span>
+  <h2 id="registrationTitle">Complete your passport information</h2>
+  <p>If you have not already provided the required passport information, please complete it before arrival. The House needs it for the required TM30 Immigration accommodation registration.</p>
+  <p class="privacy-line">Your document uses a private, room-bound, single-use link. It is not sent through the AI chat or WhatsApp and is automatically deleted 14 days after upload, or sooner after processing.</p>
+  <div class="btns">
+    <button class="btn" type="button" data-concierge-prompt="I need my secure passport registration link.">Complete Required Registration</button>
+  </div>
+  <p class="privacy-line"><strong>Already received your private link?</strong> Open the message from The House and tap that link to upload securely. Do not send passport details in the concierge chat.</p>
 </section>
 
 <section class="grid">

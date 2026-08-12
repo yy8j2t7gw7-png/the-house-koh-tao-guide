@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { readFile } from "node:fs/promises";
 import {
   handleAdminRequest,
   handleConciergeRequest,
@@ -11,7 +12,14 @@ import {
   matchKnowledge,
   sanitizeQuestion
 } from "../src/concierge-core.js";
+import { retrieveApprovedProjectKnowledge } from "../src/project-knowledge.js";
 import knowledge from "../public/data/concierge-knowledge.json" with { type: "json" };
+import activities from "../public/data/activities.json" with { type: "json" };
+import bars from "../public/data/bars.json" with { type: "json" };
+import beaches from "../public/data/beaches.json" with { type: "json" };
+import cafes from "../public/data/cafes.json" with { type: "json" };
+import places from "../public/data/places.json" with { type: "json" };
+import shopping from "../public/data/shopping.json" with { type: "json" };
 
 function createStore() {
   return {
@@ -85,8 +93,20 @@ function createEnvironment(overrides = {}) {
     passportBucket,
     env: {
       ASSETS: {
-        async fetch() {
-          return new Response(JSON.stringify(knowledge), { headers: { "content-type": "application/json" } });
+        async fetch(request) {
+          const pathname = new URL(request.url).pathname;
+          const data = {
+            "/data/concierge-knowledge.json": knowledge,
+            "/data/activities.json": activities,
+            "/data/bars.json": bars,
+            "/data/beaches.json": beaches,
+            "/data/cafes.json": cafes,
+            "/data/places.json": places,
+            "/data/shopping.json": shopping
+          }[pathname];
+          return data
+            ? new Response(JSON.stringify(data), { headers: { "content-type": "application/json" } })
+            : new Response("Not found", { status: 404 });
         }
       },
       CONCIERGE_STORE: { getByName: () => store },
@@ -96,7 +116,7 @@ function createEnvironment(overrides = {}) {
       PASSPORT_TOKEN_PEPPER: "passport_test_pepper_5500",
       PASSPORT_RETENTION_DAYS: "14",
       OPENAI_MODEL: "gpt-5.6",
-      OPENAI_REASONING_EFFORT: "low",
+      OPENAI_REASONING_EFFORT: "medium",
       ...overrides
     }
   };
@@ -146,6 +166,126 @@ test("activity booking uses guest-service wording and the House booking route", 
   assert.doesNotMatch(body.answer, /commission|referral|revenue/i);
   assert.equal(body.actions[0].route, "bookingWhatsapp");
   assert.equal(body.actions[1].route, "bookingCall");
+});
+
+test("The House recommendations answer Roctopus and Bamboo directly", async () => {
+  const { env } = createEnvironment({ OPENAI_API_KEY: "not-used" });
+  const divingResponse = await handleConciergeRequest(
+    guestRequest("Which dive school do you recommend?"),
+    env
+  );
+  const diving = await divingResponse.json();
+  assert.equal(diving.source, "approved");
+  assert.equal(diving.intentId, "recommended_dive_school");
+  assert.match(diving.answer, /Roctopus Dive/);
+  assert.match(diving.answer, /RAID International centre—not PADI/);
+  assert.equal(diving.actions[0].href, "/activity.html?id=roctopus-dive");
+  assert.equal(diving.actions[1].route, "bookingWhatsapp");
+
+  const barResponse = await handleConciergeRequest(
+    guestRequest("Which bar do you recommend?"),
+    env
+  );
+  const bar = await barResponse.json();
+  assert.equal(bar.source, "approved");
+  assert.equal(bar.intentId, "recommended_sunset_bar");
+  assert.match(bar.answer, /Bamboo Beach Bar/);
+  assert.equal(bar.actions[0].href, "/bar.html?id=bamboo-beach-bar");
+});
+
+test("retrieval connects the AI to approved activity, bar and island records", async () => {
+  const { env } = createEnvironment();
+  const request = guestRequest("approved project retrieval");
+  const diveRecords = await retrieveApprovedProjectKnowledge(
+    request,
+    env,
+    "I want a beginner-friendly RAID dive centre with small groups and conservation work."
+  );
+  assert.equal(diveRecords[0].name, "Roctopus Dive");
+  assert.equal(diveRecords[0].preferredByTheHouse, true);
+  assert.doesNotMatch(JSON.stringify(diveRecords), /roctopusdive\.com|info@roctopus/i);
+
+  const sunsetRecords = await retrieveApprovedProjectKnowledge(
+    request,
+    env,
+    "I want a mellow drink with sand under my feet at sunset."
+  );
+  assert.equal(sunsetRecords[0].name, "Bamboo Beach Bar");
+});
+
+test("retrieved approved records are included in GPT-5.6 model context", async () => {
+  const { env } = createEnvironment({ OPENAI_API_KEY: "test-key" });
+  const originalFetch = globalThis.fetch;
+  let capturedRequest;
+  globalThis.fetch = async (_url, options) => {
+    capturedRequest = JSON.parse(options.body);
+    return new Response(JSON.stringify({
+      output: [{
+        type: "message",
+        content: [{
+          type: "output_text",
+          text: JSON.stringify({
+            answer: "Roctopus Dive is the strongest fit for those preferences.",
+            intent_id: "tailored_dive_recommendation",
+            category: "booking",
+            confidence: 0.94,
+            needs_human: true,
+            handoff: "booking",
+            learning_gap: false,
+            learning_reason: "none"
+          })
+        }]
+      }]
+    }), { status: 200, headers: { "content-type": "application/json" } });
+  };
+  try {
+    const response = await handleConciergeRequest(
+      guestRequest("I am a nervous beginner interested in conservation and want a small RAID group. What would suit me?"),
+      env
+    );
+    const body = await response.json();
+    assert.equal(body.source, "ai");
+    assert.match(body.answer, /Roctopus Dive/);
+    assert.match(capturedRequest.instructions, /RETRIEVED APPROVED PROJECT RECORDS/);
+    assert.match(capturedRequest.instructions, /"name":"Roctopus Dive"/);
+    assert.match(capturedRequest.instructions, /"preferredByTheHouse":true/);
+    assert.equal(capturedRequest.reasoning.effort, "medium");
+    assert.equal(capturedRequest.max_output_tokens, 2400);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("required passport registration is a room-aware concierge action", async () => {
+  const { env } = createEnvironment({ OPENAI_API_KEY: "not-used" });
+  const response = await handleConciergeRequest(
+    guestRequest("I need my secure passport registration link."),
+    env
+  );
+  const body = await response.json();
+  assert.equal(body.source, "approved");
+  assert.equal(body.intentId, "guest_registration_required");
+  assert.equal(body.category, "stay-support");
+  assert.match(body.answer, /TM30 Immigration/);
+  assert.match(body.answer, /14 days/);
+  assert.equal(body.actions[0].route, "houseWhatsapp");
+});
+
+test("main and room welcome pages make required registration prominent", async () => {
+  const [home, room, canonicalRoom] = await Promise.all([
+    readFile(new URL("../public/index.html", import.meta.url), "utf8"),
+    readFile(new URL("../public/room.html", import.meta.url), "utf8"),
+    readFile(new URL("../public/modules/house/room.html", import.meta.url), "utf8")
+  ]);
+  [home, room].forEach((html) => {
+    assert.match(html, /Required guest registration/);
+    assert.match(html, /Complete Required Registration/);
+    assert.match(html, /TM30 Immigration/);
+    assert.match(html, /automatically deleted 14 days after upload/);
+    assert.match(html, /data-concierge-prompt="I need my secure passport registration link\."/);
+    assert.doesNotMatch(html, /href="\/passport-upload(?:\.html)?"/);
+  });
+  assert.equal(room, canonicalRoom);
 });
 
 test("model responses use structured output and deterministic handoff actions", async () => {

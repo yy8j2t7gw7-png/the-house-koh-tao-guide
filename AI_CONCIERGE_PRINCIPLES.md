@@ -4,7 +4,7 @@
 
 The AI concierge should behave like an informed, practical concierge for guests of The House – Koh Tao. It should help guests decide, plan and act.
 
-The production layer may answer only from the structured concierge knowledge file and owner-approved additions. It uses a server-side model for natural language, multilingual phrasing and contextual follow-ups while deterministic rules retain control of safety-critical intents, contact routes and public actions. A safe, honest fallback is better than an invented answer.
+The production layer may answer only from the structured concierge knowledge file, targeted records from the existing approved project datasets and owner-approved additions. It uses a server-side model for natural language, multilingual phrasing and contextual follow-ups while deterministic rules retain control of safety-critical intents, contact routes and public actions. A safe, honest fallback is better than an invented answer.
 
 ## Controlled learning
 
@@ -119,4 +119,4 @@ Professional, warm, concise and practical. Avoid influencer language and exagger
 
 The concierge should eventually connect activities with nearby beaches, beaches with food, evening plans with bars, transport with departure times, rain with safer alternatives, family constraints with suitable options, and no-scooter guests with accessible areas.
 
-This cross-module Explore phase is deliberately deferred until the operational stay concierge is stable in production.
+New cross-module Explore content and interface expansion is deliberately deferred until the operational stay concierge is stable in production. Existing approved project records are already available through targeted concierge retrieval.

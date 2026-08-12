@@ -70,7 +70,7 @@ Public labels may be generic, including “Book with Us” and “Call Us”. Th
 
 ## AI Concierge
 
-The production concierge reads approved answers from `public/data/concierge-knowledge.json` and server-side owner-approved additions. `src/concierge-api.js` owns model calls and safe response assembly, `src/concierge-core.js` owns deterministic intent and action rules, and `src/concierge-store.js` owns the private learning store. Follow `CONCIERGE_KNOWLEDGE_GUIDE.md` when adding content.
+The production concierge reads approved answers from `public/data/concierge-knowledge.json`, targeted existing project records through `src/project-knowledge.js`, and server-side owner-approved additions. `src/concierge-api.js` owns model calls and safe response assembly, `src/concierge-core.js` owns deterministic intent and action rules, and `src/concierge-store.js` owns the private learning store. Follow `CONCIERGE_KNOWLEDGE_GUIDE.md` when adding content.
 
 The concierge must:
 
@@ -80,7 +80,7 @@ The concierge must:
 - offer human handoff only when needed
 - keep stay support, bookings, property emergencies and medical emergencies on separate routes
 - use a safe fallback instead of inventing an answer
-- keep Explore recommendations out of the answer engine until explicitly approved
+- use only retrieved existing project records or explicitly approved additions for Explore recommendations
 - keep contact destinations and safety-critical actions deterministic rather than model-generated
 - require owner approval before a learned answer becomes active
 - redact and minimize stored guest-question data

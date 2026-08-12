@@ -1,0 +1,89 @@
+# The House – Koh Tao: Project Rules
+
+## Product
+
+The House – Koh Tao guest guide is a premium, mobile-first digital guest guide and AI concierge. It is not a travel blog.
+
+## Source of truth
+
+- The newest project ZIP is authoritative for implementation and architecture.
+- The newest uploaded fact-checked Deep Research is authoritative for factual content.
+- Do not invent missing facts or silently replace supplied research with general knowledge.
+- Do not browse or conduct replacement research unless the user explicitly requests it.
+- If required research is missing, document the gap and stop the factual milestone.
+
+## Editorial standard
+
+- Use professional hotel-concierge English.
+- Be neutral, factual, practical and concise.
+- Avoid influencer language, clickbait, fake rankings and unsupported superlatives.
+- Explain who an option suits and why rather than relying on star ratings.
+
+## Global contact-routing policy
+
+Routine in-stay support must route through The House support contact:
+
+- Name: Su
+- Phone display: +66 64 097 3491
+- Telephone URI: +66640973491
+- WhatsApp: +66640973491
+
+This route covers fresh towels, room cleaning, lost keys and lockouts, room supplies, air conditioning, water, Wi-Fi, check-in, checkout and similar stay-related requirements. Generic public labels such as “Contact Us” and “Call” are approved. Su does not need to be named publicly.
+
+The future AI Concierge should conduct routine stay-support conversations end-to-end. When human action or escalation is required, the handoff remains Su. Do not send routine stay requests to the booking route.
+
+## Global booking policy
+
+All commissionable activities and services marked for concierge booking must route public booking enquiries through The House.
+
+Internal booking contact:
+
+- Name: Fah
+- Phone display: +66 96 274 1424
+- Telephone URI: +66962741424
+- WhatsApp: +66962741424
+
+Public interface rules:
+
+- Generic labels such as “Book with Us”, “Call Us” and “WhatsApp Us” are approved.
+- Fah does not need to be named publicly.
+- Every booking call or WhatsApp action must use Fah’s number above.
+- Never use “Book Direct”, “Call Operator”, “Contact Operator” or equivalent direct-booking actions.
+- Do not expose an operator telephone number, website or social channel as a booking action for records marked `the-house-concierge`.
+- Operator details may remain in structured data for verification and internal AI context.
+- Apply this rule to future tours, charters, transfers, rentals and other commissionable services unless explicitly overridden.
+- Do not send commissionable booking requests to Su’s stay-support route.
+
+## UX
+
+- Mobile first, fast and accessible.
+- Clear category navigation, search and useful filters.
+- Cross-link related beaches, restaurants, cafés, bars, shopping and activities.
+- Images and logos may remain placeholders until the dedicated media pass.
+
+## Engineering
+
+- Continue the existing architecture; do not rebuild from scratch without approval.
+- Prefer reusable components and structured JSON.
+- Avoid duplicated templates and business logic.
+- Keep public root routes and canonical module copies synchronized.
+- Preserve backwards compatibility with completed modules.
+- Maintain AI-searchable metadata with structured records.
+- Maintain semantic versioning.
+- Every release updates README, CHANGELOG and ROADMAP and is delivered as a ready-to-push ZIP.
+
+## Current baseline
+
+Current release: v5.3.5.
+
+Completed content modules:
+
+- House Information
+- Restaurants
+- Cafés
+- Beaches
+- Bars & Nightlife
+- Shopping & Essentials
+- Activities & Experiences
+
+The v5.4.0 Transport milestone is research-blocked until the required authoritative source is supplied.

@@ -5,6 +5,17 @@ window.AI_CONCIERGE_CONFIG = {
   "welcomeTitle": "Welcome",
   "welcomeText": "I’m your AI Concierge. I can help you explore Koh Tao, find useful information and connect you with our team.",
   "placeholder": "Ask me anything…",
+  "requestRouting": {
+    "staySupport": {
+      "contactKey": "houseSupport",
+      "targetConversationOwner": "ai-concierge",
+      "humanHandoffContactKey": "houseSupport"
+    },
+    "commissionableBookings": {
+      "contactKey": "bookings",
+      "humanHandoffContactKey": "bookings"
+    }
+  },
   "quickActions": [
     {
       "label": "Beaches",
@@ -74,9 +85,9 @@ window.AI_CONCIERGE_CONFIG = {
       "Show me how to get there."
     ],
     "practical.html": [
-      "Help me arrange transport.",
-      "Where is the nearest pharmacy?",
-      "I need help with my stay."
+      "I need fresh towels.",
+      "Please help arrange room cleaning.",
+      "I lost my key."
     ],
     "emergency.html": [
       "I need urgent help.",

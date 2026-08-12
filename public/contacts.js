@@ -1,13 +1,53 @@
 window.HOUSE_GUIDE = {
   houseSupport: {
+    contactName: "Su",
     phoneDisplay: "+66 64 097 3491",
     phoneTel: "+66640973491",
-    whatsapp: "https://wa.me/66640973491"
+    whatsapp: "https://wa.me/66640973491",
+    primaryLabel: "Contact Us",
+    callLabel: "Call"
   },
   bookings: {
+    contactName: "Fah",
     phoneDisplay: "+66 96 274 1424",
     phoneTel: "+66962741424",
-    whatsapp: "https://wa.me/66962741424"
+    whatsapp: "https://wa.me/66962741424",
+    primaryLabel: "Book with Us",
+    callLabel: "Call Us"
+  },
+  requestRouting: {
+    staySupport: {
+      contactKey: "houseSupport",
+      currentHandler: "Su",
+      targetConversationOwner: "ai-concierge",
+      humanHandoffContactKey: "houseSupport",
+      intents: [
+        "fresh towels",
+        "room cleaning",
+        "lost keys",
+        "lockouts",
+        "toilet paper",
+        "air conditioning",
+        "water",
+        "Wi-Fi",
+        "check-in",
+        "checkout",
+        "room concerns"
+      ]
+    },
+    commissionableBookings: {
+      contactKey: "bookings",
+      currentHandler: "Fah",
+      intents: [
+        "activities",
+        "scooter rental",
+        "taxis",
+        "private transfers",
+        "ferry tickets",
+        "tours",
+        "other commissionable services"
+      ]
+    }
   },
   emergency: {
     medicalNational: {

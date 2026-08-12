@@ -7,6 +7,10 @@ window.GUEST_GUIDE_ACTIONS = {
     label: "Book with Us",
     hrefKey: "bookingWhatsapp"
   },
+  bookingCall: {
+    label: "Call Us",
+    hrefKey: "bookingCall"
+  },
   call: {
     label: "Call"
   },

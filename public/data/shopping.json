@@ -2,6 +2,13 @@
   "schemaVersion": "1.0.0",
   "property": "The House – Koh Tao",
   "source": "Uploaded Shopping & Essentials on Koh Tao research report",
+  "bookingPolicy": {
+    "contact": "Fah",
+    "phoneDisplay": "+66 96 274 1424",
+    "phoneTel": "+66962741424",
+    "whatsapp": "https://wa.me/66962741424",
+    "rule": "Items marked the-house-concierge must route public booking calls and messages through The House. Operator contact details may remain in structured data for internal verification."
+  },
   "editorialPolicy": {
     "rankingsEnabled": false,
     "ratingsEnabled": false,
@@ -912,6 +919,7 @@
       "recommendation": "Choose Oli’s Motorbike Rentals (Mae Haad) when you need no passport deposit policy (only a photo+deposit) on Koh Tao.",
       "localTip": "Best time to pick up a returned scooter is around 10 am (many are returned then). Inspect bike carefully and take photos of any existing scratches. Wear helmets (by law) and keep deposit (2,000 ฿ or ID) ready",
       "ourPick": "Honda Click 125cc/160cc scooters; also helmets and crash insurance packages",
+      "bookingPolicy": "the-house-concierge",
       "perfectFor": [
         "Scooter Rental",
         "No passport deposit policy (only a photo+deposit)",

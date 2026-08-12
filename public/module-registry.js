@@ -2,7 +2,7 @@ window.GUEST_GUIDE_MODULES = {
   "platform": {
     "name": "Guest Guide Platform with AI Concierge",
     "client": "The House – Koh Tao",
-    "version": "5.3.3"
+    "version": "5.3.5"
   },
   "modules": {
     "house": {
@@ -63,7 +63,7 @@ window.GUEST_GUIDE_MODULES = {
     "aiConcierge": {
       "enabled": true,
       "label": "AI Concierge",
-      "entry": "/ai-concierge.html"
+      "entry": "/"
     },
     "secureCheckIn": {
       "enabled": false,

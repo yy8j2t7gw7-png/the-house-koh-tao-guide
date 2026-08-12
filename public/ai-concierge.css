@@ -240,14 +240,6 @@ body.ai-concierge-open{
     grid-template-columns:1fr;
   }
 }
-  .ai-concierge-panel{
-    right:12px;
-    bottom:74px;
-    width:calc(100vw - 24px);
-    max-height:calc(100vh - 94px);
-  }
-  .ai-concierge-actions{grid-template-columns:1fr}
-}
 
 .ai-concierge-launcher.is-visible{
   opacity:1;

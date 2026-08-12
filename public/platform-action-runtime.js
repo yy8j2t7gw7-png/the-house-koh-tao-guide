@@ -4,6 +4,7 @@
   const labels = {
     contact: actions.contact?.label || "Contact Us",
     booking: actions.booking?.label || "Book with Us",
+    bookingCall: actions.bookingCall?.label || "Call Us",
     call: actions.call?.label || "Call",
     map: actions.map?.label || "Open Map",
     website: actions.website?.label || "Visit Website",
@@ -12,7 +13,6 @@
 
   const callLinkKeys = new Set([
     "houseCall",
-    "bookingCall",
     "medicalNationalCall",
     "rescueCall",
     "policeCall",
@@ -21,13 +21,14 @@
   ]);
 
   const inferAction = (element) => {
-    const explicit = element.getAttribute("data-action");
-    if (explicit) return explicit;
-
     const linkKey = element.getAttribute("data-link") || "";
     if (linkKey === "houseWhatsapp") return "contact";
     if (linkKey === "bookingWhatsapp") return "booking";
+    if (linkKey === "bookingCall") return "bookingCall";
     if (callLinkKeys.has(linkKey)) return "call";
+
+    const explicit = element.getAttribute("data-action");
+    if (explicit) return explicit;
 
     const href = element.getAttribute("href") || "";
     if (href.toLowerCase().startsWith("tel:")) return "call";

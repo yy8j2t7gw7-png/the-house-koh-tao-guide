@@ -332,6 +332,8 @@ test("main and room welcome pages make required registration prominent", async (
   });
   assert.match(registrationEntry, /`\/passport-upload#token=\$\{token\}`/);
   assert.match(registrationEntry, /Complete Required Registration/);
+  assert.match(registrationEntry, /private registration access is not attached/i);
+  assert.match(registrationEntry, /sessionStorage\.setItem/);
   assert.match(registrationForm, /Option 1 — Upload passport image/);
   assert.match(registrationForm, /Option 2 — Enter the required details/);
   assert.match(registrationForm, /exact required TM30 fields/);

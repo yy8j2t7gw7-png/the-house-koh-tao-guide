@@ -20,7 +20,7 @@ The product should feel like a competent hotel concierge in a guest’s pocket, 
 
 ### Current state
 
-Current release: v5.6.1.
+Current release: v5.6.2.
 
 Existing content areas:
 

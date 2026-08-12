@@ -2,6 +2,19 @@
 
 All notable changes to The House – Koh Tao guest guide are recorded here.
 
+## v5.6.2 — Registration Button Reliability
+
+### Fixed
+
+- The Required Registration button now retains its private room-bound token across a same-tab page refresh and continues to open the secure registration form directly.
+- A normal room page without private registration access now responds with a clear security explanation instead of appearing to do nothing.
+- Private registration access is stored only for the specific welcome-page path in the current browser tab, preventing it from being reused silently on a different room page.
+- Added the missing registration-section anchor to the main welcome page.
+
+### Validation
+
+- Extended registration regression checks and retained the full concierge, privacy, secure-upload and 41-page navigation test suite.
+
 ## v5.6.1 — Roctopus Guest Recommendation Refinement
 
 ### Changed

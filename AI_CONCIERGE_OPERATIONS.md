@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The v5.6.1 concierge combines three layers:
+The v5.6.2 concierge combines three layers:
 
 1. Deterministic safety and operational rules for emergencies, lost keys, fees, booking policy and human routing.
 2. Server-side model reasoning over approved House knowledge plus targeted retrieval from the existing Activities, Restaurants, Cafés, Beaches, Bars and Shopping records.

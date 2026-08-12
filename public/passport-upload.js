@@ -1,10 +1,14 @@
 (function () {
+  const tokenStorageKey = "housePassportUploadToken";
   const status = document.getElementById("passportStatus");
   const form = document.getElementById("passportForm");
   const fileInput = document.getElementById("passportFile");
   const submit = document.getElementById("passportSubmit");
   const fragment = new URLSearchParams(location.hash.slice(1));
-  let token = fragment.get("token") || "";
+  let token = fragment.get("token") || window.sessionStorage.getItem(tokenStorageKey) || "";
+  if (/^[A-Za-z0-9_-]{40,100}$/.test(token)) {
+    window.sessionStorage.setItem(tokenStorageKey, token);
+  }
   history.replaceState(null, "", "/passport-upload");
 
   function showStatus(message, type = "") {
@@ -46,6 +50,7 @@
       showStatus("Your private link is valid. Choose the passport image when you are ready.", "success");
     } catch (_error) {
       token = "";
+      window.sessionStorage.removeItem(tokenStorageKey);
       showStatus("This private link has expired, has already been used or is not available. Please ask The House for a new link.", "error");
     }
   }
@@ -70,6 +75,7 @@
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || "upload_failed");
       token = "";
+      window.sessionStorage.removeItem(tokenStorageKey);
       fileInput.value = "";
       form.hidden = true;
       showStatus(`Thank you. The passport image for Room ${data.room} was received securely. This one-time link is now closed.`, "success");

@@ -1,5 +1,5 @@
 window.AI_CONCIERGE_CONFIG = {
-  "release": "5.6.1",
+  "release": "5.6.2",
   "enabled": true,
   "propertyName": "The House",
   "buttonLabel": "Concierge",

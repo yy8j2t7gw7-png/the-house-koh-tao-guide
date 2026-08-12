@@ -1,4 +1,4 @@
-# Guest Guide Platform with AI Concierge — The House v5.6.1
+# Guest Guide Platform with AI Concierge — The House v5.6.2
 
 The House – Koh Tao guest guide is a production-oriented, mobile-first digital guest guide and concierge platform. It combines property information, curated island guidance, structured place and activity data, and centralized contact and booking routes.
 
@@ -18,13 +18,14 @@ The House – Koh Tao guest guide is a production-oriented, mobile-first digital
 
 The Activities module contains 49 structured profiles covering diving, freediving, snorkelling, boat trips, beach experiences, kayaking, paddleboarding, hiking, viewpoints, climbing, yoga, Muay Thai, massage, cooking, wildlife, photography, night activities and rainy-day options.
 
-## v5.6.1 release focus
+## v5.6.2 release focus
 
 - Connects the server-side concierge to targeted records from all existing approved Activities, Restaurants, Cafés, Beaches, Bars and Shopping data.
 - Adds a concise approved Roctopus Dive recommendation focused on why The House recommends the team: friendly professional service, small groups, personal attention and a welcoming experience. Diving details are left to the team in the shop.
 - Retains Bamboo Beach Bar as the direct approved relaxed beachfront-sunset recommendation.
 - Adds a final server-side safeguard that replaces technical Roctopus wording in general recommendations with the approved guest-facing answer.
 - Standardizes the desktop top bar across every guest page so legacy page CSS no longer changes its width, spacing or navigation wrapping.
+- Fixes the Required Registration button so private access remains available after a same-tab refresh and ordinary room pages show a clear security explanation instead of appearing unresponsive.
 - Raises the configured GPT-5.6 reasoning effort from low to medium while limiting retrieval to the most relevant records for cost control.
 - Adds a prominent Required Guest Registration section to the main and room-specific welcome pages, plus a concierge action that uses the active private room-bound registration link.
 - Makes the private Room welcome link activate the registration button directly, so guests continue to the secure one-time form rather than opening WhatsApp.

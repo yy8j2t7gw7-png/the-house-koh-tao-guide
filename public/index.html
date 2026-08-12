@@ -67,6 +67,7 @@ a{color:inherit}
 .registration-required p{margin:7px 0;color:var(--text)}
 .registration-required .required-label{display:inline-flex;padding:6px 10px;border-radius:999px;background:var(--ink);color:#fff;font-size:12px;font-weight:800;letter-spacing:.04em;text-transform:uppercase}
 .registration-required .privacy-line{font-size:14px;color:var(--muted)}
+.registration-required .registration-link-missing{padding:12px 14px;border:1px solid #d8b574;border-radius:12px;background:#fff8e8;color:#6c4c15}
 .registration-required button{font:inherit}
 @media(max-width:650px){.quick-grid{grid-template-columns:1fr}}
 </style>
@@ -89,7 +90,7 @@ a{color:inherit}
   </div>
 </section>
 
-<section class="registration-required" aria-labelledby="registrationTitle">
+<section class="registration-required" id="guest-registration" aria-labelledby="registrationTitle">
   <span class="required-label">Required guest registration</span>
   <h2 id="registrationTitle">Complete your passport information</h2>
   <p>If you have not already provided the required passport information, please complete it before arrival. The House needs it for the required TM30 Immigration accommodation registration.</p>

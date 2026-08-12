@@ -91,6 +91,9 @@ body.ai-concierge-open{
   overflow:hidden;
   overscroll-behavior:none;
 }
+body.ai-concierge-ready .float-wa[data-link="houseWhatsapp"]{
+  display:none;
+}
 
 .ai-concierge-drag-handle{
   display:none;
@@ -115,7 +118,20 @@ body.ai-concierge-open{
   border-bottom:1px solid #dfe7e2;
 }
 .ai-concierge-head h2{margin:0 0 4px;font-size:22px}
-.ai-concierge-head p{margin:0;color:#6e7c77;font-size:14px}
+.ai-concierge-room-context{
+  display:inline-flex;
+  align-items:center;
+  min-height:28px;
+  padding:4px 9px;
+  border:1px solid #cddbd5;
+  border-radius:999px;
+  background:#fff;
+  color:#2f6f5f;
+  font:inherit;
+  font-size:12px;
+  font-weight:800;
+  cursor:pointer;
+}
 .ai-concierge-close{
   border:0;
   background:transparent;
@@ -173,10 +189,116 @@ body.ai-concierge-open{
   cursor:pointer;
 }
 .ai-concierge-prompt:hover{background:#edf6f2}
+.ai-concierge-room-selector{
+  margin-top:16px;
+  padding:14px;
+  border:1px solid #cddbd5;
+  border-radius:16px;
+  background:#f3f8f5;
+  color:#183b34;
+}
+.ai-concierge-room-selector[hidden]{display:none}
+.ai-concierge-room-selector-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+}
+.ai-concierge-room-selector-head button{
+  border:0;
+  background:transparent;
+  color:#183b34;
+  font-size:20px;
+  cursor:pointer;
+}
+.ai-concierge-room-selector p{
+  margin:4px 0 12px;
+  color:#6e7c77;
+  font-size:13px;
+}
+.ai-concierge-room-options{
+  display:grid;
+  grid-template-columns:repeat(5,minmax(0,1fr));
+  gap:7px;
+}
+.ai-concierge-room-options button{
+  min-height:38px;
+  padding:7px 4px;
+  border:1px solid #cddbd5;
+  border-radius:10px;
+  background:#fff;
+  color:#183b34;
+  font:inherit;
+  font-size:12px;
+  font-weight:800;
+  cursor:pointer;
+}
+.ai-concierge-room-options button:hover{background:#e5f1ec}
 .ai-concierge-chat{
   margin-top:18px;
   padding-top:16px;
   border-top:1px solid #dfe7e2;
+}
+.ai-concierge-messages{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+  max-height:280px;
+  margin-bottom:12px;
+  padding-right:3px;
+  overflow:auto;
+  scroll-behavior:smooth;
+}
+.ai-concierge-message{
+  display:flex;
+  flex-direction:column;
+  align-items:flex-start;
+  gap:7px;
+}
+.ai-concierge-message.is-guest{align-items:flex-end}
+.ai-concierge-bubble{
+  max-width:88%;
+  padding:11px 13px;
+  border-radius:15px 15px 15px 5px;
+  background:#edf6f2;
+  color:#183b34;
+  font-size:14px;
+  line-height:1.45;
+  white-space:pre-wrap;
+}
+.ai-concierge-message.is-guest .ai-concierge-bubble{
+  border-radius:15px 15px 5px 15px;
+  background:#183b34;
+  color:#fff;
+}
+.ai-concierge-message.is-status .ai-concierge-bubble{
+  color:#6e7c77;
+  font-style:italic;
+}
+.ai-concierge-message-actions{
+  display:flex;
+  flex-wrap:wrap;
+  gap:7px;
+}
+.ai-concierge-message-action{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-height:38px;
+  padding:8px 11px;
+  border:1px solid #2f6f5f;
+  border-radius:11px;
+  background:#fff;
+  color:#2f6f5f;
+  text-decoration:none;
+  font-size:13px;
+  font-weight:800;
+}
+.ai-concierge-message-action:hover{background:#edf6f2}
+.ai-concierge-message-action.is-danger{
+  border-color:#a9342f;
+  background:#b83b35;
+  color:#fff;
 }
 .ai-concierge-input-row{
   display:flex;
@@ -201,20 +323,25 @@ body.ai-concierge-open{
   font-weight:800;
   cursor:pointer;
 }
+.ai-concierge-send:disabled{
+  opacity:.58;
+  cursor:wait;
+}
+.ai-concierge-input:focus,
+.ai-concierge-send:focus-visible,
+.ai-concierge-action:focus-visible,
+.ai-concierge-prompt:focus-visible,
+.ai-concierge-room-context:focus-visible,
+.ai-concierge-room-options button:focus-visible,
+.ai-concierge-message-action:focus-visible{
+  outline:3px solid rgba(47,111,95,.24);
+  outline-offset:2px;
+}
 .ai-concierge-note{
   margin:9px 0 0;
   color:#6e7c77;
   font-size:12px;
 }
-.ai-concierge-response{
-  display:none;
-  margin-top:12px;
-  padding:12px 14px;
-  border-radius:14px;
-  background:#edf6f2;
-  color:#183b34;
-}
-.ai-concierge-response.is-visible{display:block}
 @media(max-width:640px){
   .ai-concierge-launcher{
     right:12px;
@@ -237,8 +364,10 @@ body.ai-concierge-open{
     display:block;
   }
   .ai-concierge-actions{
-    grid-template-columns:1fr;
+    grid-template-columns:repeat(2,minmax(0,1fr));
   }
+  .ai-concierge-room-options{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .ai-concierge-messages{max-height:34vh}
 }
 
 .ai-concierge-launcher.is-visible{

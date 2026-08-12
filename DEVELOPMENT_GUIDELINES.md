@@ -70,7 +70,25 @@ Public labels may be generic, including “Book with Us” and “Call Us”. Th
 
 ## AI Concierge
 
-The AI layer should reason over structured project data rather than hard-coded promotional copy. It should eventually filter by guest type, budget, time, transport constraints, weather dependency, activity level, child suitability, area, time of day and booking requirements. Recommendations should explain the rationale.
+The production foundation reads approved answers from `public/data/concierge-knowledge.json`. Follow `CONCIERGE_KNOWLEDGE_GUIDE.md` when adding content.
+
+The concierge must:
+
+- determine room context from the room URL or stored room selection
+- ask for the room when a stay-support request lacks context
+- intercept general Contact Us actions and answer first
+- offer human handoff only when needed
+- keep stay support, bookings, property emergencies and medical emergencies on separate routes
+- use a safe fallback instead of inventing an answer
+- keep Explore recommendations out of the answer engine until explicitly approved
+
+Future recommendation logic may filter by guest type, budget, time, transport constraints, weather dependency, activity level, child suitability, area and booking requirements.
+
+## Sensitive operations
+
+Never put key-box codes, private guest tokens or API credentials in public source or structured content. Follow `SECURE_AFTER_HOURS_ACCESS.md` for the protected spare-key flow.
+
+After hours are 19:30–10:30 in Bangkok time. This does not define reception or property operating hours.
 
 ## Research
 
@@ -90,6 +108,9 @@ A coherent release must:
 - validate root/module copy parity
 - validate public booking destinations and prohibited direct-booking actions
 - validate that stay-support routes resolve only to Su and commissionable booking routes resolve only to Fah
+- validate concierge intent matching, room context and safe fallbacks
+- validate that public Contact Us actions open the concierge before human handoff
+- validate that no key-box code or messaging credential is present in the release
 - validate local routes and referenced assets
 - complete a production dry-run bundle
 - be packaged as a complete ready-to-push ZIP

@@ -2,6 +2,37 @@
 
 All notable changes to The House – Koh Tao guest guide are recorded here.
 
+## v5.4.0 — Working Room-Aware Concierge Foundation
+
+### Added
+
+- Structured concierge knowledge file with approved accommodation and stay answers.
+- Client-side concierge matching engine with natural trigger phrases, confidence threshold and safe fallbacks.
+- Working conversation transcript, quick questions, answer actions and accessible mobile interaction.
+- Room recognition from `/room/{number}`, local room memory and an in-concierge room selector.
+- Room-aware support messages for towels, room cleaning, lost keys and room problems.
+- Room 7 as a downstairs room around the corner and directly below Rooms 5 and 6, with a temporary arrival-photo placeholder.
+- Separate urgent property-emergency classification for major leaks, flooding, dangerous electrical problems and serious property damage.
+- Concierge authoring guide and secure after-hours spare-key architecture document.
+- Accepted private signed stay links as the required authorization method for spare-key codes.
+- Defined protected multi-recipient spare-key alerts for configured owners and Su.
+
+### Changed
+
+- General public Contact Us actions now open the concierge first rather than immediately leaving the website for WhatsApp.
+- Legacy Bars, Cafés and Shopping page copies now load the complete concierge configuration instead of silently skipping initialization.
+- Explicit human handoff remains available inside the concierge when operational action is required.
+- Lost-key messaging states that a 500 THB replacement fee will be added.
+- Recorded the after-hours window as 19:30–10:30 in Bangkok time; this does not define operating hours.
+- Further Explore development is deferred until the operational concierge is working reliably for guests.
+- Package, module registry and activity release metadata updated to v5.4.0.
+
+### Safety and operational status
+
+- Key-box codes are intentionally absent from public files and secure delivery remains disabled pending guest verification and protected server-side configuration.
+- The dedicated 24/7 property-emergency contact remains unconfirmed. The disabled role temporarily falls back to House support without publicly claiming confirmed 24/7 availability.
+- Su and Fah currently use ordinary WhatsApp, so staff handoffs use prefilled guest messages rather than automatic server-sent WhatsApp alerts.
+
 ## v5.3.5 — Stay Support & Booking Route Separation
 
 ### Added

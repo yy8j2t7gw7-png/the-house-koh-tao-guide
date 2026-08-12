@@ -20,7 +20,7 @@ The product should feel like a competent hotel concierge in a guest’s pocket, 
 
 ### Current state
 
-Current release: v5.3.5.
+Current release: v5.4.0.
 
 Existing content areas:
 
@@ -45,6 +45,18 @@ Operator-direct booking should not be promoted in the public UI for those record
 Routine stay requirements—including fresh towels, room cleaning, lost keys or lockouts, room supplies and room problems—route to Su at +66 64 097 3491. They must not be sent to Fah’s commissionable-booking route.
 
 The future AI Concierge should fully handle these routine support conversations, using Su as the human handoff for operational action or escalation.
+
+### Immediate product priority
+
+The operational concierge now takes priority over further Explore development. The first live concierge answers approved accommodation and stay questions, knows the guest's room when available and routes unresolved work to the correct person.
+
+Explore recommendations and new destination modules are deferred until the concierge is online, reliable and easy to extend.
+
+### Property emergencies and spare keys
+
+Urgent property problems require a separate 24/7 on-call role. No dedicated person or number is confirmed yet, so the public product must not claim confirmed 24/7 coverage.
+
+After-hours spare-key handling applies from 19:30 to 10:30 Bangkok time. Each room will have a key box beside its door. Lost keys add a 500 THB fee. Codes require secure server-side storage and current-guest verification before automated delivery is enabled.
 
 ### Next major phase
 

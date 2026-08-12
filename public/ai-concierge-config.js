@@ -1,10 +1,27 @@
 window.AI_CONCIERGE_CONFIG = {
+  "release": "5.4.0",
   "enabled": true,
   "propertyName": "The House",
   "buttonLabel": "Concierge",
   "welcomeTitle": "Welcome",
-  "welcomeText": "I’m your AI Concierge. I can help you explore Koh Tao, find useful information and connect you with our team.",
-  "placeholder": "Ask me anything…",
+  "welcomeText": "Ask me about your room, check-in, Wi-Fi, towels, cleaning, house rules, checkout or help during your stay.",
+  "initialMessage": "Hello. What can I help you with during your stay?",
+  "placeholder": "Ask about your stay…",
+  "engineScriptUrl": "/ai-concierge-engine.js",
+  "knowledgeUrl": "/data/concierge-knowledge.json",
+  "minimumMatchScore": 0.44,
+  "roomOptions": ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11"],
+  "afterHours": {
+    "timeZone": "Asia/Bangkok",
+    "start": "19:30",
+    "end": "10:30",
+    "spareKeyLocation": "In the key box next to the room door",
+    "lostKeyFeeThb": 500,
+    "privateStayLinkRequired": true,
+    "secureCodeDeliveryEnabled": false,
+    "notificationPolicy": "configured owners and Su",
+    "automaticNotificationsEnabled": false
+  },
   "requestRouting": {
     "staySupport": {
       "contactKey": "houseSupport",
@@ -18,71 +35,62 @@ window.AI_CONCIERGE_CONFIG = {
   },
   "quickActions": [
     {
-      "label": "Beaches",
-      "icon": "🏖",
-      "type": "link",
-      "href": "/beaches.html"
+      "label": "Check-in",
+      "icon": "🕑",
+      "type": "prompt",
+      "prompt": "What time is check-in?"
     },
     {
-      "label": "Restaurants",
-      "icon": "🍽",
-      "type": "link",
-      "href": "/restaurants.html"
+      "label": "Wi-Fi",
+      "icon": "📶",
+      "type": "prompt",
+      "prompt": "What is the Wi-Fi password?"
     },
     {
-      "label": "Diving",
-      "icon": "🤿",
-      "type": "link",
-      "href": "/diving.html"
+      "label": "Fresh towels",
+      "icon": "🛏",
+      "type": "prompt",
+      "prompt": "I need fresh towels."
     },
     {
-      "label": "Transport",
-      "icon": "🚕",
-      "type": "link",
-      "href": "/practical.html"
+      "label": "Room cleaning",
+      "icon": "🧹",
+      "type": "prompt",
+      "prompt": "Please clean my room."
     },
     {
-      "label": "Activities",
-      "icon": "🎟",
-      "type": "link",
-      "href": "/activities.html"
+      "label": "Lost key",
+      "icon": "🔑",
+      "type": "prompt",
+      "prompt": "I lost my key."
     },
     {
-      "label": "Contact Us",
-      "icon": "💬",
-      "type": "contact"
+      "label": "Urgent problem",
+      "icon": "⚠️",
+      "type": "prompt",
+      "prompt": "There is a serious problem in my room."
     }
   ],
   "pagePrompts": {
-    "activities.html": [
-      "Which activity is best for me today?",
-      "What can I do if it rains?",
-      "Can you help me book an activity through The House?"
+    "index.html": [
+      "What time is check-in?",
+      "What is the Wi-Fi password?",
+      "Where is The House?"
     ],
-    "activity.html": [
-      "Is this suitable for a beginner?",
-      "What should I bring?",
-      "How do I book this?"
+    "rooms.html": [
+      "Where is my room?",
+      "How does self check-in work?",
+      "What is the Wi-Fi password?"
     ],
-    "diving.html": [
-      "Tell me about learning to dive.",
-      "Which course is right for a beginner?",
-      "Help me book diving."
+    "room.html": [
+      "I need fresh towels.",
+      "Please clean my room.",
+      "I lost my key."
     ],
-    "beaches.html": [
-      "Which beach is best for snorkelling?",
-      "Which beach is quietest?",
-      "Which beach is easiest to reach?"
-    ],
-    "restaurants.html": [
-      "Recommend authentic Thai food.",
-      "Where should I go for sunset dinner?",
-      "Which place is best for a relaxed meal?"
-    ],
-    "restaurant.html": [
-      "Tell me more about this restaurant.",
-      "Is it suitable for a special dinner?",
-      "Show me how to get there."
+    "house.html": [
+      "Can I smoke?",
+      "What time are quiet hours?",
+      "Can I bring an overnight visitor?"
     ],
     "practical.html": [
       "I need fresh towels.",
@@ -92,8 +100,24 @@ window.AI_CONCIERGE_CONFIG = {
     "emergency.html": [
       "I need urgent help.",
       "Where is Koh Tao Hospital?",
-      "Contact the house team."
+      "I lost my key."
+    ],
+    "checkout.html": [
+      "What time is check-out?",
+      "Where do I leave the key?",
+      "Can I check out late?"
+    ],
+    "activity.html": [
+      "How do I book an activity?"
+    ],
+    "diving.html": [
+      "How do I book an activity?"
     ]
   },
-  "appearanceDelayMs": 5000
+  "defaultPrompts": [
+    "What time is check-in?",
+    "What is the Wi-Fi password?",
+    "I need help with my stay."
+  ],
+  "appearanceDelayMs": 1200
 };

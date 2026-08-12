@@ -32,6 +32,29 @@ This route covers fresh towels, room cleaning, lost keys and lockouts, room supp
 
 The future AI Concierge should conduct routine stay-support conversations end-to-end. When human action or escalation is required, the handoff remains Su. Do not send routine stay requests to the booking route.
 
+All general public “Contact Us” actions must open the concierge first. Direct human telephone or WhatsApp actions appear only when the guest asks for a person, the concierge cannot resolve the request, or a human must take operational action.
+
+## Urgent property emergencies
+
+Major water leaks, flooding, burst pipes, dangerous electrical problems and serious property damage use a separate property-emergency route intended for 24/7 coverage.
+
+Do not claim that a person or number is available 24/7 until that contact is confirmed. Until then, the role may fall back internally to House support while remaining clearly unconfirmed in documentation.
+
+Medical or personal emergencies must remain separate from property emergencies and use the verified emergency-service routes.
+
+## After-hours spare-key security
+
+- After hours: 19:30–10:30, Asia/Bangkok.
+- One key box will be located next to each room door.
+- A 500 THB replacement fee is added for a lost key.
+- Never store key-box codes in public files, URLs, structured content, repository history or release archives.
+- Never reveal a code based only on a selected room number.
+- Secure code delivery requires server-side secrets, current-guest verification, after-hours validation, confirmation and event logging.
+- Current-guest verification uses a private signed link tied to one room and validity period.
+- Every approved spare-key event must notify the configured owners and Su when the protected messaging integration is enabled.
+- Notification recipient numbers and names are server-side configuration and must never appear in public files.
+- Staff notifications must not contain the key-box code or the guest's private access token.
+
 ## Global booking policy
 
 All commissionable activities and services marked for concierge booking must route public booking enquiries through The House.
@@ -74,7 +97,7 @@ Public interface rules:
 
 ## Current baseline
 
-Current release: v5.3.5.
+Current release: v5.4.0.
 
 Completed content modules:
 
@@ -86,4 +109,4 @@ Completed content modules:
 - Shopping & Essentials
 - Activities & Experiences
 
-The v5.4.0 Transport milestone is research-blocked until the required authoritative source is supplied.
+The operational AI Concierge is now prioritized ahead of further Explore development. Transport remains research-blocked until the required authoritative source is supplied.

@@ -15,12 +15,33 @@ window.HOUSE_GUIDE = {
     primaryLabel: "Book with Us",
     callLabel: "Call Us"
   },
+  propertyEmergency: {
+    enabled: false,
+    role: "24/7 on-call property emergency support",
+    contactName: "",
+    phoneDisplay: "",
+    phoneTel: "",
+    whatsapp: "",
+    fallbackContactKey: "houseSupport",
+    callLabel: "Call Emergency Support"
+  },
   requestRouting: {
     staySupport: {
       contactKey: "houseSupport",
       currentHandler: "Su",
       targetConversationOwner: "ai-concierge",
       humanHandoffContactKey: "houseSupport",
+      afterHours: {
+        timeZone: "Asia/Bangkok",
+        start: "19:30",
+        end: "10:30",
+        spareKeyLocation: "In the key box next to the room door",
+        lostKeyFeeThb: 500,
+        privateStayLinkRequired: true,
+        secureCodeDeliveryEnabled: false,
+        notificationPolicy: "configured owners and Su",
+        automaticNotificationsEnabled: false
+      },
       intents: [
         "fresh towels",
         "room cleaning",
@@ -46,6 +67,19 @@ window.HOUSE_GUIDE = {
         "ferry tickets",
         "tours",
         "other commissionable services"
+      ]
+    },
+    propertyEmergency: {
+      contactKey: "propertyEmergency",
+      availabilityTarget: "24/7",
+      temporaryFallbackContactKey: "houseSupport",
+      intents: [
+        "major water leak",
+        "flooding",
+        "burst pipe",
+        "dangerous electrical problem",
+        "smoke or burning smell",
+        "serious room or property damage"
       ]
     }
   },

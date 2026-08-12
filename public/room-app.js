@@ -24,10 +24,14 @@
   document.getElementById("heroRoom").textContent = `Room ${room}`;
   document.getElementById("roomNote").textContent = data.note;
   document.getElementById("roomPhoto").src = photo;
-  document.getElementById("roomPhoto").alt = `Room ${room} highlighted on the building`;
+  document.getElementById("roomPhoto").alt = data.photoStatus === "placeholder"
+    ? `Room ${room} arrival photo placeholder`
+    : `Room ${room} highlighted on the building`;
   document.getElementById("arrivalRoomPhoto").src = photo;
-  document.getElementById("arrivalRoomPhoto").alt = `Room ${room} location`;
+  document.getElementById("arrivalRoomPhoto").alt = data.photoStatus === "placeholder"
+    ? `Room ${room} arrival photo placeholder`
+    : `Room ${room} location`;
   document.getElementById("arrivalTitle").textContent = `Finding Room ${room}`;
   document.getElementById("arrivalCaption").innerHTML =
-    `<strong>Step 2.</strong> ${data.note}`;
+    `<strong>Step 2.</strong> ${data.note}${data.photoStatus === "placeholder" ? " A marked arrival photo will be added later." : ""}`;
 })();

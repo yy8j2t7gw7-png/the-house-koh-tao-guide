@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="800" viewBox="0 0 1200 800" role="img" aria-labelledby="title description">
+  <title id="title">Room 7 photo placeholder</title>
+  <desc id="description">The marked arrival photo for Room 7 will be added later.</desc>
+  <rect width="1200" height="800" fill="#eaf4f0"/>
+  <rect x="80" y="80" width="1040" height="640" rx="36" fill="#fffdf9" stroke="#b9d0c7" stroke-width="4" stroke-dasharray="16 12"/>
+  <text x="600" y="360" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="72" font-weight="700" fill="#173d35">Room 7</text>
+  <text x="600" y="440" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="34" fill="#68736f">Arrival photo will be added later</text>
+  <text x="600" y="500" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="28" fill="#1f5b4f">Downstairs · below Rooms 5 and 6</text>
+</svg>

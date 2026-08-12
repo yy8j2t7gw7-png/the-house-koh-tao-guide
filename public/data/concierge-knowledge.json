@@ -1,0 +1,744 @@
+{
+  "schemaVersion": "1.0.0",
+  "release": "5.4.0",
+  "language": "en",
+  "updated": "2026-08-12",
+  "scope": "Verified accommodation, room, house-rule, support, booking and emergency answers for guests of The House – Koh Tao.",
+  "fallbackClassifiers": [
+    {
+      "id": "booking",
+      "terms": [
+        "book",
+        "booking",
+        "reserve",
+        "reservation",
+        "activity",
+        "diving",
+        "snorkelling",
+        "snorkeling",
+        "scooter",
+        "taxi",
+        "transfer",
+        "ferry",
+        "tour",
+        "boat trip"
+      ]
+    },
+    {
+      "id": "explore",
+      "terms": [
+        "best beach",
+        "best restaurant",
+        "luxury restaurant",
+        "sunset restaurant",
+        "best cafe",
+        "best café",
+        "restaurant recommendation",
+        "beach recommendation",
+        "nightlife",
+        "sunset spot",
+        "itinerary",
+        "what should i do",
+        "where should i eat",
+        "recommend a restaurant",
+        "recommend a beach"
+      ]
+    }
+  ],
+  "fallbacks": {
+    "default": {
+      "answer": "I do not have a confirmed answer for that yet. Please contact us and our team will help. We will keep adding approved answers here over time.",
+      "actions": [
+        {
+          "label": "Contact Us",
+          "type": "route",
+          "route": "houseWhatsapp",
+          "message": "Hello, I am staying at The House and need help with: {question}"
+        }
+      ]
+    },
+    "booking": {
+      "answer": "Our booking team can help with commissionable activities and services. Use the booking button below and tell us what you would like to arrange.",
+      "actions": [
+        {
+          "label": "Book with Us",
+          "type": "route",
+          "route": "bookingWhatsapp",
+          "message": "Hello, I am staying at The House and would like help booking: {question}"
+        },
+        {
+          "label": "Call Us",
+          "type": "route",
+          "route": "bookingCall"
+        }
+      ]
+    },
+    "explore": {
+      "answer": "I am not answering detailed Explore recommendations yet because those answers are still being prepared. You can browse the current guide, or contact us if you need personal help now.",
+      "actions": [
+        {
+          "label": "Explore Koh Tao",
+          "type": "link",
+          "href": "/explore.html"
+        },
+        {
+          "label": "Contact Us",
+          "type": "route",
+          "route": "houseWhatsapp",
+          "message": "Hello, I am staying at The House and would like help with: {question}"
+        }
+      ]
+    }
+  },
+  "intents": [
+    {
+      "id": "welcome",
+      "category": "concierge",
+      "priority": 10,
+      "triggers": [
+        "hello",
+        "hi",
+        "hey",
+        "good morning",
+        "good afternoon",
+        "good evening",
+        "what can you help with",
+        "help"
+      ],
+      "answer": "Hello. I can help with check-in, your room, Wi-Fi, towels, cleaning, keys, house rules, checkout and basic assistance during your stay. Ask a question or choose one of the quick options.",
+      "actions": []
+    },
+    {
+      "id": "check_in_time",
+      "category": "arrival",
+      "priority": 20,
+      "triggers": [
+        "what time is check in",
+        "when can i check in",
+        "check in time",
+        "when is check in",
+        "arrival time",
+        "what time can we arrive"
+      ],
+      "answer": "Check-in is from 2:00 PM. Self check-in is available, and your room page includes the arrival photos and room-specific instructions.",
+      "actions": [
+        {
+          "label": "Find My Room",
+          "type": "link",
+          "href": "/rooms.html"
+        }
+      ]
+    },
+    {
+      "id": "early_check_in",
+      "category": "arrival",
+      "priority": 30,
+      "triggers": [
+        "can i check in early",
+        "early check in",
+        "arrive before 2",
+        "arrive earlier",
+        "check in before 2"
+      ],
+      "answer": "Standard check-in starts at 2:00 PM. Please contact us before arriving early so our team can confirm what is possible.",
+      "actions": [
+        {
+          "label": "Contact Us",
+          "type": "route",
+          "route": "houseWhatsapp",
+          "message": "Hello, I am due to stay at The House and would like to ask about early check-in."
+        }
+      ]
+    },
+    {
+      "id": "self_check_in",
+      "category": "arrival",
+      "priority": 20,
+      "triggers": [
+        "how does self check in work",
+        "self check in",
+        "where is my room key",
+        "how do i enter my room",
+        "room unlocked",
+        "key waiting inside"
+      ],
+      "answer": "Your room may be left unlocked with the key waiting inside. Open your room-specific page and follow the arrival photos and instructions.",
+      "actions": [
+        {
+          "label": "Find My Room",
+          "type": "link",
+          "href": "/rooms.html"
+        },
+        {
+          "label": "Contact Us",
+          "type": "route",
+          "route": "houseWhatsapp",
+          "message": "Hello, I am checking in at The House and need help finding or entering {roomLabel}."
+        }
+      ]
+    },
+    {
+      "id": "find_room",
+      "category": "arrival",
+      "priority": 20,
+      "triggers": [
+        "where is my room",
+        "find my room",
+        "room location",
+        "which floor is my room",
+        "upstairs or downstairs",
+        "arrival photos"
+      ],
+      "answer": "Rooms 1–6 are upstairs. Rooms 7–11 are downstairs. Room 7 is around the corner, directly below Rooms 5 and 6. Select your room to see its arrival information.",
+      "actions": [
+        {
+          "label": "Select My Room",
+          "type": "link",
+          "href": "/rooms.html"
+        }
+      ]
+    },
+    {
+      "id": "checkout_time",
+      "category": "departure",
+      "priority": 20,
+      "triggers": [
+        "what time is check out",
+        "when is check out",
+        "check out time",
+        "when do i leave",
+        "departure time",
+        "where do i leave the key"
+      ],
+      "answer": "Check-out is by 11:00 AM. Please switch off the air conditioning and leave the key inside the room unless our team gives you different instructions.",
+      "actions": [
+        {
+          "label": "Departure Guide",
+          "type": "link",
+          "href": "/checkout.html"
+        }
+      ]
+    },
+    {
+      "id": "late_checkout",
+      "category": "departure",
+      "priority": 30,
+      "triggers": [
+        "can i check out late",
+        "late check out",
+        "keep the room longer",
+        "leave after 11",
+        "extend check out"
+      ],
+      "answer": "Please ask in advance. We will help when possible if the room is not needed immediately.",
+      "actions": [
+        {
+          "label": "Ask About Late Checkout",
+          "type": "route",
+          "route": "houseWhatsapp",
+          "message": "Hello, I am staying in {roomLabel}. Could you please let me know if late checkout is possible?"
+        }
+      ]
+    },
+    {
+      "id": "wifi",
+      "category": "room",
+      "priority": 20,
+      "triggers": [
+        "what is the wifi password",
+        "wifi password",
+        "wi fi password",
+        "internet password",
+        "how do i connect to wifi",
+        "wifi does not work",
+        "internet does not work",
+        "no wifi"
+      ],
+      "answer": "The Wi-Fi network is “The House” and the password is 123456789! If it is not working, please contact us.",
+      "actions": [
+        {
+          "label": "Contact Us",
+          "type": "route",
+          "route": "houseWhatsapp",
+          "message": "Hello, I am staying in {roomLabel} and need help with the Wi-Fi."
+        }
+      ]
+    },
+    {
+      "id": "fresh_towels",
+      "category": "stay-support",
+      "priority": 30,
+      "triggers": [
+        "i need fresh towels",
+        "fresh towel",
+        "clean towels",
+        "change my towels",
+        "towel change",
+        "new towels",
+        "can i get towels"
+      ],
+      "answer": "Fresh towels are available on request. Use the button below to send your request to our support team.",
+      "actions": [
+        {
+          "label": "Request Fresh Towels",
+          "type": "route",
+          "route": "houseWhatsapp",
+          "message": "Hello, I am staying in {roomLabel}. Could I please have fresh towels? Thank you."
+        }
+      ]
+    },
+    {
+      "id": "room_cleaning",
+      "category": "stay-support",
+      "priority": 30,
+      "triggers": [
+        "please clean my room",
+        "room cleaning",
+        "clean my room",
+        "housekeeping",
+        "can you clean the room",
+        "i need my room cleaned"
+      ],
+      "answer": "Room cleaning can be requested during your stay. Use the button below to send the request to our support team.",
+      "actions": [
+        {
+          "label": "Request Room Cleaning",
+          "type": "route",
+          "route": "houseWhatsapp",
+          "message": "Hello, I am staying in {roomLabel}. Could I please request room cleaning? Thank you."
+        }
+      ]
+    },
+    {
+      "id": "lost_key",
+      "category": "stay-support",
+      "priority": 40,
+      "triggers": [
+        "i lost my key",
+        "lost room key",
+        "cannot find my key",
+        "locked out",
+        "i am locked out",
+        "need a replacement key",
+        "key is missing"
+      ],
+      "answer": "Please contact us immediately if you are locked out or cannot find your key. A replacement fee of 500 THB will be added for a lost key.",
+      "actions": [
+        {
+          "label": "Contact Us Now",
+          "type": "route",
+          "route": "houseWhatsapp",
+          "message": "Hello, I am staying in {roomLabel} and I have lost my key or am locked out. Please help."
+        },
+        {
+          "label": "Call",
+          "type": "route",
+          "route": "houseCall"
+        }
+      ]
+    },
+    {
+      "id": "air_conditioning",
+      "category": "stay-support",
+      "priority": 20,
+      "triggers": [
+        "air conditioning does not work",
+        "ac does not work",
+        "aircon broken",
+        "room is too hot",
+        "problem with the ac",
+        "air conditioner"
+      ],
+      "answer": "Please contact us if the air conditioning is not working. When you leave the room, please switch the AC off to save energy and protect the environment.",
+      "actions": [
+        {
+          "label": "Report an AC Problem",
+          "type": "route",
+          "route": "houseWhatsapp",
+          "message": "Hello, I am staying in {roomLabel} and need help with the air conditioning."
+        }
+      ]
+    },
+    {
+      "id": "toilet",
+      "category": "room",
+      "priority": 20,
+      "triggers": [
+        "can i flush toilet paper",
+        "toilet paper",
+        "blocked toilet",
+        "toilet is blocked",
+        "toilet does not work",
+        "toilet problem"
+      ],
+      "answer": "Please do not flush toilet paper, wipes or anything else. Use the bin provided. If the toilet is blocked or not working, contact us for help.",
+      "actions": [
+        {
+          "label": "Report a Toilet Problem",
+          "type": "route",
+          "route": "houseWhatsapp",
+          "message": "Hello, I am staying in {roomLabel} and need help with the toilet."
+        }
+      ]
+    },
+    {
+      "id": "drinking_water",
+      "category": "house-rules",
+      "priority": 20,
+      "triggers": [
+        "can i drink the tap water",
+        "is tap water safe",
+        "drinking water",
+        "where can i get water",
+        "bottled water",
+        "tap water"
+      ],
+      "answer": "Tap water is not suitable for drinking. Bottled water is available nearby. Fresh water is limited on Koh Tao, so please use it responsibly.",
+      "actions": [
+        {
+          "label": "Nearby Supermarkets",
+          "type": "route",
+          "route": "supermarketMap"
+        }
+      ]
+    },
+    {
+      "id": "smoking",
+      "category": "house-rules",
+      "priority": 20,
+      "triggers": [
+        "can i smoke",
+        "where can i smoke",
+        "smoking allowed",
+        "smoking in the room",
+        "smoking area"
+      ],
+      "answer": "Smoking is allowed outside on the balcony. Please do not smoke inside the rooms.",
+      "actions": []
+    },
+    {
+      "id": "overnight_visitors",
+      "category": "house-rules",
+      "priority": 20,
+      "triggers": [
+        "can i bring a guest",
+        "overnight visitor",
+        "someone stay in my room",
+        "friend stay overnight",
+        "visitor passport",
+        "extra guest"
+      ],
+      "answer": "Please notify us and send a passport photo for every overnight visitor so we can complete the required Immigration registration.",
+      "actions": [
+        {
+          "label": "Notify Us",
+          "type": "route",
+          "route": "houseWhatsapp",
+          "message": "Hello, I am staying in {roomLabel} and need to notify you about an overnight visitor."
+        }
+      ]
+    },
+    {
+      "id": "quiet_hours",
+      "category": "house-rules",
+      "priority": 20,
+      "triggers": [
+        "what time are quiet hours",
+        "quiet hours",
+        "noise after 10",
+        "can i play music",
+        "when should i be quiet"
+      ],
+      "answer": "Please keep noise down after 10:00 PM.",
+      "actions": []
+    },
+    {
+      "id": "laundry",
+      "category": "practical",
+      "priority": 20,
+      "triggers": [
+        "do you have laundry",
+        "laundry service",
+        "wash my clothes",
+        "where is the laundry",
+        "clean my clothes"
+      ],
+      "answer": "The House does not provide laundry. Several drop-off laundry services are available along Songserm Road.",
+      "actions": [
+        {
+          "label": "Find Laundry",
+          "type": "route",
+          "route": "laundryMap"
+        }
+      ]
+    },
+    {
+      "id": "parking",
+      "category": "practical",
+      "priority": 20,
+      "triggers": [
+        "where can i park",
+        "is there parking",
+        "scooter parking",
+        "car parking",
+        "parking at the house"
+      ],
+      "answer": "Parking is available along the roadside. Please avoid blocking entrances, access routes or neighbouring businesses.",
+      "actions": []
+    },
+    {
+      "id": "house_location",
+      "category": "arrival",
+      "priority": 20,
+      "triggers": [
+        "where is the house",
+        "house location",
+        "google maps",
+        "directions to the house",
+        "how do i get to the house",
+        "find the house"
+      ],
+      "answer": "The House is in Mae Haad, close to the ferry pier. Open the map below for the exact location. When you arrive, enter beside Bar Thai Food and follow the access route to The House.",
+      "actions": [
+        {
+          "label": "Open Google Maps",
+          "type": "link",
+          "href": "https://maps.app.goo.gl/5MV4j4B1YzyR1SR69"
+        }
+      ]
+    },
+    {
+      "id": "view_before_booking",
+      "category": "pre-booking",
+      "priority": 20,
+      "triggers": [
+        "can i see the room before booking",
+        "can i visit before booking",
+        "can i look at the accommodation",
+        "view the room before booking",
+        "room viewing",
+        "visit the house before booking"
+      ],
+      "answer": "Please contact us before visiting. Our team will confirm whether a viewing can be arranged.",
+      "actions": [
+        {
+          "label": "Contact Us",
+          "type": "route",
+          "route": "houseWhatsapp",
+          "message": "Hello, I would like to ask whether I can visit and view the accommodation before booking."
+        }
+      ]
+    },
+    {
+      "id": "activity_booking",
+      "category": "booking",
+      "priority": 20,
+      "triggers": [
+        "how do i book an activity",
+        "book an activity",
+        "book diving",
+        "book snorkelling",
+        "book snorkeling",
+        "book a boat trip",
+        "activity reservation"
+      ],
+      "answer": "Commissionable activities should be booked through The House. Our booking team can check availability and help coordinate the reservation.",
+      "actions": [
+        {
+          "label": "Book with Us",
+          "type": "route",
+          "route": "bookingWhatsapp",
+          "message": "Hello, I am staying at The House and would like help booking an activity."
+        },
+        {
+          "label": "Call Us",
+          "type": "route",
+          "route": "bookingCall"
+        }
+      ]
+    },
+    {
+      "id": "transport_booking",
+      "category": "booking",
+      "priority": 20,
+      "triggers": [
+        "book a taxi",
+        "arrange a taxi",
+        "book scooter",
+        "scooter rental",
+        "private transfer",
+        "book ferry tickets",
+        "arrange transport"
+      ],
+      "answer": "Our booking team can help with bookable transport and rental enquiries. Send the details of what you need and when you need it.",
+      "actions": [
+        {
+          "label": "Book with Us",
+          "type": "route",
+          "route": "bookingWhatsapp",
+          "message": "Hello, I am staying at The House and would like help arranging transport or a rental."
+        },
+        {
+          "label": "Call Us",
+          "type": "route",
+          "route": "bookingCall"
+        }
+      ]
+    },
+    {
+      "id": "property_emergency",
+      "category": "property-emergency",
+      "priority": 90,
+      "triggers": [
+        "there is a serious problem in my room",
+        "major water leak",
+        "water leakage",
+        "water is leaking everywhere",
+        "room is flooding",
+        "flood in my room",
+        "burst water pipe",
+        "water coming through the ceiling",
+        "dangerous electrical problem",
+        "electrical sparks",
+        "burning electrical smell",
+        "smoke from electricity",
+        "serious property damage"
+      ],
+      "answer": "This sounds like an urgent property problem. Move away from wet electrical equipment or any immediate danger and call emergency property support now. The concierge has included your room in the support message. If anyone is injured or in immediate medical danger, call 1669.",
+      "actions": [
+        {
+          "label": "Call Emergency Support",
+          "type": "route",
+          "route": "propertyEmergencyCall",
+          "style": "danger"
+        },
+        {
+          "label": "Send Urgent Message",
+          "type": "route",
+          "route": "propertyEmergencyWhatsapp",
+          "message": "URGENT: I am staying in {roomLabel}. There is a serious property problem: {question}"
+        },
+        {
+          "label": "Medical Emergency 1669",
+          "type": "route",
+          "route": "medicalNationalCall"
+        }
+      ]
+    },
+    {
+      "id": "medical_emergency",
+      "category": "emergency",
+      "priority": 100,
+      "triggers": [
+        "medical emergency",
+        "life threatening emergency",
+        "need an ambulance",
+        "call an ambulance",
+        "serious injury",
+        "cannot breathe",
+        "urgent medical help"
+      ],
+      "answer": "For a serious or life-threatening medical emergency, call Thailand's national medical emergency number 1669 immediately. Say that you are on Koh Tao, Surat Thani, explain your exact location and keep your phone nearby.",
+      "actions": [
+        {
+          "label": "Call 1669 Now",
+          "type": "route",
+          "route": "medicalNationalCall",
+          "style": "danger"
+        },
+        {
+          "label": "Emergency Information",
+          "type": "link",
+          "href": "/emergency.html"
+        }
+      ]
+    },
+    {
+      "id": "hospital",
+      "category": "emergency",
+      "priority": 40,
+      "triggers": [
+        "where is the hospital",
+        "koh tao hospital",
+        "need a doctor",
+        "hospital phone number",
+        "medical care",
+        "see a doctor"
+      ],
+      "answer": "Koh Tao Hospital provides medical treatment on the island. For a serious or life-threatening emergency, call 1669 instead.",
+      "actions": [
+        {
+          "label": "Call Koh Tao Hospital",
+          "type": "route",
+          "route": "hospitalCall"
+        },
+        {
+          "label": "Open Hospital Map",
+          "type": "route",
+          "route": "hospitalMap"
+        }
+      ]
+    },
+    {
+      "id": "pharmacy",
+      "category": "practical",
+      "priority": 20,
+      "triggers": [
+        "where is the pharmacy",
+        "nearest pharmacy",
+        "need medicine",
+        "buy medicine",
+        "first aid supplies"
+      ],
+      "answer": "Use the map below to find pharmacies near Mae Haad. Opening hours and availability can change.",
+      "actions": [
+        {
+          "label": "Find a Pharmacy",
+          "type": "route",
+          "route": "pharmacyMap"
+        }
+      ]
+    },
+    {
+      "id": "atm",
+      "category": "practical",
+      "priority": 20,
+      "triggers": [
+        "where is an atm",
+        "nearest atm",
+        "cash machine",
+        "withdraw cash",
+        "need cash"
+      ],
+      "answer": "Use the map below to find ATMs near Mae Haad.",
+      "actions": [
+        {
+          "label": "Find an ATM",
+          "type": "route",
+          "route": "atmMap"
+        }
+      ]
+    },
+    {
+      "id": "supermarket",
+      "category": "practical",
+      "priority": 20,
+      "triggers": [
+        "where is the supermarket",
+        "nearest supermarket",
+        "convenience store",
+        "buy snacks",
+        "buy bottled water",
+        "grocery store"
+      ],
+      "answer": "Use the map below to find nearby supermarkets and convenience stores for drinks, snacks and everyday essentials.",
+      "actions": [
+        {
+          "label": "Find a Supermarket",
+          "type": "route",
+          "route": "supermarketMap"
+        }
+      ]
+    }
+  ]
+}

@@ -21,7 +21,7 @@ Understand the existing architecture before modifying it.
 
 ## Current baseline
 
-The current release is v5.3.5. Completed modules include House Information, Restaurants, Cafés, Beaches, Bars & Nightlife, Shopping & Essentials, and Activities & Experiences.
+The current release is v5.4.0. Completed modules include House Information, Restaurants, Cafés, Beaches, Bars & Nightlife, Shopping & Essentials, Activities & Experiences, and the working room-aware Concierge v1 foundation.
 
 Do not regress or replace completed modules.
 
@@ -41,13 +41,29 @@ Fresh towels, room cleaning, lost keys or lockouts, room supplies and similar re
 
 The future AI Concierge should fully conduct routine stay-support conversations, with Su retained as the human handoff for operational action or escalation.
 
+General public Contact Us actions open the concierge first. The concierge determines the room from the room link or asks the guest to select it. Human handoff appears only when needed.
+
+## Current priority override
+
+Do not continue the Explore expansion yet. Prioritize getting the concierge online, feeding it approved accommodation and stay answers, and hardening room-aware support flows. Explore development comes last.
+
+Approved concierge answers live in `public/data/concierge-knowledge.json`. Read `CONCIERGE_KNOWLEDGE_GUIDE.md` before editing them.
+
+## After-hours and property emergencies
+
+After hours are 19:30–10:30 Bangkok time. One spare-key box will be located next to each room door, and a lost key adds a 500 THB fee. Never place codes in public files. Follow `SECURE_AFTER_HOURS_ACCESS.md`.
+
+Major water leaks, flooding, dangerous electrical problems and serious property damage use a separate property-emergency role intended for 24/7 coverage. A dedicated on-call person and number are not yet confirmed, so do not publicly claim confirmed 24/7 coverage.
+
+Su and Fah currently use ordinary WhatsApp. Automatic server-sent notifications require a future WhatsApp Business Platform integration. The current release uses prefilled human handoff messages.
+
 ## Development method
 
 Continue from `ROADMAP.md`. Implement the next coherent, unblocked milestone completely, test for regressions, update documentation and versioning, and produce a complete ready-to-push ZIP.
 
 ## Next planned milestone
 
-The next major milestone is v5.4.0 Transport. It is blocked until an authoritative Transport research file covering `TRANSPORT_RESEARCH_REQUIREMENTS.md` is supplied.
+Continue the v5.4.x operational concierge: add approved answers, secure guest verification, protected spare-key delivery, a confirmed 24/7 property-emergency contact and a staff-notification channel. Transport and other Explore modules remain deferred.
 
 ## Media
 

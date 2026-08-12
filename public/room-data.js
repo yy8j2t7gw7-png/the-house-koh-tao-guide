@@ -29,6 +29,12 @@ window.HOUSE_ROOMS = {
     "photo": "photo-01.jpeg",
     "note": "Rooms 5 and 6 are upstairs around the corner."
   },
+  "7": {
+    "floor": "Downstairs",
+    "photo": "room-07-placeholder.svg",
+    "note": "Room 7 is downstairs, around the corner and directly below Rooms 5 and 6.",
+    "photoStatus": "placeholder"
+  },
   "8": {
     "floor": "Downstairs",
     "photo": "photo-10.jpeg",

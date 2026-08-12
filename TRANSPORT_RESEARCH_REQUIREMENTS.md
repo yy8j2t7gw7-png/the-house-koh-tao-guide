@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This specification defines the authoritative research required before v5.4.0 Transport can be implemented. It is a content requirement, not a source of Transport facts.
+This specification defines the authoritative research required before the deferred Transport milestone can be implemented. It is a content requirement, not a source of Transport facts. Transport was moved behind the operational concierge priority in v5.4.0.
 
 ## Required coverage
 

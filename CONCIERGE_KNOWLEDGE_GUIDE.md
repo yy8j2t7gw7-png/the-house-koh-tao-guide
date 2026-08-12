@@ -1,6 +1,12 @@
 # Concierge Knowledge Guide
 
-The first production concierge uses approved question-and-answer records from `public/data/concierge-knowledge.json`. This keeps the initial service fast, predictable and usable without an external AI subscription or API key.
+The production concierge uses approved question-and-answer records from `public/data/concierge-knowledge.json` plus a private owner-approved knowledge overlay. Deterministic matching keeps common and safety-critical answers predictable, while the optional server-side model handles natural multilingual wording and contextual follow-ups. The approved deterministic engine remains usable without an API key.
+
+## Owner review workflow
+
+Unknown questions and negative feedback are grouped in the private learning queue at `/concierge-admin`. Review the sanitized example questions, correct the proposed wording, assign the right category and handoff, then approve or reject the candidate.
+
+Approval makes the correction active immediately through the private overlay; it does not rewrite repository files. Export approved additions regularly, verify them against authoritative project information and reconcile durable answers into `public/data/concierge-knowledge.json`. The model must never approve or publish its own proposed fact.
 
 ## Adding an approved answer
 
@@ -79,6 +85,10 @@ Never store key-box codes, guest identity data, private access tokens, passwords
 
 Follow `SECURE_AFTER_HOURS_ACCESS.md` for spare-key access.
 
+Do not place telephone numbers or WhatsApp destinations inside learned answers. Contact actions are generated from protected, deterministic routing configuration.
+
+Passport and TM30 questions may explain the approved purpose and offer a stay-support action to request a private link. Never add an action that accepts passport content inside chat, opens a public upload or asks the guest to send a passport image through WhatsApp. Follow `PASSPORT_DATA_OPERATIONS.md`.
+
 ## Validation
 
 Before release:
@@ -88,3 +98,5 @@ Before release:
 3. Confirm that unsupported questions use the safe fallback.
 4. Confirm room details are included in stay-support handoffs.
 5. Confirm Su, Fah, property-emergency and emergency-service routes remain separate.
+6. Test the owner-review action and confirm an approved answer is immediately available.
+7. Confirm a negative rating reaches the learning queue and no raw guest identifier is stored.

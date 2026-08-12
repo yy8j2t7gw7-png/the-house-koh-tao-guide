@@ -70,7 +70,7 @@ Public labels may be generic, including “Book with Us” and “Call Us”. Th
 
 ## AI Concierge
 
-The production foundation reads approved answers from `public/data/concierge-knowledge.json`. Follow `CONCIERGE_KNOWLEDGE_GUIDE.md` when adding content.
+The production concierge reads approved answers from `public/data/concierge-knowledge.json` and server-side owner-approved additions. `src/concierge-api.js` owns model calls and safe response assembly, `src/concierge-core.js` owns deterministic intent and action rules, and `src/concierge-store.js` owns the private learning store. Follow `CONCIERGE_KNOWLEDGE_GUIDE.md` when adding content.
 
 The concierge must:
 
@@ -81,12 +81,19 @@ The concierge must:
 - keep stay support, bookings, property emergencies and medical emergencies on separate routes
 - use a safe fallback instead of inventing an answer
 - keep Explore recommendations out of the answer engine until explicitly approved
+- keep contact destinations and safety-critical actions deterministic rather than model-generated
+- require owner approval before a learned answer becomes active
+- redact and minimize stored guest-question data
+
+Model access uses the server-side `OPENAI_API_KEY` secret. Learning review uses `CONCIERGE_ADMIN_TOKEN`, and session pseudonymization should use `CONCIERGE_HASH_SALT`. Never expose these values in public code or a release archive. The deterministic engine must remain usable if model access is absent or unavailable.
 
 Future recommendation logic may filter by guest type, budget, time, transport constraints, weather dependency, activity level, child suitability, area and booking requirements.
 
 ## Sensitive operations
 
 Never put key-box codes, private guest tokens or API credentials in public source or structured content. Follow `SECURE_AFTER_HOURS_ACCESS.md` for the protected spare-key flow.
+
+Passport images use the separate `src/passport-api.js` and private R2 workflow documented in `PASSPORT_DATA_OPERATIONS.md`. Never send passport content to the model, learning store, interaction log or WhatsApp. Validate authorization, expiry, single use, byte limit and file signature before storage. Keep manual TM30 fields disabled until the authoritative schema is supplied.
 
 After hours are 19:30–10:30 in Bangkok time. This does not define reception or property operating hours.
 
@@ -109,10 +116,15 @@ A coherent release must:
 - validate public booking destinations and prohibited direct-booking actions
 - validate that stay-support routes resolve only to Su and commissionable booking routes resolve only to Fah
 - validate concierge intent matching, room context and safe fallbacks
+- run `npm test` for protected routing, model-contract, learning and privacy coverage
+- verify owner-approved knowledge works without a deployment and that feedback cannot reference a missing interaction
 - validate that public Contact Us actions open the concierge before human handoff
 - validate that no key-box code or messaging credential is present in the release
+- validate passport token expiry and one-time use, private document retrieval, immediate deletion and retention cleanup
+- validate that passport data cannot enter the model, learning queue, public assets or ordinary WhatsApp messages
 - validate local routes and referenced assets
 - complete a production dry-run bundle
+- confirm `/api/concierge/status` reports the expected model and learning configuration after production secrets are installed
 - be packaged as a complete ready-to-push ZIP
 
 Prefer meaningful milestone or policy-hardening releases over unnecessary micro-patches.

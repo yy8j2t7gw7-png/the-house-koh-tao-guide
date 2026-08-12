@@ -16,6 +16,8 @@ Key-box codes must never be stored in public HTML, JavaScript, JSON, URLs, repos
 
 The codes must remain in protected server-side secrets. Secure code delivery stays disabled until the guest-verification method and real key-box codes are configured.
 
+The language model must never receive a key-box code, private stay-link token or signing secret in its prompt or tools. Verification and code delivery must remain a separate deterministic server operation.
+
 ## Required production flow
 
 1. Every active stay receives a private, unguessable link tied to one room and a defined validity period.

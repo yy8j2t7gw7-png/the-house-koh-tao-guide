@@ -14,7 +14,7 @@
       .replace(/\bcheckin\b/g, "check in")
       .replace(/\bcheckout\b/g, "check out")
       .replace(/\bwi-fi\b/g, "wifi")
-      .replace(/[^a-z0-9]+/g, " ")
+      .replace(/[^\p{L}\p{N}]+/gu, " ")
       .replace(/\s+/g, " ")
       .trim();
   }
@@ -101,7 +101,7 @@
 
   async function create(options = {}) {
     const knowledgeUrl = options.knowledgeUrl || "/data/concierge-knowledge.json";
-    const minimumScore = Number.isFinite(options.minimumScore) ? options.minimumScore : 0.44;
+    const minimumScore = Number.isFinite(options.minimumScore) ? options.minimumScore : 0.62;
     const response = await fetch(knowledgeUrl, { cache: "no-store" });
     if (!response.ok) throw new Error(`Concierge knowledge could not be loaded (${response.status}).`);
     const knowledge = validateKnowledge(await response.json());
@@ -133,7 +133,7 @@
         return {
           matched: false,
           intentId: "fallback",
-          category: "fallback",
+          category: fallback.category || "fallback",
           confidence: best?.score || 0,
           answer: fallback.answer,
           actions: fallback.actions || []

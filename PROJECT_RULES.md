@@ -55,6 +55,17 @@ Medical or personal emergencies must remain separate from property emergencies a
 - Notification recipient numbers and names are server-side configuration and must never appear in public files.
 - Staff notifications must not contain the key-box code or the guest's private access token.
 
+## Passport and Immigration registration data
+
+- Passport information is collected only through the separate private registration flow, never through AI chat, learning logs, public files or WhatsApp attachments.
+- Explain in guest-friendly language that The House needs the information for required TM30 Immigration accommodation registration and how the document is handled.
+- Use room-bound, expiring, single-use links. Room selection alone must never authorize passport upload or retrieval.
+- Store passport images only in non-public document storage with random object keys and authenticated owner retrieval.
+- Main file retention is 14 days after upload, with immediate owner deletion and a daily application cleanup reinforcing the R2 lifecycle rule.
+- Do not use passport data for marketing, AI training or recommendation logic.
+- Do not invent the manual TM30 field schema. The structured details option stays disabled until the authoritative field list is supplied.
+- Ordinary WhatsApp supports only a prepared manual reminder. Automatic reminders require an approved server-side messaging integration.
+
 ## Global booking policy
 
 All commissionable activities and services marked for concierge booking must route public booking enquiries through The House.
@@ -95,9 +106,19 @@ Public interface rules:
 - Maintain semantic versioning.
 - Every release updates README, CHANGELOG and ROADMAP and is delivered as a ready-to-push ZIP.
 
+## AI and controlled learning
+
+- Safety-critical intents, contact destinations and public action URLs remain deterministic and server-controlled.
+- Model output must use a strict schema and must never define a telephone number, WhatsApp destination, key-box instruction or other action target.
+- The model may answer only from approved project knowledge and owner-approved additions. Missing facts use an honest fallback or human handoff.
+- Guest-question gaps and negative feedback may enter the private learning queue, but the model must never approve or publish its own proposed fact.
+- Only an owner-approved correction becomes active. Permanent source updates must still be reconciled into the repository knowledge file.
+- API keys, admin credentials, hashing secrets, guest tokens and protected access information remain server-side secrets.
+- Stored guest questions must be minimized, redacted and pseudonymized. Routine interaction and feedback records expire after 30 days.
+
 ## Current baseline
 
-Current release: v5.4.0.
+Current release: v5.5.0.
 
 Completed content modules:
 
@@ -109,4 +130,4 @@ Completed content modules:
 - Shopping & Essentials
 - Activities & Experiences
 
-The operational AI Concierge is now prioritized ahead of further Explore development. Transport remains research-blocked until the required authoritative source is supplied.
+The hybrid, room-aware AI Concierge and controlled owner-review workflow are now implemented. Production model activation requires server-side secrets and deployment verification. Explore remains deferred, and Transport remains research-blocked until the required authoritative source is supplied.

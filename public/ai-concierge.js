@@ -13,6 +13,7 @@
   function safeStorage(storage, operation, key, value) {
     try {
       if (operation === "get") return storage.getItem(key);
+      if (operation === "remove") return storage.removeItem(key);
       storage.setItem(key, value);
     } catch (_error) {
       return null;
@@ -36,6 +37,38 @@
   }
 
   let selectedRoom = initialRoom();
+  const sessionStorageKey = "houseConciergeSessionId";
+  const historyStorageKey = "houseConciergeHistory";
+  const historyLimit = Number.isFinite(cfg.historyLimit) ? cfg.historyLimit : 10;
+
+  function createSessionId() {
+    if (window.crypto?.randomUUID) return window.crypto.randomUUID().replace(/-/g, "_");
+    const random = Math.random().toString(36).slice(2);
+    return `session_${Date.now().toString(36)}_${random}_${random}`;
+  }
+
+  function initialSessionId() {
+    const stored = safeStorage(window.sessionStorage, "get", sessionStorageKey);
+    if (/^[A-Za-z0-9_-]{16,100}$/.test(stored || "")) return stored;
+    const created = createSessionId();
+    safeStorage(window.sessionStorage, "set", sessionStorageKey, created);
+    return created;
+  }
+
+  function initialHistory() {
+    try {
+      const stored = JSON.parse(safeStorage(window.sessionStorage, "get", historyStorageKey) || "[]");
+      if (!Array.isArray(stored)) return [];
+      return stored
+        .filter((item) => item && ["user", "assistant"].includes(item.role) && typeof item.content === "string")
+        .slice(-historyLimit);
+    } catch (_error) {
+      return [];
+    }
+  }
+
+  const sessionId = initialSessionId();
+  let conversationHistory = initialHistory();
   let pendingAnswer = null;
   let lastFocusedElement = null;
   let dragStartY = null;
@@ -52,6 +85,15 @@
 
   function interpolate(value, context) {
     return String(value || "").replace(/\{(question|room|roomLabel)\}/g, (_match, key) => context[key] || "");
+  }
+
+  function rememberExchange(question, answer) {
+    conversationHistory.push(
+      { role: "user", content: String(question || "").slice(0, 700) },
+      { role: "assistant", content: String(answer || "").slice(0, 700) }
+    );
+    conversationHistory = conversationHistory.slice(-historyLimit);
+    safeStorage(window.sessionStorage, "set", historyStorageKey, JSON.stringify(conversationHistory));
   }
 
   function routeMap() {
@@ -202,7 +244,7 @@
           <input class="ai-concierge-input" type="text" placeholder="${cfg.placeholder}" aria-label="Ask the AI Concierge" autocomplete="off">
           <button class="ai-concierge-send" type="submit">Send</button>
         </form>
-        <p class="ai-concierge-note">Answers use approved information from The House.</p>
+        <p class="ai-concierge-note">Answers use approved information from The House. Please do not share passport, payment or key-box details here.</p>
       </div>
     </div>`;
 
@@ -219,7 +261,7 @@
   const roomContext = panel.querySelector(".ai-concierge-room-context");
   const roomSelector = panel.querySelector(".ai-concierge-room-selector");
 
-  function appendMessage(role, text, actions = [], question = "") {
+  function appendMessage(role, text, actions = [], question = "", metadata = {}) {
     const message = document.createElement("article");
     message.className = `ai-concierge-message is-${role}`;
     const bubble = document.createElement("div");
@@ -245,6 +287,17 @@
         actionRow.appendChild(link);
       });
       message.appendChild(actionRow);
+    }
+
+    if (role === "concierge" && /^int_[A-Za-z0-9-]{20,}$/.test(metadata.interactionId || "")) {
+      const feedback = document.createElement("div");
+      feedback.className = "ai-concierge-feedback";
+      feedback.dataset.feedbackFor = metadata.interactionId;
+      feedback.innerHTML = `
+        <span>Was this helpful?</span>
+        <button type="button" data-feedback-rating="up" aria-label="This answer was helpful">Yes</button>
+        <button type="button" data-feedback-rating="down" aria-label="This answer was not helpful">No</button>`;
+      message.appendChild(feedback);
     }
 
     messages.appendChild(message);
@@ -280,7 +333,14 @@
     closeRoomSelector();
     appendMessage("concierge", `Thank you. I’ll use Room ${room} for this conversation.`);
     if (pendingAnswer) {
-      appendMessage("concierge", pendingAnswer.result.answer, pendingAnswer.result.actions, pendingAnswer.question);
+      appendMessage(
+        "concierge",
+        pendingAnswer.result.answer,
+        pendingAnswer.result.actions,
+        pendingAnswer.question,
+        { interactionId: pendingAnswer.result.interactionId }
+      );
+      rememberExchange(pendingAnswer.question, pendingAnswer.result.answer);
       pendingAnswer = null;
     }
     input.focus();
@@ -309,9 +369,58 @@
     }
   }
 
+  async function askServer(question, history) {
+    if (!cfg.useServerAI || !cfg.apiUrl) throw new Error("Server concierge disabled.");
+    const response = await fetch(cfg.apiUrl, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        question,
+        room: selectedRoom || "",
+        sessionId,
+        history,
+        page: currentPage
+      })
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok || !result.answer) {
+      const error = new Error(result.message || "The server concierge is unavailable.");
+      error.status = response.status;
+      throw error;
+    }
+    return result;
+  }
+
+  async function fallbackAnswer(question) {
+    const engine = await loadEngine();
+    return { ...engine.answer(question), source: "device-fallback", interactionId: null };
+  }
+
+  function deliverAnswer(result, question) {
+    if (result.category === "stay-support" && !selectedRoom) {
+      pendingAnswer = { result, question };
+      appendMessage("concierge", "Before I continue, which room are you staying in?");
+      openRoomSelector();
+      return;
+    }
+    appendMessage(
+      "concierge",
+      result.answer,
+      result.actions,
+      question,
+      { interactionId: result.interactionId }
+    );
+    rememberExchange(question, result.answer);
+  }
+
   async function submitQuestion(rawQuestion) {
     const question = String(rawQuestion || input.value).trim();
     if (!question) return;
+    if (question.length > 800) {
+      appendMessage("concierge", "Please shorten your question to 800 characters or fewer.");
+      return;
+    }
+    const priorHistory = conversationHistory.slice(-historyLimit);
     input.value = "";
     appendMessage("guest", question);
     sendButton.disabled = true;
@@ -319,18 +428,21 @@
     const status = appendStatus("Checking the approved information…");
 
     try {
-      const engine = await loadEngine();
-      const result = engine.answer(question);
-      status.remove();
-      if (result.category === "stay-support" && !selectedRoom) {
-        pendingAnswer = { result, question };
-        appendMessage("concierge", "Before I continue, which room are you staying in?");
-        openRoomSelector();
-      } else {
-        appendMessage("concierge", result.answer, result.actions, question);
+      let result;
+      try {
+        result = await askServer(question, priorHistory);
+      } catch (serverError) {
+        if (serverError.status === 429) throw serverError;
+        result = await fallbackAnswer(question);
       }
-    } catch (_error) {
       status.remove();
+      deliverAnswer(result, question);
+    } catch (error) {
+      status.remove();
+      if (error.status === 429) {
+        appendMessage("concierge", error.message || "Please wait a moment before sending another question.");
+        return;
+      }
       appendMessage(
         "concierge",
         "I cannot load the approved answers right now. You can still ask our team for help.",
@@ -364,6 +476,27 @@
   panel.querySelector("[data-close-room-selector]").addEventListener("click", closeRoomSelector);
 
   panel.addEventListener("click", (event) => {
+    const feedbackButton = event.target.closest("[data-feedback-rating]");
+    if (feedbackButton) {
+      const feedback = feedbackButton.closest("[data-feedback-for]");
+      const buttons = [...feedback.querySelectorAll("button")];
+      buttons.forEach((button) => { button.disabled = true; });
+      fetch(cfg.feedbackUrl || "/api/concierge/feedback", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          interactionId: feedback.dataset.feedbackFor,
+          rating: feedbackButton.dataset.feedbackRating
+        })
+      }).then((response) => {
+        feedback.innerHTML = response.ok
+          ? "<span>Thank you. Your feedback helps improve the concierge.</span>"
+          : "<span>Feedback could not be saved.</span>";
+      }).catch(() => {
+        feedback.innerHTML = "<span>Feedback could not be saved.</span>";
+      });
+      return;
+    }
     const roomButton = event.target.closest("[data-select-room]");
     if (roomButton) {
       setRoom(roomButton.dataset.selectRoom);

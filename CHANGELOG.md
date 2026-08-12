@@ -2,6 +2,51 @@
 
 All notable changes to The House – Koh Tao guest guide are recorded here.
 
+## v5.5.0 — Model-Powered Concierge & Controlled Learning
+
+### Added
+
+- Server-side OpenAI Responses API integration using strict structured output and `store: false`.
+- Hybrid response pipeline: deterministic approved answers for high-confidence and protected intents, model reasoning for natural language and contextual follow-ups, and device-safe fallback during API failure.
+- Multilingual guest-answer policy grounded only in approved House knowledge.
+- SQLite-backed Durable Object for sanitized interaction metrics, learning candidates, owner-approved answers and guest feedback.
+- Private `/concierge-admin` owner review interface with approve, reject, deactivate and export actions.
+- Immediate activation of owner-approved answers without requiring a code deployment.
+- Guest Yes/No answer feedback controls.
+- Per-session request-rate protection and strict request-size validation.
+- Automated 30-day removal of interaction and feedback records.
+- Unit tests covering protected routing, structured model contracts, fallback behavior, owner-approved learning, feedback, admin authorization and privacy redaction.
+- `AI_CONCIERGE_OPERATIONS.md` with secure activation and daily-review procedures.
+- Private room-bound, expiring and single-use passport-image links created from the authenticated owner area.
+- Guest-friendly passport page explaining the TM30 registration purpose, private handling and automatic deletion before accepting an upload.
+- Private R2 document storage with file-signature and size validation, authenticated download, immediate deletion and daily retention cleanup.
+- Owner passport-request queue with expected arrival time, overdue visibility, manual-reminder status and a ready-to-copy reminder for ordinary WhatsApp.
+- `PASSPORT_DATA_OPERATIONS.md` covering setup, retention, reminders, incident actions and the missing authoritative manual-field specification.
+
+### Changed
+
+- Guest questions now go to the protected Worker endpoint before using the existing on-device matching engine as a fallback.
+- Short conversation context is retained in browser session storage for follow-up questions.
+- The concierge welcome text now invites guests to use their preferred language.
+- Guest privacy guidance now explicitly asks users not to share passport, payment or key-box information.
+- Overnight-visitor guidance now requests a separate private passport link rather than asking guests to send a document through chat or WhatsApp.
+- Broad single-word `help` matching was removed to prevent unrelated questions from receiving the generic welcome answer.
+- The on-device and API-failure matcher now requires stronger confidence so unrelated requests cannot be misclassified as emergencies.
+- Worker configuration now includes persistent learning storage and rate limiting.
+- Package, module registry and structured knowledge release metadata updated to v5.5.0.
+
+### Safety and operational status
+
+- The model cannot generate guest action destinations; all booking, support and emergency buttons remain centrally controlled.
+- Key-box codes, stay-link tokens and credentials remain outside model prompts, logs and public files.
+- Passport images remain outside the model, learning store, interaction logs, WhatsApp and public files.
+- Chat text that resembles pasted passport fields is discarded and reduced to a generic registration intent before model reasoning or operational logging.
+- Protected lost-key, property-emergency and medical-emergency intents bypass generative answers.
+- Model-powered answers require the server-side `OPENAI_API_KEY` secret. The deterministic concierge remains available without it.
+- Owner review requires `CONCIERGE_ADMIN_TOKEN`; no secret value is included in this release.
+- The dedicated 24/7 property-emergency contact and secure spare-key delivery remain pending operational inputs.
+- Passport upload activation requires the private R2 bucket and `PASSPORT_TOKEN_PEPPER`; the manual TM30-details form remains blocked on an authoritative field list.
+
 ## v5.4.0 — Working Room-Aware Concierge Foundation
 
 ### Added

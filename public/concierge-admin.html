@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex,nofollow,noarchive">
+  <title>Concierge Learning Review | The House</title>
+  <link rel="icon" href="/logo.svg">
+  <link rel="stylesheet" href="/design-system.css">
+  <link rel="stylesheet" href="/concierge-admin.css">
+</head>
+<body>
+  <main class="concierge-admin-shell">
+    <header class="concierge-admin-header">
+      <a href="/" class="concierge-admin-brand"><img src="/logo.svg" alt="The House Koh Tao"></a>
+      <div>
+        <p class="concierge-admin-kicker">Private operations</p>
+        <h1>Concierge Learning Review</h1>
+        <p>Review unanswered questions and corrections before they become approved knowledge.</p>
+      </div>
+    </header>
+
+    <section class="concierge-admin-login" id="adminLogin">
+      <form id="adminLoginForm">
+        <label for="adminToken">Admin access token</label>
+        <div class="concierge-admin-login-row">
+          <input id="adminToken" name="token" type="password" autocomplete="current-password" required>
+          <button type="submit">Open review</button>
+        </div>
+        <p id="loginStatus" role="status">The token is kept only in this browser tab.</p>
+      </form>
+    </section>
+
+    <div id="adminWorkspace" hidden>
+      <section class="concierge-admin-toolbar">
+        <div>
+          <strong>Controlled learning is active</strong>
+          <span>Approvals take effect immediately. The concierge never approves its own facts.</span>
+        </div>
+        <div class="concierge-admin-toolbar-actions">
+          <button type="button" class="secondary" id="exportKnowledge">Export approved answers</button>
+          <button type="button" class="secondary" id="adminLogout">Lock</button>
+        </div>
+      </section>
+
+      <section class="concierge-admin-stats" id="adminStats" aria-label="Concierge statistics"></section>
+
+      <section class="concierge-admin-section">
+        <div class="concierge-admin-section-head">
+          <div>
+            <p class="concierge-admin-kicker">Required guest registration</p>
+            <h2>Passport requests & reminders</h2>
+          </div>
+        </div>
+        <p>Create one private link per passport when the information has not been supplied before arrival. With ordinary WhatsApp, copy the prepared reminder and send it in the existing guest conversation.</p>
+        <form id="passportLinkForm" class="concierge-admin-registration-form">
+          <div class="concierge-admin-field">
+            <label for="passportRoom">Room</label>
+            <select id="passportRoom" required>
+              <option value="">Select room</option>
+              <option value="1">Room 1</option><option value="2">Room 2</option>
+              <option value="3">Room 3</option><option value="4">Room 4</option>
+              <option value="5">Room 5</option><option value="6">Room 6</option>
+              <option value="7">Room 7</option><option value="8">Room 8</option>
+              <option value="9">Room 9</option><option value="10">Room 10</option>
+              <option value="11">Room 11</option>
+            </select>
+          </div>
+          <div class="concierge-admin-field">
+            <label for="passportArrival">Expected arrival (Bangkok time)</label>
+            <input id="passportArrival" type="datetime-local" required>
+          </div>
+          <div class="concierge-admin-field">
+            <label for="passportExpiry">Private link expires after</label>
+            <select id="passportExpiry">
+              <option value="24">24 hours</option>
+              <option value="48">48 hours</option>
+              <option value="72" selected>72 hours</option>
+            </select>
+          </div>
+          <button type="submit">Create secure request</button>
+        </form>
+        <div id="passportLinkResult" class="concierge-admin-link-result" hidden>
+          <strong>Copy this now—the private token is not stored in readable form. If you leave without copying it, revoke the request and create a new one.</strong>
+          <label for="passportReminderMessage">Guest-friendly reminder</label>
+          <textarea id="passportReminderMessage" readonly></textarea>
+          <div class="concierge-admin-card-actions">
+            <button type="button" data-copy-target="passportReminderMessage">Copy reminder</button>
+            <button type="button" class="secondary" data-copy-target="passportUploadUrl">Copy link only</button>
+          </div>
+          <input id="passportUploadUrl" type="text" readonly aria-label="Private passport upload link">
+        </div>
+        <div class="concierge-admin-registration-columns">
+          <div>
+            <h3>Awaiting guest information</h3>
+            <div id="pendingRegistrations" class="concierge-admin-queue"></div>
+          </div>
+          <div>
+            <h3>Received passport images</h3>
+            <div id="passportUploads" class="concierge-admin-queue"></div>
+          </div>
+        </div>
+        <p class="concierge-admin-source-note"><strong>Downloaded copies are outside automatic deletion.</strong> Remove the local file from the device as soon as the registration work is complete, then use “Delete now” to remove the stored copy.</p>
+        <p class="concierge-admin-source-note">The current approved House information supports secure passport-photo collection. The alternative manual TM30 details form remains disabled until the exact authoritative field list is supplied.</p>
+      </section>
+
+      <section class="concierge-admin-section">
+        <div class="concierge-admin-section-head">
+          <div>
+            <p class="concierge-admin-kicker">Needs attention</p>
+            <h2>Learning queue</h2>
+          </div>
+          <button type="button" class="secondary" id="refreshAdmin">Refresh</button>
+        </div>
+        <p>Each item comes from an unanswered question or negative guest rating. Check the facts, edit the answer, then approve or reject it.</p>
+        <div id="learningQueue" class="concierge-admin-queue"></div>
+      </section>
+
+      <section class="concierge-admin-section">
+        <div class="concierge-admin-section-head">
+          <div>
+            <p class="concierge-admin-kicker">Live knowledge</p>
+            <h2>Owner-approved answers</h2>
+          </div>
+        </div>
+        <div id="approvedKnowledge" class="concierge-admin-approved"></div>
+      </section>
+
+      <section class="concierge-admin-section">
+        <div class="concierge-admin-section-head">
+          <div>
+            <p class="concierge-admin-kicker">Quality review</p>
+            <h2>Recent questions</h2>
+          </div>
+        </div>
+        <p>Guest text is sanitized before storage and interaction records are retained for no more than 30 days.</p>
+        <div class="concierge-admin-table-wrap">
+          <table>
+            <thead><tr><th>Time</th><th>Room</th><th>Question</th><th>Result</th></tr></thead>
+            <tbody id="recentQuestions"></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  </main>
+  <script src="/concierge-admin.js"></script>
+</body>
+</html>

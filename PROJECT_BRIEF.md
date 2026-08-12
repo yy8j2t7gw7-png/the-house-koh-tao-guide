@@ -20,7 +20,7 @@ The product should feel like a competent hotel concierge in a guest’s pocket, 
 
 ### Current state
 
-Current release: v5.4.0.
+Current release: v5.5.0.
 
 Existing content areas:
 
@@ -48,7 +48,11 @@ The future AI Concierge should fully handle these routine support conversations,
 
 ### Immediate product priority
 
-The operational concierge now takes priority over further Explore development. The first live concierge answers approved accommodation and stay questions, knows the guest's room when available and routes unresolved work to the correct person.
+The operational concierge now takes priority over further Explore development. The hybrid concierge answers approved accommodation and stay questions, understands natural multilingual wording when its server-side model is configured, knows the guest's room when available and routes unresolved work to the correct person. Deterministic safety rules and an on-device fallback remain available when the model is unavailable.
+
+Unknown questions and negative feedback enter a private, privacy-minimized learning queue. An owner must approve every correction before it becomes active; the model is never allowed to publish new facts by itself.
+
+The owner area also creates private passport-image requests for required TM30 guest registration. Guests receive a one-time room-bound link, a clear purpose explanation and a short-retention privacy summary. Passport files remain completely separate from the AI system. Pending requests form the manual reminder queue until an outbound messaging integration is approved.
 
 Explore recommendations and new destination modules are deferred until the concierge is online, reliable and easy to extend.
 

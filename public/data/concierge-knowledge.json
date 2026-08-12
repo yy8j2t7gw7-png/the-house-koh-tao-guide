@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0.0",
-  "release": "5.4.0",
+  "release": "5.5.0",
   "language": "en",
   "updated": "2026-08-12",
   "scope": "Verified accommodation, room, house-rule, support, booking and emergency answers for guests of The House – Koh Tao.",
@@ -47,6 +47,7 @@
   ],
   "fallbacks": {
     "default": {
+      "category": "fallback",
       "answer": "I do not have a confirmed answer for that yet. Please contact us and our team will help. We will keep adding approved answers here over time.",
       "actions": [
         {
@@ -58,6 +59,7 @@
       ]
     },
     "booking": {
+      "category": "booking",
       "answer": "Our booking team can help with commissionable activities and services. Use the booking button below and tell us what you would like to arrange.",
       "actions": [
         {
@@ -74,6 +76,7 @@
       ]
     },
     "explore": {
+      "category": "concierge",
       "answer": "I am not answering detailed Explore recommendations yet because those answers are still being prepared. You can browse the current guide, or contact us if you need personal help now.",
       "actions": [
         {
@@ -102,8 +105,7 @@
         "good morning",
         "good afternoon",
         "good evening",
-        "what can you help with",
-        "help"
+        "what can you help with"
       ],
       "answer": "Hello. I can help with check-in, your room, Wi-Fi, towels, cleaning, keys, house rules, checkout and basic assistance during your stay. Ask a question or choose one of the quick options.",
       "actions": []
@@ -426,15 +428,17 @@
         "someone stay in my room",
         "friend stay overnight",
         "visitor passport",
+        "passport registration",
+        "secure passport link",
         "extra guest"
       ],
-      "answer": "Please notify us and send a passport photo for every overnight visitor so we can complete the required Immigration registration.",
+      "answer": "The House needs passport information for every overnight visitor so we can complete the required TM30 Immigration accommodation registration. Please use the private one-time passport link sent by our team. Do not put passport details in this chat or send the image through WhatsApp. If you do not have a link, request one below.",
       "actions": [
         {
-          "label": "Notify Us",
+          "label": "Request Secure Link",
           "type": "route",
           "route": "houseWhatsapp",
-          "message": "Hello, I am staying in {roomLabel} and need to notify you about an overnight visitor."
+          "message": "Hello, I am staying in {roomLabel} and need a private passport-information link for an overnight visitor."
         }
       ]
     },
@@ -602,6 +606,10 @@
         "electrical sparks",
         "burning electrical smell",
         "smoke from electricity",
+        "there is smoke",
+        "smoke in my room",
+        "fire in my room",
+        "something is burning",
         "serious property damage"
       ],
       "answer": "This sounds like an urgent property problem. Move away from wet electrical equipment or any immediate danger and call emergency property support now. The concierge has included your room in the support message. If anyone is injured or in immediate medical danger, call 1669.",

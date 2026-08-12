@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex,nofollow,noarchive">
+  <meta name="referrer" content="no-referrer">
+  <title>Secure Passport Information | The House</title>
+  <link rel="icon" href="/logo.svg">
+  <link rel="stylesheet" href="/design-system.css">
+  <link rel="stylesheet" href="/passport-upload.css">
+</head>
+<body>
+  <main class="passport-shell">
+    <header class="passport-brand">
+      <img src="/logo.svg" alt="The House Koh Tao">
+      <div><span>Private guest registration</span><strong>The House – Koh Tao</strong></div>
+    </header>
+
+    <section class="passport-card">
+      <p class="passport-kicker">Secure one-time form</p>
+      <h1>Passport information</h1>
+      <p class="passport-intro">Please use this private form if The House has asked for your passport information before or during your stay.</p>
+
+      <div class="passport-purpose">
+        <h2>Why we need it</h2>
+        <p>The House needs the information to complete the required TM30 Immigration accommodation registration for guests. If we did not receive it before your arrival, please submit it as soon as possible through this page.</p>
+      </div>
+
+      <div class="passport-privacy">
+        <h2>How we protect your information</h2>
+        <ul>
+          <li>This link is private, tied to one room, expires automatically and can be used only once.</li>
+          <li>Your passport image goes to private document storage. It is not sent through WhatsApp or the AI Concierge.</li>
+          <li>Only an owner using the protected operations area can retrieve or delete it.</li>
+          <li>The file is deleted automatically after the short period shown below, or sooner when an owner deletes it after processing.</li>
+          <li>The document is used for guest registration, not marketing or AI training.</li>
+        </ul>
+      </div>
+
+      <div id="passportStatus" class="passport-status" role="status" aria-live="polite">Checking your private link…</div>
+
+      <form id="passportForm" hidden>
+        <div class="passport-session">
+          <span id="passportRoom"></span>
+          <span id="passportExpiry"></span>
+          <span id="passportRetention"></span>
+        </div>
+        <label class="passport-file" for="passportFile">
+          <strong>Choose a clear passport image</strong>
+          <span>Use the page that shows the passport holder’s photo and details. JPEG, PNG, WebP or HEIC; maximum 10 MB.</span>
+          <input id="passportFile" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" capture="environment" required>
+        </label>
+        <label class="passport-confirm">
+          <input id="passportConsent" type="checkbox" required>
+          <span>I am authorized to submit this passport image to The House for the guest registration described above.</span>
+        </label>
+        <button id="passportSubmit" type="submit">Upload securely</button>
+      </form>
+
+      <p class="passport-help">Do not paste passport details into the AI Concierge. If this link does not work, ask The House to issue a new private link.</p>
+    </section>
+  </main>
+  <script src="/passport-upload.js"></script>
+</body>
+</html>

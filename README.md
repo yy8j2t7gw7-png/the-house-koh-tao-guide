@@ -1,4 +1,4 @@
-# Guest Guide Platform with AI Concierge — The House v5.4.0
+# Guest Guide Platform with AI Concierge — The House v5.5.0
 
 The House – Koh Tao guest guide is a production-oriented, mobile-first digital guest guide and concierge platform. It combines property information, curated island guidance, structured place and activity data, and centralized contact and booking routes.
 
@@ -14,27 +14,40 @@ The House – Koh Tao guest guide is a production-oriented, mobile-first digital
 - Practical information
 - Help & Emergency
 - Departure guidance
-- Working room-aware AI Concierge foundation
+- Model-powered, room-aware AI Concierge with controlled learning
 
 The Activities module contains 49 structured profiles covering diving, freediving, snorkelling, boat trips, beach experiences, kayaking, paddleboarding, hiking, viewpoints, climbing, yoga, Muay Thai, massage, cooking, wildlife, photography, night activities and rainy-day options.
 
-## v5.4.0 release focus
+## v5.5.0 release focus
 
-- Replaces the non-working concierge prototype response with a live structured question-and-answer engine.
-- Adds approved answers for check-in, self check-in, rooms, Wi-Fi, towels, cleaning, lost keys, house rules, checkout, location, practical needs, bookings and emergencies.
-- Recognizes the room from room-specific links, remembers it on the guest's device and provides a room selector when needed.
-- Makes public **Contact Us** actions concierge-first while preserving explicit human handoff buttons inside the conversation.
-- Adds separate routing for routine stay support, commissionable bookings, urgent property emergencies and medical emergencies.
-- Defines the 19:30–10:30 Bangkok-time after-hours window and the secure architecture required for future spare-key code delivery.
-- Defers further Explore content and recommendation work until the operational concierge is online and mature.
+- Adds a protected server-side OpenAI Responses API integration using strict structured output.
+- Gives the model all approved accommodation knowledge while retaining deterministic safety rules and an on-device fallback engine.
+- Supports natural guest phrasing, multilingual answers and short contextual follow-up conversations.
+- Adds persistent, privacy-minimized interaction metrics, guest feedback and a controlled learning queue.
+- Adds a private owner review interface at `/concierge-admin` where corrections can be edited, approved and activated immediately.
+- Adds private one-time passport-image requests for required TM30 guest registration, with an owner reminder queue and guest-friendly privacy explanation.
+- Stores passport images outside the AI system in a private R2 bucket, with authenticated owner retrieval, immediate deletion and scheduled 14-day removal.
+- Keeps model-produced links and contacts out of the public interface; buttons continue to use centralized Su/Fah and emergency routing.
+- Preserves Room 7, the 19:30–10:30 Bangkok-time after-hours rule and the secure spare-key boundary established in v5.4.0.
+- Continues to defer Explore expansion while real guest concierge usage is established.
 
 ## Working concierge
 
-The concierge loads approved content from `public/data/concierge-knowledge.json`. It runs without an external AI API or subscription and gives deterministic answers that can be expanded at any time.
+The concierge loads approved content from `public/data/concierge-knowledge.json`. High-confidence and safety-critical questions use deterministic answers. Other questions use the server-side model when `OPENAI_API_KEY` is configured.
 
-The first release supports natural guest phrasings and safe fallbacks. Unsupported Explore recommendations are not invented; the guest is directed to the existing guide or offered human assistance.
+The model receives only approved House knowledge and optional owner-approved additions. It is instructed to answer in the guest's language, use conversation context and admit when an answer is not confirmed. Unsupported Explore recommendations are not invented.
+
+If the API key is missing, an upstream request fails or output does not match the required schema, the device-safe deterministic engine answers instead. The guest interface therefore remains usable during model outages.
 
 See `CONCIERGE_KNOWLEDGE_GUIDE.md` for the content format and approval workflow.
+
+## Controlled learning
+
+Questions, confidence, routing outcome and feedback are stored in a SQLite-backed Durable Object. Personal identifiers are redacted where detectable, browser session identifiers are hashed, and interaction records are removed after 30 days.
+
+Unknown questions and negative ratings enter a learning queue. The model cannot approve its own answer. An owner reviews each candidate in `/concierge-admin`; an approved correction becomes active immediately and can later be exported into the permanent repository knowledge file.
+
+See `AI_CONCIERGE_OPERATIONS.md` for activation, privacy and daily review procedures.
 
 ## Room awareness
 
@@ -79,9 +92,26 @@ Key-box codes are not included in this release. Secure delivery remains disabled
 
 Su and the owners currently use ordinary WhatsApp. Automatic server-sent spare-key notifications require a later WhatsApp Business Platform integration. The current release uses prefilled WhatsApp handoff messages; Fah remains the separate booking contact.
 
+## Secure passport information
+
+Owners can create a room-bound, expiring, single-use link from `/concierge-admin` when required passport information was not supplied before arrival. The guest page explains that the document is needed for TM30 Immigration accommodation registration and explains the privacy controls before accepting an image.
+
+Passport images never enter the AI chat, model prompts, learning queue, WhatsApp messages or public site. They are stored in the private `PASSPORT_UPLOADS` R2 binding and can be downloaded only through the authenticated owner API. The main retention policy is 14 days after upload, with immediate deletion available and a daily application cleanup reinforcing the R2 lifecycle rule.
+
+Ordinary WhatsApp cannot send automated reminders. The owner page identifies pending and overdue requests and creates a guest-friendly message to copy into the existing conversation. The manual TM30-details alternative remains disabled because the exact authoritative field list has not been supplied; no fields were guessed. See `PASSPORT_DATA_OPERATIONS.md`.
+
+## Production activation
+
+The model-powered layer requires the server-side `OPENAI_API_KEY` secret. The private learning review requires `CONCIERGE_ADMIN_TOKEN`, and `CONCIERGE_HASH_SALT` is strongly recommended for session pseudonymization. Secure passport links also require the private `the-house-passport-uploads` R2 bucket and `PASSPORT_TOKEN_PEPPER`. Secret values must never be committed or included in release archives.
+
+The core deterministic concierge works safely before these secrets are configured. Follow `AI_CONCIERGE_OPERATIONS.md` to activate and verify the complete AI and learning workflow.
+
 ## Architecture
 
 - Cloudflare Worker entry point: `src/index.js`
+- Server-side concierge controller: `src/concierge-api.js`
+- Deterministic safety and matching logic: `src/concierge-core.js`
+- Persistent learning store: `src/concierge-store.js`
 - Static application: `public/`
 - Structured content: `public/data/`
 - Canonical module copies: `public/modules/`
@@ -92,6 +122,9 @@ Su and the owners currently use ordinary WhatsApp. Automatic server-sent spare-k
 - Concierge configuration: `public/ai-concierge-config.js`
 - Concierge matching engine: `public/ai-concierge-engine.js`
 - Approved concierge answers: `public/data/concierge-knowledge.json`
+- Owner learning review: `public/concierge-admin.html`
+- Secure passport guest page: `public/passport-upload.html`
+- Passport upload API: `src/passport-api.js`
 
 The root public routes remain in place for backwards compatibility. Where a canonical copy also exists under `public/modules/`, the two copies must remain byte-equivalent.
 
@@ -100,6 +133,7 @@ The root public routes remain in place for backwards compatibility. Where a cano
 ```sh
 npm install
 npm run dev
+npm test
 ```
 
 Production packaging is handled through Wrangler:
@@ -128,3 +162,5 @@ Transport still requires an authoritative Transport Deep Research document. See 
 - `TRANSPORT_RESEARCH_REQUIREMENTS.md`
 - `CONCIERGE_KNOWLEDGE_GUIDE.md`
 - `SECURE_AFTER_HOURS_ACCESS.md`
+- `AI_CONCIERGE_OPERATIONS.md`
+- `PASSPORT_DATA_OPERATIONS.md`

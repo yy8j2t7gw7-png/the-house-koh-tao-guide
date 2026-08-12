@@ -21,7 +21,7 @@ Understand the existing architecture before modifying it.
 
 ## Current baseline
 
-The current release is v5.4.0. Completed modules include House Information, Restaurants, Cafés, Beaches, Bars & Nightlife, Shopping & Essentials, Activities & Experiences, and the working room-aware Concierge v1 foundation.
+The current release is v5.5.0. Completed modules include House Information, Restaurants, Cafés, Beaches, Bars & Nightlife, Shopping & Essentials, Activities & Experiences, and the hybrid room-aware AI Concierge with deterministic safety fallback and controlled owner-reviewed learning.
 
 Do not regress or replace completed modules.
 
@@ -47,7 +47,7 @@ General public Contact Us actions open the concierge first. The concierge determ
 
 Do not continue the Explore expansion yet. Prioritize getting the concierge online, feeding it approved accommodation and stay answers, and hardening room-aware support flows. Explore development comes last.
 
-Approved concierge answers live in `public/data/concierge-knowledge.json`. Read `CONCIERGE_KNOWLEDGE_GUIDE.md` before editing them.
+Approved concierge answers live in `public/data/concierge-knowledge.json` and the private owner-approved knowledge overlay. Read `CONCIERGE_KNOWLEDGE_GUIDE.md` and `AI_CONCIERGE_OPERATIONS.md` before editing or operating them. Never allow the model to publish a learned answer without owner approval.
 
 ## After-hours and property emergencies
 
@@ -57,13 +57,15 @@ Major water leaks, flooding, dangerous electrical problems and serious property 
 
 Su and Fah currently use ordinary WhatsApp. Automatic server-sent notifications require a future WhatsApp Business Platform integration. The current release uses prefilled human handoff messages.
 
+v5.5.0 includes a separate private passport-image flow for required TM30 guest registration. Read `PASSPORT_DATA_OPERATIONS.md`. It requires a private R2 bucket and `PASSPORT_TOKEN_PEPPER` before production activation. Passport content must never enter the model, learning queue, public assets or WhatsApp. The manual-details alternative is intentionally blocked until the authoritative TM30 field list is supplied.
+
 ## Development method
 
 Continue from `ROADMAP.md`. Implement the next coherent, unblocked milestone completely, test for regressions, update documentation and versioning, and produce a complete ready-to-push ZIP.
 
 ## Next planned milestone
 
-Continue the v5.4.x operational concierge: add approved answers, secure guest verification, protected spare-key delivery, a confirmed 24/7 property-emergency contact and a staff-notification channel. Transport and other Explore modules remain deferred.
+Activate and verify the v5.5.x production concierge by configuring its server-side OpenAI, admin and hashing secrets, deploying the Worker and establishing the owner review routine. Then add approved stay answers as they are supplied. Secure guest verification, protected spare-key delivery, a confirmed 24/7 property-emergency contact and a staff-notification channel remain future operational milestones. Transport and other Explore modules remain deferred.
 
 ## Media
 

@@ -4,7 +4,11 @@
 
 The AI concierge should behave like an informed, practical concierge for guests of The House – Koh Tao. It should help guests decide, plan and act.
 
-The initial production layer must answer only approved accommodation and stay questions from the structured concierge knowledge file. A safe, honest fallback is better than an invented answer.
+The production layer may answer only from the structured concierge knowledge file and owner-approved additions. It uses a server-side model for natural language, multilingual phrasing and contextual follow-ups while deterministic rules retain control of safety-critical intents, contact routes and public actions. A safe, honest fallback is better than an invented answer.
+
+## Controlled learning
+
+The concierge improves by recording sanitized knowledge gaps and negative guest feedback in a private learning queue. It does not train itself from raw conversations and cannot publish a proposed fact. An owner reviews, corrects and approves an answer before it becomes active. Repeated gaps should be prioritized, and approved additions should later be reconciled into the permanent knowledge file.
 
 ## Recommendation inputs
 
@@ -96,6 +100,14 @@ Automated spare-key code delivery must validate the current guest, room, time wi
 ## Factual discipline
 
 Use the project’s structured data and uploaded research. Do not invent opening hours, prices, availability, safety conditions or transport details. Volatile details should be reconfirmed.
+
+Model replies must conform to the server's strict response schema. Model output cannot supply contact destinations, key-box instructions, access tokens or executable links; those come only from deterministic server configuration.
+
+## Privacy
+
+Do not ask guests for passport, payment, booking-reference or key-box information in chat. Store only minimized, redacted questions and pseudonymous session identifiers for operational improvement. Routine interaction and feedback records expire after 30 days. API keys, admin credentials and private access information remain server-side.
+
+When a guest asks about overnight visitors or passport registration, explain the approved TM30 purpose and direct them to request the separate private one-time link. Never accept passport details or images inside the concierge. Passport documents are not model context and must never enter learning or recommendation systems.
 
 ## Tone
 

@@ -1,6 +1,6 @@
 # Product Roadmap
 
-Baseline: v5.4.0
+Baseline: v5.5.0
 
 ## Completed
 
@@ -23,15 +23,40 @@ Baseline: v5.4.0
 - [x] Separate urgent property-emergency classification
 - [x] Safe unsupported-question and deferred-Explore fallbacks
 - [x] After-hours window and secure spare-key policy documented
+- [x] Server-side model-powered concierge contract
+- [x] Multilingual and conversational follow-up support
+- [x] Strict structured model output and deterministic safety bypass
+- [x] Privacy-minimized interaction and feedback logging
+- [x] Controlled learning queue with owner approval
+- [x] Private owner learning-review interface
+- [x] Immediate activation and export of owner-approved answers
+- [x] Request rate limiting and 30-day interaction retention
+- [x] Private one-time passport-image upload links tied to a room
+- [x] Guest-friendly TM30 purpose and passport-data treatment explanation
+- [x] Authenticated owner download, immediate deletion and 14-day scheduled cleanup
+- [x] Pending-arrival passport request and manual-reminder queue
 
-## Current priority — v5.4.x Operational Concierge
+## Current priority — v5.5.x Operational Concierge Launch
 
 The concierge must be useful to real guests before further Explore expansion.
 
 - [x] Approved stay-information knowledge file
 - [x] Check-in, room, Wi-Fi, towels, cleaning, keys, house rules and checkout answers
 - [x] Practical, booking, property-emergency and medical-emergency routing
-- [ ] Add new approved guest questions and answers continuously
+- [x] Add new approved guest questions and answers without a code deployment
+- [x] Add unanswered-question reporting without collecting unnecessary guest data
+- [x] Add guest answer feedback and owner review
+- [ ] Configure the production `OPENAI_API_KEY` secret
+- [ ] Configure a strong `CONCIERGE_ADMIN_TOKEN` secret
+- [ ] Configure the recommended `CONCIERGE_HASH_SALT` secret
+- [ ] Deploy v5.5.0 and verify AI mode on guest phones
+- [ ] Establish a regular owner learning-queue review routine
+- [ ] Create the private production R2 passport bucket
+- [ ] Configure `PASSPORT_TOKEN_PEPPER` and the 14-day R2 lifecycle rule
+- [ ] Verify the complete passport flow with a non-sensitive test image
+- [ ] Supply the authoritative TM30 manual-entry field specification
+- [ ] Add the secure manual-details alternative after that specification is approved
+- [ ] Connect an outbound messaging provider for automatic pre-arrival passport reminders
 - [ ] Confirm the dedicated 24/7 property-emergency person and number
 - [ ] Generate private signed links for active stays
 - [ ] Validate each private link against its room and validity period
@@ -41,13 +66,14 @@ The concierge must be useful to real guests before further Explore expansion.
 - [ ] Add protected owner and Su notification recipients
 - [ ] Send one spare-key event alert to every configured recipient
 - [ ] Connect WhatsApp Business Platform if automatic WhatsApp alerts are required
-- [ ] Add unanswered-question reporting without collecting unnecessary guest data
 
 Su and Fah currently use ordinary WhatsApp. The current release therefore uses prefilled human handoff messages; it cannot silently send WhatsApp alerts.
 
 ## Immediate online launch and hardening
 
-- [ ] Push the v5.4.0 release to the existing hosting workflow
+- [ ] Push the v5.5.0 release to the existing hosting workflow
+- [ ] Confirm `/api/concierge/status` reports AI and learning enabled
+- [ ] Verify the protected `/concierge-admin` review workflow
 - [ ] Verify the live room links, including Room 7
 - [ ] Test the concierge on guest phones
 - [ ] Test room persistence and room changes

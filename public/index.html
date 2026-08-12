@@ -95,9 +95,9 @@ a{color:inherit}
   <p>If you have not already provided the required passport information, please complete it before arrival. The House needs it for the required TM30 Immigration accommodation registration.</p>
   <p class="privacy-line">Your document uses a private, room-bound, single-use link. It is not sent through the AI chat or WhatsApp and is automatically deleted 14 days after upload, or sooner after processing.</p>
   <div class="btns">
-    <button class="btn" type="button" data-concierge-prompt="I need my secure passport registration link.">Complete Required Registration</button>
+    <a class="btn" data-private-registration aria-disabled="true">Use Your Private Registration Link</a>
   </div>
-  <p class="privacy-line"><strong>Already received your private link?</strong> Open the message from The House and tap that link to upload securely. Do not send passport details in the concierge chat.</p>
+  <p class="privacy-line" data-private-registration-note><strong>Open the private welcome link sent by The House.</strong> Its registration button opens the secure form directly. Do not send passport details in the concierge chat.</p>
 </section>
 
 <section class="grid">
@@ -123,6 +123,7 @@ a{color:inherit}
 <script src="/module-registry.js"></script>
 <script src="/platform-actions.js"></script>
 <script src="/platform-action-runtime.js"></script>
+<script src="/registration-entry.js"></script>
 <script src="/ai-concierge-config.js"></script>
 <script src="/ai-concierge.js"></script>
 </body></html>

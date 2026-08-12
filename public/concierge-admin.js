@@ -280,7 +280,7 @@
         })
       });
       document.getElementById("passportReminderMessage").value = data.reminderMessage;
-      document.getElementById("passportUploadUrl").value = data.uploadUrl;
+      document.getElementById("passportUploadUrl").value = data.welcomeUrl;
       passportLinkResult.dataset.registrationId = data.id;
       passportLinkResult.hidden = false;
       await loadOverview();

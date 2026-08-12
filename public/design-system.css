@@ -27,7 +27,9 @@ img{max-width:100%}
 
 .shell{
   width:min(1180px,calc(100% - 28px));
+  max-width:none;
   margin:18px auto 40px;
+  padding:0;
 }
 .topbar{
   position:sticky;
@@ -36,6 +38,7 @@ img{max-width:100%}
   display:flex;
   align-items:center;
   justify-content:space-between;
+  flex-wrap:nowrap;
   gap:18px;
   padding:12px 16px;
   border:1px solid rgba(223,231,226,.9);
@@ -44,10 +47,12 @@ img{max-width:100%}
   border-radius:20px;
   box-shadow:0 10px 30px rgba(24,59,52,.08);
 }
+.brand{flex:0 0 auto}
 .brand img{width:180px;display:block}
-.nav{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end}
+.nav{display:flex;flex-wrap:nowrap;gap:8px;justify-content:flex-end;align-items:center}
 .nav a{
   text-decoration:none;
+  margin:0;
   padding:9px 12px;
   border-radius:999px;
   color:var(--green-dark);
@@ -362,7 +367,7 @@ img{max-width:100%}
   .shell{width:min(100% - 18px,1180px);margin-top:9px}
   .topbar{position:static;align-items:flex-start;flex-direction:column}
   .brand img{width:160px}
-  .nav{justify-content:flex-start}
+  .nav{justify-content:flex-start;flex-wrap:wrap}
   .section{padding:20px;border-radius:20px}
   .grid,.explore-grid{grid-template-columns:1fr}
   .explore-card-v2{min-height:390px}
@@ -370,6 +375,11 @@ img{max-width:100%}
   .partner-logo-box{width:130px;height:130px}
   .detail-gallery img{height:300px}
   .feature-list,.detail-meta{grid-template-columns:1fr}
+}
+
+@media(max-width:960px) and (min-width:761px){
+  .topbar{align-items:flex-start;flex-direction:column}
+  .nav{justify-content:flex-start;flex-wrap:wrap}
 }
 
 .float-wa:hover{

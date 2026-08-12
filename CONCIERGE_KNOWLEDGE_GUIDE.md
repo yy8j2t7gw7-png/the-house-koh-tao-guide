@@ -89,7 +89,7 @@ Follow `SECURE_AFTER_HOURS_ACCESS.md` for spare-key access.
 
 Do not place telephone numbers or WhatsApp destinations inside learned answers. Contact actions are generated from protected, deterministic routing configuration.
 
-Passport and TM30 questions may explain the approved purpose and offer a stay-support action to request a private link. Never add an action that accepts passport content inside chat, opens a public upload or asks the guest to send a passport image through WhatsApp. Follow `PASSPORT_DATA_OPERATIONS.md`.
+Passport and TM30 questions may explain the approved purpose and offer the secure registration action only when the private Room welcome link supplied it. Never add a WhatsApp request route, accept passport content inside chat or open an unauthenticated public upload. Follow `PASSPORT_DATA_OPERATIONS.md`.
 
 ## Validation
 

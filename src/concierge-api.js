@@ -13,7 +13,7 @@ import {
 import { handlePassportAdminRequest } from "./passport-api.js";
 import { retrieveApprovedProjectKnowledge } from "./project-knowledge.js";
 
-const RELEASE = "5.6.0";
+const RELEASE = "5.6.1";
 const ROOM_OPTIONS = new Set(["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11"]);
 const MAX_HISTORY_ITEMS = 10;
 const MAX_QUESTION_LENGTH = 800;
@@ -197,6 +197,7 @@ AUTHORITATIVE KNOWLEDGE
 - RETRIEVED APPROVED PROJECT RECORDS contain the most relevant existing activity, restaurant, café, beach, bar and shopping records for this question.
 - When a retrieved record is relevant, use it instead of claiming that no confirmed recommendation exists.
 - When asked for a general recommendation, lead with a record explicitly marked preferredByTheHouse=true. Otherwise choose by the guest's stated constraints and explain the fit without claiming every alternative is inferior.
+- For a Roctopus recommendation, explain only why The House recommends the team: friendly professional service, small groups, personal attention and a welcoming approach for first-time or nervous divers. Leave training systems, certifications, course structures and detailed options to the Roctopus team in the shop unless a later owner-approved answer explicitly changes this rule.
 - Treat hours, prices, availability, schedules and conditions as changeable. Mention verification when the record or question requires current confirmation.
 - The current Bangkok date and time is ${bangkokContext()}.
 - ${roomContext}
@@ -332,13 +333,17 @@ function finalizeResult(result) {
   if (result.needsHuman && handoff === "none") handoff = "stay_support";
   const privateCommercialLanguage = /\b(?:commission(?:able|ed|s)?|referral\s+(?:fee|payment)|revenue\s+share|(?:we|the\s+house)\s+(?:earn|receive|make|take)\s+(?:money|income|a\s+payment|a\s+fee|a\s+percentage)|(?:paid|payment)\s+(?:to|for)\s+(?:us|the\s+house))\b/i;
   const replacesPrivateCommercialLanguage = privateCommercialLanguage.test(result.answer);
-  if (replacesPrivateCommercialLanguage) handoff = "booking";
-  const actions = replacesPrivateCommercialLanguage
+  const replacesRoctopusTechnicalDetail = /\broctopus\b/i.test(result.answer)
+    && /\b(?:padi|raid|certification|training\s+agency)\b/i.test(result.answer);
+  if (replacesPrivateCommercialLanguage || replacesRoctopusTechnicalDetail) handoff = "booking";
+  const actions = replacesPrivateCommercialLanguage || replacesRoctopusTechnicalDetail
     ? actionsForHandoff("booking")
     : (result.actions?.length ? result.actions : actionsForHandoff(handoff));
   const answer = replacesPrivateCommercialLanguage
     ? "Our concierge can help arrange this for you. Use the booking options below and tell us what you need."
-    : result.answer;
+    : replacesRoctopusTechnicalDetail
+      ? "We recommend Roctopus Dive because their friendly, professional team offers small groups, personal attention and a welcoming experience, especially for first-time or nervous divers. Their dive team in the shop will be happy to explain the available options and help you choose what suits you best."
+      : result.answer;
   return { ...result, answer, handoff, actions };
 }
 

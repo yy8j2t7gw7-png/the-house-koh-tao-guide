@@ -127,6 +127,15 @@
 
   function resolveAction(action, question) {
     const context = contextValues(question);
+    if (action.type === "registration") {
+      const href = window.HOUSE_PRIVATE_REGISTRATION_URL || "";
+      return href ? {
+        label: interpolate(action.label, context),
+        href,
+        style: action.style || "",
+        external: false
+      } : null;
+    }
     let href = action.href || routeMap()[action.route] || "";
     if (!href) return null;
     if (action.message && /https:\/\/wa\.me\//i.test(href)) {
@@ -184,6 +193,11 @@
   panel.setAttribute("aria-label", "AI Concierge");
 
   const quickActionsHtml = (cfg.quickActions || []).map((action) => {
+    if (action.type === "registration" && window.HOUSE_PRIVATE_REGISTRATION_URL) {
+      return `<a class="ai-concierge-action" href="${window.HOUSE_PRIVATE_REGISTRATION_URL}">
+        <span aria-hidden="true">${action.icon}</span><span>${action.label}</span>
+      </a>`;
+    }
     if (action.type === "link") {
       return `<a class="ai-concierge-action" href="${action.href}">
         <span aria-hidden="true">${action.icon}</span><span>${action.label}</span>
@@ -516,6 +530,8 @@
     if (actionButton?.dataset.conciergeAction === "contact") {
       appendMessage("concierge", "Tell me what you need. If I cannot resolve it, I will give you the correct human contact option.");
       input.focus();
+    } else if (actionButton?.dataset.conciergeAction === "registration") {
+      appendMessage("concierge", "Please open the private Room welcome link sent by The House. The registration button there opens the secure form directly.");
     }
   });
 

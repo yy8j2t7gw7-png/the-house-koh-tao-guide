@@ -2,19 +2,21 @@
 
 ## Purpose and current scope
 
-The House requires passport information for guest and overnight-visitor TM30 Immigration accommodation registration. v5.6.0 provides a private passport-image workflow and a prominent welcome-page registration entry point so guests do not send the document through the AI Concierge or as a WhatsApp attachment.
+The House requires passport information for guest and overnight-visitor TM30 Immigration accommodation registration. v5.6.1 provides a private passport-image workflow and a prominent welcome-page registration entry point so guests do not send the document through the AI Concierge or as a WhatsApp attachment.
 
 The current authoritative House information confirms the passport-photo requirement. It does not contain the exact structured TM30 field list. The alternative manual-details form must therefore remain disabled until that authoritative field specification is supplied. Do not guess legal or Immigration fields.
 
 ## Guest experience
 
 1. An authorized owner creates a private request in `/concierge-admin`, selecting the room and expected Bangkok arrival time.
-2. The system returns a guest-friendly reminder and a one-time link.
+2. The system returns a guest-friendly reminder and a private Room welcome link.
 3. The link carries its 256-bit token in the URL fragment. Browser fragments are not sent in the initial page request or referrer.
-4. The upload page explains why the passport is needed and how the file is handled before showing the file control.
-5. The guest submits one JPEG, PNG, WebP or HEIC passport image up to 10 MB.
-6. The server validates the link, expiration, single-use state, file size and file signature before private storage.
-7. The link closes after the successful upload.
+4. The Required Guest Registration button on that private welcome page opens the secure one-time registration form directly. It does not open WhatsApp.
+5. The registration page explains why the information is needed and how it is handled, then presents two choices: upload a passport image, or enter the required details securely.
+6. Passport-image upload is active. The guest submits one JPEG, PNG, WebP or HEIC passport image up to 10 MB.
+7. Manual entry remains disabled until the authoritative list of required TM30 fields is supplied. This prevents collection of guessed, unnecessary or incomplete information.
+8. The server validates the link, expiration, single-use state, file size and file signature before private storage.
+9. The link closes after the successful upload.
 
 Create one link per passport image. Do not ask a guest to combine multiple passports into one image.
 

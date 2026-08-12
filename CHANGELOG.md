@@ -2,13 +2,30 @@
 
 All notable changes to The House – Koh Tao guest guide are recorded here.
 
+## v5.6.1 — Roctopus Guest Recommendation Refinement
+
+### Changed
+
+- Simplified the approved Roctopus Dive recommendation to explain only why The House recommends the team: friendly professional service, small groups, personal attention and a welcoming experience, especially for first-time or nervous divers.
+- Leaves course, training-system and certification explanations to the Roctopus dive team in the shop.
+- Expanded direct matching for natural questions such as “Which is the best dive shop?”
+- Changed owner-created passport requests to private Room welcome links. The registration button on that page opens the actual room-bound one-time secure form directly and never opens WhatsApp.
+- Displays the intended two registration choices: passport-image upload is active; manual entry is explicitly held until the authoritative TM30 field list is supplied.
+- Standardized the guest-guide top bar across all pages, including one desktop width, non-wrapping navigation, spacing reset, logo link and navigation order.
+
+### Safety
+
+- Added a final server-side response safeguard that replaces unwanted technical Roctopus wording with the approved concise recommendation before it reaches the guest.
+- Added regression coverage proving the approved answer and safeguard do not expose technical training-system or certification language.
+- Added registration-link regression coverage proving the guest reminder uses the private welcome page, the welcome-page button activates only with a private token and the registration action has no WhatsApp route.
+
 ## v5.6.0 — Full Approved-Knowledge Concierge Integration
 
 ### Added
 
 - Targeted server-side retrieval across the existing approved Activities, Restaurants, Cafés, Beaches, Bars and Shopping datasets.
 - Compact record selection that gives GPT-5.6 the most relevant approved project facts without sending operator contact details or the complete data collection on every request.
-- Direct approved recommendation for Roctopus Dive as The House’s preferred dive school, accurately identifying it as RAID rather than PADI.
+- Direct approved recommendation for Roctopus Dive as The House’s preferred dive school.
 - Direct approved recommendation for Bamboo Beach Bar for a relaxed beachfront sunset in Mae Haad.
 - Prominent Required Guest Registration sections on both the main welcome page and every room-specific welcome page, with TM30 purpose, privacy treatment, 14-day deletion and a concierge action to request the private room-bound upload link.
 - Guest-registration quick action inside the concierge and room-aware secure-link request wording.

@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0.0",
-  "release": "5.6.0",
+  "release": "5.6.1",
   "language": "en",
   "updated": "2026-08-12",
   "scope": "Verified accommodation, room, house-rule, support, booking and emergency answers for guests of The House – Koh Tao.",
@@ -432,13 +432,11 @@
         "tm30 registration",
         "send passport information"
       ],
-      "answer": "Passport information is required for each guest staying at The House so we can complete the required TM30 Immigration accommodation registration. If you have not already provided it, request your private room-bound, single-use link below. The document is not sent through this chat or WhatsApp and is automatically deleted 14 days after upload, or sooner after processing.",
+      "answer": "Passport information is required for each guest staying at The House so we can complete the required TM30 Immigration accommodation registration. Open the private Room welcome link sent by The House and use its registration button to continue securely. Do not send passport information through this chat or WhatsApp. A passport image is automatically deleted 14 days after upload, or sooner after processing.",
       "actions": [
         {
-          "label": "Request My Secure Link",
-          "type": "route",
-          "route": "houseWhatsapp",
-          "message": "Hello, I am staying in {roomLabel} and need my private passport-registration link for the required TM30 registration."
+          "label": "Continue Securely",
+          "type": "registration"
         }
       ]
     },
@@ -456,13 +454,11 @@
         "secure passport link",
         "extra guest"
       ],
-      "answer": "The House needs passport information for every overnight visitor so we can complete the required TM30 Immigration accommodation registration. Please use the private one-time passport link sent by our team. Do not put passport details in this chat or send the image through WhatsApp. If you do not have a link, request one below.",
+      "answer": "The House needs passport information for every overnight visitor so we can complete the required TM30 Immigration accommodation registration. Open the private Room welcome link sent by The House and use its registration button to continue securely. Do not put passport information in this chat or send it through WhatsApp.",
       "actions": [
         {
-          "label": "Request Secure Link",
-          "type": "route",
-          "route": "houseWhatsapp",
-          "message": "Hello, I am staying in {roomLabel} and need a private passport-information link for an overnight visitor."
+          "label": "Continue Securely",
+          "type": "registration"
         }
       ]
     },
@@ -565,14 +561,15 @@
         "which dive school do you recommend",
         "what dive school do you recommend",
         "which diving school do you recommend",
+        "which dive shop do you recommend",
+        "which is the best dive shop",
+        "best dive shop",
         "recommended dive school",
         "best dive school",
         "where should i learn to dive",
-        "why do you recommend roctopus",
-        "is roctopus padi",
-        "is roctopus raid"
+        "why do you recommend roctopus"
       ],
-      "answer": "The House’s preferred dive-school recommendation is Roctopus Dive in Sairee. It is a Dive RAID International centre—not PADI—and publishes a maximum of four divers per instructor or dive leader for its core recreational training and fun-diving programme. We recommend it for personal small-group instruction and its conservation involvement.",
+      "answer": "We recommend Roctopus Dive because their friendly, professional team offers small groups, personal attention and a welcoming experience, especially for first-time or nervous divers. Their dive team in the shop will be happy to explain the available options and help you choose what suits you best.",
       "actions": [
         {
           "label": "View Roctopus",

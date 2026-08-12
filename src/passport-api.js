@@ -263,13 +263,15 @@ export async function handlePassportAdminRequest(request, env, path, store) {
     });
     const origin = new URL(request.url).origin;
     const automaticDeletionDays = retentionDays(env);
+    const welcomeUrl = `${origin}/room/${room}#registration=${token}`;
     return json({
       ok: true,
       id,
       room,
       expiresAt,
+      welcomeUrl,
       uploadUrl: `${origin}/passport-upload#token=${token}`,
-      reminderMessage: `Before arrival, please provide the passport information needed for The House to complete the required TM30 Immigration registration. Use this private one-time link for Room ${room}: ${origin}/passport-upload#token=${token} The document is not sent through the AI chat or WhatsApp and is deleted automatically ${automaticDeletionDays} days after upload, or sooner after processing.`
+      reminderMessage: `Before arrival, please provide the passport information needed for The House to complete the required TM30 Immigration registration. Open your private Room ${room} welcome page and select Complete Required Registration: ${welcomeUrl} Your information is not sent through the AI chat or WhatsApp. A passport image is deleted automatically ${automaticDeletionDays} days after upload, or sooner after processing.`
     });
   }
 

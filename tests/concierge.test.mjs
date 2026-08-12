@@ -171,14 +171,17 @@ test("activity booking uses guest-service wording and the House booking route", 
 test("The House recommendations answer Roctopus and Bamboo directly", async () => {
   const { env } = createEnvironment({ OPENAI_API_KEY: "not-used" });
   const divingResponse = await handleConciergeRequest(
-    guestRequest("Which dive school do you recommend?"),
+    guestRequest("Which is the best dive shop?"),
     env
   );
   const diving = await divingResponse.json();
   assert.equal(diving.source, "approved");
   assert.equal(diving.intentId, "recommended_dive_school");
   assert.match(diving.answer, /Roctopus Dive/);
-  assert.match(diving.answer, /RAID International centre—not PADI/);
+  assert.match(diving.answer, /friendly, professional team/);
+  assert.match(diving.answer, /small groups, personal attention/);
+  assert.match(diving.answer, /dive team in the shop/);
+  assert.doesNotMatch(diving.answer, /\b(?:PADI|RAID|certification|training agency)\b/i);
   assert.equal(diving.actions[0].href, "/activity.html?id=roctopus-dive");
   assert.equal(diving.actions[1].route, "bookingWhatsapp");
 
@@ -256,6 +259,43 @@ test("retrieved approved records are included in GPT-5.6 model context", async (
   }
 });
 
+test("technical Roctopus model wording is replaced with the approved guest answer", async () => {
+  const { env } = createEnvironment({ OPENAI_API_KEY: "test-key" });
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => new Response(JSON.stringify({
+    output: [{
+      type: "message",
+      content: [{
+        type: "output_text",
+        text: JSON.stringify({
+          answer: "Roctopus is a RAID centre rather than a PADI centre.",
+          intent_id: "roctopus_details",
+          category: "booking",
+          confidence: 0.9,
+          needs_human: true,
+          handoff: "booking",
+          learning_gap: false,
+          learning_reason: "none"
+        })
+      }]
+    }]
+  }), { status: 200, headers: { "content-type": "application/json" } });
+  try {
+    const response = await handleConciergeRequest(
+      guestRequest("Tell me more about the certification system used by the dive centre you recommend."),
+      env
+    );
+    const body = await response.json();
+    assert.equal(body.source, "ai");
+    assert.match(body.answer, /friendly, professional team/);
+    assert.match(body.answer, /dive team in the shop/);
+    assert.doesNotMatch(body.answer, /\b(?:PADI|RAID|certification|training agency)\b/i);
+    assert.equal(body.actions[0].route, "bookingWhatsapp");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("required passport registration is a room-aware concierge action", async () => {
   const { env } = createEnvironment({ OPENAI_API_KEY: "not-used" });
   const response = await handleConciergeRequest(
@@ -268,23 +308,33 @@ test("required passport registration is a room-aware concierge action", async ()
   assert.equal(body.category, "stay-support");
   assert.match(body.answer, /TM30 Immigration/);
   assert.match(body.answer, /14 days/);
-  assert.equal(body.actions[0].route, "houseWhatsapp");
+  assert.equal(body.actions[0].type, "registration");
+  assert.equal(body.actions[0].route, undefined);
 });
 
 test("main and room welcome pages make required registration prominent", async () => {
-  const [home, room, canonicalRoom] = await Promise.all([
+  const [home, room, canonicalRoom, registrationEntry, registrationForm] = await Promise.all([
     readFile(new URL("../public/index.html", import.meta.url), "utf8"),
     readFile(new URL("../public/room.html", import.meta.url), "utf8"),
-    readFile(new URL("../public/modules/house/room.html", import.meta.url), "utf8")
+    readFile(new URL("../public/modules/house/room.html", import.meta.url), "utf8"),
+    readFile(new URL("../public/registration-entry.js", import.meta.url), "utf8"),
+    readFile(new URL("../public/passport-upload.html", import.meta.url), "utf8")
   ]);
   [home, room].forEach((html) => {
     assert.match(html, /Required guest registration/);
-    assert.match(html, /Complete Required Registration/);
+    assert.match(html, /Use Your Private Registration Link/);
     assert.match(html, /TM30 Immigration/);
     assert.match(html, /automatically deleted 14 days after upload/);
-    assert.match(html, /data-concierge-prompt="I need my secure passport registration link\."/);
+    assert.match(html, /data-private-registration/);
+    assert.match(html, /src="\/registration-entry\.js"/);
+    assert.doesNotMatch(html, /data-concierge-prompt="I need my secure passport registration link\."/);
     assert.doesNotMatch(html, /href="\/passport-upload(?:\.html)?"/);
   });
+  assert.match(registrationEntry, /`\/passport-upload#token=\$\{token\}`/);
+  assert.match(registrationEntry, /Complete Required Registration/);
+  assert.match(registrationForm, /Option 1 — Upload passport image/);
+  assert.match(registrationForm, /Option 2 — Enter the required details/);
+  assert.match(registrationForm, /exact required TM30 fields/);
   assert.equal(room, canonicalRoom);
 });
 
@@ -420,7 +470,7 @@ test("passport details typed into chat are discarded before answering or learnin
   ), env);
   const body = await response.json();
   assert.equal(body.intentId, "overnight_visitors");
-  assert.match(body.answer, /private one-time passport link/);
+  assert.match(body.answer, /private Room welcome link/);
   assert.equal(store.interactions[0].question, "passport registration");
   assert.doesNotMatch(JSON.stringify(store.interactions[0]), /AB123456|French|1990/);
 });
@@ -479,9 +529,12 @@ test("one-time passport links keep documents outside the concierge and close aft
   }), env, "/api/concierge/admin/passport-links");
   const created = await createResponse.json();
   assert.equal(createResponse.status, 200);
+  assert.match(created.welcomeUrl, /\/room\/7#registration=/);
   assert.match(created.uploadUrl, /\/passport-upload#token=/);
   assert.equal(new URL(created.uploadUrl).search, "");
   assert.match(created.reminderMessage, /TM30 Immigration registration/);
+  assert.match(created.reminderMessage, /private Room 7 welcome page/);
+  assert.doesNotMatch(created.reminderMessage, /\/passport-upload/);
   const token = new URL(created.uploadUrl).hash.replace("#token=", "");
 
   const sessionResponse = await handlePassportGuestRequest(new Request("https://guide.example/api/passport-upload/session", {
@@ -537,4 +590,29 @@ test("one-time passport links keep documents outside the concierge and close aft
     headers: { authorization: `Bearer ${secondToken}` }
   }), env, "/api/passport-upload/session");
   assert.equal(stillUsable.status, 200);
+});
+
+test("every guest page uses the same top navigation", async () => {
+  const { readdir } = await import("node:fs/promises");
+  const publicRoot = new URL("../public/", import.meta.url);
+  const paths = [];
+  async function collect(directory, relative = "") {
+    for (const entry of await readdir(directory, { withFileTypes: true })) {
+      const childRelative = `${relative}${entry.name}`;
+      if (entry.isDirectory()) await collect(new URL(`${entry.name}/`, directory), `${childRelative}/`);
+      else if (entry.isFile() && entry.name.endsWith(".html")) paths.push(childRelative);
+    }
+  }
+  await collect(publicRoot);
+  const expected = '<header class="topbar"><a class="brand" href="/"><img src="/logo.svg" alt="The House Koh Tao"></a><nav class="nav"><a href="/rooms.html">Your Room</a><a href="/house.html">The House</a><a href="/practical.html">Guest Information</a><a href="/explore.html">Explore</a><a href="/emergency.html">Help & Emergency</a><a href="/checkout.html">Departure</a></nav></header>';
+  let checked = 0;
+  for (const path of paths) {
+    const html = await readFile(new URL(path, publicRoot), "utf8");
+    const match = html.match(/<header class="topbar">[\s\S]*?<\/header>/);
+    if (!match) continue;
+    const normalized = match[0].replace(/\s+/g, " ").replace(/> </g, "><");
+    assert.equal(normalized, expected, `Unexpected top navigation in ${path}`);
+    checked += 1;
+  }
+  assert.equal(checked, 41);
 });

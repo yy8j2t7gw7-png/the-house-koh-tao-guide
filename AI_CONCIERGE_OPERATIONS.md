@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The v5.6.0 concierge combines three layers:
+The v5.6.1 concierge combines three layers:
 
 1. Deterministic safety and operational rules for emergencies, lost keys, fees, booking policy and human routing.
 2. Server-side model reasoning over approved House knowledge plus targeted retrieval from the existing Activities, Restaurants, Cafés, Beaches, Bars and Shopping records.
@@ -54,6 +54,7 @@ The core accommodation knowledge is already supplied directly from `public/data/
 6. Test one unknown question, submit negative feedback and confirm that it enters the learning queue.
 7. Edit and approve a safe test answer, then confirm that the concierge uses it immediately.
 8. Verify the passport flow with a non-sensitive test image before requesting any real document.
+9. Confirm the owner-created private Room welcome link activates “Complete Required Registration” and opens the secure form directly without a WhatsApp handoff.
 
 ## Daily learning workflow
 

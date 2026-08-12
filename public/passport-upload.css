@@ -29,6 +29,11 @@ body{margin:0;background:linear-gradient(180deg,#f7f2e8 0,#f3f7f4 100%);color:va
 .passport-status{margin-top:18px;padding:14px 16px;border:1px solid var(--passport-line);border-radius:14px;background:#fff;color:var(--passport-muted);font-weight:800}
 .passport-status.is-error{border-color:#e3b8b5;background:#fff4f3;color:var(--passport-danger)}
 .passport-status.is-success{border-color:#a9d1c1;background:#edf9f3;color:var(--passport-accent)}
+.registration-methods{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:14px}
+.registration-method{display:grid;gap:5px;padding:16px;border:1px solid var(--passport-line);border-radius:16px}
+.registration-method span{color:var(--passport-muted);font-size:13px;line-height:1.45}
+.registration-method.is-available{border-color:#98c7b4;background:var(--passport-soft)}
+.registration-method.is-pending{background:#f7f7f5;opacity:.76}
 #passportForm{margin-top:14px}
 .passport-session{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
 .passport-session span{padding:10px;border:1px solid var(--passport-line);border-radius:12px;background:#fff;color:var(--passport-muted);font-size:12px;font-weight:800}
@@ -45,4 +50,5 @@ body{margin:0;background:linear-gradient(180deg,#f7f2e8 0,#f3f7f4 100%);color:va
   .passport-shell{width:min(100% - 18px,760px);padding-top:10px}
   .passport-card{border-radius:22px}
   .passport-session{grid-template-columns:1fr}
+  .registration-methods{grid-template-columns:1fr}
 }

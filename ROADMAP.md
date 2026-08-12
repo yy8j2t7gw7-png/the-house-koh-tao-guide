@@ -1,6 +1,6 @@
 # Product Roadmap
 
-Baseline: v5.6.0
+Baseline: v5.6.1
 
 ## Completed
 
@@ -20,6 +20,8 @@ Baseline: v5.6.0
 - [x] Existing approved Activities, Restaurants, Cafés, Beaches, Bars and Shopping data connected to the AI Concierge
 - [x] Roctopus Dive and Bamboo Beach Bar preferred recommendations available as direct approved answers
 - [x] Required passport registration made prominent on main and room-specific welcome pages
+- [x] Private Room welcome link opens the room-bound secure registration form directly without a WhatsApp handoff
+- [x] Registration page presents image-upload and manual-entry choices without activating unverified fields
 - [x] Working structured Concierge v1 question-and-answer engine
 - [x] Room-aware concierge context and room selection
 - [x] Room 7 added downstairs below Rooms 5 and 6
@@ -40,7 +42,7 @@ Baseline: v5.6.0
 - [x] Authenticated owner download, immediate deletion and 14-day scheduled cleanup
 - [x] Pending-arrival passport request and manual-reminder queue
 
-## Current priority — v5.5.x Operational Concierge Launch
+## Current priority — v5.6.x Operational Concierge Launch
 
 The concierge must be useful to real guests before further Explore expansion.
 
@@ -77,7 +79,7 @@ Su and Fah currently use ordinary WhatsApp. The current release therefore uses p
 
 - [x] Push the v5.5.0 release to the existing hosting workflow
 - [x] Confirm `/api/concierge/status` reports AI and learning enabled
-- [ ] Deploy v5.6.0 and confirm live recommendations, booking wording and registration entry point
+- [ ] Deploy v5.6.1 and confirm live recommendations, booking wording and registration entry point
 - [ ] Verify the protected `/concierge-admin` review workflow
 - [ ] Verify the live room links, including Room 7
 - [ ] Test the concierge on guest phones

@@ -119,7 +119,7 @@ Public interface rules:
 
 ## Current baseline
 
-Current release: v5.6.0.
+Current release: v5.6.1.
 
 Completed content modules:
 

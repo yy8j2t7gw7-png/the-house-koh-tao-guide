@@ -1,4 +1,4 @@
-# Guest Guide Platform with AI Concierge — The House v5.6.0
+# Guest Guide Platform with AI Concierge — The House v5.6.1
 
 The House – Koh Tao guest guide is a production-oriented, mobile-first digital guest guide and concierge platform. It combines property information, curated island guidance, structured place and activity data, and centralized contact and booking routes.
 
@@ -18,12 +18,17 @@ The House – Koh Tao guest guide is a production-oriented, mobile-first digital
 
 The Activities module contains 49 structured profiles covering diving, freediving, snorkelling, boat trips, beach experiences, kayaking, paddleboarding, hiking, viewpoints, climbing, yoga, Muay Thai, massage, cooking, wildlife, photography, night activities and rainy-day options.
 
-## v5.6.0 release focus
+## v5.6.1 release focus
 
 - Connects the server-side concierge to targeted records from all existing approved Activities, Restaurants, Cafés, Beaches, Bars and Shopping data.
-- Adds direct approved answers identifying Roctopus Dive as The House’s preferred dive-school recommendation and Bamboo Beach Bar as the recommended relaxed beachfront-sunset choice.
+- Adds a concise approved Roctopus Dive recommendation focused on why The House recommends the team: friendly professional service, small groups, personal attention and a welcoming experience. Diving details are left to the team in the shop.
+- Retains Bamboo Beach Bar as the direct approved relaxed beachfront-sunset recommendation.
+- Adds a final server-side safeguard that replaces technical Roctopus wording in general recommendations with the approved guest-facing answer.
+- Standardizes the desktop top bar across every guest page so legacy page CSS no longer changes its width, spacing or navigation wrapping.
 - Raises the configured GPT-5.6 reasoning effort from low to medium while limiting retrieval to the most relevant records for cost control.
-- Adds a prominent Required Guest Registration section to the main and room-specific welcome pages, plus a concierge quick action for requesting a private room-bound passport link.
+- Adds a prominent Required Guest Registration section to the main and room-specific welcome pages, plus a concierge action that uses the active private room-bound registration link.
+- Makes the private Room welcome link activate the registration button directly, so guests continue to the secure one-time form rather than opening WhatsApp.
+- Presents both intended registration choices on the secure page: passport-image upload is active; secure manual entry remains visibly pending until the authoritative TM30 field list is supplied.
 - Removes private commercial terminology from every guest-facing booking answer and adds a server-side disclosure guard.
 - Adds a protected server-side OpenAI Responses API integration using strict structured output.
 - Gives the model all approved accommodation knowledge while retaining deterministic safety rules and an on-device fallback engine.
@@ -101,7 +106,7 @@ Su and the owners currently use ordinary WhatsApp. Automatic server-sent spare-k
 
 ## Secure passport information
 
-Owners can create a room-bound, expiring, single-use link from `/concierge-admin` when required passport information was not supplied before arrival. The guest page explains that the document is needed for TM30 Immigration accommodation registration and explains the privacy controls before accepting an image.
+Owners can create a room-bound, expiring, single-use private Room welcome link from `/concierge-admin` when required passport information was not supplied before arrival. Its registration button opens the secure form directly. The form explains that the information is needed for TM30 Immigration accommodation registration and explains the privacy controls before accepting an image.
 
 Passport images never enter the AI chat, model prompts, learning queue, WhatsApp messages or public site. They are stored in the private `PASSPORT_UPLOADS` R2 binding and can be downloaded only through the authenticated owner API. The main retention policy is 14 days after upload, with immediate deletion available and a daily application cleanup reinforcing the R2 lifecycle rule.
 

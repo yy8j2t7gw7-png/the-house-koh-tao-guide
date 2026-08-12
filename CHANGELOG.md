@@ -2,6 +2,22 @@
 
 All notable changes to The House – Koh Tao guest guide are recorded here.
 
+## v5.5.1 — Guest-Facing Booking Language Privacy
+
+### Fixed
+
+- Replaced internal commercial terminology in deterministic booking answers with concise guest-service wording.
+- Added an explicit AI instruction never to discuss internal commercial arrangements, referral terms, revenue or how The House may benefit from a booking.
+- Added a final server-side disclosure guard covering deterministic, AI-generated and owner-approved answers.
+- Renamed public routing metadata to `conciergeBookings` and removed private commercial terminology from public configuration and project documentation.
+- Added automated regression coverage proving that an unsafe model answer is replaced before it reaches a guest.
+
+### Unchanged
+
+- **Book with Us** and **Call Us** continue to route booking enquiries to +66 96 274 1424.
+- Routine stay support continues to route to Su at +66 64 097 3491.
+- AI, controlled learning, passport privacy, 14-day passport retention and secure spare-key boundaries are unchanged.
+
 ## v5.5.0 — Model-Powered Concierge & Controlled Learning
 
 ### Added
@@ -88,14 +104,14 @@ All notable changes to The House – Koh Tao guest guide are recorded here.
 
 ### Changed
 
-- Kept commissionable activities and services on Fah’s separate booking route at +66 96 274 1424.
+- Kept House-arranged activities and services on Fah’s separate booking route at +66 96 274 1424.
 - Updated Practical Information and Help & Emergency wording to distinguish routine stay support from bookings.
 - Centralized the Departure support link through `houseSupport` instead of a hard-coded number.
 - Updated package, module registry and activity release metadata to v5.3.5.
 
 ### Validation policy
 
-- Release validation now treats Su’s stay-support route and Fah’s commissionable-booking route as separate invariants.
+- Release validation now treats Su’s stay-support route and Fah’s House-arranged booking route as separate invariants.
 
 ## v5.3.4 — Governance & Booking Policy Hardening
 
@@ -103,7 +119,7 @@ All notable changes to The House – Koh Tao guest guide are recorded here.
 
 - Permanent project documentation: project rules, roadmap, changelog, development guidelines, project brief, AI concierge principles and handover prompt.
 - `TRANSPORT_RESEARCH_REQUIREMENTS.md` defining the authoritative research needed for v5.4.0.
-- Reusable `concierge-booking.js` utility for commissionable-service WhatsApp and telephone routes.
+- Reusable `concierge-booking.js` utility for House-arranged service WhatsApp and telephone routes.
 - Structured concierge-booking policy metadata for Shopping & Essentials.
 
 ### Changed

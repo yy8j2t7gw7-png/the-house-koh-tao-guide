@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0.0",
-  "release": "5.5.0",
+  "release": "5.5.1",
   "language": "en",
   "updated": "2026-08-12",
   "scope": "Verified accommodation, room, house-rule, support, booking and emergency answers for guests of The House – Koh Tao.",
@@ -60,7 +60,7 @@
     },
     "booking": {
       "category": "booking",
-      "answer": "Our booking team can help with commissionable activities and services. Use the booking button below and tell us what you would like to arrange.",
+      "answer": "Our concierge can help arrange activities and services for you. Use the booking button below and tell us what you would like to arrange.",
       "actions": [
         {
           "label": "Book with Us",
@@ -546,7 +546,7 @@
         "book a boat trip",
         "activity reservation"
       ],
-      "answer": "Commissionable activities should be booked through The House. Our booking team can check availability and help coordinate the reservation.",
+      "answer": "We can help arrange the activity for you. Use Book with Us and tell us your preferred date, number of guests and any specific requirements.",
       "actions": [
         {
           "label": "Book with Us",

@@ -68,7 +68,7 @@ Medical or personal emergencies must remain separate from property emergencies a
 
 ## Global booking policy
 
-All commissionable activities and services marked for concierge booking must route public booking enquiries through The House.
+All activities and services marked for House-arranged booking must route public booking enquiries through The House.
 
 Internal booking contact:
 
@@ -81,12 +81,13 @@ Public interface rules:
 
 - Generic labels such as “Book with Us”, “Call Us” and “WhatsApp Us” are approved.
 - Fah does not need to be named publicly.
+- Never discuss internal commercial arrangements, referral terms, revenue or how The House may benefit from a booking in guest-facing content.
 - Every booking call or WhatsApp action must use Fah’s number above.
 - Never use “Book Direct”, “Call Operator”, “Contact Operator” or equivalent direct-booking actions.
 - Do not expose an operator telephone number, website or social channel as a booking action for records marked `the-house-concierge`.
 - Operator details may remain in structured data for verification and internal AI context.
-- Apply this rule to future tours, charters, transfers, rentals and other commissionable services unless explicitly overridden.
-- Do not send commissionable booking requests to Su’s stay-support route.
+- Apply this rule to future tours, charters, transfers, rentals and other House-arranged services unless explicitly overridden.
+- Do not send House-arranged booking requests to Su’s stay-support route.
 
 ## UX
 
@@ -118,7 +119,7 @@ Public interface rules:
 
 ## Current baseline
 
-Current release: v5.5.0.
+Current release: v5.5.1.
 
 Completed content modules:
 

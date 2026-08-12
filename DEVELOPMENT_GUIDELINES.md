@@ -51,9 +51,9 @@ Do not force or invent fields unsupported by authoritative research.
 Use `public/contacts.js` as the source of truth for both contact channels:
 
 - `houseSupport` is Su’s route for fresh towels, room cleaning, lost keys, room supplies and other requirements related to the guest’s stay.
-- `bookings` is Fah’s route for commissionable activities and services.
+- `bookings` is Fah’s route for activities and services arranged through The House.
 
-Public support labels may remain generic. Do not point routine stay-support actions at `bookings`, and do not point commissionable booking actions at `houseSupport`.
+Public support labels may remain generic. Do not point routine stay-support actions at `bookings`, and do not point House-arranged booking actions at `houseSupport`. Guest-facing content must not discuss internal commercial arrangements, referral terms or revenue.
 
 The target AI architecture should let the concierge conduct routine stay-support conversations end-to-end before handing operational work or escalation to Su.
 
@@ -114,7 +114,8 @@ A coherent release must:
 - validate JSON and JavaScript
 - validate root/module copy parity
 - validate public booking destinations and prohibited direct-booking actions
-- validate that stay-support routes resolve only to Su and commissionable booking routes resolve only to Fah
+- validate that stay-support routes resolve only to Su and House-arranged booking routes resolve only to Fah
+- validate that guest-facing booking answers contain no private commercial terminology
 - validate concierge intent matching, room context and safe fallbacks
 - run `npm test` for protected routing, model-contract, learning and privacy coverage
 - verify owner-approved knowledge works without a deployment and that feedback cannot reference a missing interaction

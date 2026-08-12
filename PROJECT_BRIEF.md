@@ -20,7 +20,7 @@ The product should feel like a competent hotel concierge in a guest’s pocket, 
 
 ### Current state
 
-Current release: v5.5.0.
+Current release: v5.5.1.
 
 Existing content areas:
 
@@ -34,15 +34,17 @@ Existing content areas:
 
 Activities cover diving, freediving, snorkelling, boat trips, beach experiences, kayaking, SUP, hiking, viewpoints, rock climbing, yoga, Muay Thai, massage, cooking, wildlife, photography, night activities and rainy-day options.
 
-### Commercial booking rule
+### Concierge booking rule
 
-Commissionable activities and services marked for concierge booking must use The House booking routes. Public labels may be generic. The underlying booking telephone and WhatsApp number must be +66 96 274 1424, which is managed by Fah.
+Activities and services marked for House-arranged booking must use The House booking routes. Public labels may be generic. The underlying booking telephone and WhatsApp number must be +66 96 274 1424, which is managed by Fah.
+
+Guest-facing content must never discuss internal commercial arrangements, referral terms, revenue or how The House may benefit from a booking.
 
 Operator-direct booking should not be promoted in the public UI for those records.
 
 ### Stay-support rule
 
-Routine stay requirements—including fresh towels, room cleaning, lost keys or lockouts, room supplies and room problems—route to Su at +66 64 097 3491. They must not be sent to Fah’s commissionable-booking route.
+Routine stay requirements—including fresh towels, room cleaning, lost keys or lockouts, room supplies and room problems—route to Su at +66 64 097 3491. They must not be sent to Fah’s booking route.
 
 The future AI Concierge should fully handle these routine support conversations, using Su as the human handoff for operational action or escalation.
 

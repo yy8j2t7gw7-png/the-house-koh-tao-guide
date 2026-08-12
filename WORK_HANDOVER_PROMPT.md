@@ -21,7 +21,7 @@ Understand the existing architecture before modifying it.
 
 ## Current baseline
 
-The current release is v5.5.0. Completed modules include House Information, Restaurants, Cafés, Beaches, Bars & Nightlife, Shopping & Essentials, Activities & Experiences, and the hybrid room-aware AI Concierge with deterministic safety fallback and controlled owner-reviewed learning.
+The current release is v5.5.1. Completed modules include House Information, Restaurants, Cafés, Beaches, Bars & Nightlife, Shopping & Essentials, Activities & Experiences, and the hybrid room-aware AI Concierge with deterministic safety fallback and controlled owner-reviewed learning.
 
 Do not regress or replace completed modules.
 
@@ -31,7 +31,7 @@ Uploaded Deep Research is the authoritative factual source. Do not conduct new r
 
 ## Critical booking rule
 
-All commissionable activities and services marked for concierge booking must route enquiries through The House using +66 96 274 1424 for telephone and WhatsApp. Fah manages the booking number internally, but public buttons may use generic labels such as “Book with Us” and “Call Us”.
+All activities and services marked for House-arranged booking must route enquiries through The House using +66 96 274 1424 for telephone and WhatsApp. Fah manages the booking number internally, but public buttons may use generic labels such as “Book with Us” and “Call Us”. Guest-facing answers must never discuss internal commercial arrangements, referral terms, revenue or how The House may benefit from a booking.
 
 Never expose direct operator booking actions for those records.
 
@@ -57,7 +57,7 @@ Major water leaks, flooding, dangerous electrical problems and serious property 
 
 Su and Fah currently use ordinary WhatsApp. Automatic server-sent notifications require a future WhatsApp Business Platform integration. The current release uses prefilled human handoff messages.
 
-v5.5.0 includes a separate private passport-image flow for required TM30 guest registration. Read `PASSPORT_DATA_OPERATIONS.md`. It requires a private R2 bucket and `PASSPORT_TOKEN_PEPPER` before production activation. Passport content must never enter the model, learning queue, public assets or WhatsApp. The manual-details alternative is intentionally blocked until the authoritative TM30 field list is supplied.
+v5.5.1 includes a separate private passport-image flow for required TM30 guest registration. Read `PASSPORT_DATA_OPERATIONS.md`. It requires a private R2 bucket and `PASSPORT_TOKEN_PEPPER` before production activation. Passport content must never enter the model, learning queue, public assets or WhatsApp. The manual-details alternative is intentionally blocked until the authoritative TM30 field list is supplied.
 
 ## Development method
 

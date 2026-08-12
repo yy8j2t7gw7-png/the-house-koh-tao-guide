@@ -1,4 +1,4 @@
-# Guest Guide Platform with AI Concierge — The House v5.5.0
+# Guest Guide Platform with AI Concierge — The House v5.5.1
 
 The House – Koh Tao guest guide is a production-oriented, mobile-first digital guest guide and concierge platform. It combines property information, curated island guidance, structured place and activity data, and centralized contact and booking routes.
 
@@ -18,8 +18,9 @@ The House – Koh Tao guest guide is a production-oriented, mobile-first digital
 
 The Activities module contains 49 structured profiles covering diving, freediving, snorkelling, boat trips, beach experiences, kayaking, paddleboarding, hiking, viewpoints, climbing, yoga, Muay Thai, massage, cooking, wildlife, photography, night activities and rainy-day options.
 
-## v5.5.0 release focus
+## v5.5.1 release focus
 
+- Removes private commercial terminology from every guest-facing booking answer and adds a server-side disclosure guard.
 - Adds a protected server-side OpenAI Responses API integration using strict structured output.
 - Gives the model all approved accommodation knowledge while retaining deterministic safety rules and an on-device fallback engine.
 - Supports natural guest phrasing, multilingual answers and short contextual follow-up conversations.
@@ -68,7 +69,7 @@ The concierge answers first. When human action is required, it prepares a room-a
 
 ## Booking routing
 
-Commissionable activities and services marked for concierge booking must use the centralized The House booking route:
+Activities and services marked for House-arranged booking must use the centralized The House booking route:
 
 - Telephone URI: `+66962741424`
 - WhatsApp: `https://wa.me/66962741424`
@@ -76,7 +77,9 @@ Commissionable activities and services marked for concierge booking must use the
 
 The public interface does not need to name Fah or Su. Generic labels such as **Book with Us**, **Contact Us** and **Call Us** are approved. Direct operator booking, call, website or social CTAs must not be shown for records marked `the-house-concierge`.
 
-Stay-support requests must never be sent to the booking number, and commissionable bookings must never be sent to the stay-support number.
+Guest-facing answers must never discuss internal commercial arrangements, referral terms, revenue or how The House may benefit from a booking.
+
+Stay-support requests must never be sent to the booking number, and House-arranged bookings must never be sent to the stay-support number.
 
 ## Urgent property emergencies
 

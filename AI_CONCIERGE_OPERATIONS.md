@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The v5.5.0 concierge combines three layers:
+The v5.5.1 concierge combines three layers:
 
 1. Deterministic safety and operational rules for emergencies, lost keys, fees, booking policy and human routing.
 2. Server-side model reasoning over approved House knowledge for natural language, multilingual questions and conversational follow-ups.
@@ -90,7 +90,8 @@ Guests are told not to enter passport, payment or key-box information in the con
 - No key-box code or protected token enters the model prompt or learning store.
 - Lost-key handling always includes the 500 THB replacement fee.
 - Property and medical emergencies bypass generative answers when a protected intent is detected.
-- Commissionable bookings always route through The House booking contact.
+- House-arranged bookings always route through The House booking contact.
+- Guest answers never discuss internal commercial arrangements, referral terms or revenue.
 - Routine stay requests always use House support.
 - Model-produced links and telephone numbers are never trusted; guest action buttons are generated only from centralized application routes.
 - When approved facts are missing, the correct output is uncertainty plus a human handoff—not an invented answer.

@@ -56,7 +56,7 @@ window.HOUSE_GUIDE = {
         "room concerns"
       ]
     },
-    commissionableBookings: {
+    conciergeBookings: {
       contactKey: "bookings",
       currentHandler: "Fah",
       intents: [
@@ -66,7 +66,7 @@ window.HOUSE_GUIDE = {
         "private transfers",
         "ferry tickets",
         "tours",
-        "other commissionable services"
+        "other House-arranged services"
       ]
     },
     propertyEmergency: {

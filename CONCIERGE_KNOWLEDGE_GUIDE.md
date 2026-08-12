@@ -68,7 +68,7 @@ Supported route keys include:
 ## Routing rules
 
 - Routine stay requests are handled by the concierge first and handed to Su only when a person must act.
-- Commissionable bookings hand off to Fah.
+- House-arranged bookings hand off to the booking contact.
 - Urgent property problems use the separate property-emergency role.
 - Medical or personal emergencies use the verified emergency routes.
 - Explore recommendations remain outside the live question engine until their answers are explicitly prepared and approved.

@@ -46,7 +46,7 @@ This specification defines the authoritative research required before the deferr
 - Booking lead time
 - Current price basis where verified
 - Cancellation and delay handling
-- Commissionability and The House booking route
+- The House booking route, where applicable
 
 ### Scooter rental
 
@@ -59,7 +59,7 @@ This specification defines the authoritative research required before the deferr
 - Current price basis and rental period
 - Delivery and pickup
 - Breakdown and accident procedure
-- Commissionability and The House booking route
+- The House booking route, where applicable
 
 ### Road safety
 
@@ -102,7 +102,7 @@ This specification defines the authoritative research required before the deferr
 - accessibility
 - payment methods
 - phone, website, social and map links for internal verification
-- booking policy and commissionability
+- booking policy and House-arranged booking status
 - safety notes
 - last verified date
 - primary official sources
@@ -120,7 +120,7 @@ This specification defines the authoritative research required before the deferr
 
 ## Booking routing requirement
 
-Every commissionable transport or rental record must identify whether it uses `the-house-concierge`. Public booking calls and messages for those records must route to +66 96 274 1424. Generic public labels such as “Book with Us” and “Call Us” are approved.
+Every transport or rental record must identify whether it uses `the-house-concierge`. Public booking calls and messages for those records must route to +66 96 274 1424. Generic public labels such as “Book with Us” and “Call Us” are approved.
 
 ## Delivery format
 

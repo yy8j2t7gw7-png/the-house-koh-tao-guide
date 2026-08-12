@@ -1,6 +1,6 @@
 # Product Roadmap
 
-Baseline: v5.5.0
+Baseline: v5.5.1
 
 ## Completed
 
@@ -15,7 +15,8 @@ Baseline: v5.5.0
 - [x] Permanent project governance documents
 - [x] Centralized concierge booking links and generic public labels
 - [x] Public scooter-rental booking routed through The House
-- [x] Stay support routed to Su and commissionable bookings routed to Fah
+- [x] Stay support routed to Su and House-arranged bookings routed to Fah
+- [x] Private commercial terminology removed from guest-facing booking answers
 - [x] Working structured Concierge v1 question-and-answer engine
 - [x] Room-aware concierge context and room selection
 - [x] Room 7 added downstairs below Rooms 5 and 6
@@ -46,13 +47,13 @@ The concierge must be useful to real guests before further Explore expansion.
 - [x] Add new approved guest questions and answers without a code deployment
 - [x] Add unanswered-question reporting without collecting unnecessary guest data
 - [x] Add guest answer feedback and owner review
-- [ ] Configure the production `OPENAI_API_KEY` secret
-- [ ] Configure a strong `CONCIERGE_ADMIN_TOKEN` secret
-- [ ] Configure the recommended `CONCIERGE_HASH_SALT` secret
-- [ ] Deploy v5.5.0 and verify AI mode on guest phones
+- [x] Configure the production `OPENAI_API_KEY` secret
+- [x] Configure a strong `CONCIERGE_ADMIN_TOKEN` secret
+- [x] Configure the recommended `CONCIERGE_HASH_SALT` secret
+- [x] Deploy v5.5.0 and verify AI mode on a live room page
 - [ ] Establish a regular owner learning-queue review routine
-- [ ] Create the private production R2 passport bucket
-- [ ] Configure `PASSPORT_TOKEN_PEPPER` and the 14-day R2 lifecycle rule
+- [x] Create the private production R2 passport bucket
+- [x] Configure `PASSPORT_TOKEN_PEPPER` and the 14-day R2 lifecycle rule
 - [ ] Verify the complete passport flow with a non-sensitive test image
 - [ ] Supply the authoritative TM30 manual-entry field specification
 - [ ] Add the secure manual-details alternative after that specification is approved
@@ -71,8 +72,9 @@ Su and Fah currently use ordinary WhatsApp. The current release therefore uses p
 
 ## Immediate online launch and hardening
 
-- [ ] Push the v5.5.0 release to the existing hosting workflow
-- [ ] Confirm `/api/concierge/status` reports AI and learning enabled
+- [x] Push the v5.5.0 release to the existing hosting workflow
+- [x] Confirm `/api/concierge/status` reports AI and learning enabled
+- [ ] Deploy v5.5.1 and confirm the live booking answer uses only guest-service wording
 - [ ] Verify the protected `/concierge-admin` review workflow
 - [ ] Verify the live room links, including Room 7
 - [ ] Test the concierge on guest phones

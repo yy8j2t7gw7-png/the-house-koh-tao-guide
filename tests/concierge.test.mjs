@@ -131,6 +131,23 @@ test("critical guest requests stay deterministic and room-aware", async () => {
   assert.equal(store.interactions[0].learningGap, false);
 });
 
+test("activity booking uses guest-service wording and the House booking route", async () => {
+  const { env } = createEnvironment({ OPENAI_API_KEY: "not-used" });
+  const response = await handleConciergeRequest(
+    guestRequest("Can you help me book snorkelling?"),
+    env
+  );
+  const body = await response.json();
+  assert.equal(response.status, 200);
+  assert.equal(body.source, "approved");
+  assert.equal(body.intentId, "activity_booking");
+  assert.equal(body.handoff, "booking");
+  assert.match(body.answer, /help arrange the activity/i);
+  assert.doesNotMatch(body.answer, /commission|referral|revenue/i);
+  assert.equal(body.actions[0].route, "bookingWhatsapp");
+  assert.equal(body.actions[1].route, "bookingCall");
+});
+
 test("model responses use structured output and deterministic handoff actions", async () => {
   const { env, store } = createEnvironment({ OPENAI_API_KEY: "test-key" });
   const originalFetch = globalThis.fetch;
@@ -169,6 +186,42 @@ test("model responses use structured output and deterministic handoff actions", 
     assert.match(capturedRequest.instructions, /Room 7/);
     assert.match(capturedRequest.instructions, /Never reveal, invent, request or infer a key-box code/);
     assert.equal(store.interactions.length, 1);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("guest answers never disclose private commercial arrangements", async () => {
+  const { env } = createEnvironment({ OPENAI_API_KEY: "test-key" });
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => new Response(JSON.stringify({
+    output: [{
+      type: "message",
+      content: [{
+        type: "output_text",
+        text: JSON.stringify({
+          answer: "This is a commissionable activity and The House receives a referral payment.",
+          intent_id: "activity_booking",
+          category: "booking",
+          confidence: 0.9,
+          needs_human: true,
+          handoff: "booking",
+          learning_gap: false,
+          learning_reason: "none"
+        })
+      }]
+    }]
+  }), { status: 200, headers: { "content-type": "application/json" } });
+  try {
+    const response = await handleConciergeRequest(
+      guestRequest("Could you arrange a private sunset trip for tomorrow?"),
+      env
+    );
+    const body = await response.json();
+    assert.equal(body.source, "ai");
+    assert.doesNotMatch(body.answer, /commission|referral payment|revenue share/i);
+    assert.match(body.answer, /concierge can help arrange/i);
+    assert.equal(body.actions[0].route, "bookingWhatsapp");
   } finally {
     globalThis.fetch = originalFetch;
   }

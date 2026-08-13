@@ -31,7 +31,7 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-vis
 .concierge-admin-toolbar strong,.concierge-admin-toolbar span{display:block}
 .concierge-admin-toolbar span{margin-top:3px;color:var(--admin-muted);font-size:13px}
 .concierge-admin-toolbar-actions{display:flex;flex-wrap:wrap;gap:8px}
-.concierge-admin-stats{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px;margin-bottom:18px}
+.concierge-admin-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:18px}
 .concierge-admin-stat{padding:18px;border:1px solid var(--admin-line);border-radius:18px;background:#fff}
 .concierge-admin-stat strong{display:block;font-size:28px}
 .concierge-admin-stat span{color:var(--admin-muted);font-size:13px}
@@ -63,8 +63,9 @@ th,td{padding:12px;border-bottom:1px solid var(--admin-line);text-align:left;ver
 th{background:var(--admin-soft);font-size:11px;text-transform:uppercase;letter-spacing:.05em}
 tr:last-child td{border-bottom:0}
 .concierge-admin-result{white-space:nowrap}
-.concierge-admin-registration-form{display:grid;grid-template-columns:.7fr 1.4fr .8fr auto;align-items:end;gap:10px;padding:16px;border:1px solid var(--admin-line);border-radius:17px;background:var(--admin-soft)}
+.concierge-admin-registration-form{display:grid;grid-template-columns:.7fr 1.4fr .8fr 1.2fr auto;align-items:end;gap:10px;padding:16px;border:1px solid var(--admin-line);border-radius:17px;background:var(--admin-soft)}
 .concierge-admin-registration-form input,.concierge-admin-registration-form select{width:100%;box-sizing:border-box;padding:11px;border:1px solid var(--admin-line);border-radius:11px;background:#fff;color:var(--admin-ink);font:inherit}
+.concierge-admin-confirm{display:flex;align-items:center;gap:8px;min-height:44px;font-size:12px;font-weight:800}.concierge-admin-confirm input{width:auto}
 .concierge-admin-link-result{display:grid;gap:8px;margin-top:12px;padding:16px;border:1px solid #b7d5c8;border-radius:17px;background:#edf8f2}
 .concierge-admin-link-result label{font-size:12px;font-weight:900}
 .concierge-admin-link-result textarea,.concierge-admin-link-result input{box-sizing:border-box;width:100%;padding:11px;border:1px solid var(--admin-line);border-radius:11px;background:#fff;color:var(--admin-ink);font:inherit}
@@ -75,6 +76,15 @@ tr:last-child td{border-bottom:0}
 .concierge-admin-registration-item strong,.concierge-admin-registration-item span{display:block}
 .concierge-admin-registration-item span{margin-top:4px;color:var(--admin-muted);font-size:12px;line-height:1.4}
 .concierge-admin-source-note{margin-top:16px!important;padding-top:14px;border-top:1px solid var(--admin-line);font-size:12px}
+.concierge-admin-config-status{display:inline-flex;align-items:center;padding:7px 10px;border-radius:999px;font-size:12px;font-weight:900}
+.concierge-admin-config-status.is-ready{background:#e3f4eb;color:#1e654c}
+.concierge-admin-config-status.is-missing{background:#fff0df;color:#8b4d15}
+.concierge-admin-alert{padding:17px;border:1px solid var(--admin-line);border-left:5px solid #b98531;border-radius:17px;background:var(--admin-soft)}
+.concierge-admin-alert.is-critical{border-left-color:#b52f2b;background:#fff5f3}
+.concierge-admin-alert.is-urgent{border-left-color:#d06c24;background:#fff8ef}
+.concierge-admin-alert-summary{margin:8px 0;color:var(--admin-ink);font-weight:700;line-height:1.45}
+.concierge-admin-alert-time,.concierge-admin-alert-escalation{display:block;color:var(--admin-muted);font-size:12px;line-height:1.45}
+.concierge-admin-alert-escalation{margin-top:4px;color:var(--admin-danger);font-weight:800}
 @media(max-width:760px){
   .concierge-admin-shell{width:min(100% - 20px,1180px);padding-top:12px}
   .concierge-admin-header{align-items:flex-start;gap:14px}

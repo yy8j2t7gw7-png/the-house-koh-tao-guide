@@ -1,6 +1,6 @@
 # Product Roadmap
 
-Baseline: v5.7.0
+Baseline: v5.8.1
 
 ## Completed
 
@@ -19,6 +19,8 @@ Baseline: v5.7.0
 - [x] Private commercial terminology removed from guest-facing booking answers
 - [x] Existing approved Activities, Restaurants, Cafés, Beaches, Bars and Shopping data connected to the AI Concierge
 - [x] Roctopus Dive and Bamboo Beach Bar preferred recommendations available as direct approved answers
+- [x] Bamboo Beach Bar website follow-ups return its official Facebook and Instagram actions
+- [x] Concierge loading state uses a quiet animated-dot indicator
 - [x] Required passport registration made prominent on main and room-specific welcome pages
 - [x] Private Room welcome link opens the room-bound secure registration form directly without a WhatsApp handoff
 - [x] Registration page presents image-upload and manual-entry choices without activating unverified fields
@@ -44,8 +46,14 @@ Baseline: v5.7.0
 - [x] Seven-language operational guest interface across welcome, rooms, House information, practical information, emergencies, departure, secure registration and AI Concierge
 - [x] Reviewed multilingual safety, passport and operational controls
 - [x] Protected approved-content translation cache without guest-message translation
+- [x] Translation batch isolation so one skipped dynamic item cannot block the rest of an operational page
+- [x] Thai-national exemption stated across guest registration, owner request and approved concierge knowledge
+- [x] Owner confirmation that passport requests concern a non-Thai guest
+- [x] Action-needed alert classification, five-minute deduplication and protected owner alert console
+- [x] Official WhatsApp Business Platform adapter with signed webhook acknowledgement and resolution
+- [x] Role-based protected recipient groups and ten-minute urgent/critical escalation
 
-## Current priority — v5.7.x Operational Concierge Launch
+## Current priority — v5.8.x Operational Concierge Launch
 
 The concierge must be useful to real guests before further Explore expansion.
 
@@ -72,17 +80,20 @@ The concierge must be useful to real guests before further Explore expansion.
 - [ ] Store room key-box codes only in protected server-side secrets
 - [ ] Enable the 19:30–10:30 Bangkok-time spare-key flow
 - [ ] Log spare-key access events and urgent property incidents
-- [ ] Add protected owner and Su notification recipients
-- [ ] Send one spare-key event alert to every configured recipient
-- [ ] Connect WhatsApp Business Platform if automatic WhatsApp alerts are required
+- [x] Add protected owner and Su notification recipient configuration
+- [x] Add one-alert-per-recipient delivery and escalation logic
+- [x] Integrate the official WhatsApp Business Platform adapter
+- [ ] Configure the production Meta account, approved Utility template and protected recipients
+- [ ] Verify live outbound delivery, signed acknowledgement and escalation using non-sensitive test events
 
-Su and Fah currently use ordinary WhatsApp. The current release therefore uses prefilled human handoff messages; it cannot silently send WhatsApp alerts.
+Guests may continue using ordinary WhatsApp handoffs. Automated internal alerts use the separate official WhatsApp Business Platform adapter only after its protected production configuration is complete. Until then, actionable events remain visible in the protected owner console.
 
 ## Immediate online launch and hardening
 
 - [x] Push the v5.5.0 release to the existing hosting workflow
 - [x] Confirm `/api/concierge/status` reports AI and learning enabled
-- [ ] Deploy v5.7.0 and confirm live language switching, recommendations, booking wording and registration entry point
+- [ ] Deploy v5.8.1 and confirm full-page language switching, recommendations, Bamboo social actions, booking wording, registration entry point and alert console
+- [ ] Configure the Meta production alert channel following `WHATSAPP_ALERT_OPERATIONS.md`
 - [ ] Test all seven languages on guest phones and review real guest feedback for wording refinements
 - [ ] Verify the protected `/concierge-admin` review workflow
 - [ ] Verify the live room links, including Room 7

@@ -95,6 +95,44 @@ export class ConciergeStore extends DurableObject {
           updated_at TEXT NOT NULL
         );
         CREATE INDEX IF NOT EXISTS translation_cache_language ON translation_cache(language, updated_at);
+
+        CREATE TABLE IF NOT EXISTS concierge_alerts (
+          id TEXT PRIMARY KEY,
+          interaction_id TEXT NOT NULL DEFAULT '',
+          dedupe_key TEXT NOT NULL,
+          severity TEXT NOT NULL,
+          alert_type TEXT NOT NULL,
+          recipient_group TEXT NOT NULL,
+          room TEXT NOT NULL DEFAULT '',
+          room_verified INTEGER NOT NULL DEFAULT 0,
+          summary TEXT NOT NULL,
+          bangkok_time TEXT NOT NULL,
+          status TEXT NOT NULL DEFAULT 'open',
+          created_at TEXT NOT NULL,
+          acknowledged_at TEXT NOT NULL DEFAULT '',
+          acknowledged_by_hash TEXT NOT NULL DEFAULT '',
+          resolved_at TEXT NOT NULL DEFAULT '',
+          resolved_by_hash TEXT NOT NULL DEFAULT '',
+          escalation_due_at TEXT NOT NULL DEFAULT '',
+          escalated_at TEXT NOT NULL DEFAULT ''
+        );
+        CREATE INDEX IF NOT EXISTS concierge_alerts_status ON concierge_alerts(status, escalation_due_at, created_at);
+        CREATE INDEX IF NOT EXISTS concierge_alerts_dedupe ON concierge_alerts(dedupe_key, created_at);
+
+        CREATE TABLE IF NOT EXISTS concierge_alert_deliveries (
+          id TEXT PRIMARY KEY,
+          alert_id TEXT NOT NULL,
+          stage TEXT NOT NULL,
+          recipient_hash TEXT NOT NULL DEFAULT '',
+          recipient_label TEXT NOT NULL DEFAULT '',
+          provider_message_id TEXT NOT NULL DEFAULT '',
+          status TEXT NOT NULL,
+          error_code TEXT NOT NULL DEFAULT '',
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS concierge_alert_deliveries_alert ON concierge_alert_deliveries(alert_id, created_at);
+        CREATE INDEX IF NOT EXISTS concierge_alert_deliveries_provider ON concierge_alert_deliveries(provider_message_id);
       `);
     });
   }
@@ -273,6 +311,29 @@ export class ConciergeStore extends DurableObject {
       ORDER BY created_at DESC
       LIMIT 50
     `));
+    const alertTotals = rows(this.ctx.storage.sql.exec(`
+      SELECT
+        SUM(CASE WHEN status IN ('open', 'acknowledged') THEN 1 ELSE 0 END) AS openAlerts,
+        SUM(CASE WHEN severity = 'critical' AND status IN ('open', 'acknowledged') THEN 1 ELSE 0 END) AS criticalAlerts
+      FROM concierge_alerts
+    `))[0] || {};
+    const alerts = rows(this.ctx.storage.sql.exec(`
+      SELECT a.id, a.interaction_id AS interactionId, a.severity,
+             a.alert_type AS alertType, a.recipient_group AS recipientGroup,
+             a.room, a.room_verified AS roomVerified, a.summary,
+             a.bangkok_time AS bangkokTime, a.status, a.created_at AS createdAt,
+             a.acknowledged_at AS acknowledgedAt, a.resolved_at AS resolvedAt,
+             a.escalation_due_at AS escalationDueAt, a.escalated_at AS escalatedAt,
+             SUM(CASE WHEN d.status IN ('accepted', 'sent', 'delivered', 'read') THEN 1 ELSE 0 END) AS delivered,
+             SUM(CASE WHEN d.status = 'failed' THEN 1 ELSE 0 END) AS failed
+      FROM concierge_alerts a
+      LEFT JOIN concierge_alert_deliveries d ON d.alert_id = a.id
+      WHERE a.status IN ('open', 'acknowledged')
+      GROUP BY a.id
+      ORDER BY CASE a.severity WHEN 'critical' THEN 0 WHEN 'urgent' THEN 1 ELSE 2 END,
+               a.created_at DESC
+      LIMIT 100
+    `));
     return {
       totals: {
         interactions24h: Number(totals.interactions24h) || 0,
@@ -284,14 +345,149 @@ export class ConciergeStore extends DurableObject {
         pending: queue.length,
         approved: approved.length,
         pendingRegistrations: Number(passportTotals.pendingRegistrations) || 0,
-        storedPassportFiles: Number(passportTotals.storedPassportFiles) || 0
+        storedPassportFiles: Number(passportTotals.storedPassportFiles) || 0,
+        openAlerts: Number(alertTotals.openAlerts) || 0,
+        criticalAlerts: Number(alertTotals.criticalAlerts) || 0
       },
       queue,
       approved,
       pendingRegistrations,
       passportUploads,
+      alerts: alerts.map((alert) => ({
+        ...alert,
+        roomVerified: Boolean(alert.roomVerified),
+        delivered: Number(alert.delivered) || 0,
+        failed: Number(alert.failed) || 0
+      })),
       recent
     };
+  }
+
+  async createAlert(record) {
+    const createdAt = cleanText(record.createdAt, 40) || new Date().toISOString();
+    const dedupeKey = cleanText(record.dedupeKey, 100);
+    const existing = rows(this.ctx.storage.sql.exec(
+      `SELECT id, interaction_id AS interactionId, severity, alert_type AS alertType,
+              recipient_group AS recipientGroup, room, room_verified AS roomVerified,
+              summary, bangkok_time AS bangkokTime, status, created_at AS createdAt,
+              escalation_due_at AS escalationDueAt, escalated_at AS escalatedAt
+       FROM concierge_alerts
+       WHERE dedupe_key = ? AND status IN ('open', 'acknowledged')
+         AND julianday(created_at) >= julianday(?, '-5 minutes')
+       ORDER BY created_at DESC LIMIT 1`,
+      dedupeKey,
+      createdAt
+    ))[0];
+    if (existing) return { created: false, alert: { ...existing, roomVerified: Boolean(existing.roomVerified) } };
+
+    this.ctx.storage.sql.exec(
+      `INSERT INTO concierge_alerts
+       (id, interaction_id, dedupe_key, severity, alert_type, recipient_group, room,
+        room_verified, summary, bangkok_time, status, created_at, escalation_due_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'open', ?, ?)`,
+      cleanText(record.id, 100),
+      cleanText(record.interactionId, 100),
+      dedupeKey,
+      cleanText(record.severity, 20),
+      cleanText(record.alertType, 80),
+      cleanText(record.recipientGroup, 40),
+      cleanText(record.room, 4),
+      record.roomVerified ? 1 : 0,
+      cleanText(record.summary, 400),
+      cleanText(record.bangkokTime, 80),
+      createdAt,
+      cleanText(record.escalationDueAt, 40)
+    );
+    this.ctx.storage.sql.exec(
+      "DELETE FROM concierge_alert_deliveries WHERE julianday(created_at) < julianday('now', '-30 days')"
+    );
+    this.ctx.storage.sql.exec(
+      "DELETE FROM concierge_alerts WHERE julianday(created_at) < julianday('now', '-30 days')"
+    );
+    return { created: true };
+  }
+
+  async recordAlertDelivery(record) {
+    const createdAt = cleanText(record.createdAt, 40) || new Date().toISOString();
+    this.ctx.storage.sql.exec(
+      `INSERT OR REPLACE INTO concierge_alert_deliveries
+       (id, alert_id, stage, recipient_hash, recipient_label, provider_message_id,
+        status, error_code, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      cleanText(record.id, 100),
+      cleanText(record.alertId, 100),
+      cleanText(record.stage, 30),
+      cleanText(record.recipientHash, 100),
+      cleanText(record.recipientLabel, 80),
+      cleanText(record.providerMessageId, 180),
+      cleanText(record.status, 30),
+      cleanText(record.errorCode, 80),
+      createdAt,
+      createdAt
+    );
+    return { ok: true };
+  }
+
+  async updateAlertDeliveryStatus(record) {
+    const providerMessageId = cleanText(record.providerMessageId, 180);
+    if (!providerMessageId) return { ok: false };
+    this.ctx.storage.sql.exec(
+      `UPDATE concierge_alert_deliveries
+       SET status = ?, error_code = ?, updated_at = ?
+       WHERE provider_message_id = ?`,
+      cleanText(record.status, 30),
+      cleanText(record.errorCode, 80),
+      cleanText(record.updatedAt, 40) || new Date().toISOString(),
+      providerMessageId
+    );
+    return { ok: true };
+  }
+
+  async getDueAlertEscalations(nowValue) {
+    return rows(this.ctx.storage.sql.exec(
+      `SELECT id, interaction_id AS interactionId, severity, alert_type AS alertType,
+              recipient_group AS recipientGroup, room, room_verified AS roomVerified,
+              summary, bangkok_time AS bangkokTime, status, created_at AS createdAt,
+              escalation_due_at AS escalationDueAt, escalated_at AS escalatedAt
+       FROM concierge_alerts
+       WHERE status = 'open' AND escalation_due_at != '' AND escalation_due_at <= ?
+         AND escalated_at = ''
+       ORDER BY escalation_due_at ASC LIMIT 100`,
+      cleanText(nowValue, 40)
+    )).map((alert) => ({ ...alert, roomVerified: Boolean(alert.roomVerified) }));
+  }
+
+  async markAlertEscalated(id, nowValue) {
+    this.ctx.storage.sql.exec(
+      "UPDATE concierge_alerts SET escalated_at = ? WHERE id = ? AND escalated_at = ''",
+      cleanText(nowValue, 40) || new Date().toISOString(),
+      cleanText(id, 100)
+    );
+    return { ok: true };
+  }
+
+  async acknowledgeAlert(id, actorHash, nowValue) {
+    this.ctx.storage.sql.exec(
+      `UPDATE concierge_alerts
+       SET status = 'acknowledged', acknowledged_at = ?, acknowledged_by_hash = ?
+       WHERE id = ? AND status = 'open'`,
+      cleanText(nowValue, 40) || new Date().toISOString(),
+      cleanText(actorHash, 100),
+      cleanText(id, 100)
+    );
+    return { ok: true };
+  }
+
+  async resolveAlert(id, actorHash, nowValue) {
+    this.ctx.storage.sql.exec(
+      `UPDATE concierge_alerts
+       SET status = 'resolved', resolved_at = ?, resolved_by_hash = ?
+       WHERE id = ? AND status IN ('open', 'acknowledged')`,
+      cleanText(nowValue, 40) || new Date().toISOString(),
+      cleanText(actorHash, 100),
+      cleanText(id, 100)
+    );
+    return { ok: true };
   }
 
   async reviewLearning(review) {

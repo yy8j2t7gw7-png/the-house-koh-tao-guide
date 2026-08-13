@@ -21,9 +21,9 @@ Understand the existing architecture before modifying it.
 
 ## Current baseline
 
-The current release is v5.7.0. Completed modules include House Information, Restaurants, Cafés, Beaches, Bars & Nightlife, Shopping & Essentials, Activities & Experiences, the seven-language guest interface, and the hybrid room-aware AI Concierge with targeted approved-data retrieval, deterministic safety fallback and controlled owner-reviewed learning.
+The current release is v5.8.1. Completed modules include House Information, Restaurants, Cafés, Beaches, Bars & Nightlife, Shopping & Essentials, Activities & Experiences, the seven-language operational guest interface, and the hybrid room-aware AI Concierge with targeted approved-data retrieval, deterministic safety fallback, controlled owner-reviewed learning and protected action-needed alerts.
 
-The live v5.7.0 deployment sets `EXPLORE_ENABLED=false`: Explore navigation and routes are hidden from guests, but every page, structured record and asset remains in source. Do not delete them. The operational guest pages, secure registration and AI Concierge support English, Thai, Simplified Chinese, Russian, German, French and Spanish. Accident guidance offers Koh Tao Rescue first and 1669 second.
+The live v5.8.1 deployment sets `EXPLORE_ENABLED=false`: Explore navigation and routes are hidden from guests, but every page, structured record and asset remains in source. Do not delete them. The operational guest pages, secure registration and AI Concierge support English, Thai, Simplified Chinese, Russian, German, French and Spanish. Translation batches isolate skipped text instead of failing a whole page. Accident guidance offers Koh Tao Rescue first and 1669 second. The concierge thinking state shows animated dots only. Bamboo Beach Bar website follow-ups return its approved Facebook and Instagram actions and must not expose an internal Explore path.
 
 Do not regress or replace completed modules.
 
@@ -57,9 +57,9 @@ After hours are 19:30–10:30 Bangkok time. One spare-key box will be located ne
 
 Major water leaks, flooding, dangerous electrical problems and serious property damage use a separate property-emergency role intended for 24/7 coverage. A dedicated on-call person and number are not yet confirmed, so do not publicly claim confirmed 24/7 coverage.
 
-Su and Fah currently use ordinary WhatsApp. Automatic server-sent notifications require a future WhatsApp Business Platform integration. The current release uses prefilled human handoff messages.
+Guests may continue to use ordinary WhatsApp handoffs. v5.8.1 contains a separate official WhatsApp Business Platform adapter for protected staff alerts, including role-based recipients, signed acknowledgement and urgent/critical escalation. Outbound delivery starts only after the Meta account, Utility template and encrypted Cloudflare secrets in `WHATSAPP_ALERT_OPERATIONS.md` are configured.
 
-v5.7.0 includes a separate seven-language private passport-image flow for required TM30 guest registration and a prominent required-registration entry point on the welcome page. Read `PASSPORT_DATA_OPERATIONS.md`. It requires a private R2 bucket and `PASSPORT_TOKEN_PEPPER` before production activation. Passport content must never enter the model, learning queue, public assets or WhatsApp. The manual-details alternative is intentionally blocked until the authoritative TM30 field list is supplied.
+v5.8.1 includes a separate seven-language private passport-image flow for required non-Thai guest TM30 registration and a prominent required-registration entry point on the welcome page. Thai nationals do not need it, and owners must confirm a request is for a non-Thai guest. Read `PASSPORT_DATA_OPERATIONS.md`. It requires a private R2 bucket and `PASSPORT_TOKEN_PEPPER`. Passport content must never enter the model, learning queue, public assets or WhatsApp. The manual-details alternative is intentionally blocked until the authoritative TM30 field list is supplied.
 
 ## Development method
 
@@ -67,7 +67,7 @@ Continue from `ROADMAP.md`. Implement the next coherent, unblocked milestone com
 
 ## Next planned milestone
 
-Activate and verify the v5.7.x production concierge by deploying the Worker, testing all seven guest languages and the private registration flow, and establishing the owner review routine. Then add approved stay answers as they are supplied. Secure guest verification, protected spare-key delivery, a confirmed 24/7 property-emergency contact and a staff-notification channel remain future operational milestones. Transport and other Explore modules remain deferred.
+Deploy and verify v5.8.1 by testing full operational translation in all seven guest languages, Bamboo social actions, the non-Thai private registration flow, owner learning review, alert-console routing and the configured Meta staff-alert channel. Then add approved stay answers as supplied. Secure guest verification, protected spare-key delivery and a confirmed 24/7 property-emergency contact remain future operational milestones. Transport and other Explore modules remain deferred.
 
 ## Media
 

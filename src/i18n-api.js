@@ -11,6 +11,7 @@ const LANGUAGE_NAMES = Object.freeze({
 const MAX_TEXTS = 24;
 const MAX_TEXT_LENGTH = 1800;
 const MAX_TOTAL_LENGTH = 12_000;
+const TRANSLATION_CACHE_VERSION = "v2";
 
 const COMMON_APPROVED_ASSETS = [
   "/data/concierge-knowledge.json",
@@ -136,16 +137,21 @@ function sourceIsApproved(text, bundles) {
   const jsonEscaped = JSON.stringify(text).slice(1, -1);
   if (bundles.some((bundle) => bundle.includes(text) || bundle.includes(jsonEscaped))) return true;
   const templatePattern = text
-    .replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
-    .replace(/\\b\d+(?::\d+)?\\b/g, "(?:\\d+(?::\\d+)?)")
-    .replace(/[“”]/g, '[“”"`]')
-    .replace(/[’']/g, "[’']");
+    .split(/(\d+(?::\d+)?)/g)
+    .map((part, index) => index % 2
+      ? "(?:\\d+(?::\\d+)?)"
+      : part
+        .replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+        .replace(/[“”]/g, '[“”"`]')
+        .replace(/[’']/g, "[’']"))
+    .join("");
   try {
     const matcher = new RegExp(templatePattern);
-    return bundles.some((bundle) => matcher.test(bundle));
+    if (bundles.some((bundle) => matcher.test(bundle))) return true;
   } catch (_error) {
-    return false;
+    // Continue to the explicit safe runtime patterns below.
   }
+  return /^(?:Room (?:[1-9]|1[01])(?: · (?:Upstairs|Downstairs))?|Welcome to Room (?:[1-9]|1[01])|Finding Room (?:[1-9]|1[01])|Room (?:[1-9]|1[01]) \| The House – Koh Tao|Room (?:[1-9]|1[01]) (?:arrival photo placeholder|highlighted on the building|location))$/.test(text);
 }
 
 async function sha256(value) {
@@ -179,7 +185,7 @@ async function callTranslationModel(env, language, entries) {
         role: "user",
         content: JSON.stringify({ targetLanguage: language, entries })
       }],
-      reasoning: { effort: env.OPENAI_TRANSLATION_REASONING_EFFORT || "low" },
+      reasoning: { effort: env.OPENAI_TRANSLATION_REASONING_EFFORT || "medium" },
       max_output_tokens: 6000,
       text: {
         format: {
@@ -212,7 +218,7 @@ export async function translateApprovedTexts(env, language, texts) {
 
   const records = await Promise.all(cleaned.map(async (text) => {
     const sourceHash = await sha256(text);
-    return { text, sourceHash, cacheKey: `${targetLanguage}:${sourceHash}` };
+    return { text, sourceHash, cacheKey: `${TRANSLATION_CACHE_VERSION}:${targetLanguage}:${sourceHash}` };
   }));
   const store = getStore(env);
   const cached = store?.getTranslations
@@ -269,13 +275,26 @@ export async function handleTranslationRequest(request, env) {
   }
 
   const bundles = await approvedSourceBundles(request, env, body.page);
-  if (texts.some((text) => !sourceIsApproved(text, bundles))) {
+  const approved = texts.map((text) => sourceIsApproved(text, bundles));
+  if (!approved.some(Boolean)) {
     return json({ error: "unapproved_source_text" }, 403);
   }
 
   try {
-    const translations = await translateApprovedTexts(env, language, texts);
-    return json({ language, translations });
+    const approvedTexts = texts.filter((_text, index) => approved[index]);
+    const approvedTranslations = await translateApprovedTexts(env, language, approvedTexts);
+    let translatedIndex = 0;
+    const translations = texts.map((_text, index) => {
+      if (!approved[index]) return null;
+      const translation = approvedTranslations[translatedIndex];
+      translatedIndex += 1;
+      return translation;
+    });
+    return json({
+      language,
+      translations,
+      untranslated: approved.filter((value) => !value).length
+    });
   } catch (_error) {
     return json({ error: "translation_unavailable" }, 503);
   }

@@ -2,6 +2,53 @@
 
 All notable changes to The House – Koh Tao guest guide are recorded here.
 
+## v5.8.1 — Concierge Loading & Bamboo Social Links
+
+### Changed
+
+- Replaced the visible “Checking the approved information” loading sentence with an animated three-dot typing indicator.
+- Added an accessible thinking-state label while keeping the visible interface limited to the moving dots.
+- Replaced Bamboo Beach Bar’s disabled internal Explore action with separate official Facebook and Instagram buttons.
+- Added deterministic conversation context for Bamboo website and social-page follow-up questions.
+
+### Safety and reliability
+
+- Removed internal Explore detail paths from approved records sent to model reasoning while Explore remains disabled.
+- Added regression coverage that prevents generic Bamboo follow-ups from reaching the model or returning `/bar.html` routes.
+- Preserved the reduced-motion accessibility setting for the loading indicator.
+
+## v5.8.0 — Complete Operational Translation & Protected Staff Alerts
+
+### Added
+
+- Deterministic action-needed alert policy for routine stay support, explicit booking requests, after-hours lost keys, medical emergencies and serious property incidents.
+- Protected owner alert console with sanitized descriptions, delivery status, acknowledgement and resolution controls.
+- Official WhatsApp Business Platform adapter with encrypted role-based recipient configuration, approved-template delivery, signed webhook verification and status tracking.
+- Five-minute duplicate suppression and ten-minute escalation of unacknowledged urgent or critical alerts to the protected escalation group.
+- Authorized WhatsApp reply commands to acknowledge or resolve an alert without opening the owner console.
+- Explicit Thai-national exemption across registration pages, House rules, concierge knowledge and owner operations. Thai nationals do not need to complete TM30 passport registration.
+- Required owner confirmation that a private registration request concerns a non-Thai guest.
+
+### Fixed
+
+- Translation batches now isolate approved and skipped items, so one unsupported dynamic sentence cannot prevent all other approved text on the page from translating.
+- Browser and server translation caches are versioned to invalidate older partial results.
+- Added reviewed Thai-national registration-exemption wording in all seven supported guest languages.
+
+### Privacy and safety
+
+- Recipient telephone numbers remain only in an encrypted Worker secret; stored delivery records contain recipient labels and salted one-way hashes.
+- Alert descriptions are sanitized independently from concierge logs and exclude passport fields, key-box codes and private stay tokens.
+- The alert channel cannot reveal spare-key codes and does not treat a displayed room as identity verification.
+- Incomplete WhatsApp configuration never blocks the guest concierge; actionable events remain available in the protected owner console.
+- Passport files remain private, room-bound, single-use and subject to the 14-day R2 lifecycle rule. The staff-alert channel is not a guest passport-reminder channel.
+
+### Operations
+
+- Added `WHATSAPP_ALERT_OPERATIONS.md` with the required Meta account, Utility template, Cloudflare secrets, protected recipient schema, webhook and production verification process.
+- Added a one-minute scheduled escalation check while retaining daily passport cleanup.
+- Explore remains disabled through `EXPLORE_ENABLED=false`, with all source pages, structured data and assets preserved for the later rebuild.
+
 ## v5.7.0 — Seven-Language Guest Experience
 
 ### Added

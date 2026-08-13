@@ -1,4 +1,4 @@
-# Guest Guide Platform with AI Concierge — The House v5.7.0
+# Guest Guide Platform with AI Concierge — The House v5.8.1
 
 The House – Koh Tao guest guide is a production-oriented, mobile-first digital guest guide and concierge platform. It combines property information, curated island guidance, structured place and activity data, and centralized contact and booking routes.
 
@@ -17,6 +17,30 @@ The House – Koh Tao guest guide is a production-oriented, mobile-first digital
 - Model-powered, room-aware AI Concierge with controlled learning
 
 The Activities module contains 49 structured profiles covering diving, freediving, snorkelling, boat trips, beach experiences, kayaking, paddleboarding, hiking, viewpoints, climbing, yoga, Muay Thai, massage, cooking, wildlife, photography, night activities and rainy-day options.
+
+## v5.8.1 release focus
+
+- Replaces the concierge loading sentence with a quiet animated three-dot indicator, including a reduced-motion fallback and an accessible status label.
+- Gives Bamboo Beach Bar an approved online-contact answer with separate official Facebook and Instagram buttons.
+- Understands conversational follow-ups such as “Do they have a website?” when the recent conversation is about Bamboo Beach Bar.
+- Removes disabled internal Explore paths from the approved records supplied to the model, preventing invented or unusable venue links.
+- Keeps Explore disabled and fully preserved for its later rebuild.
+- Retains every v5.8.0 operational translation, TM30, alerting, routing and privacy safeguard.
+
+## v5.8.0 release focus
+
+- Fixes full-page localization so one unsupported dynamic string no longer prevents the rest of an approved translation batch from rendering.
+- Invalidates older partial browser and server translation caches, while preserving English as the safe fallback for any individual untranslated item.
+- Retains seven guest languages across the complete live operational journey: English, Thai, Simplified Chinese, Russian, German, French and Spanish. Explore remains preserved but disabled and untranslated pending its later rebuild.
+- Adds protected action-needed alert classification for routine stay support, actionable bookings, after-hours lost keys, and medical or serious property incidents.
+- Adds an official WhatsApp Business Platform delivery adapter with role-based recipient groups, five-minute deduplication, signed webhook handling and ten-minute escalation for unacknowledged urgent or critical alerts.
+- Keeps alert recipient names and numbers in one encrypted Worker secret. Stored delivery records contain only recipient labels and salted hashes.
+- Adds an owner alert console with delivery status, acknowledgement and resolution controls. Alerts continue to appear there even when WhatsApp credentials are not yet configured.
+- Clarifies throughout the guest and owner registration flows that TM30 registration and passport upload apply only to non-Thai guests. Thai nationals do not need to complete this registration.
+- Requires an owner to confirm that a registration request is for a non-Thai guest before a private passport link can be created.
+- Preserves every secure boundary: passport files never enter AI or WhatsApp, room selection is not identity verification, and the alert channel cannot reveal a spare-key code.
+
+The WhatsApp alert channel is production-ready in code but sends messages only after the official Meta account, approved Utility template and encrypted Cloudflare secrets are configured. See `WHATSAPP_ALERT_OPERATIONS.md`.
 
 ## v5.7.0 release focus
 
@@ -120,19 +144,19 @@ After hours are 19:30–10:30 in the `Asia/Bangkok` time zone. Each room will ha
 
 Key-box codes are not included in this release. Secure delivery remains disabled until guest verification and protected server-side secrets are configured. See `SECURE_AFTER_HOURS_ACCESS.md`.
 
-Su and the owners currently use ordinary WhatsApp. Automatic server-sent spare-key notifications require a later WhatsApp Business Platform integration. The current release uses prefilled WhatsApp handoff messages; Fah remains the separate booking contact.
+The protected WhatsApp Business Platform alert adapter can notify configured owners and Su when its production account, template and secrets are enabled. It never includes a key-box code or private stay token. Secure spare-key delivery itself remains disabled; Fah remains the separate booking contact.
 
 ## Secure passport information
 
-Owners can create a room-bound, expiring, single-use private Room welcome link from `/concierge-admin` when required passport information was not supplied before arrival. Its registration button opens the secure form directly. The form explains that the information is needed for TM30 Immigration accommodation registration and explains the privacy controls before accepting an image.
+Owners can create a room-bound, expiring, single-use private Room welcome link from `/concierge-admin` when a non-Thai guest did not supply the required passport information before arrival. Thai nationals do not need this TM30 registration or passport upload. The owner must confirm that the request concerns a non-Thai guest. Its registration button opens the secure form directly, where the TM30 purpose and privacy controls are explained before an image is accepted.
 
 Passport images never enter the AI chat, model prompts, learning queue, WhatsApp messages or public site. They are stored in the private `PASSPORT_UPLOADS` R2 binding and can be downloaded only through the authenticated owner API. The main retention policy is 14 days after upload, with immediate deletion available and a daily application cleanup reinforcing the R2 lifecycle rule.
 
-Ordinary WhatsApp cannot send automated reminders. The owner page identifies pending and overdue requests and creates a guest-friendly message to copy into the existing conversation. The manual TM30-details alternative remains disabled because the exact authoritative field list has not been supplied; no fields were guessed. See `PASSPORT_DATA_OPERATIONS.md`.
+The owner page identifies pending and overdue requests and creates a guest-friendly reminder to copy into the existing conversation. Automatic pre-arrival reminders remain separate from the new staff-alert channel because they require approved guest-contact and stay-arrival data. The manual TM30-details alternative remains disabled because the exact authoritative field list has not been supplied; no fields were guessed. See `PASSPORT_DATA_OPERATIONS.md`.
 
 ## Production activation
 
-The model-powered layer requires the server-side `OPENAI_API_KEY` secret. The private learning review requires `CONCIERGE_ADMIN_TOKEN`, and `CONCIERGE_HASH_SALT` is strongly recommended for session pseudonymization. Secure passport links also require the private `the-house-passport-uploads` R2 bucket and `PASSPORT_TOKEN_PEPPER`. Secret values must never be committed or included in release archives.
+The model-powered layer requires the server-side `OPENAI_API_KEY` secret. The private learning and alert review requires `CONCIERGE_ADMIN_TOKEN`, and `CONCIERGE_HASH_SALT` is strongly recommended for session and recipient pseudonymization. Secure passport links also require the private `the-house-passport-uploads` R2 bucket and `PASSPORT_TOKEN_PEPPER`. WhatsApp delivery additionally requires the encrypted values documented in `WHATSAPP_ALERT_OPERATIONS.md`. Secret values must never be committed or included in release archives.
 
 The core deterministic concierge works safely before these secrets are configured. Follow `AI_CONCIERGE_OPERATIONS.md` to activate and verify the complete AI and learning workflow.
 
@@ -140,6 +164,9 @@ The core deterministic concierge works safely before these secrets are configure
 
 - Cloudflare Worker entry point: `src/index.js`
 - Server-side concierge controller: `src/concierge-api.js`
+- Deterministic action-needed alert policy: `src/alert-policy.js`
+- Protected WhatsApp alert delivery: `src/whatsapp-alerts.js`
+- Approved page-translation API: `src/i18n-api.js`
 - Approved project-data retrieval: `src/project-knowledge.js`
 - Deterministic safety and matching logic: `src/concierge-core.js`
 - Persistent learning store: `src/concierge-store.js`
@@ -156,6 +183,7 @@ The core deterministic concierge works safely before these secrets are configure
 - Owner learning review: `public/concierge-admin.html`
 - Secure passport guest page: `public/passport-upload.html`
 - Passport upload API: `src/passport-api.js`
+- WhatsApp alert operations: `WHATSAPP_ALERT_OPERATIONS.md`
 
 The root public routes remain in place for backwards compatibility. Where a canonical copy also exists under `public/modules/`, the two copies must remain byte-equivalent.
 

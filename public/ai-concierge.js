@@ -324,10 +324,18 @@
     return message;
   }
 
-  function appendStatus(text) {
-    const status = appendMessage("concierge", text);
+  function appendStatus() {
+    const status = appendMessage("concierge", "");
     status.classList.add("is-status");
     status.setAttribute("aria-busy", "true");
+    status.setAttribute("role", "status");
+    const bubble = status.querySelector(".ai-concierge-bubble");
+    bubble.dataset.i18nSkip = "true";
+    bubble.setAttribute("aria-label", window.HOUSE_I18N?.t("Concierge is thinking") || "Concierge is thinking");
+    bubble.innerHTML = `
+      <span class="ai-concierge-thinking-dots" aria-hidden="true">
+        <span></span><span></span><span></span>
+      </span>`;
     return status;
   }
 
@@ -448,7 +456,7 @@
     appendMessage("guest", question);
     sendButton.disabled = true;
     input.disabled = true;
-    const status = appendStatus("Checking the approved information…");
+    const status = appendStatus();
 
     try {
       let result;

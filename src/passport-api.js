@@ -245,6 +245,7 @@ export async function handlePassportAdminRequest(request, env, path, store) {
     const requestedHours = Number(body?.expiresHours || 24);
     const expiresHours = [1, 6, 12, 24, 48, 72].includes(requestedHours) ? requestedHours : 24;
     if (!ROOM_OPTIONS.has(room)) return json({ error: "invalid_room" }, 400);
+    if (body?.nonThaiConfirmed !== true) return json({ error: "non_thai_confirmation_required" }, 400);
     const arrivalDate = body?.arrivalAt ? new Date(body.arrivalAt) : null;
     if (arrivalDate && !Number.isFinite(arrivalDate.getTime())) return json({ error: "invalid_arrival_time" }, 400);
 
@@ -271,7 +272,7 @@ export async function handlePassportAdminRequest(request, env, path, store) {
       expiresAt,
       welcomeUrl,
       uploadUrl: `${origin}/passport-upload#token=${token}`,
-      reminderMessage: `Before arrival, please provide the passport information needed for The House to complete the required TM30 Immigration registration. Open your private Room ${room} welcome page and select Complete Required Registration: ${welcomeUrl} Your information is not sent through the AI chat or WhatsApp. A passport image is deleted automatically ${automaticDeletionDays} days after upload, or sooner after processing.`
+      reminderMessage: `This TM30 Immigration accommodation registration applies only to non-Thai guests. Thai nationals do not need to complete it. If you are not a Thai national, please provide the required passport information before arrival. Open your private Room ${room} welcome page and select Complete Required Registration: ${welcomeUrl} Your information is not sent through the AI chat or WhatsApp. A passport image is deleted automatically ${automaticDeletionDays} days after upload, or sooner after processing.`
     });
   }
 

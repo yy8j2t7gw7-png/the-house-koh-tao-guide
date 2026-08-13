@@ -86,6 +86,9 @@ The concierge must:
 - require owner approval before a learned answer becomes active
 - redact and minimize stored guest-question data
 - answer in the guest's selected language while leaving deterministic safety and contact routing under server control
+- create action-needed alerts only through `src/alert-policy.js` and deliver them through `src/whatsapp-alerts.js`
+- keep recipient numbers in encrypted Worker configuration and persist only recipient labels and salted hashes
+- isolate approved page-translation items so one skipped source string cannot fail an entire translation batch
 
 For accidents and urgent medical situations, present Koh Tao Rescue first because the team knows the island and local access points, then present Thailand's national medical emergency number 1669 as the second immediate option. Keep both actions visible and distinct.
 
@@ -97,7 +100,9 @@ Future recommendation logic may filter by guest type, budget, time, transport co
 
 Never put key-box codes, private guest tokens or API credentials in public source or structured content. Follow `SECURE_AFTER_HOURS_ACCESS.md` for the protected spare-key flow.
 
-Passport images use the separate `src/passport-api.js` and private R2 workflow documented in `PASSPORT_DATA_OPERATIONS.md`. Never send passport content to the model, learning store, interaction log or WhatsApp. Validate authorization, expiry, single use, byte limit and file signature before storage. Keep manual TM30 fields disabled until the authoritative schema is supplied.
+Passport images use the separate `src/passport-api.js` and private R2 workflow documented in `PASSPORT_DATA_OPERATIONS.md`. This workflow applies only to non-Thai guests; require the owner confirmation and never infer nationality. Never send passport content to the model, learning store, interaction log or WhatsApp. Validate authorization, expiry, single use, byte limit and file signature before storage. Keep manual TM30 fields disabled until the authoritative schema is supplied.
+
+Action-needed alerts use the separate deterministic policy and protected delivery adapter documented in `WHATSAPP_ALERT_OPERATIONS.md`. The guest request must remain usable when external delivery is unavailable. Verify signed webhooks, recipient authorization, duplicate suppression, escalation, sanitization and 30-day cleanup. Staff alerts must never enable or contain protected spare-key access.
 
 After hours are 19:30–10:30 in Bangkok time. This does not define reception or property operating hours.
 
@@ -127,6 +132,9 @@ A coherent release must:
 - validate that no key-box code or messaging credential is present in the release
 - validate passport token expiry and one-time use, private document retrieval, immediate deletion and retention cleanup
 - validate that passport data cannot enter the model, learning queue, public assets or ordinary WhatsApp messages
+- validate that passport requests require the non-Thai confirmation and Thai guests receive the exemption answer
+- validate full-page approved translation coverage and rejection of arbitrary guest-authored page-translation text
+- validate alert classification, deduplication, recipient privacy, delivery failure handling, signed webhook acknowledgement and escalation
 - validate local routes and referenced assets
 - complete a production dry-run bundle
 - confirm `/api/concierge/status` reports the expected model and learning configuration after production secrets are installed

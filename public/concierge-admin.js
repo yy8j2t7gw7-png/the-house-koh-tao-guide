@@ -13,6 +13,8 @@
   const passportUploads = document.getElementById("passportUploads");
   const passportLinkForm = document.getElementById("passportLinkForm");
   const passportLinkResult = document.getElementById("passportLinkResult");
+  const alerts = document.getElementById("conciergeAlerts");
+  const alertStatus = document.getElementById("whatsappAlertStatus");
   let token = "";
 
   const categories = [
@@ -62,7 +64,9 @@
       stat(totals.gaps30d, "Knowledge gaps in 30 days"),
       stat(`${totals.positive}/${totals.negative}`, "Helpful / not helpful"),
       stat(totals.pendingRegistrations, "Passport requests pending"),
-      stat(totals.storedPassportFiles, "Passport files stored")
+      stat(totals.storedPassportFiles, "Passport files stored"),
+      stat(totals.openAlerts, "Open concierge alerts"),
+      stat(totals.criticalAlerts, "Critical alerts open")
     );
   }
 
@@ -127,6 +131,56 @@
       actions.append(download, remove);
       card.appendChild(actions);
       passportUploads.appendChild(card);
+    });
+  }
+
+  function renderAlerts(items, configuration = {}) {
+    alerts.replaceChildren();
+    alertStatus.textContent = configuration.configured ? "WhatsApp connected" : "WhatsApp setup incomplete";
+    alertStatus.className = `concierge-admin-config-status ${configuration.configured ? "is-ready" : "is-missing"}`;
+    const counts = Object.entries(configuration.groupCounts || {})
+      .map(([group, count]) => `${group}: ${count}`)
+      .join(" · ");
+    alertStatus.title = counts || "No recipient groups configured";
+    if (!items.length) {
+      alerts.appendChild(element("div", "concierge-admin-empty", "No open concierge alerts."));
+      return;
+    }
+    items.forEach((item) => {
+      const card = element("article", `concierge-admin-alert is-${item.severity || "attention"}`);
+      card.dataset.alertId = item.id;
+      const head = element("div", "concierge-admin-card-head");
+      const title = element("h3", "", `${String(item.severity || "attention").toUpperCase()} · ${String(item.alertType || "guest request").replaceAll("_", " ")}`);
+      const meta = element("div", "concierge-admin-card-meta");
+      meta.append(
+        element("span", "concierge-admin-pill", item.room ? `Room ${item.room} · guest-selected` : "Room not selected"),
+        element("span", "concierge-admin-pill", item.status),
+        element("span", "concierge-admin-pill", `WhatsApp accepted: ${item.delivered || 0}`)
+      );
+      head.append(title, meta);
+      card.append(
+        head,
+        element("p", "concierge-admin-alert-summary", item.summary),
+        element("span", "concierge-admin-alert-time", `${item.bangkokTime || bangkokDate(item.createdAt)} · Route: ${item.recipientGroup}`)
+      );
+      if (item.escalationDueAt && !item.acknowledgedAt && !item.escalatedAt) {
+        card.appendChild(element("span", "concierge-admin-alert-escalation", `Escalates if not acknowledged by ${bangkokDate(item.escalationDueAt)}`));
+      } else if (item.escalatedAt) {
+        card.appendChild(element("span", "concierge-admin-alert-escalation", `Escalated ${bangkokDate(item.escalatedAt)}`));
+      }
+      const actions = element("div", "concierge-admin-card-actions");
+      if (item.status === "open") {
+        const acknowledge = element("button", "secondary", "Acknowledge");
+        acknowledge.type = "button";
+        acknowledge.dataset.alertAction = "acknowledge";
+        actions.appendChild(acknowledge);
+      }
+      const resolve = element("button", "", "Resolve");
+      resolve.type = "button";
+      resolve.dataset.alertAction = "resolve";
+      actions.appendChild(resolve);
+      card.appendChild(actions);
+      alerts.appendChild(card);
     });
   }
 
@@ -239,6 +293,7 @@
     renderApproved(data.approved || []);
     renderPendingRegistrations(data.pendingRegistrations || []);
     renderPassportUploads(data.passportUploads || []);
+    renderAlerts(data.alerts || [], data.alertConfiguration || {});
     renderRecent(data.recent || []);
     login.hidden = true;
     workspace.hidden = false;
@@ -276,13 +331,15 @@
         body: JSON.stringify({
           room: document.getElementById("passportRoom").value,
           arrivalAt: arrivalValue ? `${arrivalValue}:00+07:00` : "",
-          expiresHours: Number(document.getElementById("passportExpiry").value)
+          expiresHours: Number(document.getElementById("passportExpiry").value),
+          nonThaiConfirmed: document.getElementById("passportNonThai").checked
         })
       });
       document.getElementById("passportReminderMessage").value = data.reminderMessage;
       document.getElementById("passportUploadUrl").value = data.welcomeUrl;
       passportLinkResult.dataset.registrationId = data.id;
       passportLinkResult.hidden = false;
+      document.getElementById("passportNonThai").checked = false;
       await loadOverview();
     } catch (error) {
       window.alert(error.message === "passport_upload_unavailable"
@@ -342,6 +399,22 @@
 
   pendingRegistrations.addEventListener("click", passportAction);
   passportUploads.addEventListener("click", passportAction);
+  alerts.addEventListener("click", async (event) => {
+    const button = event.target.closest("[data-alert-action]");
+    if (!button) return;
+    const card = button.closest("[data-alert-id]");
+    button.disabled = true;
+    try {
+      await api(`/api/concierge/admin/alerts/${button.dataset.alertAction}`, {
+        method: "POST",
+        body: JSON.stringify({ id: card.dataset.alertId })
+      });
+      await loadOverview();
+    } catch (_error) {
+      button.disabled = false;
+      window.alert("The alert status could not be updated.");
+    }
+  });
 
   document.getElementById("refreshAdmin").addEventListener("click", () => loadOverview().catch(() => {}));
   document.getElementById("adminLogout").addEventListener("click", () => {

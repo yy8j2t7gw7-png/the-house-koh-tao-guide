@@ -131,7 +131,6 @@ function compactRecord(definition, record, score) {
     weather: cleanText(record.weatherConsiderations || record.conditions, 400),
     childFriendly: cleanText(record.childFriendly ?? record.familyFriendly, 120),
     lastVerified: cleanText(record.lastVerified || record.notes?.lastVerified, 80),
-    publicPath: record.id ? `${definition.publicPage}?id=${encodeURIComponent(record.id)}` : "",
     relevanceScore: score
   };
   return Object.fromEntries(Object.entries(details).filter(([, value]) => value !== "" && value !== undefined));
@@ -172,4 +171,3 @@ export async function retrieveApprovedProjectKnowledge(request, env, question, m
     .slice(0, maximumRecords)
     .map(({ definition, record, score }) => compactRecord(definition, record, score));
 }
-

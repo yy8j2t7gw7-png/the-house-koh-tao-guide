@@ -272,8 +272,33 @@ body.ai-concierge-ready .float-wa[data-link="houseWhatsapp"]{
   color:#fff;
 }
 .ai-concierge-message.is-status .ai-concierge-bubble{
-  color:#6e7c77;
-  font-style:italic;
+  display:inline-flex;
+  min-width:54px;
+  align-items:center;
+  justify-content:center;
+  padding:13px 15px;
+}
+.ai-concierge-thinking-dots{
+  display:inline-flex;
+  align-items:center;
+  gap:5px;
+}
+.ai-concierge-thinking-dots span{
+  width:7px;
+  height:7px;
+  border-radius:50%;
+  background:#47756a;
+  opacity:.32;
+  animation:ai-concierge-thinking-dot 1.15s ease-in-out infinite;
+}
+.ai-concierge-thinking-dots span:nth-child(2){animation-delay:.15s}
+.ai-concierge-thinking-dots span:nth-child(3){animation-delay:.3s}
+@keyframes ai-concierge-thinking-dot{
+  0%,60%,100%{transform:translateY(0);opacity:.32}
+  30%{transform:translateY(-4px);opacity:1}
+}
+@media (prefers-reduced-motion:reduce){
+  .ai-concierge-thinking-dots span{animation:none;opacity:.72}
 }
 .ai-concierge-message-actions{
   display:flex;

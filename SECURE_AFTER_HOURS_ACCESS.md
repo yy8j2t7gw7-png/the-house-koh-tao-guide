@@ -61,7 +61,7 @@ Delivery failures must be logged so one failed owner notification does not preve
 
 Until secure code delivery is enabled, the concierge identifies the room, explains the 500 THB fee and offers the correct human support handoff. It never reveals or guesses a key-box code.
 
-Su and the owners currently use ordinary WhatsApp. Automatic server-sent WhatsApp notifications are therefore not enabled. Human handoff uses a prefilled WhatsApp message containing the room and request. A future WhatsApp Business Platform integration will send one approved operational message to every configured owner and Su.
+v5.8.1 provides the protected official WhatsApp Business Platform alert adapter and owner console. When the production account, approved template and encrypted recipients are configured, an after-hours lost-key request can notify the protected urgent group and escalate if unacknowledged. The alert never contains the key-box code or private stay token. This notification capability does not enable secure code delivery, which remains blocked on current-guest verification and protected server-side codes.
 
 ## Separate 24/7 property-emergency route
 
@@ -77,6 +77,5 @@ Once confirmed, configure the dedicated on-call contact server-side and enable t
 - A secure signing secret and private-link generation workflow
 - Validity dates for each active stay link
 - A protected event log or operations store
-- WhatsApp Business Platform credentials if automatic staff alerts are required
-- The protected list of owner and Su notification recipients
+- Production WhatsApp Business Platform account, approved Utility template, credentials and protected owner/Su recipients if automatic delivery is required
 - The confirmed 24/7 on-call property-emergency person and telephone/WhatsApp number

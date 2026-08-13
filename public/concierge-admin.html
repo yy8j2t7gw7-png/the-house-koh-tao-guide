@@ -48,11 +48,23 @@
       <section class="concierge-admin-section">
         <div class="concierge-admin-section-head">
           <div>
+            <p class="concierge-admin-kicker">Guest requests needing action</p>
+            <h2>Concierge alerts</h2>
+          </div>
+          <span id="whatsappAlertStatus" class="concierge-admin-config-status"></span>
+        </div>
+        <p>Critical incidents, after-hours lost keys and actionable guest requests are routed to the configured WhatsApp groups. Room numbers shown here come from the guest’s private room link or selection and must be confirmed before protected access is given.</p>
+        <div id="conciergeAlerts" class="concierge-admin-queue"></div>
+      </section>
+
+      <section class="concierge-admin-section">
+        <div class="concierge-admin-section-head">
+          <div>
             <p class="concierge-admin-kicker">Required guest registration</p>
             <h2>Passport requests & reminders</h2>
           </div>
         </div>
-        <p>Create one private link per passport when the information has not been supplied before arrival. With ordinary WhatsApp, copy the prepared reminder and send it in the existing guest conversation.</p>
+        <p>Create one private link per passport for non-Thai guests when the information has not been supplied before arrival. Thai nationals do not need TM30 passport registration; do not create or send a request to them. With ordinary WhatsApp, copy the prepared reminder and send it in the existing guest conversation.</p>
         <form id="passportLinkForm" class="concierge-admin-registration-form">
           <div class="concierge-admin-field">
             <label for="passportRoom">Room</label>
@@ -78,6 +90,7 @@
               <option value="72" selected>72 hours</option>
             </select>
           </div>
+          <label class="concierge-admin-confirm"><input id="passportNonThai" type="checkbox" required> <span>I confirm this request is for a non-Thai guest.</span></label>
           <button type="submit">Create secure request</button>
         </form>
         <div id="passportLinkResult" class="concierge-admin-link-result" hidden>

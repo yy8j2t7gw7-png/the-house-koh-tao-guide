@@ -81,6 +81,12 @@ The target behavior is for the AI Concierge to conduct routine stay-support conv
 
 General Contact Us actions should open the concierge first. Human WhatsApp and telephone actions should be offered only when the guest requests a person, the answer is unavailable or operational action is required.
 
+## Action-needed alerts
+
+Human-action requests create a sanitized server-side alert for the correct protected recipient group. Routine support routes to support, explicit booking work routes to booking, after-hours lost keys route to urgent, and medical or serious property incidents route to emergency. A recommendation question by itself is not a booking alert.
+
+Urgent and critical alerts may escalate if not acknowledged. Recipient telephone numbers remain encrypted server configuration; the operational store uses only labels and salted hashes. Alerts never include passport information, key-box codes or private stay tokens. WhatsApp delivery uses the official Business Platform only when fully configured; otherwise the protected owner console remains available.
+
 ## Room context
 
 Read the room from a room-specific URL and remember it on the guest's device. Ask the guest to select a room if it is missing from a stay-support request.
@@ -113,7 +119,7 @@ Model replies must conform to the server's strict response schema. Model output 
 
 Do not ask guests for passport, payment, booking-reference or key-box information in chat. Store only minimized, redacted questions and pseudonymous session identifiers for operational improvement. Routine interaction and feedback records expire after 30 days. API keys, admin credentials and private access information remain server-side.
 
-When a guest asks about overnight visitors or passport registration, explain the approved TM30 purpose and direct them to request the separate private one-time link. Never accept passport details or images inside the concierge. Passport documents are not model context and must never enter learning or recommendation systems.
+When a non-Thai guest asks about overnight visitors or passport registration, explain the approved TM30 purpose and direct them to request the separate private one-time link. Thai nationals do not need to complete this registration or upload a passport. Never infer nationality, and never accept passport details or images inside the concierge. Passport documents are not model context and must never enter learning or recommendation systems.
 
 ## Tone
 

@@ -57,6 +57,8 @@ Medical or personal emergencies must remain separate from property emergencies a
 
 ## Passport and Immigration registration data
 
+- TM30 accommodation registration and this passport-upload workflow apply only to non-Thai guests. Thai nationals must be told that they do not need to complete it.
+- An owner must confirm that a request concerns a non-Thai guest before creating a private registration link. Do not attempt to infer nationality from chat or other unverified data.
 - Passport information is collected only through the separate private registration flow, never through AI chat, learning logs, public files or WhatsApp attachments.
 - Explain in guest-friendly language that The House needs the information for required TM30 Immigration accommodation registration and how the document is handled.
 - Use room-bound, expiring, single-use links. Room selection alone must never authorize passport upload or retrieval.
@@ -65,6 +67,16 @@ Medical or personal emergencies must remain separate from property emergencies a
 - Do not use passport data for marketing, AI training or recommendation logic.
 - Do not invent the manual TM30 field schema. The structured details option stays disabled until the authoritative field list is supplied.
 - Ordinary WhatsApp supports only a prepared manual reminder. Automatic reminders require an approved server-side messaging integration.
+
+## Protected staff alerts
+
+- Requests requiring human attention may create a sanitized server-side alert for the configured `support`, `booking`, `urgent`, `emergency` or `escalation` recipient group.
+- Recommendation questions alone do not notify booking staff; an explicit request to book, arrange, reserve or check availability is required.
+- Urgent and critical alerts may escalate only if they remain unacknowledged for the configured period.
+- Recipient numbers and names are encrypted server configuration. Public files, URLs, releases and guest answers must never contain the protected recipient list.
+- Stored delivery records use labels and salted hashes, never recipient telephone numbers.
+- Alerts must never contain passport information, key-box codes, private stay tokens or unredacted personal data.
+- WhatsApp delivery uses only the official WhatsApp Business Platform and requires a configured account, approved message template and signed webhook. Without that configuration, the protected owner console remains the alert fallback.
 
 ## Global booking policy
 
@@ -119,9 +131,9 @@ Public interface rules:
 
 ## Current baseline
 
-Current release: v5.7.0.
+Current release: v5.8.1.
 
-Explore is intentionally disabled in the live v5.7.0 release. Do not delete its pages, structured records or media. Restore it only after the planned Explore rebuild and review by changing the protected deployment feature variable.
+Explore is intentionally disabled in the live v5.8.1 release. Do not delete its pages, structured records or media. Restore it only after the planned Explore rebuild and review by changing the protected deployment feature variable. Do not expose internal Explore detail paths in live concierge answers while the feature remains disabled; use approved external actions where supplied.
 
 Completed content modules:
 
@@ -133,4 +145,4 @@ Completed content modules:
 - Shopping & Essentials
 - Activities & Experiences
 
-The hybrid, room-aware AI Concierge and controlled owner-review workflow are now implemented. Production model activation requires server-side secrets and deployment verification. Explore remains deferred, and Transport remains research-blocked until the required authoritative source is supplied.
+The hybrid, room-aware AI Concierge, full operational translation path, controlled owner-review workflow and protected action-needed alert channel are implemented. Production model and WhatsApp delivery still require their respective server-side secrets and deployment verification. Explore remains deferred, and Transport remains research-blocked until the required authoritative source is supplied.

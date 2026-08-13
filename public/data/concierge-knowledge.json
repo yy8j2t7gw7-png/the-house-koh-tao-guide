@@ -1,8 +1,8 @@
 {
   "schemaVersion": "1.0.0",
-  "release": "5.7.0",
+  "release": "5.8.1",
   "language": "en",
-  "updated": "2026-08-12",
+  "updated": "2026-08-13",
   "scope": "Verified accommodation, room, house-rule, support, booking and emergency answers for guests of The House – Koh Tao.",
   "fallbackClassifiers": [
     {
@@ -94,6 +94,21 @@
     }
   },
   "intents": [
+    {
+      "id": "thai_national_registration_exemption",
+      "category": "house-rules",
+      "priority": 70,
+      "triggers": [
+        "i am thai",
+        "i am a thai national",
+        "thai citizen passport upload",
+        "do thai guests need tm30",
+        "does a thai guest need to register",
+        "thai national registration"
+      ],
+      "answer": "Thai nationals do not need to complete this TM30 Immigration accommodation registration. Please tell The House so any unused private registration request can be closed.",
+      "actions": []
+    },
     {
       "id": "welcome",
       "category": "concierge",
@@ -432,7 +447,7 @@
         "tm30 registration",
         "send passport information"
       ],
-      "answer": "Passport information is required for each guest staying at The House so we can complete the required TM30 Immigration accommodation registration. Open the private Room welcome link sent by The House and use its registration button to continue securely. Do not send passport information through this chat or WhatsApp. A passport image is automatically deleted 14 days after upload, or sooner after processing.",
+      "answer": "This TM30 Immigration accommodation registration applies only to non-Thai guests. Thai nationals do not need to complete it. Non-Thai guests should open the private Room welcome link sent by The House and use its registration button to continue securely. Do not send passport information through this chat or WhatsApp. A passport image is automatically deleted 14 days after upload, or sooner after processing.",
       "actions": [
         {
           "label": "Continue Securely",
@@ -454,7 +469,7 @@
         "secure passport link",
         "extra guest"
       ],
-      "answer": "The House needs passport information for every overnight visitor so we can complete the required TM30 Immigration accommodation registration. Open the private Room welcome link sent by The House and use its registration button to continue securely. Do not put passport information in this chat or send it through WhatsApp.",
+      "answer": "The House needs passport information for every non-Thai overnight visitor so we can complete the required TM30 Immigration accommodation registration. Thai nationals do not need to complete this registration. Non-Thai guests should open the private Room welcome link sent by The House and use its registration button to continue securely. Do not put passport information in this chat or send it through WhatsApp.",
       "actions": [
         {
           "label": "Continue Securely",
@@ -590,6 +605,32 @@
       ]
     },
     {
+      "id": "bamboo_beach_bar_social",
+      "category": "concierge",
+      "priority": 50,
+      "triggers": [
+        "bamboo beach bar website",
+        "does bamboo beach bar have a website",
+        "bamboo beach bar facebook",
+        "bamboo beach bar instagram",
+        "bamboo beach bar social media",
+        "where can i find bamboo beach bar online"
+      ],
+      "answer": "You can find Bamboo Beach Bar on its official Facebook and Instagram pages. Choose either option below.",
+      "actions": [
+        {
+          "label": "Facebook",
+          "type": "link",
+          "href": "https://facebook.com/bamboobeachbarkohtao"
+        },
+        {
+          "label": "Instagram",
+          "type": "link",
+          "href": "https://www.instagram.com/bamboobeachbar_kohtao/"
+        }
+      ]
+    },
+    {
       "id": "recommended_sunset_bar",
       "category": "concierge",
       "priority": 35,
@@ -606,9 +647,14 @@
       "answer": "For a relaxed beachfront sunset, The House recommends Bamboo Beach Bar on Mae Haad Beach. It is a good fit for guests looking for toes-in-the-sand seating, drinks and an easygoing atmosphere. Event schedules and opening details can change, so check the current details if a specific evening matters.",
       "actions": [
         {
-          "label": "View Bamboo Beach Bar",
+          "label": "Facebook",
           "type": "link",
-          "href": "/bar.html?id=bamboo-beach-bar"
+          "href": "https://facebook.com/bamboobeachbarkohtao"
+        },
+        {
+          "label": "Instagram",
+          "type": "link",
+          "href": "https://www.instagram.com/bamboobeachbar_kohtao/"
         }
       ]
     },

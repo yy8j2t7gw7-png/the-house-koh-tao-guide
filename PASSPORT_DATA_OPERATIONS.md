@@ -2,17 +2,20 @@
 
 ## Purpose and current scope
 
-The House requires passport information for guest and overnight-visitor TM30 Immigration accommodation registration. v5.7.0 provides a private passport-image workflow, a prominent welcome-page registration entry point and a seven-language secure form so guests do not send the document through the AI Concierge or as a WhatsApp attachment.
+TM30 accommodation registration concerns foreign guests. Thai nationals do not need to complete this registration or upload a passport. For non-Thai guests and overnight visitors, v5.8.1 provides a private passport-image workflow, a prominent welcome-page registration entry point and a seven-language secure form so guests do not send the document through the AI Concierge or as a WhatsApp attachment.
+
+This scope was checked against the Thai Immigration Bureau TM30 service description, which states that Section 38 notification applies when accommodation is provided to foreign nationals. Operational wording must remain limited to this exemption and must not expand into unsourced legal advice.
 
 The current authoritative House information confirms the passport-photo requirement. It does not contain the exact structured TM30 field list. The alternative manual-details form must therefore remain disabled until that authoritative field specification is supplied. Do not guess legal or Immigration fields.
 
 ## Guest experience
 
-1. An authorized owner creates a private request in `/concierge-admin`, selecting the room and expected Bangkok arrival time.
+1. An authorized owner confirms the request is for a non-Thai guest, then creates it in `/concierge-admin` with the room and expected Bangkok arrival time. The application does not infer nationality.
 2. The system returns a guest-friendly reminder and a private Room welcome link.
 3. The link carries its 256-bit token in the URL fragment. Browser fragments are not sent in the initial page request or referrer.
 4. The Required Guest Registration button on that private welcome page opens the secure one-time registration form directly. It does not open WhatsApp.
 5. The registration page explains why the information is needed and how it is handled, then presents two choices: upload a passport image, or enter the required details securely.
+   Thai guests are told that neither choice is required for them.
 6. Passport-image upload is active. The guest submits one JPEG, PNG, WebP or HEIC passport image up to 10 MB.
 7. Manual entry remains disabled until the authoritative list of required TM30 fields is supplied. This prevents collection of guessed, unnecessary or incomplete information.
 8. The server validates the link, expiration, single-use state, file size and file signature before private storage.
@@ -33,6 +36,8 @@ The private review area shows:
 Su and the owners currently use ordinary WhatsApp. The application therefore prepares a reminder for the owner to copy into the existing guest conversation. It cannot send that message automatically. After sending it, mark the reminder as sent. If information arrives through an approved alternative process, revoke the pending link.
 
 Automatic reminders require an approved outbound messaging integration, such as the WhatsApp Business Platform, plus the guest contact and stay-arrival data. Do not silently add personal telephone numbers to this store.
+
+The protected v5.8.1 staff-alert channel does not automatically become a guest reminder channel. Pre-arrival reminders require separate approved guest-contact data, consent and templates.
 
 ## Data handling
 
@@ -88,3 +93,7 @@ This design minimizes exposure but does not by itself establish legal compliance
 - Confirmation of any future production retention-policy change from the approved 14-day maximum
 - Approved outbound messaging provider and recipient workflow for automatic reminders
 - Booking or stay-system integration that can automatically supply arrival time and submission status
+
+## Verified reference
+
+- Thai Immigration Bureau TM30 service: `https://tm30.immigration.go.th/TM30/Foreigner/TM30EN/index.html` (checked 13 August 2026)

@@ -13,8 +13,13 @@ import {
 import { handlePassportAdminRequest } from "./passport-api.js";
 import { retrieveApprovedProjectKnowledge } from "./project-knowledge.js";
 import { LANGUAGE_NAMES, translateApprovedTexts, validLanguage } from "./i18n-api.js";
+import {
+  createConciergeAlert,
+  dispatchConciergeAlert,
+  whatsappAlertConfiguration
+} from "./whatsapp-alerts.js";
 
-const RELEASE = "5.7.0";
+const RELEASE = "5.8.1";
 const ROOM_OPTIONS = new Set(["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11"]);
 const MAX_HISTORY_ITEMS = 10;
 const MAX_QUESTION_LENGTH = 800;
@@ -331,6 +336,27 @@ function safeFallbackMatch(match, question, knowledge) {
   return matchKnowledge(question, knowledge, FALLBACK_MINIMUM_SCORE);
 }
 
+function bambooSocialFollowUpMatch(question, history, knowledge) {
+  const normalizedQuestion = normalizeText(question);
+  const asksForOnlinePage = /\b(?:website|facebook|instagram|social|page|link|site|sitio|seite|webseite|site internet|pagina|page facebook|sait|ssylka)\b/.test(normalizedQuestion)
+    || /(?:网站|网页|链接|Вебсайт|веб-сайт|сайт|ссылка|เว็บไซต์|ลิงก์)/i.test(String(question || ""));
+  if (!asksForOnlinePage) return null;
+  const recentContext = [question, ...history.slice(-4).map((item) => item.content)]
+    .map(normalizeText)
+    .join(" ");
+  if (!recentContext.includes("bamboo beach bar")) return null;
+  const intent = (knowledge.intents || []).find((item) => item.id === "bamboo_beach_bar_social");
+  if (!intent) return null;
+  return {
+    matched: true,
+    intentId: intent.id,
+    category: intent.category,
+    confidence: 1,
+    answer: intent.answer,
+    actions: intent.actions || []
+  };
+}
+
 function finalizeResult(result) {
   let handoff = result.handoff;
   if (result.needsHuman && handoff === "none") handoff = "stay_support";
@@ -445,9 +471,10 @@ export async function handleConciergeRequest(request, env, ctx) {
   }
 
   const effectiveKnowledge = mergeApprovedKnowledge(knowledge, approvedKnowledge);
-  const match = matchKnowledge(question, effectiveKnowledge, 0.44);
+  const contextualMatch = bambooSocialFollowUpMatch(question, history, effectiveKnowledge);
+  const match = contextualMatch || matchKnowledge(question, effectiveKnowledge, 0.44);
   let result;
-  if (shouldUseDeterministic(match, history)) {
+  if (contextualMatch || shouldUseDeterministic(match, history)) {
     result = deterministicResult(match);
   } else if (env.OPENAI_API_KEY) {
     try {
@@ -483,6 +510,22 @@ export async function handleConciergeRequest(request, env, ctx) {
     const recordedId = await interactionRecord({ env, store, interactionId, sessionId, room, question, result })
       .catch(() => null);
     if (!recordedId) interactionId = null;
+  }
+
+  if (interactionId) {
+    const alert = await createConciergeAlert({
+      env,
+      interactionId,
+      sessionId,
+      room,
+      question,
+      result
+    }).catch(() => null);
+    if (alert && !alert.duplicate) {
+      const delivery = dispatchConciergeAlert(alert, env).catch(() => ({ attempted: 0, accepted: 0 }));
+      if (ctx?.waitUntil) ctx.waitUntil(delivery);
+      else await delivery;
+    }
   }
 
   return json({
@@ -539,7 +582,10 @@ export async function handleAdminRequest(request, env, path) {
   }
 
   if (path === "/api/concierge/admin/overview" && request.method === "GET") {
-    return json(await store.getAdminOverview());
+    return json({
+      ...(await store.getAdminOverview()),
+      alertConfiguration: whatsappAlertConfiguration(env)
+    });
   }
   if (path === "/api/concierge/admin/export" && request.method === "GET") {
     const entries = await store.getApprovedKnowledge();
@@ -575,6 +621,23 @@ export async function handleAdminRequest(request, env, path) {
     await store.setApprovedKnowledgeActive(String(body.id || ""), Boolean(body.active));
     return json({ ok: true });
   }
+  if ((path === "/api/concierge/admin/alerts/acknowledge" || path === "/api/concierge/admin/alerts/resolve") && request.method === "POST") {
+    let body;
+    try {
+      body = await readJson(request, 4_000);
+    } catch (response) {
+      if (response instanceof Response) return response;
+      return json({ error: "invalid_request" }, 400);
+    }
+    const id = String(body.id || "");
+    if (!/^alert_[A-Za-z0-9-]{20,}$/.test(id)) return json({ error: "invalid_request" }, 400);
+    const actorHash = await hashSession(`admin:${request.headers.get("authorization") || ""}`, env.CONCIERGE_HASH_SALT);
+    const now = new Date().toISOString();
+    const result = path.endsWith("/acknowledge")
+      ? await store.acknowledgeAlert(id, actorHash, now)
+      : await store.resolveAlert(id, actorHash, now);
+    return json(result);
+  }
   return json({ error: "not_found" }, 404);
 }
 
@@ -584,6 +647,7 @@ export function conciergeStatus(env) {
     aiConfigured: Boolean(env.OPENAI_API_KEY),
     learningEnabled: Boolean(env.CONCIERGE_STORE),
     passportUploadsConfigured: Boolean(env.PASSPORT_UPLOADS && env.PASSPORT_TOKEN_PEPPER),
+    whatsappAlertsConfigured: whatsappAlertConfiguration(env).configured,
     secureSpareKeyEnabled: false
   });
 }

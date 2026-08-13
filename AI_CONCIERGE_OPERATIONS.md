@@ -2,11 +2,12 @@
 
 ## Purpose
 
-The v5.7.0 concierge combines three layers:
+The v5.8.1 concierge combines four layers:
 
 1. Deterministic safety and operational rules for emergencies, lost keys, fees, booking policy and human routing.
 2. Server-side model reasoning over approved House knowledge plus targeted retrieval from the existing Activities, Restaurants, Cafés, Beaches, Bars and Shopping records.
 3. A controlled learning queue that records knowledge gaps and negative feedback for owner review.
+4. A deterministic action-needed alert channel with protected owner-console delivery and optional official WhatsApp Business Platform notifications.
 
 The model cannot publish its own facts. An owner must approve or edit every knowledge addition before it becomes active.
 
@@ -18,10 +19,12 @@ Configure secrets on the existing Cloudflare Worker. Never place their values in
 
 ## Guest-language operations
 
-v5.7.0 supports English, Thai, Simplified Chinese, Russian, German, French and Spanish for the operational guest journey. Essential navigation, emergency, passport and concierge controls have reviewed built-in translations. Longer approved operational text is translated through `/api/i18n/translate` using strict structured output with `store: false` and cached in the existing Durable Object.
+v5.8.1 supports English, Thai, Simplified Chinese, Russian, German, French and Spanish for the operational guest journey. Essential navigation, emergency, passport and concierge controls have reviewed built-in translations. Longer approved operational text is translated through `/api/i18n/translate` using strict structured output with `store: false` and cached in the existing Durable Object. Approved items are isolated within each batch, so one skipped dynamic item cannot prevent the rest of a page from translating.
+
+The visible concierge thinking state is an animated three-dot indicator rather than an operational status sentence. Venue website or social actions must use approved external URLs. Internal Explore detail paths are excluded from model context while Explore is disabled. Bamboo Beach Bar follow-up questions use the approved Facebook and Instagram actions in `public/data/concierge-knowledge.json`.
 
 - `OPENAI_TRANSLATION_MODEL` defaults to `gpt-5.6`.
-- `OPENAI_TRANSLATION_REASONING_EFFORT` defaults to `low`.
+- `OPENAI_TRANSLATION_REASONING_EFFORT` defaults to `medium`.
 - Only approved public project text may be sent to the translation endpoint.
 - Guest-authored chat messages and the owner dashboard are excluded.
 - Explore content translation is deferred.
@@ -50,6 +53,10 @@ Required for private passport-upload links. Use a separate long random secret. R
 
 Create `the-house-passport-uploads`, keep it non-public and bind it as `PASSPORT_UPLOADS`. Configure a 14-day object lifecycle rule for the `passport/` prefix as the main storage-retention rule. The application cleanup reinforces the same deadline. See `PASSPORT_DATA_OPERATIONS.md`.
 
+### WhatsApp staff alerts
+
+The owner console receives actionable alerts without additional provider configuration. Official WhatsApp delivery requires `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_WEBHOOK_VERIFY_TOKEN`, `META_APP_SECRET` and `WHATSAPP_ALERT_RECIPIENTS`. `CONCIERGE_HASH_SALT` is strongly recommended for recipient hashes; when it is absent, the existing Meta app secret is used as the private salt. Keep every value encrypted and follow `WHATSAPP_ALERT_OPERATIONS.md`; never place recipient numbers in Git or release archives.
+
 ## Optional configuration
 
 ### `OPENAI_VECTOR_STORE_ID`
@@ -60,7 +67,7 @@ The core accommodation knowledge is already supplied directly from `public/data/
 
 ## Activation
 
-1. Add the three production secrets to the existing Cloudflare Worker.
+1. Add the required production secrets for the features being activated to the existing Cloudflare Worker.
 2. Deploy the verified release.
 3. Open `/api/concierge/status` and confirm `aiConfigured` and `learningEnabled` are `true`.
 4. Test check-in, Wi-Fi, room cleaning, lost key, booking, property emergency and medical emergency flows.
@@ -69,6 +76,9 @@ The core accommodation knowledge is already supplied directly from `public/data/
 7. Edit and approve a safe test answer, then confirm that the concierge uses it immediately.
 8. Verify the passport flow with a non-sensitive test image before requesting any real document.
 9. Confirm the owner-created private Room welcome link activates “Complete Required Registration” and opens the secure form directly without a WhatsApp handoff.
+10. Confirm the owner cannot create a passport request until the non-Thai guest checkbox is selected.
+11. Open the owner alert console and test a support, booking, urgent and emergency alert with non-sensitive text.
+12. If WhatsApp is configured, verify signed acknowledgement and the unacknowledged escalation path before relying on it operationally.
 
 ## Daily learning workflow
 
@@ -98,12 +108,14 @@ An authorized owner should review the queue regularly:
 - Approved knowledge and learning candidates remain until reviewed or deactivated because they are operational content, not a guest conversation archive.
 - The OpenAI request uses `store: false`.
 - Passport images are handled by a separate private API and R2 bucket. They never enter model prompts, interaction records or the learning queue.
+- Staff-alert descriptions are independently sanitized, and recipient numbers are never written to the operational database.
 
 Guests are told not to enter passport, payment or key-box information in the concierge.
 
 ## Safety invariants
 
 - Room selection is context, not identity verification.
+- Thai nationals do not require the TM30 passport-registration flow; the owner must confirm a request is for a non-Thai guest.
 - No key-box code or protected token enters the model prompt or learning store.
 - Lost-key handling always includes the 500 THB replacement fee.
 - Property and medical emergencies bypass generative answers when a protected intent is detected.

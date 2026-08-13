@@ -14,7 +14,7 @@
     window.HOUSE_PRIVATE_REGISTRATION_URL = secureUrl;
     controls.forEach((control) => {
       control.href = secureUrl;
-      control.textContent = "Complete Required Registration";
+      control.textContent = "Complete Required Registration — Non-Thai Guests";
       control.removeAttribute("aria-disabled");
     });
     notes.forEach((note) => {

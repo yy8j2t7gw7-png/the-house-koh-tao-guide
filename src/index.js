@@ -6,6 +6,7 @@ import {
 } from "./concierge-api.js";
 import { cleanupPassportUploads, handlePassportGuestRequest } from "./passport-api.js";
 import { handleTranslationRequest } from "./i18n-api.js";
+import { handleWhatsAppWebhook, processDueAlertEscalations } from "./whatsapp-alerts.js";
 export { ConciergeStore } from "./concierge-store.js";
 
 const EXPLORE_PAGE_PATTERN = /^\/(?:explore|activities|activity|diving|bars|bar|beaches|beach|cafes|cafe|restaurants|restaurant|shopping|shop)(?:\.html)?\/?$/;
@@ -74,6 +75,10 @@ export default {
       return handleFeedbackRequest(request, env);
     }
 
+    if (url.pathname === "/api/whatsapp/webhook") {
+      return handleWhatsAppWebhook(request, env);
+    }
+
     if (url.pathname === "/api/i18n/translate") {
       return handleTranslationRequest(request, env);
     }
@@ -132,7 +137,11 @@ export default {
     const response = await env.ASSETS.fetch(request);
     return exploreEnabled(env) ? response : withoutExploreNavigation(response);
   },
-  async scheduled(_controller, env, ctx) {
+  async scheduled(controller, env, ctx) {
+    if (controller.cron === "*/1 * * * *") {
+      ctx.waitUntil(processDueAlertEscalations(env));
+      return;
+    }
     ctx.waitUntil(cleanupPassportUploads(env));
   }
 };

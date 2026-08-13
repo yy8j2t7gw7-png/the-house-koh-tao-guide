@@ -2,7 +2,7 @@
   if (window.HOUSE_I18N) return;
 
   const STORAGE_KEY = "houseGuideLanguage";
-  const CACHE_PREFIX = "houseGuideTranslations:";
+  const CACHE_PREFIX = "houseGuideTranslations:v5.8:";
   const languages = Object.freeze([
     { code: "en", label: "English" },
     { code: "th", label: "ไทย" },
@@ -49,6 +49,7 @@
   add("Guest registration", "ลงทะเบียนผู้เข้าพัก", "住客登记", "Регистрация гостя", "Gästeregistrierung", "Enregistrement client", "Registro de huéspedes");
   add("Concierge", "คอนเซียร์จ", "礼宾服务", "Консьерж", "Concierge", "Conciergerie", "Conserjería");
   add("AI Concierge", "AI คอนเซียร์จ", "AI 礼宾服务", "AI-консьерж", "AI-Concierge", "Conciergerie IA", "Conserjería con IA");
+  add("Concierge is thinking", "คอนเซียร์จกำลังประมวลผล", "礼宾服务正在思考", "Консьерж готовит ответ", "Der Concierge bereitet eine Antwort vor", "La conciergerie prépare une réponse", "La conserjería está preparando una respuesta");
   add("Welcome", "ยินดีต้อนรับ", "欢迎", "Добро пожаловать", "Willkommen", "Bienvenue", "Bienvenido");
   add("Common questions", "คำถามที่พบบ่อย", "常见问题", "Частые вопросы", "Häufige Fragen", "Questions fréquentes", "Preguntas frecuentes");
   add("Set your room", "เลือกห้องของคุณ", "选择您的客房", "Укажите номер", "Zimmer auswählen", "Choisir votre chambre", "Elige tu habitación");
@@ -65,7 +66,6 @@
   add("This answer was helpful", "คำตอบนี้มีประโยชน์", "此回答有帮助", "Ответ был полезен", "Diese Antwort war hilfreich", "Cette réponse était utile", "Esta respuesta fue útil");
   add("This answer was not helpful", "คำตอบนี้ไม่มีประโยชน์", "此回答没有帮助", "Ответ не помог", "Diese Antwort war nicht hilfreich", "Cette réponse n’était pas utile", "Esta respuesta no fue útil");
   add("Answers use approved information from The House. Please do not share passport, payment or key-box details here.", "คำตอบใช้เฉพาะข้อมูลที่ The House อนุมัติ โปรดอย่าแชร์ข้อมูลหนังสือเดินทาง การชำระเงิน หรือรหัสกล่องกุญแจที่นี่", "回答仅使用 The House 批准的信息。请勿在此分享护照、付款或钥匙盒信息。", "Ответы основаны на подтверждённой информации The House. Не сообщайте здесь паспортные, платёжные данные или код бокса для ключей.", "Die Antworten basieren auf freigegebenen Informationen von The House. Bitte teilen Sie hier keine Pass-, Zahlungs- oder Schlüsselboxdaten.", "Les réponses utilisent les informations approuvées par The House. Ne communiquez ici aucune donnée de passeport, de paiement ou de boîte à clés.", "Las respuestas utilizan información aprobada por The House. No compartas aquí datos de pasaporte, pago ni de la caja de llaves.");
-  add("Checking the approved information…", "กำลังตรวจสอบข้อมูลที่ได้รับอนุมัติ…", "正在核对已批准的信息…", "Проверяю подтверждённую информацию…", "Freigegebene Informationen werden geprüft…", "Vérification des informations approuvées…", "Comprobando la información aprobada…");
   add("Before I continue, which room are you staying in?", "ก่อนดำเนินการต่อ คุณพักอยู่ห้องไหน", "继续之前，请问您住在哪个房间？", "Прежде чем продолжить, скажите, в каком номере вы остановились?", "Bevor ich fortfahre: In welchem Zimmer wohnen Sie?", "Avant de continuer, dans quelle chambre séjournez-vous ?", "Antes de continuar, ¿en qué habitación te alojas?");
   add("Please shorten your question to 800 characters or fewer.", "โปรดย่อคำถามให้เหลือไม่เกิน 800 ตัวอักษร", "请将问题缩短至 800 个字符以内。", "Сократите вопрос до 800 символов.", "Bitte kürzen Sie Ihre Frage auf höchstens 800 Zeichen.", "Veuillez limiter votre question à 800 caractères.", "Reduce la pregunta a un máximo de 800 caracteres.");
   add("Ask a Human", "ติดต่อเจ้าหน้าที่", "联系工作人员", "Связаться с сотрудником", "Mitarbeiter kontaktieren", "Contacter une personne", "Contactar con una persona");
@@ -95,6 +95,10 @@
   add("Practical Information", "ข้อมูลที่เป็นประโยชน์", "实用信息", "Практическая информация", "Praktische Informationen", "Informations pratiques", "Información práctica");
   add("Required guest registration", "ต้องลงทะเบียนผู้เข้าพัก", "必须完成住客登记", "Обязательная регистрация гостя", "Erforderliche Gästeregistrierung", "Enregistrement client obligatoire", "Registro de huéspedes obligatorio");
   add("Complete your passport information", "กรอกข้อมูลหนังสือเดินทางให้เรียบร้อย", "完成护照信息提交", "Предоставьте паспортные данные", "Passinformationen vervollständigen", "Complétez vos informations de passeport", "Completa los datos de tu pasaporte");
+  add("Required registration for non-Thai guests", "การลงทะเบียนที่จำเป็นสำหรับผู้เข้าพักที่ไม่ใช่คนไทย", "非泰国籍住客必须登记", "Обязательная регистрация для гостей, не являющихся гражданами Таиланда", "Erforderliche Registrierung für nicht-thailändische Gäste", "Enregistrement obligatoire pour les clients non thaïlandais", "Registro obligatorio para huéspedes no tailandeses");
+  add("Non-Thai guests: complete your passport information", "ผู้เข้าพักที่ไม่ใช่คนไทย: กรุณากรอกข้อมูลหนังสือเดินทาง", "非泰国籍住客：请完成护照信息提交", "Гости, не являющиеся гражданами Таиланда: предоставьте паспортные данные", "Nicht-thailändische Gäste: Passinformationen vervollständigen", "Clients non thaïlandais : complétez les informations de votre passeport", "Huéspedes no tailandeses: completa los datos de tu pasaporte");
+  add("Non-Thai guests: use your private registration link", "ผู้เข้าพักที่ไม่ใช่คนไทย: ใช้ลิงก์ลงทะเบียนส่วนตัว", "非泰国籍住客：使用私人登记链接", "Гости, не являющиеся гражданами Таиланда: используйте личную ссылку для регистрации", "Nicht-thailändische Gäste: privaten Registrierungslink verwenden", "Clients non thaïlandais : utilisez votre lien privé d’enregistrement", "Huéspedes no tailandeses: usa tu enlace privado de registro");
+  add("Complete Required Registration — Non-Thai Guests", "ดำเนินการลงทะเบียนที่จำเป็น — ผู้เข้าพักที่ไม่ใช่คนไทย", "完成必要登记 — 非泰国籍住客", "Завершить обязательную регистрацию — гости, не являющиеся гражданами Таиланда", "Erforderliche Registrierung abschließen — nicht-thailändische Gäste", "Terminer l’enregistrement obligatoire — clients non thaïlandais", "Completar el registro obligatorio — huéspedes no tailandeses");
   add("Use Your Private Registration Link", "ใช้ลิงก์ลงทะเบียนส่วนตัวของคุณ", "使用您的私人登记链接", "Использовать личную ссылку регистрации", "Privaten Registrierungslink verwenden", "Utiliser votre lien d’enregistrement privé", "Usar tu enlace privado de registro");
   add("Complete Required Registration", "ดำเนินการลงทะเบียนที่จำเป็น", "完成必须登记", "Пройти обязательную регистрацию", "Erforderliche Registrierung abschließen", "Effectuer l’enregistrement obligatoire", "Completar el registro obligatorio");
 
@@ -111,6 +115,9 @@
   add("Only an owner using the protected operations area can retrieve or delete it.", "มีเพียงเจ้าของที่ใช้พื้นที่ปฏิบัติการที่มีการป้องกันเท่านั้นที่สามารถเรียกดูหรือลบไฟล์ได้", "只有通过受保护操作区域的业主才能查看或删除该文件。", "Получить или удалить файл может только владелец через защищённый рабочий раздел.", "Nur ein Eigentümer mit Zugang zum geschützten Betriebsbereich kann die Datei abrufen oder löschen.", "Seul un propriétaire utilisant l’espace d’opérations protégé peut récupérer ou supprimer le fichier.", "Solo un propietario que acceda al área operativa protegida puede recuperar o eliminar el archivo.");
   add("The file is deleted automatically after the short period shown below, or sooner when an owner deletes it after processing.", "ไฟล์จะถูกลบอัตโนมัติหลังพ้นระยะเวลาสั้น ๆ ที่แสดงด้านล่าง หรือเร็วกว่านั้นเมื่อเจ้าของลบหลังดำเนินการเสร็จ", "文件会在下方所示的短期后自动删除；业主处理完毕后也可提前删除。", "Файл автоматически удаляется по истечении указанного ниже короткого срока либо раньше, если владелец удалит его после обработки.", "Die Datei wird nach der unten angegebenen kurzen Frist automatisch gelöscht oder früher, wenn ein Eigentümer sie nach der Bearbeitung löscht.", "Le fichier est supprimé automatiquement après la courte période indiquée ci-dessous, ou plus tôt si un propriétaire le supprime après traitement.", "El archivo se elimina automáticamente tras el breve periodo indicado abajo, o antes si un propietario lo borra después de procesarlo.");
   add("The document is used for guest registration, not marketing or AI training.", "เอกสารนี้ใช้เพื่อลงทะเบียนผู้เข้าพักเท่านั้น ไม่ใช้เพื่อการตลาดหรือฝึก AI", "该文件仅用于住客登记，不用于营销或 AI 训练。", "Документ используется для регистрации гостя, а не для маркетинга или обучения ИИ.", "Das Dokument wird zur Gästeregistrierung verwendet, nicht für Marketing oder KI-Training.", "Le document sert à l’enregistrement des clients, et non au marketing ni à l’entraînement de l’IA.", "El documento se utiliza para el registro de huéspedes, no para marketing ni para entrenar IA.");
+  add("Thai nationals do not need to complete this registration.", "ผู้มีสัญชาติไทยไม่ต้องดำเนินการลงทะเบียนนี้", "泰国公民无需完成此登记。", "Гражданам Таиланда не нужно проходить эту регистрацию.", "Thailändische Staatsangehörige müssen diese Registrierung nicht durchführen.", "Les ressortissants thaïlandais n’ont pas besoin d’effectuer cet enregistrement.", "Los ciudadanos tailandeses no necesitan completar este registro.");
+  add("Thai national?", "ผู้มีสัญชาติไทย?", "泰国公民？", "Гражданин Таиланда?", "Thailändische Staatsangehörigkeit?", "Ressortissant thaïlandais ?", "¿Ciudadano tailandés?");
+  add("You do not need to upload a passport for this registration. Please tell The House so the unused request can be closed.", "คุณไม่ต้องอัปโหลดหนังสือเดินทางสำหรับการลงทะเบียนนี้ โปรดแจ้ง The House เพื่อปิดคำขอที่ไม่ได้ใช้", "您无需为此登记上传护照。请告知 The House，以便关闭未使用的申请。", "Для этой регистрации загружать паспорт не нужно. Сообщите The House, чтобы неиспользованный запрос был закрыт.", "Für diese Registrierung müssen Sie keinen Pass hochladen. Bitte informieren Sie The House, damit die nicht benötigte Anfrage geschlossen werden kann.", "Vous n’avez pas besoin d’importer de passeport pour cet enregistrement. Veuillez en informer The House afin que la demande inutilisée soit clôturée.", "No necesitas subir un pasaporte para este registro. Informa a The House para que se cierre la solicitud no utilizada.");
   add("Checking your private link…", "กำลังตรวจสอบลิงก์ส่วนตัวของคุณ…", "正在检查您的私人链接…", "Проверяем личную ссылку…", "Ihr privater Link wird geprüft…", "Vérification de votre lien privé…", "Comprobando tu enlace privado…");
   add("Registration choices", "ตัวเลือกการลงทะเบียน", "登记方式", "Способы регистрации", "Registrierungsoptionen", "Options d’enregistrement", "Opciones de registro");
   add("Option 1 — Upload passport image", "ตัวเลือก 1 — อัปโหลดภาพหนังสือเดินทาง", "选项 1 — 上传护照图片", "Вариант 1 — Загрузить изображение паспорта", "Option 1 — Passbild hochladen", "Option 1 — Importer l’image du passeport", "Opción 1 — Subir una imagen del pasaporte");
@@ -226,7 +233,10 @@
       if (!response.ok || !Array.isArray(data.translations) || data.translations.length !== unresolved.length) {
         throw new Error("Translation unavailable.");
       }
-      unresolved.forEach((source, index) => { result[source] = data.translations[index]; });
+      unresolved.forEach((source, index) => {
+        const translated = data.translations[index];
+        if (typeof translated === "string" && translated.trim()) result[source] = translated;
+      });
       storeCache(result);
       return result;
     } finally {

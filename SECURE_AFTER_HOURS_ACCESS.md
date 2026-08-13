@@ -61,7 +61,7 @@ Delivery failures must be logged so one failed owner notification does not preve
 
 Until secure code delivery is enabled, the concierge identifies the room, explains the 500 THB fee and offers the correct human support handoff. It never reveals or guesses a key-box code.
 
-v5.8.1 provides the protected official WhatsApp Business Platform alert adapter and owner console. When the production account, approved template and encrypted recipients are configured, an after-hours lost-key request can notify the protected urgent group and escalate if unacknowledged. The alert never contains the key-box code or private stay token. This notification capability does not enable secure code delivery, which remains blocked on current-guest verification and protected server-side codes.
+v5.8.2 provides the protected official WhatsApp Business Platform alert adapter and owner console. When the production account, approved template and encrypted recipients are configured, an after-hours lost-key request can notify the protected urgent group and escalate if unacknowledged. The alert never contains the key-box code or private stay token. This notification capability does not enable secure code delivery, which remains blocked on current-guest verification and protected server-side codes.
 
 ## Separate 24/7 property-emergency route
 

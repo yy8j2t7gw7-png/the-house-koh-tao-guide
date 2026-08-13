@@ -19,7 +19,7 @@ import {
   whatsappAlertConfiguration
 } from "./whatsapp-alerts.js";
 
-const RELEASE = "5.8.1";
+const RELEASE = "5.8.2";
 const ROOM_OPTIONS = new Set(["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11"]);
 const MAX_HISTORY_ITEMS = 10;
 const MAX_QUESTION_LENGTH = 800;

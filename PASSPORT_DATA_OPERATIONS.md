@@ -2,7 +2,7 @@
 
 ## Purpose and current scope
 
-TM30 accommodation registration concerns foreign guests. Thai nationals do not need to complete this registration or upload a passport. For non-Thai guests and overnight visitors, v5.8.1 provides a private passport-image workflow, a prominent welcome-page registration entry point and a seven-language secure form so guests do not send the document through the AI Concierge or as a WhatsApp attachment.
+TM30 accommodation registration concerns foreign guests. Thai nationals do not need to complete this registration or upload a passport. For non-Thai guests and overnight visitors, v5.8.2 provides a private passport-image workflow, a prominent welcome-page registration entry point and a seven-language secure form so guests do not send the document through the AI Concierge or as a WhatsApp attachment.
 
 This scope was checked against the Thai Immigration Bureau TM30 service description, which states that Section 38 notification applies when accommodation is provided to foreign nationals. Operational wording must remain limited to this exemption and must not expand into unsourced legal advice.
 
@@ -37,7 +37,7 @@ Su and the owners currently use ordinary WhatsApp. The application therefore pre
 
 Automatic reminders require an approved outbound messaging integration, such as the WhatsApp Business Platform, plus the guest contact and stay-arrival data. Do not silently add personal telephone numbers to this store.
 
-The protected v5.8.1 staff-alert channel does not automatically become a guest reminder channel. Pre-arrival reminders require separate approved guest-contact data, consent and templates.
+The protected v5.8.2 staff-alert channel does not automatically become a guest reminder channel. Pre-arrival reminders require separate approved guest-contact data, consent and templates.
 
 ## Data handling
 

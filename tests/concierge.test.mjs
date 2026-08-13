@@ -476,6 +476,9 @@ test("guest localization supports seven languages and keeps the owner dashboard 
   assert.doesNotMatch(admin, /src="\/i18n\.js"/);
   assert.match(runtime, /exploreContentDeferred/);
   assert.match(runtime, /element\.closest\("\.section,\.footer"\)/);
+  assert.match(runtime, /houseGuideTranslations:v5\.8\.2:/);
+  assert.match(runtime, /MAX_REQUEST_RETRIES = 2/);
+  assert.match(runtime, /let flushRunning = false/);
 });
 
 test("critical emergency and registration wording is reviewed in every guest language", async () => {
@@ -644,6 +647,7 @@ test("one dynamic room phrase cannot block the rest of a translated page batch",
         texts: [
           "Welcome to Room 1",
           "Room 1 · Upstairs",
+          "Thank you. I’ll use Room 1 for this conversation.",
           "This TM30 Immigration accommodation registration applies only to non-Thai guests. If you have not already provided the required passport information, please complete it before arrival. Thai nationals do not need to complete this registration.",
           "My private guest message"
         ]
@@ -654,9 +658,173 @@ test("one dynamic room phrase cannot block the rest of a translated page batch",
     assert.equal(response.status, 200);
     assert.match(body.translations[0], /^Deutsch: Welcome to Room 1$/);
     assert.match(body.translations[1], /^Deutsch: Room 1 · Upstairs$/);
-    assert.match(body.translations[2], /^Deutsch: This TM30 Immigration accommodation registration/);
-    assert.equal(body.translations[3], null);
+    assert.match(body.translations[2], /^Deutsch: Thank you\. I’ll use Room 1/);
+    assert.match(body.translations[3], /^Deutsch: This TM30 Immigration accommodation registration/);
+    assert.equal(body.translations[4], null);
     assert.equal(body.untranslated, 1);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("large page translation batches split and recover instead of leaving lower sections in English", async () => {
+  const { env } = createEnvironment({ OPENAI_API_KEY: "test-key" });
+  const originalFetch = globalThis.fetch;
+  const modelBatchSizes = [];
+  globalThis.fetch = async (_url, options) => {
+    const modelRequest = JSON.parse(options.body);
+    const entries = JSON.parse(modelRequest.input[0].content).entries;
+    modelBatchSizes.push(entries.length);
+    if (entries.length > 2) return new Response("temporary model failure", { status: 502 });
+    return new Response(JSON.stringify({
+      output: [{
+        type: "message",
+        content: [{
+          type: "output_text",
+          text: JSON.stringify({
+            translations: entries.map((entry) => ({ id: entry.id, text: `Deutsch: ${entry.text}` }))
+          })
+        }]
+      }]
+    }), { status: 200, headers: { "content-type": "application/json" } });
+  };
+  try {
+    const texts = [
+      "Your personal guest guide for The House – Koh Tao.",
+      "Find My Room",
+      "Arrival photos and self check-in instructions.",
+      "House Information",
+      "Rules, towels, laundry, parking, water and more.",
+      "Practical Information",
+      "Taxi, ferries, laundry, ATMs and shops."
+    ];
+    const request = new Request("https://guide.example/api/i18n/translate", {
+      method: "POST",
+      headers: { "content-type": "application/json", "cf-connecting-ip": "203.0.113.10" },
+      body: JSON.stringify({ language: "de", page: "/room/2", texts })
+    });
+    const response = await handleTranslationRequest(request, env);
+    const body = await response.json();
+    assert.equal(response.status, 200);
+    assert.deepEqual(body.retryable, []);
+    assert.equal(body.untranslated, 0);
+    assert.equal(body.translations.length, texts.length);
+    body.translations.forEach((translation) => assert.match(translation, /^Deutsch: /));
+    assert.ok(modelBatchSizes.some((size) => size > 2));
+    assert.ok(modelBatchSizes.some((size) => size <= 2));
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("one failing translation is isolated and explicitly marked for browser retry", async () => {
+  const { env } = createEnvironment({ OPENAI_API_KEY: "test-key" });
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (_url, options) => {
+    const modelRequest = JSON.parse(options.body);
+    const entries = JSON.parse(modelRequest.input[0].content).entries;
+    if (entries.some((entry) => entry.text === "House Information")) {
+      return new Response("temporary model failure", { status: 502 });
+    }
+    return new Response(JSON.stringify({
+      output: [{
+        type: "message",
+        content: [{
+          type: "output_text",
+          text: JSON.stringify({
+            translations: entries.map((entry) => ({ id: entry.id, text: `Français : ${entry.text}` }))
+          })
+        }]
+      }]
+    }), { status: 200, headers: { "content-type": "application/json" } });
+  };
+  try {
+    const request = new Request("https://guide.example/api/i18n/translate", {
+      method: "POST",
+      headers: { "content-type": "application/json", "cf-connecting-ip": "203.0.113.11" },
+      body: JSON.stringify({
+        language: "fr",
+        page: "/room/2",
+        texts: ["Find My Room", "House Information", "Practical Information"]
+      })
+    });
+    const response = await handleTranslationRequest(request, env);
+    const body = await response.json();
+    assert.equal(response.status, 200);
+    assert.match(body.translations[0], /^Français : /);
+    assert.equal(body.translations[1], null);
+    assert.match(body.translations[2], /^Français : /);
+    assert.deepEqual(body.retryable, [1]);
+    assert.equal(body.untranslated, 1);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("every static text and accessibility label on live operational pages is translation-approved", async () => {
+  const { env } = createEnvironment({ OPENAI_API_KEY: "test-key" });
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (_url, options) => {
+    const modelRequest = JSON.parse(options.body);
+    const entries = JSON.parse(modelRequest.input[0].content).entries;
+    return new Response(JSON.stringify({
+      output: [{
+        type: "message",
+        content: [{
+          type: "output_text",
+          text: JSON.stringify({
+            translations: entries.map((entry) => ({ id: entry.id, text: `Español: ${entry.text}` }))
+          })
+        }]
+      }]
+    }), { status: 200, headers: { "content-type": "application/json" } });
+  };
+
+  const pages = [
+    ["index.html", "/"],
+    ["rooms.html", "/room"],
+    ["room.html", "/room/2"],
+    ["house.html", "/house.html"],
+    ["practical.html", "/practical.html"],
+    ["emergency.html", "/emergency.html"],
+    ["checkout.html", "/checkout.html"],
+    ["passport-upload.html", "/passport-upload"]
+  ];
+
+  try {
+    for (const [filename, page] of pages) {
+      const html = await readFile(new URL(`../public/${filename}`, import.meta.url), "utf8");
+      const withoutCode = html
+        .replace(/<script\b[\s\S]*?<\/script>/gi, " ")
+        .replace(/<style\b[\s\S]*?<\/style>/gi, " ");
+      const visible = withoutCode.replace(/<[^>]+>/g, "\n");
+      const attributes = [...withoutCode.matchAll(/(?:placeholder|aria-label|title|alt|content)="([^"]+)"/gi)]
+        .map((match) => match[1]);
+      const texts = [...new Set([...visible.split(/\n+/), ...attributes]
+        .map((value) => value
+          .replaceAll("&amp;", "&")
+          .replaceAll("&quot;", '"')
+          .replaceAll("&#39;", "'")
+          .replaceAll("&apos;", "'")
+          .replaceAll("&lt;", "<")
+          .replaceAll("&gt;", ">")
+          .trim())
+        .filter((value) => value && /[A-Za-z]/.test(value) && value.length <= 1800))];
+
+      for (let offset = 0; offset < texts.length; offset += 24) {
+        const batch = texts.slice(offset, offset + 24);
+        const request = new Request("https://guide.example/api/i18n/translate", {
+          method: "POST",
+          headers: { "content-type": "application/json", "cf-connecting-ip": "203.0.113.12" },
+          body: JSON.stringify({ language: "es", page, texts: batch })
+        });
+        const response = await handleTranslationRequest(request, env);
+        const body = await response.json();
+        assert.equal(response.status, 200, `${filename}: ${JSON.stringify(body)}`);
+        const rejected = batch.filter((_text, index) => body.translations[index] === null);
+        assert.deepEqual(rejected, [], `${filename} contains unapproved text: ${rejected.join(" | ")}`);
+      }
+    }
   } finally {
     globalThis.fetch = originalFetch;
   }

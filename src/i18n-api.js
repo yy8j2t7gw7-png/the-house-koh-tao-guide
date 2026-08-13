@@ -11,7 +11,8 @@ const LANGUAGE_NAMES = Object.freeze({
 const MAX_TEXTS = 24;
 const MAX_TEXT_LENGTH = 1800;
 const MAX_TOTAL_LENGTH = 12_000;
-const TRANSLATION_CACHE_VERSION = "v2";
+const MODEL_BATCH_SIZE = 8;
+const TRANSLATION_CACHE_VERSION = "v3";
 
 const COMMON_APPROVED_ASSETS = [
   "/data/concierge-knowledge.json",
@@ -139,7 +140,7 @@ function sourceIsApproved(text, bundles) {
   const templatePattern = text
     .split(/(\d+(?::\d+)?)/g)
     .map((part, index) => index % 2
-      ? "(?:\\d+(?::\\d+)?)"
+      ? "(?:\\d+(?::\\d+)?|\\$\\{[^}\\r\\n]{1,80}\\})"
       : part
         .replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
         .replace(/[“”]/g, '[“”"`]')
@@ -186,7 +187,7 @@ async function callTranslationModel(env, language, entries) {
         content: JSON.stringify({ targetLanguage: language, entries })
       }],
       reasoning: { effort: env.OPENAI_TRANSLATION_REASONING_EFFORT || "medium" },
-      max_output_tokens: 6000,
+      max_output_tokens: 9000,
       text: {
         format: {
           type: "json_schema",
@@ -210,10 +211,43 @@ async function callTranslationModel(env, language, entries) {
   return translated;
 }
 
-export async function translateApprovedTexts(env, language, texts) {
+async function translateModelRecords(env, language, records) {
+  const translated = new Map();
+  const failed = new Set();
+
+  async function translateGroup(group) {
+    if (!group.length) return;
+    try {
+      const result = await callTranslationModel(env, language, group.map((record) => ({
+        id: record.sourceHash,
+        text: record.text
+      })));
+      group.forEach((record) => translated.set(record.cacheKey, result.get(record.sourceHash)));
+    } catch (_error) {
+      if (group.length === 1) {
+        failed.add(group[0].cacheKey);
+        return;
+      }
+      const middle = Math.ceil(group.length / 2);
+      await translateGroup(group.slice(0, middle));
+      await translateGroup(group.slice(middle));
+    }
+  }
+
+  const groups = [];
+  for (let index = 0; index < records.length; index += MODEL_BATCH_SIZE) {
+    groups.push(records.slice(index, index + MODEL_BATCH_SIZE));
+  }
+  await Promise.all(groups.map(translateGroup));
+  return { translated, failed };
+}
+
+async function translateApprovedTextsDetailed(env, language, texts) {
   const targetLanguage = validLanguage(language);
   const cleaned = (Array.isArray(texts) ? texts : []).map(cleanText);
-  if (!targetLanguage || targetLanguage === "en") return cleaned;
+  if (!targetLanguage || targetLanguage === "en") {
+    return cleaned.map((translation) => ({ translation, translated: true }));
+  }
   if (!env.OPENAI_API_KEY) throw new Error("Translation service is not configured.");
 
   const records = await Promise.all(cleaned.map(async (text) => {
@@ -221,27 +255,39 @@ export async function translateApprovedTexts(env, language, texts) {
     return { text, sourceHash, cacheKey: `${TRANSLATION_CACHE_VERSION}:${targetLanguage}:${sourceHash}` };
   }));
   const store = getStore(env);
-  const cached = store?.getTranslations
+  const cachedResult = store?.getTranslations
     ? await store.getTranslations(records.map((record) => record.cacheKey)).catch(() => ({}))
     : {};
-  const missing = records.filter((record) => !cached?.[record.cacheKey]);
+  const cached = cachedResult && typeof cachedResult === "object" ? cachedResult : {};
+  const missingByKey = new Map();
+  records.forEach((record) => {
+    if (!cached?.[record.cacheKey]) missingByKey.set(record.cacheKey, record);
+  });
+  const missing = [...missingByKey.values()];
 
   if (missing.length) {
-    const translated = await callTranslationModel(env, targetLanguage, missing.map((record) => ({
-      id: record.sourceHash,
-      text: record.text
-    })));
-    const additions = missing.map((record) => ({
-      cacheKey: record.cacheKey,
-      language: targetLanguage,
-      sourceHash: record.sourceHash,
-      translation: translated.get(record.sourceHash)
-    }));
+    const { translated } = await translateModelRecords(env, targetLanguage, missing);
+    const additions = missing
+      .filter((record) => translated.has(record.cacheKey))
+      .map((record) => ({
+        cacheKey: record.cacheKey,
+        language: targetLanguage,
+        sourceHash: record.sourceHash,
+        translation: translated.get(record.cacheKey)
+      }));
     additions.forEach((entry) => { cached[entry.cacheKey] = entry.translation; });
-    if (store?.saveTranslations) await store.saveTranslations(additions).catch(() => {});
+    if (additions.length && store?.saveTranslations) await store.saveTranslations(additions).catch(() => {});
   }
 
-  return records.map((record) => cached?.[record.cacheKey] || record.text);
+  return records.map((record) => ({
+    translation: cached?.[record.cacheKey] || record.text,
+    translated: Boolean(cached?.[record.cacheKey])
+  }));
+}
+
+export async function translateApprovedTexts(env, language, texts) {
+  const results = await translateApprovedTextsDetailed(env, language, texts);
+  return results.map((result) => result.translation);
 }
 
 async function enforceRateLimit(request, env) {
@@ -282,18 +328,24 @@ export async function handleTranslationRequest(request, env) {
 
   try {
     const approvedTexts = texts.filter((_text, index) => approved[index]);
-    const approvedTranslations = await translateApprovedTexts(env, language, approvedTexts);
+    const approvedTranslations = await translateApprovedTextsDetailed(env, language, approvedTexts);
     let translatedIndex = 0;
+    const retryable = [];
     const translations = texts.map((_text, index) => {
       if (!approved[index]) return null;
-      const translation = approvedTranslations[translatedIndex];
+      const result = approvedTranslations[translatedIndex];
       translatedIndex += 1;
-      return translation;
+      if (!result.translated) {
+        retryable.push(index);
+        return null;
+      }
+      return result.translation;
     });
     return json({
       language,
       translations,
-      untranslated: approved.filter((value) => !value).length
+      untranslated: approved.filter((value) => !value).length + retryable.length,
+      retryable
     });
   } catch (_error) {
     return json({ error: "translation_unavailable" }, 503);

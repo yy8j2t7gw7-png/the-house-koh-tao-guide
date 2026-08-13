@@ -2,6 +2,27 @@
 
 All notable changes to The House – Koh Tao guest guide are recorded here.
 
+## v5.8.2 — Reliable Complete Operational Translation
+
+### Fixed
+
+- Replaced all-or-nothing model translation groups with small recoverable groups that automatically split again if a response is incomplete or temporarily fails.
+- Added browser retries for temporary `429` and server errors and a targeted retry for individual approved strings returned as retryable.
+- Prevented overlapping browser translation flushes from creating request bursts and leaving later sections untranslated.
+- Invalidated the previous browser and server translation caches so incomplete results cannot persist after deployment.
+
+### Validation
+
+- Added a complete static-source audit for the welcome, room list, room detail, House information, practical information, emergency, departure and secure registration pages.
+- The audit verifies every visible static text item and accessibility label is accepted by the protected translation endpoint.
+- Added regression tests for large-batch recovery, isolated single-item failure and browser retry/cache safeguards.
+- All 35 automated release checks pass.
+
+### Preserved
+
+- Explore remains disabled and preserved in source for its later rebuild.
+- The animated concierge dots, Bamboo Facebook and Instagram actions, seven supported guest languages and all TM30, emergency, alerting and privacy safeguards remain unchanged.
+
 ## v5.8.1 — Concierge Loading & Bamboo Social Links
 
 ### Changed

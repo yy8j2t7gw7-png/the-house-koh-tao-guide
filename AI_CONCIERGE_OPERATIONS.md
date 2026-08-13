@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The v5.8.1 concierge combines four layers:
+The v5.8.2 concierge combines four layers:
 
 1. Deterministic safety and operational rules for emergencies, lost keys, fees, booking policy and human routing.
 2. Server-side model reasoning over approved House knowledge plus targeted retrieval from the existing Activities, Restaurants, Cafés, Beaches, Bars and Shopping records.
@@ -19,7 +19,7 @@ Configure secrets on the existing Cloudflare Worker. Never place their values in
 
 ## Guest-language operations
 
-v5.8.1 supports English, Thai, Simplified Chinese, Russian, German, French and Spanish for the operational guest journey. Essential navigation, emergency, passport and concierge controls have reviewed built-in translations. Longer approved operational text is translated through `/api/i18n/translate` using strict structured output with `store: false` and cached in the existing Durable Object. Approved items are isolated within each batch, so one skipped dynamic item cannot prevent the rest of a page from translating.
+v5.8.2 supports English, Thai, Simplified Chinese, Russian, German, French and Spanish for the operational guest journey. Essential navigation, emergency, passport and concierge controls have reviewed built-in translations. Longer approved operational text is translated through `/api/i18n/translate` using strict structured output with `store: false` and cached in the existing Durable Object. Approved items use recoverable model sub-batches; incomplete groups are split automatically, browser requests retry temporary failures, and overlapping page flushes are prevented. A release audit verifies every static visible string and accessibility label on each live operational page is accepted by the protected endpoint.
 
 The visible concierge thinking state is an animated three-dot indicator rather than an operational status sentence. Venue website or social actions must use approved external URLs. Internal Explore detail paths are excluded from model context while Explore is disabled. Bamboo Beach Bar follow-up questions use the approved Facebook and Instagram actions in `public/data/concierge-knowledge.json`.
 

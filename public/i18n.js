@@ -2,7 +2,8 @@
   if (window.HOUSE_I18N) return;
 
   const STORAGE_KEY = "houseGuideLanguage";
-  const CACHE_PREFIX = "houseGuideTranslations:v5.8:";
+  const CACHE_PREFIX = "houseGuideTranslations:v5.8.2:";
+  const MAX_REQUEST_RETRIES = 2;
   const languages = Object.freeze([
     { code: "en", label: "English" },
     { code: "th", label: "ไทย" },
@@ -170,6 +171,7 @@
   const attributeState = new WeakMap();
   const pending = new Map();
   let flushTimer = null;
+  let flushRunning = false;
   let activeRequests = 0;
   let statusElement = null;
 
@@ -189,7 +191,7 @@
     Object.assign(cachedTranslations, additions);
     try {
       const keys = Object.keys(cachedTranslations);
-      if (keys.length > 350) keys.slice(0, keys.length - 350).forEach((key) => delete cachedTranslations[key]);
+      if (keys.length > 1200) keys.slice(0, keys.length - 1200).forEach((key) => delete cachedTranslations[key]);
       window.localStorage.setItem(`${CACHE_PREFIX}${language}`, JSON.stringify(cachedTranslations));
     } catch (_error) {
       // Translation remains available from the server cache if browser storage is full.
@@ -210,6 +212,28 @@
     statusElement.classList.toggle("is-visible", active);
   }
 
+  function wait(milliseconds) {
+    return new Promise((resolve) => window.setTimeout(resolve, milliseconds));
+  }
+
+  async function fetchTranslations(texts, attempt = 0) {
+    const response = await fetch("/api/i18n/translate", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ language, page: location.pathname, texts })
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !Array.isArray(data.translations) || data.translations.length !== texts.length) {
+      const retryableStatus = response.status === 429 || response.status >= 500;
+      if (retryableStatus && attempt < MAX_REQUEST_RETRIES) {
+        await wait(attempt === 0 ? 700 : 1600);
+        return fetchTranslations(texts, attempt + 1);
+      }
+      throw new Error("Translation unavailable.");
+    }
+    return data;
+  }
+
   async function requestTranslations(sources) {
     const unique = [...new Set(sources)].filter(Boolean);
     const result = {};
@@ -224,19 +248,23 @@
     activeRequests += 1;
     setStatus(true);
     try {
-      const response = await fetch("/api/i18n/translate", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ language, page: location.pathname, texts: unresolved })
-      });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok || !Array.isArray(data.translations) || data.translations.length !== unresolved.length) {
-        throw new Error("Translation unavailable.");
-      }
+      const data = await fetchTranslations(unresolved);
       unresolved.forEach((source, index) => {
         const translated = data.translations[index];
         if (typeof translated === "string" && translated.trim()) result[source] = translated;
       });
+      const retryIndexes = Array.isArray(data.retryable)
+        ? data.retryable.filter((index) => Number.isInteger(index) && index >= 0 && index < unresolved.length)
+        : [];
+      if (retryIndexes.length) {
+        const retrySources = retryIndexes.map((index) => unresolved[index]);
+        await wait(900);
+        const retryData = await fetchTranslations(retrySources);
+        retrySources.forEach((source, index) => {
+          const translated = retryData.translations[index];
+          if (typeof translated === "string" && translated.trim()) result[source] = translated;
+        });
+      }
       storeCache(result);
       return result;
     } finally {
@@ -260,20 +288,30 @@
   }
 
   async function flush() {
+    if (flushRunning) return;
+    flushRunning = true;
     flushTimer = null;
-    while (pending.size) {
-      const batch = [...pending.keys()].slice(0, 24);
-      const callbacks = new Map(batch.map((source) => [source, pending.get(source)]));
-      batch.forEach((source) => pending.delete(source));
-      try {
-        const translations = await requestTranslations(batch);
-        batch.forEach((source) => {
-          const translated = translations[source];
-          if (!translated) return;
-          callbacks.get(source)?.forEach((apply) => apply(translated));
-        });
-      } catch (_error) {
-        // Keep the authoritative English source visible if translation is unavailable.
+    try {
+      while (pending.size) {
+        const batch = [...pending.keys()].slice(0, 24);
+        const callbacks = new Map(batch.map((source) => [source, pending.get(source)]));
+        batch.forEach((source) => pending.delete(source));
+        try {
+          const translations = await requestTranslations(batch);
+          batch.forEach((source) => {
+            const translated = translations[source];
+            if (!translated) return;
+            callbacks.get(source)?.forEach((apply) => apply(translated));
+          });
+        } catch (_error) {
+          // Keep the authoritative English source visible if translation is unavailable.
+        }
+      }
+    } finally {
+      flushRunning = false;
+      if (pending.size) {
+        window.clearTimeout(flushTimer);
+        flushTimer = window.setTimeout(flush, 80);
       }
     }
     if (!activeRequests) window.setTimeout(() => setStatus(false), 220);

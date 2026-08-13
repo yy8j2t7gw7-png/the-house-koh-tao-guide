@@ -1,6 +1,6 @@
 # Product Roadmap
 
-Baseline: v5.8.1
+Baseline: v5.8.2
 
 ## Completed
 
@@ -47,6 +47,7 @@ Baseline: v5.8.1
 - [x] Reviewed multilingual safety, passport and operational controls
 - [x] Protected approved-content translation cache without guest-message translation
 - [x] Translation batch isolation so one skipped dynamic item cannot block the rest of an operational page
+- [x] Recoverable translation sub-batches, browser retries and complete operational-page source audit
 - [x] Thai-national exemption stated across guest registration, owner request and approved concierge knowledge
 - [x] Owner confirmation that passport requests concern a non-Thai guest
 - [x] Action-needed alert classification, five-minute deduplication and protected owner alert console
@@ -92,7 +93,7 @@ Guests may continue using ordinary WhatsApp handoffs. Automated internal alerts 
 
 - [x] Push the v5.5.0 release to the existing hosting workflow
 - [x] Confirm `/api/concierge/status` reports AI and learning enabled
-- [ ] Deploy v5.8.1 and confirm full-page language switching, recommendations, Bamboo social actions, booking wording, registration entry point and alert console
+- [ ] Deploy v5.8.2 and confirm full-page language switching, recommendations, Bamboo social actions, booking wording, registration entry point and alert console
 - [ ] Configure the Meta production alert channel following `WHATSAPP_ALERT_OPERATIONS.md`
 - [ ] Test all seven languages on guest phones and review real guest feedback for wording refinements
 - [ ] Verify the protected `/concierge-admin` review workflow

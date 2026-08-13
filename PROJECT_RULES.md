@@ -50,7 +50,10 @@ Medical or personal emergencies must remain separate from property emergencies a
 - Never store key-box codes in public files, URLs, structured content, repository history or release archives.
 - Never reveal a code based only on a selected room number.
 - Secure code delivery requires server-side secrets, current-guest verification, after-hours validation, confirmation and event logging.
-- Current-guest verification uses a private signed link tied to one room and validity period.
+- Current-guest verification uses the Airbnb confirmation code from the guest's trip details, checked against the protected synchronized listing, room and stay dates.
+- Each active room may use one permanent public page, but that URL and a selected room are not proof of a reservation.
+- Store confirmation codes only as keyed one-way hashes; never store, log or export readable codes.
+- Verification sessions must be secure, HTTP-only, bound to one room and reservation, and expire no later than checkout.
 - Every approved spare-key event must notify the configured owners and Su when the protected messaging integration is enabled.
 - Notification recipient numbers and names are server-side configuration and must never appear in public files.
 - Staff notifications must not contain the key-box code or the guest's private access token.
@@ -58,15 +61,15 @@ Medical or personal emergencies must remain separate from property emergencies a
 ## Passport and Immigration registration data
 
 - TM30 accommodation registration and this passport-upload workflow apply only to non-Thai guests. Thai nationals must be told that they do not need to complete it.
-- An owner must confirm that a request concerns a non-Thai guest before creating a private registration link. Do not attempt to infer nationality from chat or other unverified data.
+- A verified guest may either create a separate one-time passport form for each non-Thai overnight guest or declare that every overnight guest on the reservation is a Thai national. Do not infer nationality from chat or other data.
 - Passport information is collected only through the separate private registration flow, never through AI chat, learning logs, public files or WhatsApp attachments.
 - Explain in guest-friendly language that The House needs the information for required TM30 Immigration accommodation registration and how the document is handled.
-- Use room-bound, expiring, single-use links. Room selection alone must never authorize passport upload or retrieval.
+- Use reservation- and room-bound, expiring, single-use upload links. Room selection or the permanent room URL alone must never authorize passport upload or retrieval.
 - Store passport images only in non-public document storage with random object keys and authenticated owner retrieval.
 - Main file retention is 14 days after upload, with immediate owner deletion and a daily application cleanup reinforcing the R2 lifecycle rule.
 - Do not use passport data for marketing, AI training or recommendation logic.
 - Do not invent the manual TM30 field schema. The structured details option stays disabled until the authoritative field list is supplied.
-- Ordinary WhatsApp supports only a prepared manual reminder. Automatic reminders require an approved server-side messaging integration.
+- Use Airbnb's scheduled arrival message as the automatic pre-arrival reminder. Passport images and details must never be sent through Airbnb messages or WhatsApp.
 
 ## Protected staff alerts
 
@@ -131,9 +134,9 @@ Public interface rules:
 
 ## Current baseline
 
-Current release: v5.8.2.
+Current release: v5.9.0.
 
-Explore is intentionally disabled in the live v5.8.2 release. Do not delete its pages, structured records or media. Restore it only after the planned Explore rebuild and review by changing the protected deployment feature variable. Do not expose internal Explore detail paths in live concierge answers while the feature remains disabled; use approved external actions where supplied.
+Explore is intentionally disabled in the live v5.9.0 release. Do not delete its pages, structured records or media. Restore it only after the planned Explore rebuild and review by changing the protected deployment feature variable. Do not expose internal Explore detail paths in live concierge answers while the feature remains disabled; use approved external actions where supplied.
 
 Completed content modules:
 
@@ -145,4 +148,4 @@ Completed content modules:
 - Shopping & Essentials
 - Activities & Experiences
 
-The hybrid, room-aware AI Concierge, full operational translation path, controlled owner-review workflow and protected action-needed alert channel are implemented. Production model and WhatsApp delivery still require their respective server-side secrets and deployment verification. Explore remains deferred, and Transport remains research-blocked until the required authoritative source is supplied.
+The hybrid, room-aware AI Concierge, full operational translation path, controlled owner-review workflow, protected staff-alert channel and verified-stay automation are implemented. Production key release is fail-closed until the reservation sync, key-code secret and official urgent WhatsApp recipients are configured and verified. Room 7 remains inactive. Explore remains deferred, and Transport remains research-blocked until the required authoritative source is supplied.

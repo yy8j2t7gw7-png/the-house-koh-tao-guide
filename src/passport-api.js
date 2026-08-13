@@ -1,4 +1,4 @@
-const ROOM_OPTIONS = new Set(["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11"]);
+const ROOM_OPTIONS = new Set(["1", "2", "3", "4", "5", "6", "8", "9", "10", "11"]);
 const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 const MIN_UPLOAD_BYTES = 512;
 const TOKEN_PATTERN = /^[A-Za-z0-9_-]{40,100}$/;
@@ -230,6 +230,9 @@ export async function handlePassportGuestRequest(request, env, path) {
       await env.PASSPORT_UPLOADS.delete(objectKey).catch(() => {});
       return json({ error: "link_already_used" }, 409);
     }
+    if (typeof store.markRegistrationFromPassport === "function") {
+      await store.markRegistrationFromPassport(completed.id, uploadedAt).catch(() => {});
+    }
     return json({ ok: true, room: completed.room, deleteAfter });
   }
 
@@ -264,15 +267,14 @@ export async function handlePassportAdminRequest(request, env, path, store) {
     });
     const origin = new URL(request.url).origin;
     const automaticDeletionDays = retentionDays(env);
-    const welcomeUrl = `${origin}/room/${room}#registration=${token}`;
     return json({
       ok: true,
       id,
       room,
       expiresAt,
-      welcomeUrl,
+      welcomeUrl: `${origin}/room/${room}`,
       uploadUrl: `${origin}/passport-upload#token=${token}`,
-      reminderMessage: `This TM30 Immigration accommodation registration applies only to non-Thai guests. Thai nationals do not need to complete it. If you are not a Thai national, please provide the required passport information before arrival. Open your private Room ${room} welcome page and select Complete Required Registration: ${welcomeUrl} Your information is not sent through the AI chat or WhatsApp. A passport image is deleted automatically ${automaticDeletionDays} days after upload, or sooner after processing.`
+      reminderMessage: `This TM30 Immigration accommodation registration applies only to non-Thai guests. Thai nationals do not need to complete it. If you are not a Thai national, please provide the required passport information before arrival through this private, single-use secure form: ${origin}/passport-upload#token=${token} Your information is not sent through the AI chat or WhatsApp. A passport image is deleted automatically ${automaticDeletionDays} days after upload, or sooner after processing.`
     });
   }
 

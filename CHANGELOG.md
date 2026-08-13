@@ -2,6 +2,45 @@
 
 All notable changes to The House – Koh Tao guest guide are recorded here.
 
+## v5.9.0 — Automatic Verified-Stay Access
+
+### Added
+
+- Fixed, owner-verified Airbnb listing-to-room mapping for active Rooms 1–6 and 8–11; Room 7 remains reserved and inactive.
+- One permanent guest URL per active room, with Airbnb confirmation-code verification against synchronized reservation dates.
+- A conservative Google Apps Script synchronizer that combines private Airbnb iCal feeds and Airbnb host emails without transmitting guest names, email addresses, phone numbers, message bodies or payment data.
+- Secure, `HttpOnly`, `SameSite=Strict` verified-stay sessions that expire at 11:00 AM on checkout day.
+- Self-service passport registration: a verified non-Thai guest can create a private single-use upload form without owner work for each reservation.
+- Self-service all-Thai reservation exemption that closes the registration reminder without requesting a passport and revokes unused pending upload links.
+- Protected after-hours spare-key access from 19:30 to 10:30 Bangkok time for verified active stays only.
+- Explicit guest confirmation of the 500 THB lost-key replacement fee before a key can be released.
+- Synchronous official WhatsApp notification to the configured urgent owners/Su group before the code is shown.
+- Per-room key-code rotation lock: one automatic release blocks the next until staff change the physical code and confirm rotation in the owner console.
+- Owner stay-operations view, manual reservation fallback and key-code rotation confirmation.
+- Exact scheduled Airbnb arrival-message copy for all ten active listings and a complete one-time automation setup guide.
+
+### Security and privacy
+
+- Airbnb confirmation codes are normalized and HMAC-hashed before storage; readable codes never enter the database or logs.
+- Key-box codes live only in the encrypted `SPARE_KEY_CODES` Worker secret. They never enter Git, the release ZIP, AI prompts, alerts or the operations database.
+- A room URL or room selection alone never grants passport or key access.
+- Automatic key release fails closed unless the system submits at least one urgent-team message successfully to the official WhatsApp API; the guest confirms only the fee and does not approve the notification.
+- Passport files remain isolated from AI and WhatsApp, use random private R2 keys and retain the existing 14-day lifecycle maximum.
+- Reservation-linked passport forms remain single-use; multiple non-Thai overnight guests can each receive a separate upload form.
+- Room 7 is removed from active room selection, public room routes, reservation mapping and legacy owner-created passport requests.
+
+### Guest experience
+
+- The required-registration panel now asks guests to verify once with the Airbnb confirmation code shown in their trip details.
+- Verification unlocks both intended options: secure passport upload for each non-Thai guest or an exemption when all overnight guests on the reservation are Thai nationals.
+- During an active after-hours stay, the same verified page can release the room's spare-key instruction after fee acceptance and team notification.
+- Existing seven-language operational translation, moving-dot concierge state, Bamboo social links, emergency routing and disabled Explore interface remain preserved.
+
+### Validation
+
+- Added reservation mapping, code hashing, cross-room rejection, automated passport-link, Thai-exemption and protected spare-key regression tests.
+- All 39 automated checks pass, including complete operational translation coverage, canonical navigation consistency and fail-closed automatic WhatsApp notification handling for lost-key release.
+
 ## v5.8.2 — Reliable Complete Operational Translation
 
 ### Fixed

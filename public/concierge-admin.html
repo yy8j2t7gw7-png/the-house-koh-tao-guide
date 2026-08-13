@@ -48,6 +48,27 @@
       <section class="concierge-admin-section">
         <div class="concierge-admin-section-head">
           <div>
+            <p class="concierge-admin-kicker">Verified guest access</p>
+            <h2>Airbnb stays & spare-key safety</h2>
+          </div>
+        </div>
+        <p>The automatic Gmail and Airbnb iCal sync supplies confirmation codes and stay dates. Codes are hashed immediately and never shown here. Use the manual form only as a fallback if an Airbnb reservation has not synchronized.</p>
+        <form id="manualStayForm" class="concierge-admin-registration-form">
+          <div class="concierge-admin-field"><label for="manualStayRoom">Room</label><select id="manualStayRoom" required><option value="">Select room</option><option value="1">Room 1</option><option value="2">Room 2</option><option value="3">Room 3</option><option value="4">Room 4</option><option value="5">Room 5</option><option value="6">Room 6</option><option value="8">Room 8</option><option value="9">Room 9</option><option value="10">Room 10</option><option value="11">Room 11</option></select></div>
+          <div class="concierge-admin-field"><label for="manualStayCode">Airbnb confirmation code</label><input id="manualStayCode" type="text" autocomplete="off" required></div>
+          <div class="concierge-admin-field"><label for="manualStayCheckIn">Check-in</label><input id="manualStayCheckIn" type="date" required></div>
+          <div class="concierge-admin-field"><label for="manualStayCheckOut">Checkout</label><input id="manualStayCheckOut" type="date" required></div>
+          <button type="submit">Add fallback stay</button>
+        </form>
+        <div class="concierge-admin-registration-columns">
+          <div><h3>Upcoming and active reservations</h3><div id="stayReservations" class="concierge-admin-queue"></div></div>
+          <div><h3>Key-box codes requiring rotation</h3><div id="keyRotations" class="concierge-admin-queue"></div></div>
+        </div>
+      </section>
+
+      <section class="concierge-admin-section">
+        <div class="concierge-admin-section-head">
+          <div>
             <p class="concierge-admin-kicker">Guest requests needing action</p>
             <h2>Concierge alerts</h2>
           </div>
@@ -64,7 +85,7 @@
             <h2>Passport requests & reminders</h2>
           </div>
         </div>
-        <p>Create one private link per passport for non-Thai guests when the information has not been supplied before arrival. Thai nationals do not need TM30 passport registration; do not create or send a request to them. With ordinary WhatsApp, copy the prepared reminder and send it in the existing guest conversation.</p>
+        <p>Verified guests create their own one-time passport form from the permanent Room page, so routine owner-created links are no longer required. The form below remains only as an operational fallback. Thai nationals do not need TM30 passport registration.</p>
         <form id="passportLinkForm" class="concierge-admin-registration-form">
           <div class="concierge-admin-field">
             <label for="passportRoom">Room</label>
@@ -73,7 +94,7 @@
               <option value="1">Room 1</option><option value="2">Room 2</option>
               <option value="3">Room 3</option><option value="4">Room 4</option>
               <option value="5">Room 5</option><option value="6">Room 6</option>
-              <option value="7">Room 7</option><option value="8">Room 8</option>
+              <option value="8">Room 8</option>
               <option value="9">Room 9</option><option value="10">Room 10</option>
               <option value="11">Room 11</option>
             </select>
@@ -99,9 +120,9 @@
           <textarea id="passportReminderMessage" readonly></textarea>
           <div class="concierge-admin-card-actions">
             <button type="button" data-copy-target="passportReminderMessage">Copy reminder</button>
-            <button type="button" class="secondary" data-copy-target="passportUploadUrl">Copy private welcome link</button>
+            <button type="button" class="secondary" data-copy-target="passportUploadUrl">Copy permanent Room page</button>
           </div>
-          <input id="passportUploadUrl" type="text" readonly aria-label="Private Room welcome link">
+          <input id="passportUploadUrl" type="text" readonly aria-label="Permanent Room page">
         </div>
         <div class="concierge-admin-registration-columns">
           <div>

@@ -15,6 +15,9 @@
   const passportLinkResult = document.getElementById("passportLinkResult");
   const alerts = document.getElementById("conciergeAlerts");
   const alertStatus = document.getElementById("whatsappAlertStatus");
+  const stayReservations = document.getElementById("stayReservations");
+  const keyRotations = document.getElementById("keyRotations");
+  const manualStayForm = document.getElementById("manualStayForm");
   let token = "";
 
   const categories = [
@@ -153,9 +156,9 @@
       const title = element("h3", "", `${String(item.severity || "attention").toUpperCase()} · ${String(item.alertType || "guest request").replaceAll("_", " ")}`);
       const meta = element("div", "concierge-admin-card-meta");
       meta.append(
-        element("span", "concierge-admin-pill", item.room ? `Room ${item.room} · guest-selected` : "Room not selected"),
+        element("span", "concierge-admin-pill", item.room ? `Room ${item.room} · ${item.roomVerified ? "stay verified" : "guest-selected"}` : "Room not selected"),
         element("span", "concierge-admin-pill", item.status),
-        element("span", "concierge-admin-pill", `WhatsApp accepted: ${item.delivered || 0}`)
+        element("span", "concierge-admin-pill", `WhatsApp submitted: ${item.delivered || 0}`)
       );
       head.append(title, meta);
       card.append(
@@ -181,6 +184,42 @@
       actions.appendChild(resolve);
       card.appendChild(actions);
       alerts.appendChild(card);
+    });
+  }
+
+  function renderStayOperations(data = {}) {
+    stayReservations.replaceChildren();
+    const reservations = data.reservations || [];
+    if (!reservations.length) stayReservations.appendChild(element("div", "concierge-admin-empty", "No synchronized future stays yet."));
+    reservations.forEach((item) => {
+      const card = element("article", "concierge-admin-registration-item");
+      card.append(
+        element("strong", "", `Room ${item.room}`),
+        element("span", "", `${item.checkInDate} to ${item.checkOutDate}`),
+        element("span", "", `Airbnb listing ${item.listingId}`),
+        element("span", "", `Guest registration: ${String(item.registrationStatus || "not_started").replaceAll("_", " ")}`),
+        element("span", "", `Status: ${item.status} · updated ${bangkokDate(item.updatedAt)}`)
+      );
+      stayReservations.appendChild(card);
+    });
+    keyRotations.replaceChildren();
+    const rotations = data.rotations || [];
+    if (!rotations.length) keyRotations.appendChild(element("div", "concierge-admin-empty", "No key-box rotation is currently required."));
+    rotations.forEach((item) => {
+      const card = element("article", "concierge-admin-registration-item");
+      card.dataset.rotationRoom = item.room;
+      card.append(
+        element("strong", "", `Room ${item.room}`),
+        element("span", "", item.lastReleasedAt
+          ? `Spare-key code released: ${bangkokDate(item.lastReleasedAt)}`
+          : `Lost-key release is being processed: ${bangkokDate(item.updatedAt)}`),
+        element("span", "", "Change the physical key-box code, update the SPARE_KEY_CODES secret, deploy, then confirm below.")
+      );
+      const button = element("button", "danger", "I changed and deployed the code");
+      button.type = "button";
+      button.dataset.rotationAction = "confirm";
+      card.appendChild(button);
+      keyRotations.appendChild(card);
     });
   }
 
@@ -294,6 +333,7 @@
     renderPendingRegistrations(data.pendingRegistrations || []);
     renderPassportUploads(data.passportUploads || []);
     renderAlerts(data.alerts || [], data.alertConfiguration || {});
+    renderStayOperations(data.stayOperations || {});
     renderRecent(data.recent || []);
     login.hidden = true;
     workspace.hidden = false;
@@ -347,6 +387,47 @@
         : "The secure request could not be created.");
     } finally {
       submit.disabled = false;
+    }
+  });
+
+  manualStayForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const submit = manualStayForm.querySelector('button[type="submit"]');
+    submit.disabled = true;
+    try {
+      await api("/api/concierge/admin/stays", {
+        method: "POST",
+        body: JSON.stringify({
+          room: document.getElementById("manualStayRoom").value,
+          confirmationCode: document.getElementById("manualStayCode").value,
+          checkInDate: document.getElementById("manualStayCheckIn").value,
+          checkOutDate: document.getElementById("manualStayCheckOut").value
+        })
+      });
+      manualStayForm.reset();
+      await loadOverview();
+    } catch (_error) {
+      window.alert("The fallback stay could not be saved. Check the room, code and dates.");
+    } finally {
+      submit.disabled = false;
+    }
+  });
+
+  keyRotations.addEventListener("click", async (event) => {
+    const button = event.target.closest("[data-rotation-action]");
+    if (!button) return;
+    const card = button.closest("[data-rotation-room]");
+    if (!window.confirm(`Confirm that the physical Room ${card.dataset.rotationRoom} key-box code and the Cloudflare SPARE_KEY_CODES secret were both changed and deployed.`)) return;
+    button.disabled = true;
+    try {
+      await api("/api/concierge/admin/spare-key-rotation", {
+        method: "POST",
+        body: JSON.stringify({ room: card.dataset.rotationRoom, confirmed: true })
+      });
+      await loadOverview();
+    } catch (_error) {
+      button.disabled = false;
+      window.alert("The rotation confirmation could not be saved.");
     }
   });
 

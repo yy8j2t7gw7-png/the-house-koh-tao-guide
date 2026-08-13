@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0.0",
-  "release": "5.8.2",
+  "release": "5.9.0",
   "language": "en",
   "updated": "2026-08-13",
   "scope": "Verified accommodation, room, house-rule, support, booking and emergency answers for guests of The House – Koh Tao.",
@@ -106,7 +106,7 @@
         "does a thai guest need to register",
         "thai national registration"
       ],
-      "answer": "Thai nationals do not need to complete this TM30 Immigration accommodation registration. Please tell The House so any unused private registration request can be closed.",
+      "answer": "Thai nationals do not need to complete this TM30 Immigration accommodation registration. After verifying the Airbnb stay on the permanent Room page, select ‘All overnight guests are Thai nationals’ only if the exemption applies to everyone staying overnight on that reservation. If any non-Thai guest is staying overnight, securely upload a passport for each one.",
       "actions": []
     },
     {
@@ -206,7 +206,7 @@
         "upstairs or downstairs",
         "arrival photos"
       ],
-      "answer": "Rooms 1–6 are upstairs. Rooms 7–11 are downstairs. Room 7 is around the corner, directly below Rooms 5 and 6. Select your room to see its arrival information.",
+      "answer": "Rooms 1–6 are upstairs, and active Rooms 8–11 are downstairs. Room 7 is not currently active. Select your room to see its arrival information.",
       "actions": [
         {
           "label": "Select My Room",
@@ -339,13 +339,11 @@
         "need a replacement key",
         "key is missing"
       ],
-      "answer": "Please contact us immediately if you are locked out or cannot find your key. A replacement fee of 500 THB will be added for a lost key.",
+      "answer": "A lost-key replacement fee of 500 THB applies. During the day, ask the concierge for help. After hours—from 7:30 PM until 10:30 AM Bangkok time—use the protected spare-key section on your permanent Room page. It verifies your Airbnb reservation before showing only your room’s code and immediately notifies the configured team.",
       "actions": [
         {
-          "label": "Contact Us Now",
-          "type": "route",
-          "route": "houseWhatsapp",
-          "message": "Hello, I am staying in {roomLabel} and I have lost my key or am locked out. Please help."
+          "label": "Secure spare-key access",
+          "type": "spare-key"
         },
         {
           "label": "Call",
@@ -447,7 +445,7 @@
         "tm30 registration",
         "send passport information"
       ],
-      "answer": "This TM30 Immigration accommodation registration applies only to non-Thai guests. Thai nationals do not need to complete it. Non-Thai guests should open the private Room welcome link sent by The House and use its registration button to continue securely. Do not send passport information through this chat or WhatsApp. A passport image is automatically deleted 14 days after upload, or sooner after processing.",
+      "answer": "This TM30 Immigration accommodation registration applies only to non-Thai guests. Thai nationals do not need to complete it. Open your permanent Room welcome page, verify the Airbnb confirmation code shown in your trip details, then choose the secure passport upload option. Do not send passport information through this chat or WhatsApp. A passport image is automatically deleted 14 days after upload, or sooner after processing.",
       "actions": [
         {
           "label": "Continue Securely",
@@ -469,7 +467,7 @@
         "secure passport link",
         "extra guest"
       ],
-      "answer": "The House needs passport information for every non-Thai overnight visitor so we can complete the required TM30 Immigration accommodation registration. Thai nationals do not need to complete this registration. Non-Thai guests should open the private Room welcome link sent by The House and use its registration button to continue securely. Do not put passport information in this chat or send it through WhatsApp.",
+      "answer": "The House needs passport information for every non-Thai overnight visitor so we can complete the required TM30 Immigration accommodation registration. Thai nationals do not need to complete this registration. After verifying the Airbnb confirmation code on the permanent Room page, use the secure passport option once for each non-Thai overnight guest. Do not put passport information in this chat or send it through WhatsApp.",
       "actions": [
         {
           "label": "Continue Securely",

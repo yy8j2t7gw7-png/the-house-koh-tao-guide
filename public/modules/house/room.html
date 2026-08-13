@@ -74,6 +74,7 @@ a{color:inherit}
 </style>
 <link rel="stylesheet" href="/design-system.css">
 <link rel="stylesheet" href="/ai-concierge.css">
+<link rel="stylesheet" href="/stay-access.css">
 </head>
 <body>
 <div class="shell">
@@ -95,15 +96,49 @@ a{color:inherit}
   <p class="section-intro">Your personal guest guide for The House – Koh Tao.</p>
 </section>
 
-<section class="registration-required" id="guest-registration" aria-labelledby="roomRegistrationTitle">
-  <span class="required-label">Required registration for non-Thai guests</span>
-  <h2 id="roomRegistrationTitle">Non-Thai guests: complete your passport information</h2>
-  <p>This TM30 Immigration accommodation registration applies only to non-Thai guests. If you have not already provided the required passport information, please complete it before arrival. Thai nationals do not need to complete this registration.</p>
-  <p class="privacy-line">Your document uses a private, room-bound, single-use link. It is not sent through the AI chat or WhatsApp and is automatically deleted 14 days after upload, or sooner after processing.</p>
-  <div class="btns">
-    <a class="btn" data-private-registration aria-disabled="true">Non-Thai guests: use your private registration link</a>
+<section class="stay-access-card" id="verifiedStayAccess" aria-labelledby="stayAccessTitle">
+  <span class="stay-access-label">Secure guest access</span>
+  <h2 id="stayAccessTitle">Verify your Airbnb stay</h2>
+  <p>Enter the Airbnb confirmation code shown in your trip details. This confirms that this permanent link belongs to your booked room.</p>
+  <div id="stayVerificationFields">
+    <form class="stay-access-form" id="stayVerificationForm">
+      <label for="airbnbConfirmationCode">Airbnb confirmation code</label>
+      <input id="airbnbConfirmationCode" name="confirmationCode" type="text" inputmode="text" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="24" required aria-describedby="confirmationCodeHelp">
+      <span class="stay-privacy" id="confirmationCodeHelp">Usually begins with HM. The code is checked securely and is never stored in readable form.</span>
+      <button class="btn" type="submit">Verify my stay</button>
+    </form>
   </div>
-  <p class="privacy-line" data-private-registration-note><strong>Open the private Room welcome link sent by The House.</strong> Its registration button opens the secure form directly. Do not send passport details in the concierge chat.</p>
+  <p class="stay-access-status" id="stayVerificationStatus" role="status" aria-live="polite" hidden></p>
+  <div class="verified-stay-panel" id="verifiedStayPanel" hidden>
+    <h3>Required guest registration</h3>
+    <p id="verifiedStayDates"></p>
+    <p>This TM30 Immigration accommodation registration applies only to non-Thai guests. Thai nationals do not need to upload a passport. If any non-Thai guest is staying overnight, securely upload a passport for each one.</p>
+    <p class="stay-privacy">Choose the Thai-national exemption only when every overnight guest on this reservation is Thai. Passport images use a private, room-bound, single-use upload form and are automatically deleted 14 days after upload, or sooner after processing. Never send passport information in the concierge chat or WhatsApp.</p>
+    <p class="stay-access-status" id="registrationStatus" role="status" aria-live="polite"></p>
+    <div class="stay-access-actions">
+      <button class="btn" id="createPassportUpload" type="button">Upload passport securely</button>
+      <button class="btn secondary" id="confirmThaiNational" type="button">All overnight guests are Thai nationals</button>
+    </div>
+  </div>
+</section>
+
+<section class="spare-key-card" id="spareKeyAccess" aria-labelledby="spareKeyTitle" hidden>
+  <span class="stay-access-label">Protected after-hours access</span>
+  <h2 id="spareKeyTitle">Lost key or locked out?</h2>
+  <p>After hours—from 7:30 PM until 10:30 AM Bangkok time—a verified guest can obtain the spare-key code for this room. The key box is directly next to the room door.</p>
+  <p>A lost-key replacement fee of <strong>500 THB</strong> will be added. The request is recorded and our urgent team is notified immediately. The key-box code is never included in that notification.</p>
+  <p class="stay-access-status" id="spareKeyStatus" role="status" aria-live="assertive" hidden></p>
+  <form class="spare-key-form" id="spareKeyForm" hidden>
+    <label class="fee-confirmation"><input id="lostKeyFeeAccepted" type="checkbox" required> <span>I confirm that I have lost my key or am locked out, and I accept the 500 THB lost-key replacement fee.</span></label>
+    <div class="stay-access-actions"><button class="btn" type="submit">Show my spare-key code</button></div>
+  </form>
+  <div class="spare-key-result" id="spareKeyResult" hidden>
+    <strong>Your Room key-box code</strong>
+    <span class="spare-key-code" id="spareKeyCode"></span>
+    <p id="spareKeyLocation"></p>
+    <button class="btn secondary" id="copySpareKeyCode" type="button">Copy code</button>
+    <p class="stay-privacy">Use the spare key, close the key box and contact the concierge if you need further help.</p>
+  </div>
 </section>
 
 <section class="hero" style="min-height:360px">

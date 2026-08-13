@@ -1,5 +1,5 @@
 window.AI_CONCIERGE_CONFIG = {
-  "release": "5.8.2",
+  "release": "5.9.0",
   "enabled": true,
   "propertyName": "The House",
   "buttonLabel": "Concierge",
@@ -14,17 +14,17 @@ window.AI_CONCIERGE_CONFIG = {
   "engineScriptUrl": "/ai-concierge-engine.js",
   "knowledgeUrl": "/data/concierge-knowledge.json",
   "minimumMatchScore": 0.62,
-  "roomOptions": ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11"],
+  "roomOptions": ["1", "2", "3", "4", "5", "6", "8", "9", "10", "11"],
   "afterHours": {
     "timeZone": "Asia/Bangkok",
     "start": "19:30",
     "end": "10:30",
     "spareKeyLocation": "In the key box next to the room door",
     "lostKeyFeeThb": 500,
-    "privateStayLinkRequired": true,
-    "secureCodeDeliveryEnabled": false,
+    "airbnbConfirmationRequired": true,
+    "secureCodeDeliveryEnabled": true,
     "notificationPolicy": "configured owners and Su",
-    "automaticNotificationsEnabled": false
+    "automaticNotificationsEnabled": true
   },
   "requestRouting": {
     "staySupport": {
@@ -70,8 +70,7 @@ window.AI_CONCIERGE_CONFIG = {
     {
       "label": "Lost key",
       "icon": "🔑",
-      "type": "prompt",
-      "prompt": "I lost my key."
+      "type": "spare-key"
     },
     {
       "label": "Urgent problem",

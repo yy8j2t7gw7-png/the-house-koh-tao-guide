@@ -32,7 +32,7 @@ window.HOUSE_ROOMS = {
   "7": {
     "floor": "Downstairs",
     "photo": "room-07-placeholder.svg",
-    "note": "Room 7 is downstairs, around the corner and directly below Rooms 5 and 6.",
+    "note": "Room 7 is reserved for future use and is not currently active.",
     "photoStatus": "placeholder"
   },
   "8": {

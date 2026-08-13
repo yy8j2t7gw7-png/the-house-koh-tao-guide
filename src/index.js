@@ -7,6 +7,10 @@ import {
 import { cleanupPassportUploads, handlePassportGuestRequest } from "./passport-api.js";
 import { handleTranslationRequest } from "./i18n-api.js";
 import { handleWhatsAppWebhook, processDueAlertEscalations } from "./whatsapp-alerts.js";
+import {
+  handleReservationSyncRequest,
+  handleStayGuestRequest
+} from "./stay-api.js";
 export { ConciergeStore } from "./concierge-store.js";
 
 const EXPLORE_PAGE_PATTERN = /^\/(?:explore|activities|activity|diving|bars|bar|beaches|beach|cafes|cafe|restaurants|restaurant|shopping|shop)(?:\.html)?\/?$/;
@@ -83,6 +87,14 @@ export default {
       return handleTranslationRequest(request, env);
     }
 
+    if (url.pathname === "/api/reservations/sync") {
+      return handleReservationSyncRequest(request, env);
+    }
+
+    if (url.pathname.startsWith("/api/stay/")) {
+      return handleStayGuestRequest(request, env, url.pathname, ctx);
+    }
+
     if (url.pathname === "/api/passport-upload" || url.pathname === "/api/passport-upload/session") {
       return handlePassportGuestRequest(request, env, url.pathname);
     }
@@ -106,7 +118,11 @@ export default {
       return Response.redirect(new URL("/", request.url).toString(), 302);
     }
 
-    if (/^\/room\/(1|2|3|4|5|6|7|8|9|10|11)\/?$/.test(url.pathname)) {
+    if (/^\/room\/7\/?$/.test(url.pathname)) {
+      return Response.redirect(new URL("/rooms.html", request.url).toString(), 302);
+    }
+
+    if (/^\/room\/(1|2|3|4|5|6|8|9|10|11)\/?$/.test(url.pathname)) {
       const roomPageUrl = new URL("/room.html", url);
       const assetRequest = new Request(roomPageUrl.toString(), {
         method: "GET",

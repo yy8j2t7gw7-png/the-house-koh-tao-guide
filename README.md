@@ -1,4 +1,4 @@
-# Guest Guide Platform with AI Concierge — The House v5.8.2
+# Guest Guide Platform with AI Concierge — The House v5.9.0
 
 The House – Koh Tao guest guide is a production-oriented, mobile-first digital guest guide and concierge platform. It combines property information, curated island guidance, structured place and activity data, and centralized contact and booking routes.
 
@@ -17,6 +17,20 @@ The House – Koh Tao guest guide is a production-oriented, mobile-first digital
 - Model-powered, room-aware AI Concierge with controlled learning
 
 The Activities module contains 49 structured profiles covering diving, freediving, snorkelling, boat trips, beach experiences, kayaking, paddleboarding, hiking, viewpoints, climbing, yoga, Muay Thai, massage, cooking, wildlife, photography, night activities and rainy-day options.
+
+## v5.9.0 release focus
+
+- Gives each active room one permanent guest page and verifies the current or upcoming stay with the Airbnb confirmation code from the guest's trip details.
+- Synchronizes reservation codes and stay dates automatically from private Airbnb iCal feeds and Airbnb host emails through the included Google Apps Script.
+- Maps the ten verified Airbnb listing IDs to Rooms 1–6 and 8–11. Room 7 remains reserved in source and is not active.
+- Lets verified non-Thai guests create their own private, single-use passport-upload form; Thai nationals can record that the TM30 passport flow does not apply.
+- Enables protected after-hours spare-key access for an active stay from 19:30 to 10:30 Bangkok time, after explicit acceptance of the 500 THB lost-key fee.
+- Automatically sends the lost-key alert to the configured owners/Su group and waits for the WhatsApp API to confirm message submission before showing a key-box code. The guest only confirms the 500 THB fee; the system handles the staff notification. Another release remains blocked until staff rotate the physical code.
+- Stores confirmation codes only as HMAC hashes and key-box codes only in the encrypted Worker secret.
+- Includes exact scheduled Airbnb messages for every active room and a complete one-time setup guide.
+- Preserves the seven-language operational interface, approved AI knowledge, moving-dot thinking state, emergency safeguards and disabled Explore interface.
+
+See `AIRBNB_AUTOMATION_SETUP.md` for activation and `AIRBNB_SCHEDULED_MESSAGES.md` for the prepared guest messages.
 
 ## v5.8.2 release focus
 
@@ -147,25 +161,27 @@ Major water leaks, flooding, burst pipes, dangerous electrical problems and seri
 
 No dedicated on-call person or number has been confirmed yet. The role therefore remains disabled and temporarily falls back to House support without publicly claiming 24/7 availability.
 
-## After-hours spare keys
+## Verified stays and after-hours spare keys
 
 After hours are 19:30–10:30 in the `Asia/Bangkok` time zone. Each room will have one spare-key box next to its door, and a lost key adds a 500 THB replacement fee.
 
-Key-box codes are not included in this release. Secure delivery remains disabled until guest verification and protected server-side secrets are configured. See `SECURE_AFTER_HOURS_ACCESS.md`.
+Each active room uses one permanent page. The guest enters the Airbnb confirmation code from the trip details; the Worker compares its HMAC hash with the automatically synchronized reservation for that listing, room and stay period. The secure browser session expires at checkout.
 
-The protected WhatsApp Business Platform alert adapter can notify configured owners and Su when its production account, template and secrets are enabled. It never includes a key-box code or private stay token. Secure spare-key delivery itself remains disabled; Fah remains the separate booking contact.
+Key-box codes are deliberately absent from this repository and release archive. Put them only in the encrypted `SPARE_KEY_CODES` Worker secret. Automatic release activates only when the production official WhatsApp alert channel has at least one protected urgent recipient. The Worker sends the owner/Su notification automatically and waits for the WhatsApp API to confirm submission, records the event, shows the code only to the verified guest and then blocks another release until staff rotate the physical code. The guest does not approve the notification; the guest confirms only the 500 THB lost-key fee.
+
+See `SECURE_AFTER_HOURS_ACCESS.md` and `AIRBNB_AUTOMATION_SETUP.md`.
 
 ## Secure passport information
 
-Owners can create a room-bound, expiring, single-use private Room welcome link from `/concierge-admin` when a non-Thai guest did not supply the required passport information before arrival. Thai nationals do not need this TM30 registration or passport upload. The owner must confirm that the request concerns a non-Thai guest. Its registration button opens the secure form directly, where the TM30 purpose and privacy controls are explained before an image is accepted.
+The permanent room page asks the guest to verify the Airbnb stay once. A verified non-Thai guest can then create a room- and reservation-bound, expiring, single-use passport form automatically. Thai nationals can select the exemption option and do not need this TM30 passport registration. The form explains the TM30 purpose and privacy controls before an image is accepted.
 
 Passport images never enter the AI chat, model prompts, learning queue, WhatsApp messages or public site. They are stored in the private `PASSPORT_UPLOADS` R2 binding and can be downloaded only through the authenticated owner API. The main retention policy is 14 days after upload, with immediate deletion available and a daily application cleanup reinforcing the R2 lifecycle rule.
 
-The owner page identifies pending and overdue requests and creates a guest-friendly reminder to copy into the existing conversation. Automatic pre-arrival reminders remain separate from the new staff-alert channel because they require approved guest-contact and stay-arrival data. The manual TM30-details alternative remains disabled because the exact authoritative field list has not been supplied; no fields were guessed. See `PASSPORT_DATA_OPERATIONS.md`.
+The prepared Airbnb scheduled-arrival message is the automatic pre-arrival reminder and includes the permanent room page. The owner console shows synchronized stays and registration status and retains a manual link as an emergency fallback. The manual TM30-details alternative remains disabled because the exact authoritative field list has not been supplied; no fields were guessed. See `PASSPORT_DATA_OPERATIONS.md`.
 
 ## Production activation
 
-The model-powered layer requires the server-side `OPENAI_API_KEY` secret. The private learning and alert review requires `CONCIERGE_ADMIN_TOKEN`, and `CONCIERGE_HASH_SALT` is strongly recommended for session and recipient pseudonymization. Secure passport links also require the private `the-house-passport-uploads` R2 bucket and `PASSPORT_TOKEN_PEPPER`. WhatsApp delivery additionally requires the encrypted values documented in `WHATSAPP_ALERT_OPERATIONS.md`. Secret values must never be committed or included in release archives.
+The model-powered layer requires `OPENAI_API_KEY`. Owner operations require `CONCIERGE_ADMIN_TOKEN`, and `CONCIERGE_HASH_SALT` is strongly recommended. Verified stays require `STAY_TOKEN_PEPPER` and `RESERVATION_SYNC_TOKEN`. Secure passport forms require the private `the-house-passport-uploads` R2 bucket and `PASSPORT_TOKEN_PEPPER`. Spare-key release additionally requires the encrypted `SPARE_KEY_CODES` JSON secret and the official WhatsApp values documented in `WHATSAPP_ALERT_OPERATIONS.md`. Secret values must never be committed or included in release archives.
 
 The core deterministic concierge works safely before these secrets are configured. Follow `AI_CONCIERGE_OPERATIONS.md` to activate and verify the complete AI and learning workflow.
 
@@ -173,12 +189,14 @@ The core deterministic concierge works safely before these secrets are configure
 
 - Cloudflare Worker entry point: `src/index.js`
 - Server-side concierge controller: `src/concierge-api.js`
+- Verified-stay, passport-entry and spare-key controller: `src/stay-api.js`
 - Deterministic action-needed alert policy: `src/alert-policy.js`
 - Protected WhatsApp alert delivery: `src/whatsapp-alerts.js`
 - Approved page-translation API: `src/i18n-api.js`
 - Approved project-data retrieval: `src/project-knowledge.js`
 - Deterministic safety and matching logic: `src/concierge-core.js`
 - Persistent learning store: `src/concierge-store.js`
+- Automatic Airbnb synchronizer: `airbnb-sync/Code.gs`
 - Static application: `public/`
 - Structured content: `public/data/`
 - Canonical module copies: `public/modules/`

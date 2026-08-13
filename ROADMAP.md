@@ -1,6 +1,6 @@
 # Product Roadmap
 
-Baseline: v5.8.2
+Baseline: v5.9.0
 
 ## Completed
 
@@ -26,7 +26,7 @@ Baseline: v5.8.2
 - [x] Registration page presents image-upload and manual-entry choices without activating unverified fields
 - [x] Working structured Concierge v1 question-and-answer engine
 - [x] Room-aware concierge context and room selection
-- [x] Room 7 added downstairs below Rooms 5 and 6
+- [x] Room 7 preserved as a future room but removed from the active guest release
 - [x] Concierge-first public Contact Us actions
 - [x] Separate urgent property-emergency classification
 - [x] Safe unsupported-question and deferred-Explore fallbacks
@@ -53,8 +53,16 @@ Baseline: v5.8.2
 - [x] Action-needed alert classification, five-minute deduplication and protected owner alert console
 - [x] Official WhatsApp Business Platform adapter with signed webhook acknowledgement and resolution
 - [x] Role-based protected recipient groups and ten-minute urgent/critical escalation
+- [x] Fixed Airbnb listing-to-room mapping for active Rooms 1–6 and 8–11
+- [x] Automatic reservation-code and stay-date synchronization from Airbnb iCal plus host email
+- [x] Permanent verified room pages using the Airbnb confirmation code
+- [x] Reservation-linked self-service passport forms and Thai-national exemption
+- [x] Verified active-stay after-hours spare-key release with 500 THB fee confirmation
+- [x] Automatic official WhatsApp urgent-team notification with confirmed API submission required before key display
+- [x] Key-code rotation lock and owner confirmation workflow
+- [x] Prepared scheduled Airbnb arrival messages for every active listing
 
-## Current priority — v5.8.x Operational Concierge Launch
+## Current priority — v5.9.x Verified Guest Launch
 
 The concierge must be useful to real guests before further Explore expansion.
 
@@ -74,13 +82,13 @@ The concierge must be useful to real guests before further Explore expansion.
 - [ ] Verify the complete passport flow with a non-sensitive test image
 - [ ] Supply the authoritative TM30 manual-entry field specification
 - [ ] Add the secure manual-details alternative after that specification is approved
-- [ ] Connect an outbound messaging provider for automatic pre-arrival passport reminders
+- [x] Prepare Airbnb scheduled messages as the automatic pre-arrival passport reminder
 - [ ] Confirm the dedicated 24/7 property-emergency person and number
-- [ ] Generate private signed links for active stays
-- [ ] Validate each private link against its room and validity period
-- [ ] Store room key-box codes only in protected server-side secrets
-- [ ] Enable the 19:30–10:30 Bangkok-time spare-key flow
-- [ ] Log spare-key access events and urgent property incidents
+- [x] Use one permanent URL per active room with protected reservation verification
+- [x] Validate every verified session against its room, listing and reservation validity period
+- [x] Implement protected server-side key-code secret parsing without repository values
+- [x] Implement the 19:30–10:30 Bangkok-time spare-key flow
+- [x] Log spare-key access and require key-code rotation before reuse
 - [x] Add protected owner and Su notification recipient configuration
 - [x] Add one-alert-per-recipient delivery and escalation logic
 - [x] Integrate the official WhatsApp Business Platform adapter
@@ -93,11 +101,19 @@ Guests may continue using ordinary WhatsApp handoffs. Automated internal alerts 
 
 - [x] Push the v5.5.0 release to the existing hosting workflow
 - [x] Confirm `/api/concierge/status` reports AI and learning enabled
-- [ ] Deploy v5.8.2 and confirm full-page language switching, recommendations, Bamboo social actions, booking wording, registration entry point and alert console
+- [ ] Deploy v5.9.0 and confirm full-page language switching, recommendations, Bamboo social actions, booking wording, verified registration and alert console
+- [ ] Add `STAY_TOKEN_PEPPER`, `RESERVATION_SYNC_TOKEN` and protected `SPARE_KEY_CODES` Worker secrets
+- [ ] Install and authorize the included Airbnb Google Apps Script synchronizer
+- [ ] Add each listing's private Airbnb iCal URL to Apps Script properties
+- [ ] Add and activate the prepared scheduled Airbnb arrival message for each active listing
+- [ ] Confirm `HOUSE_AIRBNB_LAST_DIAGNOSTICS` is blank after the first full synchronization
 - [ ] Configure the Meta production alert channel following `WHATSAPP_ALERT_OPERATIONS.md`
 - [ ] Test all seven languages on guest phones and review real guest feedback for wording refinements
 - [ ] Verify the protected `/concierge-admin` review workflow
-- [ ] Verify the live room links, including Room 7
+- [ ] Verify all ten active permanent room links; Room 7 must remain inactive
+- [ ] Test cross-room confirmation-code rejection in a private browser window
+- [ ] Test a non-sensitive reservation-linked passport upload and Thai exemption
+- [ ] Test spare-key release with a temporary code and automatic urgent-team WhatsApp submission, then rotate it
 - [ ] Test the concierge on guest phones
 - [ ] Test room persistence and room changes
 - [ ] Test Su/Fah handoff separation

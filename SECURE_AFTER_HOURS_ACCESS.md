@@ -1,81 +1,68 @@
 # Secure After-Hours Spare-Key Access
 
-## Confirmed after-hours rule
+## Confirmed rule
 
 - Time zone: Asia/Bangkok
 - After-hours window: 19:30 until 10:30
-- One spare-key box per room
-- Key-box location: next to the relevant room door
+- One spare-key box per active room
+- Key-box location: directly next to the relevant room door
 - Lost-key replacement fee: 500 THB
 
 This window defines after-hours handling only. It does not define reception, office or property operating hours.
 
-## Security rule
+## v5.9.0 verified-stay flow
 
-Key-box codes must never be stored in public HTML, JavaScript, JSON, URLs, repository history or the release ZIP. Public room numbers are not proof that a person is the current guest.
+1. Every active Room 1–6 and 8–11 has one permanent page listed in `AIRBNB_AUTOMATION_SETUP.md`. Room 7 is inactive.
+2. The Airbnb synchronizer sends the minimum reservation record to the Worker: listing ID, room, confirmation code, check-in, checkout and status.
+3. The Worker HMAC-hashes the confirmation code immediately. The readable code is never written to the database or logs.
+4. The guest enters the Airbnb confirmation code shown in the trip details on the permanent page for the booked room.
+5. Verification succeeds only when the code, listing, room and unexpired reservation agree. A cross-room attempt fails.
+6. The browser receives a `Secure`, `HttpOnly`, `SameSite=Strict` session tied to that reservation and room. It expires no later than 11:00 AM on checkout day.
+7. Spare-key access is available only from check-in at 2:00 PM until checkout at 11:00 AM and only within the 19:30–10:30 after-hours window.
+8. The guest must explicitly confirm the 500 THB lost-key replacement fee. This confirmation is separate from the automatic staff notification.
+9. The Worker automatically creates and sends a verified urgent event to the configured owners/Su group, then waits for the WhatsApp API to confirm at least one message submission. The guest is not asked to approve this staff notification.
+10. Only then does the Worker record the access and return the room's code with the instruction that the box is next to the door.
+11. The room is immediately marked as requiring code rotation. No second automatic release is permitted until staff change the physical code, update the Cloudflare secret and confirm rotation in `/concierge-admin`.
 
-The codes must remain in protected server-side secrets. Secure code delivery stays disabled until the guest-verification method and real key-box codes are configured.
+## Protected code storage
 
-The language model must never receive a key-box code, private stay-link token or signing secret in its prompt or tools. Verification and code delivery must remain a separate deterministic server operation.
+Key-box codes must never be stored in public HTML, JavaScript, JSON data, URLs, Durable Object storage, model prompts, logs, repository history, screenshots or the release ZIP.
 
-## Required production flow
+Store the real codes only in the encrypted Cloudflare Worker secret `SPARE_KEY_CODES` as a JSON object keyed by active room. The example structure in the setup guide contains placeholders only. Never send real values through chat.
 
-1. Every active stay receives a private, unguessable link tied to one room and a defined validity period.
-2. The concierge determines the room from that private stay link. A manually selected room may provide context but cannot authorize code access.
-3. A server-side check verifies the signed link, validity period and current access to that room.
-4. The server confirms that Bangkok time is within the configured after-hours window.
-5. The concierge states that a 500 THB lost-key replacement fee will be added and asks the guest to confirm the spare-key request.
-6. Only after verification and confirmation, the server returns the code and the instruction that the box is next to the room door.
-7. The access event is logged with room, time and outcome.
-8. Every configured owner and Su receives an operational notification when an approved messaging channel is connected.
+The deterministic stay API—not the language model—performs verification and code release. The AI Concierge may guide a guest to the protected section but cannot access or produce a code.
 
-## Private stay-link contents
+## Team notification
 
-The signed link should identify only what the server needs:
+The protected `urgent` recipient group should contain Su and each owner who must receive the event. Names and telephone numbers remain only in the encrypted `WHATSAPP_ALERT_RECIPIENTS` secret.
 
-- room number
-- valid-from and valid-until times
-- random stay reference or nonce
-- server-verifiable signature
+Each successfully submitted event includes:
 
-The link must not contain the key-box code, guest passport details, WhatsApp credentials or a readable master secret. Expired or altered links must be rejected.
+- verified room;
+- Bangkok date and time;
+- spare-key release event type;
+- confirmation that the guest acknowledged the 500 THB fee;
+- instruction to rotate the room's key-box code;
+- random alert reference.
 
-## Multi-recipient owner notification
+The alert never includes the code, confirmation code, session cookie, passport information or a readable guest identifier.
 
-Notification recipients are a protected, configurable list containing selected owners and Su. Names and phone numbers must be stored server-side and must not appear in the public contact configuration, JavaScript, knowledge JSON, repository or release ZIP.
+Automatic key release fails closed when WhatsApp is incomplete, no urgent recipient exists or all delivery attempts fail. The guest receives an urgent concierge fallback; no code is shown.
 
-Each approved spare-key event sends one operational alert per configured recipient. The alert should contain:
+## Activation checklist
 
-- Room number
-- Bangkok date and time
-- Verified stay reference
-- Confirmation that spare-key access was released
-- Confirmation that the 500 THB lost-key fee applies
-- Delivery or event status
+1. Deploy v5.9.0.
+2. Add `STAY_TOKEN_PEPPER` and `RESERVATION_SYNC_TOKEN` as separate long random Worker secrets.
+3. Add real current codes only to the encrypted `SPARE_KEY_CODES` Worker secret.
+4. Configure the official WhatsApp Business Platform and protected `urgent` recipients using `WHATSAPP_ALERT_OPERATIONS.md`.
+5. Install the included Airbnb synchronizer using `AIRBNB_AUTOMATION_SETUP.md` and confirm its diagnostics are blank.
+6. Test with a temporary code and non-sensitive future/current test reservation.
+7. Confirm a wrong-room code fails, daytime release fails and missing fee confirmation fails.
+8. Confirm Su/owners receive the sanitized alert before the temporary code appears.
+9. Change the physical test code, update the secret, redeploy and confirm rotation in the owner console.
 
-The notification must never contain the key-box code or private stay-link token.
+## Separate property emergency route
 
-Delivery failures must be logged so one failed owner notification does not prevent the guest from receiving an already-authorized spare-key instruction.
+Urgent property problems are not limited to the spare-key window. Major water leaks, flooding, burst pipes, dangerous electrical problems and serious property damage require a separate on-call human route.
 
-## Current launch behavior
-
-Until secure code delivery is enabled, the concierge identifies the room, explains the 500 THB fee and offers the correct human support handoff. It never reveals or guesses a key-box code.
-
-v5.8.2 provides the protected official WhatsApp Business Platform alert adapter and owner console. When the production account, approved template and encrypted recipients are configured, an after-hours lost-key request can notify the protected urgent group and escalate if unacknowledged. The alert never contains the key-box code or private stay token. This notification capability does not enable secure code delivery, which remains blocked on current-guest verification and protected server-side codes.
-
-## Separate 24/7 property-emergency route
-
-Urgent property problems are not limited to the after-hours spare-key window. Major water leaks, flooding, burst pipes, dangerous electrical problems and serious property damage require a 24/7 on-call human route.
-
-The application contains a separate `propertyEmergency` contact role. Until a dedicated person and number are confirmed, it remains disabled and temporarily falls back to the existing House support call and WhatsApp routes. The public interface must not claim that the temporary fallback is available 24/7.
-
-Once confirmed, configure the dedicated on-call contact server-side and enable the role. The concierge should include the room number and the guest's description in every urgent message.
-
-## Information still required before activation
-
-- The final code for each installed key box, supplied only through protected server configuration
-- A secure signing secret and private-link generation workflow
-- Validity dates for each active stay link
-- A protected event log or operations store
-- Production WhatsApp Business Platform account, approved Utility template, credentials and protected owner/Su recipients if automatic delivery is required
-- The confirmed 24/7 on-call property-emergency person and telephone/WhatsApp number
+No dedicated 24/7 property-emergency contact has been confirmed. The role therefore remains disabled and temporarily falls back to House support without publicly claiming confirmed 24/7 availability. Configure the dedicated person server-side only after the owner supplies and confirms that contact.

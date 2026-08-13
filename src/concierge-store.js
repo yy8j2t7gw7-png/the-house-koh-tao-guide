@@ -133,6 +133,74 @@ export class ConciergeStore extends DurableObject {
         );
         CREATE INDEX IF NOT EXISTS concierge_alert_deliveries_alert ON concierge_alert_deliveries(alert_id, created_at);
         CREATE INDEX IF NOT EXISTS concierge_alert_deliveries_provider ON concierge_alert_deliveries(provider_message_id);
+
+        CREATE TABLE IF NOT EXISTS stay_reservations (
+          id TEXT PRIMARY KEY,
+          provider TEXT NOT NULL DEFAULT 'airbnb',
+          listing_id TEXT NOT NULL,
+          room TEXT NOT NULL,
+          confirmation_code_hash TEXT NOT NULL UNIQUE,
+          check_in_date TEXT NOT NULL,
+          check_out_date TEXT NOT NULL,
+          status TEXT NOT NULL DEFAULT 'confirmed',
+          source_ref_hash TEXT NOT NULL DEFAULT '',
+          last_seen_sync TEXT NOT NULL,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS stay_reservations_room_dates
+          ON stay_reservations(room, status, check_in_date, check_out_date);
+
+        CREATE TABLE IF NOT EXISTS verified_stay_sessions (
+          id TEXT PRIMARY KEY,
+          token_hash TEXT NOT NULL UNIQUE,
+          reservation_id TEXT NOT NULL,
+          room TEXT NOT NULL,
+          created_at TEXT NOT NULL,
+          expires_at TEXT NOT NULL,
+          last_seen_at TEXT NOT NULL,
+          revoked_at TEXT NOT NULL DEFAULT ''
+        );
+        CREATE INDEX IF NOT EXISTS verified_stay_sessions_expiry
+          ON verified_stay_sessions(expires_at, revoked_at);
+
+        CREATE TABLE IF NOT EXISTS passport_reservation_links (
+          passport_id TEXT PRIMARY KEY,
+          reservation_id TEXT NOT NULL,
+          created_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS passport_reservation_links_reservation
+          ON passport_reservation_links(reservation_id, created_at);
+
+        CREATE TABLE IF NOT EXISTS stay_registration_status (
+          reservation_id TEXT PRIMARY KEY,
+          status TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS spare_key_events (
+          id TEXT PRIMARY KEY,
+          reservation_id TEXT NOT NULL,
+          room TEXT NOT NULL,
+          event_type TEXT NOT NULL,
+          fee_accepted INTEGER NOT NULL DEFAULT 0,
+          code_released INTEGER NOT NULL DEFAULT 0,
+          alert_id TEXT NOT NULL DEFAULT '',
+          created_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS spare_key_events_reservation
+          ON spare_key_events(reservation_id, created_at);
+        CREATE UNIQUE INDEX IF NOT EXISTS spare_key_events_single_claim
+          ON spare_key_events(reservation_id);
+
+        CREATE TABLE IF NOT EXISTS spare_key_room_state (
+          room TEXT PRIMARY KEY,
+          rotation_required INTEGER NOT NULL DEFAULT 0,
+          last_released_at TEXT NOT NULL DEFAULT '',
+          last_reservation_id TEXT NOT NULL DEFAULT '',
+          rotation_confirmed_at TEXT NOT NULL DEFAULT '',
+          updated_at TEXT NOT NULL
+        );
       `);
     });
   }
@@ -542,6 +610,416 @@ export class ConciergeStore extends DurableObject {
     return { ok: true };
   }
 
+  async syncStayReservations(payload) {
+    const now = cleanText(payload.syncedAt, 40) || new Date().toISOString();
+    const room = cleanText(payload.room, 4);
+    const listingId = cleanText(payload.listingId, 32);
+    const provider = cleanText(payload.provider || "airbnb", 24);
+    const syncId = cleanText(payload.syncId, 100);
+    const records = Array.isArray(payload.records) ? payload.records.slice(0, 250) : [];
+    let upserted = 0;
+
+    for (const record of records) {
+      const codeHash = cleanText(record.confirmationCodeHash, 100);
+      const checkInDate = cleanText(record.checkInDate, 10);
+      const checkOutDate = cleanText(record.checkOutDate, 10);
+      if (!codeHash || !/^\d{4}-\d{2}-\d{2}$/.test(checkInDate) || !/^\d{4}-\d{2}-\d{2}$/.test(checkOutDate)) continue;
+      const existing = rows(this.ctx.storage.sql.exec(
+        "SELECT id, created_at AS createdAt FROM stay_reservations WHERE confirmation_code_hash = ? LIMIT 1",
+        codeHash
+      ))[0];
+      const id = existing?.id || `stay_${crypto.randomUUID()}`;
+      const createdAt = existing?.createdAt || now;
+      const status = record.status === "cancelled" ? "cancelled" : "confirmed";
+      this.ctx.storage.sql.exec(
+        `INSERT INTO stay_reservations
+         (id, provider, listing_id, room, confirmation_code_hash, check_in_date,
+          check_out_date, status, source_ref_hash, last_seen_sync, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(confirmation_code_hash) DO UPDATE SET
+           provider = excluded.provider,
+           listing_id = excluded.listing_id,
+           room = excluded.room,
+           check_in_date = excluded.check_in_date,
+           check_out_date = excluded.check_out_date,
+           status = excluded.status,
+           source_ref_hash = excluded.source_ref_hash,
+           last_seen_sync = excluded.last_seen_sync,
+           updated_at = excluded.updated_at`,
+        id,
+        provider,
+        listingId,
+        room,
+        codeHash,
+        checkInDate,
+        checkOutDate,
+        status,
+        cleanText(record.sourceRefHash, 100),
+        syncId,
+        createdAt,
+        now
+      );
+      upserted += 1;
+    }
+
+    if (payload.complete === true) {
+      this.ctx.storage.sql.exec(
+        `UPDATE stay_reservations
+         SET status = 'cancelled', updated_at = ?
+         WHERE provider = ? AND listing_id = ? AND room = ? AND status = 'confirmed'
+           AND last_seen_sync != ? AND check_out_date >= date('now', '-2 days')`,
+        now,
+        provider,
+        listingId,
+        room,
+        syncId
+      );
+    }
+    this.ctx.storage.sql.exec(
+      "DELETE FROM verified_stay_sessions WHERE expires_at <= ? OR revoked_at != ''",
+      now
+    );
+    this.ctx.storage.sql.exec(
+      "DELETE FROM stay_reservations WHERE status = 'cancelled' AND julianday(updated_at) < julianday('now', '-90 days')"
+    );
+    return { ok: true, upserted };
+  }
+
+  async getStayReservationByCodeHash(codeHash, room) {
+    return rows(this.ctx.storage.sql.exec(
+      `SELECT id, provider, listing_id AS listingId, room,
+              check_in_date AS checkInDate, check_out_date AS checkOutDate,
+              status, updated_at AS updatedAt
+       FROM stay_reservations
+       WHERE confirmation_code_hash = ? AND room = ? AND status = 'confirmed'
+       LIMIT 1`,
+      cleanText(codeHash, 100),
+      cleanText(room, 4)
+    ))[0] || null;
+  }
+
+  async createVerifiedStaySession(record) {
+    this.ctx.storage.sql.exec(
+      `INSERT INTO verified_stay_sessions
+       (id, token_hash, reservation_id, room, created_at, expires_at, last_seen_at, revoked_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, '')`,
+      cleanText(record.id, 100),
+      cleanText(record.tokenHash, 100),
+      cleanText(record.reservationId, 100),
+      cleanText(record.room, 4),
+      cleanText(record.createdAt, 40),
+      cleanText(record.expiresAt, 40),
+      cleanText(record.createdAt, 40)
+    );
+    return { ok: true };
+  }
+
+  async getVerifiedStaySession(tokenHash, nowValue) {
+    const session = rows(this.ctx.storage.sql.exec(
+      `SELECT s.id, s.reservation_id AS reservationId, s.room, s.created_at AS createdAt,
+              s.expires_at AS expiresAt, r.provider, r.listing_id AS listingId,
+              r.check_in_date AS checkInDate, r.check_out_date AS checkOutDate,
+              r.status AS reservationStatus
+       FROM verified_stay_sessions s
+       JOIN stay_reservations r ON r.id = s.reservation_id
+       WHERE s.token_hash = ? AND s.revoked_at = '' AND s.expires_at > ?
+         AND r.status = 'confirmed'
+       LIMIT 1`,
+      cleanText(tokenHash, 100),
+      cleanText(nowValue, 40)
+    ))[0] || null;
+    if (session) {
+      this.ctx.storage.sql.exec(
+        "UPDATE verified_stay_sessions SET last_seen_at = ? WHERE id = ?",
+        cleanText(nowValue, 40),
+        session.id
+      );
+    }
+    return session;
+  }
+
+  async revokeVerifiedStaySession(tokenHash, nowValue) {
+    this.ctx.storage.sql.exec(
+      "UPDATE verified_stay_sessions SET revoked_at = ? WHERE token_hash = ? AND revoked_at = ''",
+      cleanText(nowValue, 40),
+      cleanText(tokenHash, 100)
+    );
+    return { ok: true };
+  }
+
+  async createAutomaticPassportUpload(record) {
+    const existing = rows(this.ctx.storage.sql.exec(
+      `SELECT p.id, p.status, p.expires_at AS expiresAt
+       FROM passport_uploads p
+       JOIN passport_reservation_links l ON l.passport_id = p.id
+       WHERE l.reservation_id = ? AND p.status = 'pending' AND p.expires_at > ?
+       ORDER BY p.created_at DESC LIMIT 1`,
+      cleanText(record.reservationId, 100),
+      cleanText(record.createdAt, 40)
+    ))[0];
+    if (existing) {
+      this.ctx.storage.sql.exec(
+        `UPDATE passport_uploads
+         SET status = 'deleted', deleted_at = ?, object_key = ''
+         WHERE id = ? AND status = 'pending'`,
+        cleanText(record.createdAt, 40),
+        existing.id
+      );
+    }
+
+    const count = rows(this.ctx.storage.sql.exec(
+      `SELECT COUNT(*) AS total
+       FROM passport_reservation_links l
+       JOIN passport_uploads p ON p.id = l.passport_id
+       WHERE l.reservation_id = ? AND p.status IN ('pending', 'uploaded')`,
+      cleanText(record.reservationId, 100)
+    ))[0];
+    if ((Number(count?.total) || 0) >= 6) return { ok: false, error: "registration_limit_reached" };
+
+    await this.createPassportUpload(record);
+    this.ctx.storage.sql.exec(
+      `INSERT INTO passport_reservation_links (passport_id, reservation_id, created_at)
+       VALUES (?, ?, ?)`,
+      cleanText(record.id, 100),
+      cleanText(record.reservationId, 100),
+      cleanText(record.createdAt, 40)
+    );
+    return { ok: true };
+  }
+
+  async setStayRegistrationStatus(reservationId, status, nowValue) {
+    this.ctx.storage.sql.exec(
+      `INSERT INTO stay_registration_status (reservation_id, status, updated_at)
+       VALUES (?, ?, ?)
+       ON CONFLICT(reservation_id) DO UPDATE SET
+         status = excluded.status, updated_at = excluded.updated_at`,
+      cleanText(reservationId, 100),
+      cleanText(status, 40),
+      cleanText(nowValue, 40) || new Date().toISOString()
+    );
+    return { ok: true };
+  }
+
+  async getStayRegistrationStatus(reservationId) {
+    return rows(this.ctx.storage.sql.exec(
+      "SELECT status, updated_at AS updatedAt FROM stay_registration_status WHERE reservation_id = ? LIMIT 1",
+      cleanText(reservationId, 100)
+    ))[0] || null;
+  }
+
+  async closePendingPassportLinksForReservation(reservationId, nowValue) {
+    const now = cleanText(nowValue, 40) || new Date().toISOString();
+    this.ctx.storage.sql.exec(
+      `UPDATE passport_uploads
+       SET status = 'deleted', deleted_at = ?, object_key = ''
+       WHERE status = 'pending' AND id IN (
+         SELECT passport_id FROM passport_reservation_links WHERE reservation_id = ?
+       )`,
+      now,
+      cleanText(reservationId, 100)
+    );
+    return { ok: true };
+  }
+
+  async getSpareKeyState(reservationId, room) {
+    const event = rows(this.ctx.storage.sql.exec(
+      `SELECT id, created_at AS createdAt FROM spare_key_events
+       WHERE reservation_id = ? AND code_released = 1
+       ORDER BY created_at DESC LIMIT 1`,
+      cleanText(reservationId, 100)
+    ))[0] || null;
+    const roomState = rows(this.ctx.storage.sql.exec(
+      `SELECT rotation_required AS rotationRequired, last_released_at AS lastReleasedAt,
+              last_reservation_id AS lastReservationId,
+              rotation_confirmed_at AS rotationConfirmedAt
+       FROM spare_key_room_state WHERE room = ? LIMIT 1`,
+      cleanText(room, 4)
+    ))[0] || null;
+    return {
+      releasedForReservation: Boolean(event),
+      rotationRequired: Boolean(roomState?.rotationRequired),
+      lastReleasedAt: roomState?.lastReleasedAt || "",
+      lastReservationId: roomState?.lastReservationId || ""
+    };
+  }
+
+  async recordSpareKeyEvent(record) {
+    const now = cleanText(record.createdAt, 40) || new Date().toISOString();
+    this.ctx.storage.sql.exec(
+      `INSERT INTO spare_key_events
+       (id, reservation_id, room, event_type, fee_accepted, code_released, alert_id, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      cleanText(record.id, 100),
+      cleanText(record.reservationId, 100),
+      cleanText(record.room, 4),
+      cleanText(record.eventType, 60),
+      record.feeAccepted ? 1 : 0,
+      record.codeReleased ? 1 : 0,
+      cleanText(record.alertId, 100),
+      now
+    );
+    if (record.codeReleased) {
+      this.ctx.storage.sql.exec(
+        `INSERT INTO spare_key_room_state
+         (room, rotation_required, last_released_at, last_reservation_id,
+          rotation_confirmed_at, updated_at)
+         VALUES (?, 1, ?, ?, '', ?)
+         ON CONFLICT(room) DO UPDATE SET
+           rotation_required = 1,
+           last_released_at = excluded.last_released_at,
+           last_reservation_id = excluded.last_reservation_id,
+           rotation_confirmed_at = '',
+           updated_at = excluded.updated_at`,
+        cleanText(record.room, 4),
+        now,
+        cleanText(record.reservationId, 100),
+        now
+      );
+    }
+    return { ok: true };
+  }
+
+  async claimSpareKeyRelease(record) {
+    const reservationId = cleanText(record.reservationId, 100);
+    const room = cleanText(record.room, 4);
+    const roomState = rows(this.ctx.storage.sql.exec(
+      "SELECT rotation_required AS rotationRequired FROM spare_key_room_state WHERE room = ? LIMIT 1",
+      room
+    ))[0];
+    if (Boolean(roomState?.rotationRequired)) return { ok: false, error: "key_code_rotation_required" };
+    const existing = rows(this.ctx.storage.sql.exec(
+      "SELECT id FROM spare_key_events WHERE reservation_id = ? LIMIT 1",
+      reservationId
+    ))[0];
+    if (existing) return { ok: false, error: "spare_key_already_released" };
+    const now = cleanText(record.createdAt, 40) || new Date().toISOString();
+    this.ctx.storage.sql.exec(
+      `INSERT INTO spare_key_events
+       (id, reservation_id, room, event_type, fee_accepted, code_released, alert_id, created_at)
+       VALUES (?, ?, ?, 'notification_pending', 1, 0, '', ?)`,
+      cleanText(record.id, 100),
+      reservationId,
+      room,
+      now
+    );
+    this.ctx.storage.sql.exec(
+      `INSERT INTO spare_key_room_state
+       (room, rotation_required, last_released_at, last_reservation_id,
+        rotation_confirmed_at, updated_at)
+       VALUES (?, 1, '', ?, '', ?)
+       ON CONFLICT(room) DO UPDATE SET
+         rotation_required = 1,
+         last_reservation_id = excluded.last_reservation_id,
+         rotation_confirmed_at = '',
+         updated_at = excluded.updated_at`,
+      room,
+      reservationId,
+      now
+    );
+    return { ok: true };
+  }
+
+  async finalizeSpareKeyRelease(record) {
+    const now = cleanText(record.createdAt, 40) || new Date().toISOString();
+    const eventId = cleanText(record.id, 100);
+    const reservationId = cleanText(record.reservationId, 100);
+    const room = cleanText(record.room, 4);
+    const claim = rows(this.ctx.storage.sql.exec(
+      `SELECT id FROM spare_key_events
+       WHERE id = ? AND reservation_id = ? AND room = ? AND code_released = 0 LIMIT 1`,
+      eventId,
+      reservationId,
+      room
+    ))[0];
+    if (!claim) return { ok: false, error: "claim_not_found" };
+    this.ctx.storage.sql.exec(
+      `UPDATE spare_key_events
+       SET event_type = 'verified_after_hours_release', code_released = 1, alert_id = ?
+       WHERE id = ?`,
+      cleanText(record.alertId, 100),
+      eventId
+    );
+    this.ctx.storage.sql.exec(
+      `INSERT INTO spare_key_room_state
+       (room, rotation_required, last_released_at, last_reservation_id,
+        rotation_confirmed_at, updated_at)
+       VALUES (?, 1, ?, ?, '', ?)
+       ON CONFLICT(room) DO UPDATE SET
+         rotation_required = 1,
+         last_released_at = excluded.last_released_at,
+         last_reservation_id = excluded.last_reservation_id,
+         rotation_confirmed_at = '',
+         updated_at = excluded.updated_at`,
+      room,
+      now,
+      reservationId,
+      now
+    );
+    return { ok: true };
+  }
+
+  async cancelSpareKeyClaim(id) {
+    const claim = rows(this.ctx.storage.sql.exec(
+      "SELECT room, reservation_id AS reservationId FROM spare_key_events WHERE id = ? AND code_released = 0 LIMIT 1",
+      cleanText(id, 100)
+    ))[0];
+    this.ctx.storage.sql.exec(
+      "DELETE FROM spare_key_events WHERE id = ? AND code_released = 0",
+      cleanText(id, 100)
+    );
+    if (claim) {
+      this.ctx.storage.sql.exec(
+        `UPDATE spare_key_room_state
+         SET rotation_required = 0, last_reservation_id = '', updated_at = ?
+         WHERE room = ? AND last_reservation_id = ?`,
+        new Date().toISOString(),
+        cleanText(claim.room, 4),
+        cleanText(claim.reservationId, 100)
+      );
+    }
+    return { ok: true };
+  }
+
+  async confirmSpareKeyRotation(room, nowValue) {
+    const now = cleanText(nowValue, 40) || new Date().toISOString();
+    this.ctx.storage.sql.exec(
+      `INSERT INTO spare_key_room_state
+       (room, rotation_required, last_released_at, last_reservation_id,
+        rotation_confirmed_at, updated_at)
+       VALUES (?, 0, '', '', ?, ?)
+       ON CONFLICT(room) DO UPDATE SET
+         rotation_required = 0,
+         rotation_confirmed_at = excluded.rotation_confirmed_at,
+         updated_at = excluded.updated_at`,
+      cleanText(room, 4),
+      now,
+      now
+    );
+    return { ok: true, room, rotationConfirmedAt: now };
+  }
+
+  async getStayOperationsOverview() {
+    const reservations = rows(this.ctx.storage.sql.exec(
+      `SELECT r.room, r.listing_id AS listingId, r.check_in_date AS checkInDate,
+              r.check_out_date AS checkOutDate, r.status, r.updated_at AS updatedAt,
+              COALESCE(g.status, 'not_started') AS registrationStatus
+       FROM stay_reservations r
+       LEFT JOIN stay_registration_status g ON g.reservation_id = r.id
+       WHERE r.check_out_date >= date('now', '-1 day')
+       ORDER BY r.check_in_date ASC, r.room ASC LIMIT 250`
+    ));
+    const rotations = rows(this.ctx.storage.sql.exec(
+      `SELECT room, rotation_required AS rotationRequired,
+              last_released_at AS lastReleasedAt,
+              updated_at AS updatedAt,
+              rotation_confirmed_at AS rotationConfirmedAt
+       FROM spare_key_room_state
+       WHERE rotation_required = 1
+       ORDER BY updated_at DESC`
+    )).map((item) => ({ ...item, rotationRequired: Boolean(item.rotationRequired) }));
+    return { reservations, rotations };
+  }
+
   async getTranslations(cacheKeys) {
     const keys = Array.isArray(cacheKeys)
       ? cacheKeys.map((key) => cleanText(key, 100)).filter(Boolean).slice(0, 24)
@@ -629,6 +1107,20 @@ export class ConciergeStore extends DurableObject {
       session.id
     );
     return { ok: true, id: session.id, room: session.room };
+  }
+
+  async markRegistrationFromPassport(passportId, nowValue) {
+    const linked = rows(this.ctx.storage.sql.exec(
+      "SELECT reservation_id AS reservationId FROM passport_reservation_links WHERE passport_id = ? LIMIT 1",
+      cleanText(passportId, 100)
+    ))[0];
+    if (!linked) return { ok: false };
+    await this.setStayRegistrationStatus(
+      linked.reservationId,
+      "passport_received",
+      cleanText(nowValue, 40) || new Date().toISOString()
+    );
+    return { ok: true, reservationId: linked.reservationId };
   }
 
   async getPassportUpload(id) {

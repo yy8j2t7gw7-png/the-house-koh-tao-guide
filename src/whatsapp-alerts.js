@@ -81,7 +81,8 @@ function severityLabel(severity) {
 }
 
 function roomLabel(alert) {
-  return alert.room ? `Room ${alert.room} (guest-selected)` : "Room not selected";
+  if (!alert.room) return "Room not selected";
+  return alert.roomVerified ? `Room ${alert.room} (stay verified)` : `Room ${alert.room} (guest-selected)`;
 }
 
 function templatePayload(alert, recipient, env) {
@@ -124,6 +125,7 @@ async function sendTemplate(alert, recipient, stage, env, store) {
     });
     const responseBody = await response.json().catch(() => ({}));
     const providerMessageId = String(responseBody?.messages?.[0]?.id || "").slice(0, 180);
+    const submitted = response.ok && Boolean(providerMessageId);
     await store.recordAlertDelivery({
       id: deliveryId,
       alertId: alert.id,
@@ -131,11 +133,11 @@ async function sendTemplate(alert, recipient, stage, env, store) {
       recipientHash: hashedRecipient,
       recipientLabel: recipient.label,
       providerMessageId,
-      status: response.ok ? "accepted" : "failed",
-      errorCode: response.ok ? "" : String(responseBody?.error?.code || response.status),
+      status: submitted ? "accepted" : "failed",
+      errorCode: submitted ? "" : String(responseBody?.error?.code || (response.ok ? "missing_message_id" : response.status)),
       createdAt: new Date().toISOString()
     });
-    return response.ok;
+    return submitted;
   } catch (_error) {
     await store.recordAlertDelivery({
       id: deliveryId,
@@ -193,6 +195,45 @@ export async function createConciergeAlert({ env, interactionId, sessionId, room
     summary: safeAlertSummary(policy.summary),
     bangkokTime: policy.bangkokTime,
     createdAt: policy.createdAt,
+    escalationDueAt
+  };
+  const created = await store.createAlert(alert);
+  if (!created?.created) return { ...created?.alert, duplicate: true };
+  return { ...alert, duplicate: false, configured: config.configured };
+}
+
+export async function createProtectedOperationsAlert({
+  env,
+  room,
+  alertType,
+  severity,
+  recipientGroup,
+  summary,
+  escalationRequired = false,
+  now = new Date()
+}) {
+  const store = getStore(env);
+  if (!store) return null;
+  const config = whatsappAlertConfiguration(env);
+  const safeSummary = safeAlertSummary(summary);
+  const dedupeKey = await sha256(
+    `${env.CONCIERGE_HASH_SALT || env.META_APP_SECRET || "the-house-alert"}:protected:${room}:${alertType}:${normalizeDedupeSummary(safeSummary)}`
+  );
+  const escalationDueAt = escalationRequired
+    ? new Date(now.getTime() + (config.escalationMinutes * 60_000)).toISOString()
+    : "";
+  const alert = {
+    id: `alert_${crypto.randomUUID()}`,
+    interactionId: "",
+    dedupeKey,
+    severity: String(severity || "attention"),
+    alertType: String(alertType || "protected_operation"),
+    recipientGroup: String(recipientGroup || "urgent"),
+    room: String(room || ""),
+    roomVerified: true,
+    summary: safeSummary,
+    bangkokTime: formatBangkokAlertTime(now),
+    createdAt: now.toISOString(),
     escalationDueAt
   };
   const created = await store.createAlert(alert);

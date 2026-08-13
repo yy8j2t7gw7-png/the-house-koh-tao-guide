@@ -81,6 +81,8 @@ The concierge reads the room from a room-specific URL such as `/room/5` and reme
 
 Room selection is useful context but is not secure proof of current occupancy. Never use room selection alone to reveal a key-box code or other protected information.
 
+Protected passport entry and spare-key access use the separate deterministic verified-stay API. The permanent room URL alone is not proof. The guest must enter the Airbnb confirmation code that matches the synchronized listing, room and stay dates. The model never receives that code or the verified-session cookie.
+
 ## Sensitive information
 
 Never store key-box codes, guest identity data, private access tokens, passwords, API credentials or messaging credentials in the knowledge JSON, public files, Git history or release ZIP.
@@ -89,7 +91,7 @@ Follow `SECURE_AFTER_HOURS_ACCESS.md` for spare-key access.
 
 Do not place telephone numbers or WhatsApp destinations inside learned answers. Contact actions are generated from protected, deterministic routing configuration.
 
-Passport and TM30 questions may explain the approved purpose and offer the secure registration action only when the private Room welcome link supplied it. Never add a WhatsApp request route, accept passport content inside chat or open an unauthenticated public upload. Follow `PASSPORT_DATA_OPERATIONS.md`.
+Passport and TM30 questions may explain the approved purpose and guide the guest to the permanent Room page. A verified stay can create a private single-use form automatically. Never add a WhatsApp request route, accept passport content inside chat or open an unauthenticated public upload. Follow `PASSPORT_DATA_OPERATIONS.md`.
 
 ## Validation
 

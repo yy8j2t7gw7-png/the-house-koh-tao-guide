@@ -2,7 +2,7 @@
 
 ## Purpose and current scope
 
-TM30 accommodation registration concerns foreign guests. Thai nationals do not need to complete this registration or upload a passport. For non-Thai guests and overnight visitors, v5.8.2 provides a private passport-image workflow, a prominent welcome-page registration entry point and a seven-language secure form so guests do not send the document through the AI Concierge or as a WhatsApp attachment.
+TM30 accommodation registration concerns foreign guests. Thai nationals do not need to complete this registration or upload a passport. For non-Thai guests and overnight visitors, v5.9.0 provides a reservation-bound private passport-image workflow, a prominent welcome-page registration entry point and a seven-language secure form so guests do not send the document through the AI Concierge, Airbnb messages or WhatsApp.
 
 This scope was checked against the Thai Immigration Bureau TM30 service description, which states that Section 38 notification applies when accommodation is provided to foreign nationals. Operational wording must remain limited to this exemption and must not expand into unsourced legal advice.
 
@@ -10,22 +10,22 @@ The current authoritative House information confirms the passport-photo requirem
 
 ## Guest experience
 
-1. An authorized owner confirms the request is for a non-Thai guest, then creates it in `/concierge-admin` with the room and expected Bangkok arrival time. The application does not infer nationality.
-2. The system returns a guest-friendly reminder and a private Room welcome link.
-3. The link carries its 256-bit token in the URL fragment. Browser fragments are not sent in the initial page request or referrer.
-4. The Required Guest Registration button on that private welcome page opens the secure one-time registration form directly. It does not open WhatsApp.
-5. The registration page explains why the information is needed and how it is handled, then presents two choices: upload a passport image, or enter the required details securely.
-   Thai guests are told that neither choice is required for them.
-6. Passport-image upload is active. The guest submits one JPEG, PNG, WebP or HEIC passport image up to 10 MB.
-7. Manual entry remains disabled until the authoritative list of required TM30 fields is supplied. This prevents collection of guessed, unnecessary or incomplete information.
-8. The server validates the link, expiration, single-use state, file size and file signature before private storage.
-9. The link closes after the successful upload.
+1. Airbnb sends the scheduled arrival message containing the permanent page for the booked room and Airbnb's own confirmation-code detail.
+2. The guest enters that code. The Worker verifies it against the protected synchronized listing, room and reservation dates.
+3. A verified guest chooses either **Upload passport securely** for each non-Thai overnight guest or **All overnight guests are Thai nationals** when the exemption applies to the whole reservation. The application does not infer nationality.
+4. Each passport-button use creates a new random, reservation- and room-bound, 72-hour, single-use upload link automatically. No owner action is required.
+5. Its 256-bit token is carried only in the URL fragment; fragments are not sent in the initial page request or referrer.
+6. The registration page explains why the information is needed and how it is handled. It does not open WhatsApp.
+7. Passport-image upload accepts one JPEG, PNG, WebP or HEIC image up to 10 MB.
+8. Manual details remain disabled until the authoritative TM30 field list is supplied, preventing guessed, unnecessary or incomplete collection.
+9. The server validates authorization, reservation link, expiry, single use, byte limit and file signature before private storage.
+10. The upload link closes after success. The verified room page can create a separate form for another non-Thai overnight guest. Selecting the all-Thai exemption revokes unused pending passport links for that reservation.
 
 Create one link per passport image. Do not ask a guest to combine multiple passports into one image.
 
-## Owner workflow and reminders
+## Automation, owner view and reminders
 
-The private review area shows:
+The private review area shows synchronized reservations and registration status as well as:
 
 - active requests still awaiting guest information;
 - expected arrival time in Bangkok time;
@@ -33,11 +33,11 @@ The private review area shows:
 - received documents, their size, receipt time and deletion time;
 - authenticated download and immediate deletion controls.
 
-Su and the owners currently use ordinary WhatsApp. The application therefore prepares a reminder for the owner to copy into the existing guest conversation. It cannot send that message automatically. After sending it, mark the reminder as sent. If information arrives through an approved alternative process, revoke the pending link.
+The prepared Airbnb scheduled message is the automatic pre-arrival reminder and makes registration a visible required step. It contains no passport data. The system does not currently send a conditional second message when a particular reservation remains incomplete because Airbnb does not expose that protected conversation action to this Worker.
 
-Automatic reminders require an approved outbound messaging integration, such as the WhatsApp Business Platform, plus the guest contact and stay-arrival data. Do not silently add personal telephone numbers to this store.
+The legacy owner-created one-time request remains in `/concierge-admin` only as an operational fallback. It creates a direct private upload URL inside the reminder text, is limited to active rooms and still requires explicit non-Thai confirmation. Ordinary operation should use the verified permanent room page.
 
-The protected v5.8.2 staff-alert channel does not automatically become a guest reminder channel. Pre-arrival reminders require separate approved guest-contact data, consent and templates.
+Do not silently add personal phone numbers to this store. The protected staff-alert channel is not a guest passport-reminder channel.
 
 ## Data handling
 
@@ -47,7 +47,7 @@ The protected v5.8.2 staff-alert channel does not automatically become a guest r
 - If a guest pastes multiple recognizable passport fields into chat, the server discards the values and keeps only a generic `passport registration` intent before answering or logging.
 - Object keys are random and contain no room number, guest name or passport identifier.
 - The Durable Object stores only operational metadata: room, random record ID, token hash, status, file type, file size and lifecycle timestamps.
-- The raw one-time token is returned once to the authorized owner and is never stored in readable form.
+- The raw one-time token is returned once to the verified browser and is never stored in readable form.
 - Only requests carrying the owner admin bearer token can retrieve a document.
 - Downloads use no-store, no-referrer, frame-denial and content-sniffing protection headers.
 - The main retention policy is 14 days after upload. Owners can delete sooner.
@@ -74,7 +74,7 @@ This design minimizes exposure but does not by itself establish legal compliance
 
 4. In the R2 bucket settings, add an object lifecycle rule for the `passport/` prefix with a 14-day expiration.
 5. Deploy the Worker and confirm `/api/concierge/status` reports `passportUploadsConfigured: true`.
-6. Create a test request for a non-production test room, upload a non-sensitive test image, download it through the owner area, delete it and confirm the object is gone.
+6. Synchronize a non-sensitive future test reservation, verify it from the correct permanent room page, create the upload form, upload a test image, download it through the owner area, delete it and confirm the object is gone.
 7. Never test with a real passport until access control, deletion and the owner workflow have been verified in production.
 
 `PASSPORT_RETENTION_DAYS` defaults to `14` and may be reduced to as little as 1. The application caps it at 14 days so it cannot silently exceed the main R2 lifecycle rule.
@@ -91,8 +91,7 @@ This design minimizes exposure but does not by itself establish legal compliance
 
 - Authoritative structured list of the exact TM30 details that a guest may enter instead of uploading a passport image
 - Confirmation of any future production retention-policy change from the approved 14-day maximum
-- Approved outbound messaging provider and recipient workflow for automatic reminders
-- Booking or stay-system integration that can automatically supply arrival time and submission status
+- Confirmed authoritative wording or field specification if a structured manual-details alternative is later required
 
 ## Verified reference
 

@@ -40,7 +40,7 @@
 
   async function validateLink() {
     if (!/^[A-Za-z0-9_-]{40,100}$/.test(token)) {
-      showStatus("This private link is missing or is not valid. Please ask The House for a new link.", "error");
+      showStatus("This private link is missing or is not valid. Return to your verified permanent Room page to create a new secure form.", "error");
       return;
     }
     try {
@@ -55,7 +55,7 @@
     } catch (_error) {
       token = "";
       window.sessionStorage.removeItem(tokenStorageKey);
-      showStatus("This private link has expired, has already been used or is not available. Please ask The House for a new link.", "error");
+      showStatus("This private link has expired, has already been used or is not available. Return to your verified permanent Room page to create a new secure form.", "error");
     }
   }
 
@@ -88,10 +88,10 @@
         unsupported_file_type: "That file is not a supported passport image. Please choose a JPEG, PNG, WebP or HEIC image.",
         invalid_file: "That image is incomplete or too small. Please choose a clear passport photo.",
         too_large: "The image is larger than 10 MB. Please choose a smaller image.",
-        invalid_or_expired_link: "This private link has expired or has already been used. Please ask The House for a new link.",
-        link_already_used: "This private link has already been used. Please ask The House for a new link."
+        invalid_or_expired_link: "This private link has expired or has already been used. Return to your verified permanent Room page to create a new secure form.",
+        link_already_used: "This private link has already been used. Return to your verified permanent Room page to create a new secure form."
       };
-      showStatus(messages[error.message] || "The image could not be uploaded securely. Please try again or ask The House for a new link.", "error");
+      showStatus(messages[error.message] || "The image could not be uploaded securely. Please try again or return to your verified permanent Room page.", "error");
       fileInput.disabled = false;
       submit.disabled = false;
     }

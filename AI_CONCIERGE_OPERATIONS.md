@@ -2,12 +2,13 @@
 
 ## Purpose
 
-The v5.8.2 concierge combines four layers:
+The v5.9.0 concierge combines five layers:
 
 1. Deterministic safety and operational rules for emergencies, lost keys, fees, booking policy and human routing.
 2. Server-side model reasoning over approved House knowledge plus targeted retrieval from the existing Activities, Restaurants, Cafés, Beaches, Bars and Shopping records.
 3. A controlled learning queue that records knowledge gaps and negative feedback for owner review.
 4. A deterministic action-needed alert channel with protected owner-console delivery and optional official WhatsApp Business Platform notifications.
+5. A deterministic verified-stay layer for automatic passport entry and protected after-hours spare-key access, fully separated from model reasoning.
 
 The model cannot publish its own facts. An owner must approve or edit every knowledge addition before it becomes active.
 
@@ -19,7 +20,7 @@ Configure secrets on the existing Cloudflare Worker. Never place their values in
 
 ## Guest-language operations
 
-v5.8.2 supports English, Thai, Simplified Chinese, Russian, German, French and Spanish for the operational guest journey. Essential navigation, emergency, passport and concierge controls have reviewed built-in translations. Longer approved operational text is translated through `/api/i18n/translate` using strict structured output with `store: false` and cached in the existing Durable Object. Approved items use recoverable model sub-batches; incomplete groups are split automatically, browser requests retry temporary failures, and overlapping page flushes are prevented. A release audit verifies every static visible string and accessibility label on each live operational page is accepted by the protected endpoint.
+v5.9.0 supports English, Thai, Simplified Chinese, Russian, German, French and Spanish for the operational guest journey. Essential navigation, emergency, passport and concierge controls have reviewed built-in translations. Longer approved operational text is translated through `/api/i18n/translate` using strict structured output with `store: false` and cached in the existing Durable Object. Approved items use recoverable model sub-batches; incomplete groups are split automatically, browser requests retry temporary failures, and overlapping page flushes are prevented. A release audit verifies every static visible string and accessibility label on each live operational page is accepted by the protected endpoint.
 
 The visible concierge thinking state is an animated three-dot indicator rather than an operational status sentence. Venue website or social actions must use approved external URLs. Internal Explore detail paths are excluded from model context while Explore is disabled. Bamboo Beach Bar follow-up questions use the approved Facebook and Instagram actions in `public/data/concierge-knowledge.json`.
 
@@ -49,6 +50,12 @@ Strongly recommended. This secret is used when hashing temporary browser-session
 
 Required for private passport-upload links. Use a separate long random secret. Rotation invalidates all outstanding links.
 
+### Verified-stay secrets
+
+`STAY_TOKEN_PEPPER` hashes Airbnb confirmation codes and verified-session tokens. `RESERVATION_SYNC_TOKEN` authenticates the Google Apps Script synchronizer. They must be separate long random values.
+
+`SPARE_KEY_CODES` is an encrypted JSON secret containing the current code for each active room. Never place a real value in documentation, source, logs, screenshots or release archives. The key release feature additionally requires a working official WhatsApp `urgent` recipient group.
+
 ### Private R2 bucket
 
 Create `the-house-passport-uploads`, keep it non-public and bind it as `PASSPORT_UPLOADS`. Configure a 14-day object lifecycle rule for the `passport/` prefix as the main storage-retention rule. The application cleanup reinforces the same deadline. See `PASSPORT_DATA_OPERATIONS.md`.
@@ -75,10 +82,12 @@ The core accommodation knowledge is already supplied directly from `public/data/
 6. Test one unknown question, submit negative feedback and confirm that it enters the learning queue.
 7. Edit and approve a safe test answer, then confirm that the concierge uses it immediately.
 8. Verify the passport flow with a non-sensitive test image before requesting any real document.
-9. Confirm the owner-created private Room welcome link activates “Complete Required Registration” and opens the secure form directly without a WhatsApp handoff.
-10. Confirm the owner cannot create a passport request until the non-Thai guest checkbox is selected.
-11. Open the owner alert console and test a support, booking, urgent and emergency alert with non-sensitive text.
-12. If WhatsApp is configured, verify signed acknowledgement and the unacknowledged escalation path before relying on it operationally.
+9. Follow `AIRBNB_AUTOMATION_SETUP.md`, run the first reservation sync and confirm its diagnostic property is blank.
+10. Verify a future reservation from its correct permanent room page and confirm the same code fails for another room.
+11. Confirm the verified passport button opens the secure form directly and the all-Thai-overnight-guests option closes the reminder and revokes unused pending upload links.
+12. Open the owner alert console and test a support, booking, urgent and emergency alert with non-sensitive text.
+13. Test spare-key release with a temporary code. Confirm the system automatically submits an urgent-team WhatsApp message before display and that the message contains no code.
+14. Rotate the physical test code, update the encrypted secret, redeploy and confirm rotation in the owner console.
 
 ## Daily learning workflow
 
@@ -114,7 +123,7 @@ Guests are told not to enter passport, payment or key-box information in the con
 
 ## Safety invariants
 
-- Room selection is context, not identity verification.
+- Room selection and a permanent room URL are context, not identity verification. Protected access requires a matching synchronized Airbnb confirmation code.
 - Thai nationals do not require the TM30 passport-registration flow; the owner must confirm a request is for a non-Thai guest.
 - No key-box code or protected token enters the model prompt or learning store.
 - Lost-key handling always includes the 500 THB replacement fee.

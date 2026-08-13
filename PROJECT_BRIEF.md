@@ -20,7 +20,7 @@ The product should feel like a competent hotel concierge in a guest’s pocket, 
 
 ### Current state
 
-Current release: v5.8.2.
+Current release: v5.9.0.
 
 The live release prioritizes the operational guest journey and AI Concierge. It supports seven guest languages across the complete live operational pages, with per-item translation isolation so one unsupported sentence cannot block an entire page. The concierge uses an animated-dot thinking state and approved external social actions for Bamboo Beach Bar. Explore is disabled through a reversible deployment feature switch; all Explore source content remains preserved for the final content phase.
 
@@ -56,7 +56,7 @@ The operational concierge now takes priority over further Explore development. T
 
 Unknown questions and negative feedback enter a private, privacy-minimized learning queue. An owner must approve every correction before it becomes active; the model is never allowed to publish new facts by itself.
 
-The owner area also creates private passport-image requests for required non-Thai guest TM30 registration. Thai nationals do not need this workflow. Owners must confirm a request concerns a non-Thai guest before generating the one-time room-bound link. Passport files remain completely separate from the AI system and pending requests form a manual reminder queue.
+Each active room has one permanent guest page. The guest verifies the stay with the Airbnb confirmation code from the trip details, checked against the protected synchronized listing, room and dates. A verified non-Thai guest can create a one-time room- and reservation-bound passport form without owner work. Thai nationals can record the exemption. Passport files remain completely separate from the AI system.
 
 Action-needed requests create sanitized protected alerts in the owner console. The release includes role-based official WhatsApp Business Platform delivery, signed acknowledgement and urgent/critical escalation, but outbound messages require the production Meta account, approved Utility template and encrypted recipient configuration.
 
@@ -66,7 +66,7 @@ New Explore interface and content expansion remains deferred. The concierge may 
 
 Urgent property problems require a separate 24/7 on-call role. No dedicated person or number is confirmed yet, so the public product must not claim confirmed 24/7 coverage.
 
-After-hours spare-key handling applies from 19:30 to 10:30 Bangkok time. Each room will have a key box beside its door. Lost keys add a 500 THB fee. Codes require secure server-side storage and current-guest verification before automated delivery is enabled. The staff-alert channel never contains or unlocks a code.
+After-hours spare-key handling applies from 19:30 to 10:30 Bangkok time. Each active room will have a key box beside its door. Lost keys add a 500 THB fee. Codes remain only in an encrypted Worker secret. For an active verified stay, the guest confirms the fee and the system automatically sends the protected owner/Su WhatsApp alert before showing the room code. The WhatsApp API must confirm message submission; no guest approval of that notification is required. The code never appears in that alert or operational storage, and a second release is blocked until staff rotate it.
 
 ### Next major phase
 

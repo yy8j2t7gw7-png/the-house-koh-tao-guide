@@ -3,7 +3,7 @@
   if (!cfg || !cfg.enabled) return;
 
   const contacts = window.HOUSE_GUIDE || {};
-  const roomOptions = (cfg.roomOptions || ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11"]).map(String);
+  const roomOptions = (cfg.roomOptions || ["1", "2", "3", "4", "5", "6", "8", "9", "10", "11"]).map(String);
   const pagePath = location.pathname;
   const currentPage = /^\/room\/(?:\d+)\/?$/.test(pagePath)
     ? "room.html"
@@ -128,9 +128,18 @@
   function resolveAction(action, question) {
     const context = contextValues(question);
     if (action.type === "registration") {
-      const href = window.HOUSE_PRIVATE_REGISTRATION_URL || "";
+      const href = selectedRoom ? `/room/${selectedRoom}#verifiedStayAccess` : "";
       return href ? {
         label: interpolate(action.label, context),
+        href,
+        style: action.style || "",
+        external: false
+      } : null;
+    }
+    if (action.type === "spare-key") {
+      const href = selectedRoom ? `/room/${selectedRoom}#spareKeyAccess` : "";
+      return href ? {
+        label: interpolate(action.label || "Secure spare-key access", context),
         href,
         style: action.style || "",
         external: false
@@ -196,8 +205,13 @@
   panel.setAttribute("aria-label", "AI Concierge");
 
   const quickActionsHtml = (cfg.quickActions || []).map((action) => {
-    if (action.type === "registration" && window.HOUSE_PRIVATE_REGISTRATION_URL) {
-      return `<a class="ai-concierge-action" href="${window.HOUSE_PRIVATE_REGISTRATION_URL}">
+    if (action.type === "registration" && selectedRoom) {
+      return `<a class="ai-concierge-action" href="/room/${selectedRoom}#verifiedStayAccess">
+        <span aria-hidden="true">${action.icon}</span><span>${action.label}</span>
+      </a>`;
+    }
+    if (action.type === "spare-key" && selectedRoom) {
+      return `<a class="ai-concierge-action" href="/room/${selectedRoom}#spareKeyAccess">
         <span aria-hidden="true">${action.icon}</span><span>${action.label}</span>
       </a>`;
     }
@@ -548,7 +562,13 @@
       appendMessage("concierge", "Tell me what you need. If I cannot resolve it, I will give you the correct human contact option.");
       input.focus();
     } else if (actionButton?.dataset.conciergeAction === "registration") {
-      appendMessage("concierge", "Please open the private Room welcome link sent by The House. The registration button there opens the secure form directly.");
+      appendMessage("concierge", selectedRoom
+        ? `Open the Room ${selectedRoom} page and verify your Airbnb confirmation code to continue securely.`
+        : "Please select your booked room first. Its permanent Room page will verify your Airbnb confirmation code before opening secure registration.");
+    } else if (actionButton?.dataset.conciergeAction === "spare-key") {
+      appendMessage("concierge", selectedRoom
+        ? `Open the protected Room ${selectedRoom} access section. Your Airbnb confirmation code is required before any spare-key code can be shown.`
+        : "Please select your booked room first. Protected spare-key access requires Airbnb reservation verification.");
     }
   });
 

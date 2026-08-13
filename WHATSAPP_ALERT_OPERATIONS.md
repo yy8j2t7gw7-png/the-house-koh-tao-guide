@@ -2,7 +2,7 @@
 
 ## Purpose
 
-v5.8.2 contains the protected server-side alert channel for guest requests that require attention. Guests continue to use the website concierge. The Worker can notify configured owners or staff through the official WhatsApp Business Platform without exposing recipient numbers in public files.
+v5.9.0 contains the protected server-side alert channel for guest requests that require attention. Guests continue to use the website concierge. The Worker can notify configured owners or staff through the official WhatsApp Business Platform without exposing recipient numbers in public files.
 
 The alert channel is separate from guest-facing contact buttons:
 
@@ -21,7 +21,7 @@ A recommendation question alone does not create a booking alert. The guest must 
 - Guest descriptions are sanitized before an alert is created.
 - Passport fields, key-box codes and private stay tokens are never included.
 - A displayed room number is guest-selected context, not identity verification.
-- The alert channel does not enable spare-key code delivery. That remains disabled until the private active-stay verification flow and protected codes are configured.
+- The alert channel never contains or has access to a key-box code. Automatic spare-key release is a separate verified-stay operation: the system sends the protected `urgent` notification automatically and fails closed unless the WhatsApp API confirms at least one message submission. The guest confirms only the 500 THB fee and does not approve the staff notification.
 - Alert records and delivery metadata are removed after 30 days.
 
 ## Meta prerequisites
@@ -140,5 +140,6 @@ Change the Graph API version only after reviewing Meta's current supported versi
 6. Reply `ACK` with the exact alert reference, then confirm the owner console changes to acknowledged.
 7. Repeat a critical test without acknowledgement and confirm the escalation group receives it after approximately 10 minutes.
 8. Resolve every test alert and remove test recipient values if they are no longer needed.
+9. With a temporary `SPARE_KEY_CODES` value and verified test stay, confirm the guest sees no code when the urgent group is missing or WhatsApp rejects delivery.
 
 If the WhatsApp configuration is incomplete, alerts still appear in the protected owner console and the guest concierge remains usable. Delivery attempts show `not_configured` without exposing a credential error to guests.

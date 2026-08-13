@@ -48,6 +48,22 @@
         "limit": 30,
         "period": 60
       }
+    },
+    {
+      "name": "STAY_VERIFY_RATE_LIMITER",
+      "namespace_id": "550002",
+      "simple": {
+        "limit": 8,
+        "period": 60
+      }
+    },
+    {
+      "name": "SPARE_KEY_RATE_LIMITER",
+      "namespace_id": "550003",
+      "simple": {
+        "limit": 4,
+        "period": 60
+      }
     }
   ],
   "triggers": {

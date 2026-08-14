@@ -2,7 +2,7 @@
 
 ## Purpose and current scope
 
-TM30 accommodation registration concerns foreign guests. Thai nationals do not need to complete this registration or upload a passport. For non-Thai guests and overnight visitors, v5.9.0 provides a reservation-bound private passport-image workflow, a prominent welcome-page registration entry point and a seven-language secure form so guests do not send the document through the AI Concierge, Airbnb messages or WhatsApp.
+TM30 accommodation registration concerns foreign guests. Thai nationals do not need to complete this registration or upload a passport. For every non-Thai adult or child staying overnight—not only the person who made the Airbnb booking—v5.10.0 requires one reservation-bound private passport submission before private room information opens. The prominent seven-language registration flow keeps documents out of the AI Concierge, Airbnb messages and WhatsApp.
 
 This scope was checked against the Thai Immigration Bureau TM30 service description, which states that Section 38 notification applies when accommodation is provided to foreign nationals. Operational wording must remain limited to this exemption and must not expand into unsourced legal advice.
 
@@ -12,14 +12,16 @@ The current authoritative House information confirms the passport-photo requirem
 
 1. Airbnb sends the scheduled arrival message containing the permanent page for the booked room and Airbnb's own confirmation-code detail.
 2. The guest enters that code. The Worker verifies it against the protected synchronized listing, room and reservation dates.
-3. A verified guest chooses either **Upload passport securely** for each non-Thai overnight guest or **All overnight guests are Thai nationals** when the exemption applies to the whole reservation. The application does not infer nationality.
-4. Each passport-button use creates a new random, reservation- and room-bound, 72-hour, single-use upload link automatically. No owner action is required.
-5. Its 256-bit token is carried only in the URL fragment; fragments are not sent in the initial page request or referrer.
-6. The registration page explains why the information is needed and how it is handled. It does not open WhatsApp.
-7. Passport-image upload accepts one JPEG, PNG, WebP or HEIC image up to 10 MB.
-8. Manual details remain disabled until the authoritative TM30 field list is supplied, preventing guessed, unnecessary or incomplete collection.
-9. The server validates authorization, reservation link, expiry, single use, byte limit and file signature before private storage.
-10. The upload link closes after success. The verified room page can create a separate form for another non-Thai overnight guest. Selecting the all-Thai exemption revokes unused pending passport links for that reservation.
+3. A verified guest chooses either **Foreign or mixed group** or **All overnight guests are Thai nationals**. The application does not infer nationality.
+4. For a foreign or mixed group, the guest declares the total number of non-Thai adults and children staying overnight and confirms that the number includes everyone, not only the booking guest.
+5. The private guide remains locked until one passport has been received for every declared non-Thai overnight guest.
+6. Each passport-button use creates a new random, reservation- and room-bound, 72-hour, single-use upload link automatically. No owner action is required.
+7. Its 256-bit token is carried only in the URL fragment; fragments are not sent in the initial page request or referrer.
+8. The registration page explains why the information is needed and how it is handled. It does not open WhatsApp.
+9. Passport-image upload accepts one JPEG, PNG, WebP or HEIC image up to 10 MB.
+10. Manual details remain disabled until the authoritative TM30 field list is supplied, preventing guessed, unnecessary or incomplete collection.
+11. The server validates authorization, reservation link, expiry, single use, byte limit and file signature before private storage.
+12. The upload link closes after success. The verified room page returns to the progress screen and creates a separate form for the next non-Thai guest until the declared total is reached. Selecting the all-Thai path is blocked after a foreign requirement or uploaded file exists unless staff review it.
 
 Create one link per passport image. Do not ask a guest to combine multiple passports into one image.
 

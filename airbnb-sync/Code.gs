@@ -27,15 +27,27 @@ var HOUSE_AIRBNB_LISTINGS = {
 
 var HOUSE_SYNC_SETTINGS = {
   timeZone: "Asia/Bangkok",
-  gmailLookbackDays: 400,
+  fullGmailLookbackDays: 400,
+  recentGmailLookbackDays: 2,
+  recentMessageOverlapMinutes: 10,
+  fullAuditHours: 24,
   futureDays: 400,
   calendarPastDays: 14,
-  maximumThreads: 500,
+  maximumFullThreads: 500,
+  maximumRecentThreads: 100,
   codePattern: /\b(?:HM|HMA|HMC|HMS|HMW)[A-Z0-9]{6,16}\b/gi,
   datePattern: /^\d{4}-\d{2}-\d{2}$/
 };
 
 function syncHouseReservations() {
+  syncHouseReservationsInternal_(false);
+}
+
+function runFullHouseReservationAudit() {
+  syncHouseReservationsInternal_(true);
+}
+
+function syncHouseReservationsInternal_(forceFullAudit) {
   var lock = LockService.getScriptLock();
   if (!lock.tryLock(10000)) return;
   try {
@@ -46,7 +58,25 @@ function syncHouseReservations() {
       throw new Error("HOUSE_WORKER_ORIGIN and RESERVATION_SYNC_TOKEN are required Script Properties.");
     }
 
-    var emailReservations = readAirbnbReservationEmails_();
+    var now = new Date();
+    var lastSyncAt = validDate_(properties.getProperty("HOUSE_AIRBNB_LAST_SYNC_AT"));
+    var lastAuditAt = validDate_(properties.getProperty("HOUSE_AIRBNB_LAST_AUDIT_AT"));
+    var fullAuditDue = forceFullAudit === true
+      || !lastAuditAt
+      || now.getTime() - lastAuditAt.getTime() >= HOUSE_SYNC_SETTINGS.fullAuditHours * 3600000;
+    var emailReservations = readAirbnbReservationEmails_({
+      fullAudit: fullAuditDue,
+      since: lastSyncAt
+    });
+
+    // Routine hourly runs stop here when Airbnb has sent no new reservation
+    // message. The ten private calendars are fetched only after a change or
+    // during the complete daily audit, preserving shared Apps Script quota.
+    if (!fullAuditDue && Object.keys(emailReservations).length === 0) {
+      properties.setProperty("HOUSE_AIRBNB_LAST_SYNC_AT", now.toISOString());
+      return;
+    }
+
     var diagnostics = [];
     Object.keys(HOUSE_AIRBNB_LISTINGS).forEach(function (room) {
       var propertyName = "AIRBNB_ICAL_ROOM_" + room;
@@ -55,12 +85,22 @@ function syncHouseReservations() {
         diagnostics.push(propertyName + " is missing");
         return;
       }
-      var calendar = readRoomCalendar_(calendarUrl, room, emailReservations);
+      var calendar = readRoomCalendar_(calendarUrl, room, emailReservations, fullAuditDue);
       diagnostics = diagnostics.concat(calendar.diagnostics);
-      postRoomSync_(origin, syncToken, room, HOUSE_AIRBNB_LISTINGS[room], calendar.records, calendar.complete);
+      postRoomSync_(
+        origin,
+        syncToken,
+        room,
+        HOUSE_AIRBNB_LISTINGS[room],
+        calendar.records,
+        fullAuditDue && calendar.complete
+      );
     });
-    properties.setProperty("HOUSE_AIRBNB_LAST_SYNC_AT", new Date().toISOString());
-    properties.setProperty("HOUSE_AIRBNB_LAST_DIAGNOSTICS", diagnostics.slice(0, 80).join("\n"));
+    properties.setProperty("HOUSE_AIRBNB_LAST_SYNC_AT", now.toISOString());
+    if (fullAuditDue) {
+      properties.setProperty("HOUSE_AIRBNB_LAST_AUDIT_AT", now.toISOString());
+      properties.setProperty("HOUSE_AIRBNB_LAST_DIAGNOSTICS", diagnostics.slice(0, 80).join("\n"));
+    }
   } finally {
     lock.releaseLock();
   }
@@ -70,22 +110,32 @@ function installHouseReservationTrigger() {
   ScriptApp.getProjectTriggers().forEach(function (trigger) {
     if (trigger.getHandlerFunction() === "syncHouseReservations") ScriptApp.deleteTrigger(trigger);
   });
-  ScriptApp.newTrigger("syncHouseReservations").timeBased().everyMinutes(10).create();
-  syncHouseReservations();
+  ScriptApp.newTrigger("syncHouseReservations").timeBased().everyHours(1).create();
+  runFullHouseReservationAudit();
 }
 
-function readAirbnbReservationEmails_() {
+function readAirbnbReservationEmails_(options) {
+  options = options || {};
+  var fullAudit = options.fullAudit === true;
+  var since = options.since instanceof Date && !isNaN(options.since.getTime())
+    ? new Date(options.since.getTime() - HOUSE_SYNC_SETTINGS.recentMessageOverlapMinutes * 60000)
+    : null;
   var query = [
-    "newer_than:" + HOUSE_SYNC_SETTINGS.gmailLookbackDays + "d",
+    "newer_than:" + (fullAudit ? HOUSE_SYNC_SETTINGS.fullGmailLookbackDays : HOUSE_SYNC_SETTINGS.recentGmailLookbackDays) + "d",
     "from:airbnb.com",
     "(\"confirmation code\" OR \"reservation code\" OR \"confirmation\")"
   ].join(" ");
-  var threads = GmailApp.search(query, 0, HOUSE_SYNC_SETTINGS.maximumThreads);
+  var threads = GmailApp.search(
+    query,
+    0,
+    fullAudit ? HOUSE_SYNC_SETTINGS.maximumFullThreads : HOUSE_SYNC_SETTINGS.maximumRecentThreads
+  );
   var byCode = {};
   threads.forEach(function (thread) {
     thread.getMessages().forEach(function (message) {
       var from = String(message.getFrom() || "").toLowerCase();
       if (from.indexOf("airbnb") < 0) return;
+      if (!fullAudit && since && message.getDate().getTime() < since.getTime()) return;
       var subject = String(message.getSubject() || "");
       var body = String(message.getPlainBody() || "");
       var combined = subject + "\n" + body;
@@ -113,7 +163,7 @@ function readAirbnbReservationEmails_() {
   return byCode;
 }
 
-function readRoomCalendar_(calendarUrl, room, emailsByCode) {
+function readRoomCalendar_(calendarUrl, room, emailsByCode, fullAudit) {
   var response = UrlFetchApp.fetch(calendarUrl, { muteHttpExceptions: true, followRedirects: true });
   if (response.getResponseCode() !== 200) {
     throw new Error("Airbnb iCal for Room " + room + " returned HTTP " + response.getResponseCode() + ".");
@@ -141,7 +191,9 @@ function readRoomCalendar_(calendarUrl, room, emailsByCode) {
     var emailMatch = code ? emailsByCode[code] : matchEmailToCalendar_(emailsByCode, HOUSE_AIRBNB_LISTINGS[room], checkInDate, checkOutDate);
     if (!code && emailMatch) code = emailMatch.confirmationCode;
     if (!code) {
-      diagnostics.push("Room " + room + " has an Airbnb reservation " + checkInDate + " to " + checkOutDate + " without a recognized confirmation code.");
+      if (fullAudit) {
+        diagnostics.push("Room " + room + " has an Airbnb reservation " + checkInDate + " to " + checkOutDate + " without a recognized confirmation code.");
+      }
       return;
     }
     records.push({
@@ -169,7 +221,11 @@ function readRoomCalendar_(calendarUrl, room, emailsByCode) {
   // Only allow the Worker to cancel absent reservations when every Airbnb
   // reservation in this feed was matched to a confirmation code. A partial
   // parser result may add or update stays, but can never cancel good records.
-  return { records: dedupeRecords_(records), complete: diagnostics.length === 0, diagnostics: diagnostics };
+  return {
+    records: dedupeRecords_(records),
+    complete: fullAudit === true && diagnostics.length === 0,
+    diagnostics: diagnostics
+  };
 }
 
 function postRoomSync_(origin, token, room, listingId, records, complete) {
@@ -277,4 +333,9 @@ function unique_(values) {
 function cleanOrigin_(value) {
   var origin = String(value || "").trim().replace(/\/+$/, "");
   return /^https:\/\/[A-Za-z0-9.-]+(?::\d+)?$/.test(origin) ? origin : "";
+}
+
+function validDate_(value) {
+  var parsed = new Date(String(value || ""));
+  return isNaN(parsed.getTime()) ? null : parsed;
 }

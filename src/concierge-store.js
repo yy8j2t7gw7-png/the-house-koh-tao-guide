@@ -178,6 +178,15 @@ export class ConciergeStore extends DurableObject {
           updated_at TEXT NOT NULL
         );
 
+        CREATE TABLE IF NOT EXISTS stay_registration_requirements (
+          reservation_id TEXT PRIMARY KEY,
+          guest_type TEXT NOT NULL,
+          required_passports INTEGER NOT NULL DEFAULT 0,
+          received_passports INTEGER NOT NULL DEFAULT 0,
+          status TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        );
+
         CREATE TABLE IF NOT EXISTS spare_key_events (
           id TEXT PRIMARY KEY,
           reservation_id TEXT NOT NULL,
@@ -774,7 +783,7 @@ export class ConciergeStore extends DurableObject {
        WHERE l.reservation_id = ? AND p.status IN ('pending', 'uploaded')`,
       cleanText(record.reservationId, 100)
     ))[0];
-    if ((Number(count?.total) || 0) >= 6) return { ok: false, error: "registration_limit_reached" };
+    if ((Number(count?.total) || 0) >= 10) return { ok: false, error: "registration_limit_reached" };
 
     await this.createPassportUpload(record);
     this.ctx.storage.sql.exec(
@@ -800,7 +809,52 @@ export class ConciergeStore extends DurableObject {
     return { ok: true };
   }
 
+  async setStayRegistrationRequirement(reservationId, guestType, requiredPassports, nowValue) {
+    const cleanGuestType = guestType === "thai" ? "thai" : "foreign";
+    const required = cleanGuestType === "thai"
+      ? 0
+      : Math.min(10, Math.max(1, Number(requiredPassports) || 1));
+    const receivedRow = rows(this.ctx.storage.sql.exec(
+      `SELECT COUNT(*) AS total
+       FROM passport_reservation_links l
+       JOIN passport_uploads p ON p.id = l.passport_id
+       WHERE l.reservation_id = ? AND p.status = 'uploaded'`,
+      cleanText(reservationId, 100)
+    ))[0];
+    const received = cleanGuestType === "thai" ? 0 : Number(receivedRow?.total) || 0;
+    const status = cleanGuestType === "thai"
+      ? "thai_exempt"
+      : received >= required ? "passport_complete" : "passport_pending";
+    const updatedAt = cleanText(nowValue, 40) || new Date().toISOString();
+    this.ctx.storage.sql.exec(
+      `INSERT INTO stay_registration_requirements
+       (reservation_id, guest_type, required_passports, received_passports, status, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?)
+       ON CONFLICT(reservation_id) DO UPDATE SET
+         guest_type = excluded.guest_type,
+         required_passports = excluded.required_passports,
+         received_passports = excluded.received_passports,
+         status = excluded.status,
+         updated_at = excluded.updated_at`,
+      cleanText(reservationId, 100),
+      cleanGuestType,
+      required,
+      received,
+      status,
+      updatedAt
+    );
+    await this.setStayRegistrationStatus(reservationId, status, updatedAt);
+    return { ok: true, guestType: cleanGuestType, requiredPassports: required, receivedPassports: received, status };
+  }
+
   async getStayRegistrationStatus(reservationId) {
+    const requirement = rows(this.ctx.storage.sql.exec(
+      `SELECT guest_type AS guestType, required_passports AS requiredPassports,
+              received_passports AS receivedPassports, status, updated_at AS updatedAt
+       FROM stay_registration_requirements WHERE reservation_id = ? LIMIT 1`,
+      cleanText(reservationId, 100)
+    ))[0];
+    if (requirement) return requirement;
     return rows(this.ctx.storage.sql.exec(
       "SELECT status, updated_at AS updatedAt FROM stay_registration_status WHERE reservation_id = ? LIMIT 1",
       cleanText(reservationId, 100)
@@ -1002,9 +1056,13 @@ export class ConciergeStore extends DurableObject {
     const reservations = rows(this.ctx.storage.sql.exec(
       `SELECT r.room, r.listing_id AS listingId, r.check_in_date AS checkInDate,
               r.check_out_date AS checkOutDate, r.status, r.updated_at AS updatedAt,
-              COALESCE(g.status, 'not_started') AS registrationStatus
+              COALESCE(q.status, g.status, 'not_started') AS registrationStatus,
+              COALESCE(q.guest_type, '') AS guestType,
+              COALESCE(q.required_passports, 0) AS requiredPassports,
+              COALESCE(q.received_passports, 0) AS receivedPassports
        FROM stay_reservations r
        LEFT JOIN stay_registration_status g ON g.reservation_id = r.id
+       LEFT JOIN stay_registration_requirements q ON q.reservation_id = r.id
        WHERE r.check_out_date >= date('now', '-1 day')
        ORDER BY r.check_in_date ASC, r.room ASC LIMIT 250`
     ));
@@ -1115,12 +1173,43 @@ export class ConciergeStore extends DurableObject {
       cleanText(passportId, 100)
     ))[0];
     if (!linked) return { ok: false };
-    await this.setStayRegistrationStatus(
-      linked.reservationId,
-      "passport_received",
-      cleanText(nowValue, 40) || new Date().toISOString()
-    );
-    return { ok: true, reservationId: linked.reservationId };
+    const requirement = rows(this.ctx.storage.sql.exec(
+      `SELECT guest_type AS guestType, required_passports AS requiredPassports
+       FROM stay_registration_requirements WHERE reservation_id = ? LIMIT 1`,
+      cleanText(linked.reservationId, 100)
+    ))[0];
+    const receivedRow = rows(this.ctx.storage.sql.exec(
+      `SELECT COUNT(*) AS total
+       FROM passport_reservation_links l
+       JOIN passport_uploads p ON p.id = l.passport_id
+       WHERE l.reservation_id = ? AND p.status = 'uploaded'`,
+      cleanText(linked.reservationId, 100)
+    ))[0];
+    const received = Number(receivedRow?.total) || 0;
+    const required = Number(requirement?.requiredPassports) || 0;
+    const status = requirement?.guestType === "foreign" && required > 0 && received >= required
+      ? "passport_complete"
+      : "passport_pending";
+    const updatedAt = cleanText(nowValue, 40) || new Date().toISOString();
+    if (requirement) {
+      this.ctx.storage.sql.exec(
+        `UPDATE stay_registration_requirements
+         SET received_passports = ?, status = ?, updated_at = ?
+         WHERE reservation_id = ?`,
+        received,
+        status,
+        updatedAt,
+        cleanText(linked.reservationId, 100)
+      );
+    }
+    await this.setStayRegistrationStatus(linked.reservationId, status, updatedAt);
+    return {
+      ok: true,
+      reservationId: linked.reservationId,
+      status,
+      requiredPassports: required,
+      receivedPassports: received
+    };
   }
 
   async getPassportUpload(id) {

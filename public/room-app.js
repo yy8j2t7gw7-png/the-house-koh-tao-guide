@@ -1,37 +1,40 @@
-(function () {
-  const parts = window.location.pathname.split("/").filter(Boolean);
-  let room = null;
+(async function () {
+  const match = window.location.pathname.match(/^\/room\/(1|2|3|4|5|6|8|9|10|11)\/?$/);
+  const room = match?.[1] || "";
+  const titleElement = document.getElementById("roomTitle");
+  const noteElement = document.getElementById("roomNote");
+  if (!room || !titleElement || !noteElement) return;
 
-  if (parts[0] === "room" && parts[1]) room = parts[1];
-  if (!room) {
-    const params = new URLSearchParams(window.location.search);
-    room = params.get("room");
+  try {
+    const response = await fetch(`/api/stay/room-content?room=${encodeURIComponent(room)}`, {
+      credentials: "same-origin",
+      headers: { accept: "application/json" }
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      window.location.assign(`/room/${encodeURIComponent(room)}`);
+      return;
+    }
+
+    const title = `Welcome to Room ${room}`;
+    document.title = `Room ${room} | The House – Koh Tao`;
+    document.getElementById("roomBadge").textContent = `Room ${room} · ${data.floor}`;
+    titleElement.textContent = title;
+    document.getElementById("heroRoom").textContent = `Room ${room}`;
+    noteElement.textContent = data.note;
+
+    const roomPhoto = document.getElementById("roomPhoto");
+    const arrivalRoomPhoto = document.getElementById("arrivalRoomPhoto");
+    const entrancePhoto = document.getElementById("entrancePhoto");
+    roomPhoto.src = data.roomPhotoUrl;
+    roomPhoto.alt = `Room ${room} highlighted on the building`;
+    arrivalRoomPhoto.src = data.roomPhotoUrl;
+    arrivalRoomPhoto.alt = `Room ${room} location`;
+    entrancePhoto.src = data.entrancePhotoUrl;
+    document.getElementById("arrivalTitle").textContent = `Finding Room ${room}`;
+    document.getElementById("arrivalCaption").innerHTML = `<strong>Step 2.</strong> ${data.note}`;
+  } catch (_error) {
+    titleElement.textContent = "Private room information unavailable";
+    noteElement.textContent = "Please refresh the page or contact the concierge for help.";
   }
-
-  const data = window.HOUSE_ROOMS && window.HOUSE_ROOMS[room];
-  if (!data) {
-    document.getElementById("roomTitle").textContent = "Room link not found";
-    document.getElementById("roomNote").textContent = "Please check the link or Contact Us on WhatsApp.";
-    return;
-  }
-
-  const title = `Welcome to Room ${room}`;
-  const photo = `/assets/${data.photo}`;
-
-  document.title = `Room ${room} | The House – Koh Tao`;
-  document.getElementById("roomBadge").textContent = `Room ${room} · ${data.floor}`;
-  document.getElementById("roomTitle").textContent = title;
-  document.getElementById("heroRoom").textContent = `Room ${room}`;
-  document.getElementById("roomNote").textContent = data.note;
-  document.getElementById("roomPhoto").src = photo;
-  document.getElementById("roomPhoto").alt = data.photoStatus === "placeholder"
-    ? `Room ${room} arrival photo placeholder`
-    : `Room ${room} highlighted on the building`;
-  document.getElementById("arrivalRoomPhoto").src = photo;
-  document.getElementById("arrivalRoomPhoto").alt = data.photoStatus === "placeholder"
-    ? `Room ${room} arrival photo placeholder`
-    : `Room ${room} location`;
-  document.getElementById("arrivalTitle").textContent = `Finding Room ${room}`;
-  document.getElementById("arrivalCaption").innerHTML =
-    `<strong>Step 2.</strong> ${data.note}${data.photoStatus === "placeholder" ? " A marked arrival photo will be added later." : ""}`;
 })();

@@ -60,9 +60,9 @@ The official WhatsApp Business Platform alert secrets and the `urgent` recipient
 
 8. In the Apps Script function selector, choose `installHouseReservationTrigger`, then select **Run**.
 9. Approve the Gmail, external-request and trigger permissions. The script reads only Airbnb reservation emails and transmits only room, listing ID, confirmation code, stay dates and reservation status.
-10. Return to **Project Settings → Script Properties** and check `HOUSE_AIRBNB_LAST_SYNC_AT`. `HOUSE_AIRBNB_LAST_DIAGNOSTICS` must be blank before relying on automatic cancellation detection.
+10. Return to **Project Settings → Script Properties** and check `HOUSE_AIRBNB_LAST_SYNC_AT` and `HOUSE_AIRBNB_LAST_AUDIT_AT`. `HOUSE_AIRBNB_LAST_DIAGNOSTICS` must be blank before relying on automatic cancellation detection.
 
-The script runs every ten minutes. If it cannot match an Airbnb calendar event to a confirmation code, it records a diagnostic and sends only safe additions/updates; it does not cancel missing reservations.
+The script runs once per hour to protect the Apps Script quota shared with the existing housekeeping-calendar automation. Most runs inspect only new Airbnb email since the preceding run and finish without fetching calendars when nothing changed. Once every 24 hours it performs a complete audit using the longer email history and all ten private calendars. If that audit cannot match a calendar event to a confirmation code, it records a diagnostic and sends only safe additions/updates; it does not cancel missing reservations.
 
 ## 3. Add the Airbnb scheduled messages
 

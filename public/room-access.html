@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow,noarchive">
+<meta name="referrer" content="no-referrer">
+<meta name="description" content="Secure guest access for The House Koh Tao">
+<title>Secure guest access | The House – Koh Tao</title>
+<link rel="icon" href="/logo.svg">
+<link rel="stylesheet" href="/design-system.css">
+<link rel="stylesheet" href="/stay-access.css">
+<link rel="stylesheet" href="/ai-concierge.css">
+<style>
+body{margin:0;font-family:Arial,Helvetica,sans-serif;color:#26322f;background:#fbfcfb;line-height:1.55}
+.shell{max-width:900px;margin:auto;padding:0 18px 110px}.topbar{display:flex;align-items:center;justify-content:space-between;padding:14px 0;position:sticky;top:0;background:rgba(251,252,251,.96);backdrop-filter:blur(10px);z-index:20;border-bottom:1px solid #dbe5e0}.brand img{width:190px;display:block}.nav a{font-size:14px;text-decoration:none;margin-left:14px;color:#1f5b4f;font-weight:700}.intro{margin:38px 0 22px}.intro h1{font-size:clamp(34px,7vw,56px);line-height:1.05;color:#173d35;margin:0 0 12px}.intro p{max-width:720px;color:#68736f;font-size:18px}.choice-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:18px}.choice{border:1px solid #dbe5e0;border-radius:16px;padding:18px;background:#fff}.choice h3{margin:0 0 8px;color:#173d35}.choice p{margin:0 0 14px}.choice label{display:block;font-weight:700;margin-bottom:6px}.choice input[type=number]{width:100%;padding:13px;border:1px solid #a8beb6;border-radius:10px;font:inherit;margin-bottom:12px}.important{padding:13px 15px;border-left:5px solid #1f5b4f;background:#eaf4f0;border-radius:10px}.public-help{margin-top:24px;padding:20px;border:1px solid #dbe5e0;border-radius:18px;background:#fff}.public-help h2{margin:0 0 8px;color:#173d35}.footer{margin-top:42px;padding-top:18px;border-top:1px solid #dbe5e0;color:#68736f;font-size:13px}@media(max-width:650px){.nav a:not([href="/emergency.html"]){display:none}.choice-grid{grid-template-columns:1fr}.brand img{width:165px}}
+</style>
+</head>
+<body data-guest-access="pending">
+<div class="shell">
+<header class="topbar">
+  <a class="brand" href="/"><img src="/logo.svg" alt="The House Koh Tao"></a>
+  <nav class="nav"><a href="/rooms.html">Your Room</a><a href="/house.html">The House</a><a href="/practical.html">Guest Information</a><a href="/explore.html">Explore</a><a href="/emergency.html">Help & Emergency</a><a href="/checkout.html">Departure</a></nav>
+</header>
+
+<section class="intro">
+  <h1>Welcome to The House</h1>
+  <p>Complete secure guest verification to open your private room guide. Room location, arrival photos, Wi-Fi and stay instructions remain protected until this is complete.</p>
+</section>
+
+<section class="stay-access-card" id="verifiedStayAccess" aria-labelledby="stayAccessTitle">
+  <span class="stay-access-label">Secure guest access</span>
+  <h2 id="stayAccessTitle">Verify your Airbnb stay</h2>
+  <p>Enter the Airbnb confirmation code shown in your trip details. This confirms that this permanent link belongs to your booked room.</p>
+  <div id="stayVerificationFields">
+    <form class="stay-access-form" id="stayVerificationForm">
+      <label for="airbnbConfirmationCode">Airbnb confirmation code</label>
+      <input id="airbnbConfirmationCode" name="confirmationCode" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="24" required aria-describedby="confirmationCodeHelp">
+      <span class="stay-privacy" id="confirmationCodeHelp">Usually begins with HM. The code is checked securely and is never stored in readable form.</span>
+      <button class="btn" type="submit">Verify my stay</button>
+    </form>
+  </div>
+  <p class="stay-access-status" id="stayVerificationStatus" role="status" aria-live="polite" hidden></p>
+
+  <div id="nationalityPanel" hidden>
+    <h3>Who is staying overnight?</h3>
+    <p>Choose the option that applies to everyone staying in the room. If the group includes both Thai and foreign guests, choose <strong>Foreign guest(s)</strong>.</p>
+    <div class="choice-grid">
+      <div class="choice">
+        <h3>Thai nationals only</h3>
+        <p>This TM30 Immigration accommodation registration applies only to non-Thai guests. Thai nationals do not need to upload a passport. No passport information is required when every overnight guest is a Thai national.</p>
+        <button class="btn secondary" id="confirmThaiNational" type="button">All overnight guests are Thai</button>
+      </div>
+      <div class="choice">
+        <h3>Foreign guest(s)</h3>
+        <p>Passport information is required for <strong>every non-Thai person staying overnight</strong>, not only the guest who made the booking.</p>
+        <label for="nonThaiGuestCount">Number of non-Thai overnight guests</label>
+        <input id="nonThaiGuestCount" type="number" inputmode="numeric" min="1" max="10" value="1" required>
+        <label class="guest-count-confirmation"><input id="confirmAllNonThaiGuests" type="checkbox" required> I confirm this number includes every non-Thai adult and child staying overnight, not only the Airbnb booking guest.</label>
+        <button class="btn" id="startForeignRegistration" type="button">Continue to secure passport upload</button>
+      </div>
+    </div>
+    <p class="important">The information is required for Thailand's TM30 accommodation registration. Passport images are stored privately, never sent through the AI Concierge or WhatsApp, and deleted automatically 14 days after upload—or sooner after processing.</p>
+  </div>
+
+  <div id="passportProgressPanel" hidden>
+    <h3>Complete passport information</h3>
+    <p id="passportProgressText"></p>
+    <p><strong>Every non-Thai overnight guest must be submitted.</strong> This includes partners, family members, friends and children staying in the room, not only the Airbnb booking guest.</p>
+    <button class="btn" id="createPassportUpload" type="button">Upload next passport securely</button>
+    <p class="stay-privacy">Each form is private, room-bound and single-use. After the final required passport is received, this private room guide opens automatically.</p>
+  </div>
+  <p class="stay-access-status" id="registrationStatus" role="status" aria-live="polite" hidden></p>
+</section>
+
+<section class="public-help">
+  <h2>Need urgent help?</h2>
+  <p>Emergency information remains available without guest verification. The public concierge can also guide you through verification and remind you to submit passport information if it has not been completed.</p>
+  <div class="stay-access-actions"><a class="btn" href="/emergency.html">Open Help & Emergency</a></div>
+</section>
+
+<footer class="footer">The House – Koh Tao · Private guest access</footer>
+</div>
+<script src="/contacts.js"></script>
+<script src="/guide-app.js"></script>
+<script src="/registration-entry.js"></script>
+<script src="/ai-concierge-config.js"></script>
+<script src="/ai-concierge.js"></script>
+</body>
+</html>

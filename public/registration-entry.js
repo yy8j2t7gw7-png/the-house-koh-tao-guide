@@ -3,47 +3,54 @@
   const room = match?.[1] || "";
   if (!room) return;
 
-  const verificationSection = document.getElementById("verifiedStayAccess");
+  const pendingPage = document.body.dataset.guestAccess !== "granted";
   const verificationForm = document.getElementById("stayVerificationForm");
   const confirmationInput = document.getElementById("airbnbConfirmationCode");
-  const verificationStatus = document.getElementById("stayVerificationStatus");
   const verificationFields = document.getElementById("stayVerificationFields");
-  const verifiedPanel = document.getElementById("verifiedStayPanel");
-  const verifiedDates = document.getElementById("verifiedStayDates");
+  const verificationStatus = document.getElementById("stayVerificationStatus");
+  const nationalityPanel = document.getElementById("nationalityPanel");
+  const progressPanel = document.getElementById("passportProgressPanel");
+  const progressText = document.getElementById("passportProgressText");
   const registrationStatus = document.getElementById("registrationStatus");
   const passportButton = document.getElementById("createPassportUpload");
   const thaiButton = document.getElementById("confirmThaiNational");
+  const foreignButton = document.getElementById("startForeignRegistration");
+  const foreignCount = document.getElementById("nonThaiGuestCount");
+  const allForeignGuestsConfirmed = document.getElementById("confirmAllNonThaiGuests");
   const spareKeySection = document.getElementById("spareKeyAccess");
   const spareKeyForm = document.getElementById("spareKeyForm");
   const spareKeyStatus = document.getElementById("spareKeyStatus");
   const feeCheckbox = document.getElementById("lostKeyFeeAccepted");
+  const lostKeyConfirmationCode = document.getElementById("lostKeyConfirmationCode");
   const keyResult = document.getElementById("spareKeyResult");
   const keyCode = document.getElementById("spareKeyCode");
   const keyLocation = document.getElementById("spareKeyLocation");
 
-  if (!verificationSection || !verificationForm) return;
-
   const messages = {
     verifying: "Verifying your Airbnb stay…",
-    verified: "Stay verified for Room {room}.",
-    wrongCode: "That confirmation code does not match an active or upcoming Room {room} reservation. Check the code shown in your Airbnb trip details and try again.",
+    verified: "Your Airbnb stay is verified. Please complete the guest registration step below.",
+    wrongCode: "That confirmation code does not match an active or upcoming reservation for this Room link. Check the HM code shown in your Airbnb trip details and try again.",
     rateLimited: "Too many attempts. Please wait a minute before trying again.",
     unavailable: "Secure stay verification is temporarily unavailable. Please contact the concierge for help.",
-    passportCreating: "Opening your secure one-time passport form…",
-    passportReceived: "Passport information received securely. If another non-Thai guest is staying overnight, you can upload another passport.",
-    thaiExempt: "Thai-national exemption recorded. No passport upload is required because all overnight guests on this reservation are Thai nationals.",
-    registrationRequired: "Registration is still required for each non-Thai overnight guest.",
+    nationalitySaving: "Saving your guest type securely…",
+    passportCreating: "Opening a private one-time passport form…",
+    passportProgress: "{received} of {required} required passport submissions received.",
+    allPassportsRequired: "Passport information is required for every non-Thai overnight guest, not only the person who made the booking.",
     passportError: "A secure upload form could not be opened. Please try again.",
-    thaiError: "The exemption could not be saved. Please try again.",
-    stayDates: "Verified stay: {checkIn} to {checkOut}.",
+    nationalityError: "The guest type could not be saved. Please check the information and try again.",
+    countError: "Enter the number of non-Thai people who will stay overnight in this room.",
+    allGuestsError: "Confirm that the number includes every non-Thai adult and child staying overnight, not only the Airbnb booking guest.",
     keyDaytime: "Automatic spare-key access is available only after hours, from 7:30 PM until 10:30 AM Bangkok time. During the day, please ask the concierge for help.",
     keyNotActive: "Spare-key access starts at check-in and ends at 11:00 AM on checkout day.",
     keyAlreadyReleased: "The spare key has already been released for this reservation. Please contact the concierge for assistance.",
     keyRotation: "Automatic release is temporarily paused while the key-box code is changed. The urgent team has been notified; please contact the concierge.",
     keyUnavailable: "Automatic spare-key access is not available right now. Please contact the concierge for urgent help.",
     keyConfirmFee: "Please confirm the 500 THB lost-key replacement fee before continuing.",
+    keyConfirmStay: "Re-enter the Airbnb confirmation code for your verified active stay before continuing.",
+    keyWrongCode: "That confirmation code does not match your verified active stay. Check the HM code shown in your Airbnb trip details and try again.",
+    keyRateLimited: "Too many confirmation attempts. Please wait a minute before trying again.",
     keyReleasing: "Verifying the after-hours request and notifying the team…",
-    keyReady: "Spare key access approved for Room {room}.",
+    keyReady: "Spare-key access approved for your verified room.",
     copied: "Code copied.",
     copy: "Copy code"
   };
@@ -84,67 +91,102 @@
     return data;
   }
 
-  function registrationCopy(status) {
-    if (status === "passport_received") return messages.passportReceived;
-    if (status === "thai_exempt") return messages.thaiExempt;
-    return messages.registrationRequired;
+  function showRegistration(data) {
+    if (verificationFields) verificationFields.hidden = true;
+    setStatus(verificationStatus, messages.verified, "success");
+    if (data.guestType === "foreign" || ["passport_pending", "passport_complete"].includes(data.registrationStatus)) {
+      if (nationalityPanel) nationalityPanel.hidden = true;
+      if (progressPanel) progressPanel.hidden = false;
+      const received = Number(data.receivedPassports) || 0;
+      const required = Math.max(1, Number(data.requiredPassports) || 1);
+      if (progressText) progressText.textContent = `${format(messages.passportProgress, { received, required })} ${messages.allPassportsRequired}`;
+      setStatus(registrationStatus, format(messages.passportProgress, { received, required }), received >= required ? "success" : "attention");
+      return;
+    }
+    if (nationalityPanel) nationalityPanel.hidden = false;
+    if (progressPanel) progressPanel.hidden = true;
   }
 
-  function renderVerified(data) {
-    verificationFields.hidden = true;
-    verifiedPanel.hidden = false;
+  function renderSpareKey(data) {
+    if (!spareKeySection) return;
     spareKeySection.hidden = false;
-    setStatus(verificationStatus, format(messages.verified, { room }), "success");
-    verifiedDates.textContent = format(messages.stayDates, { checkIn: data.checkInDate || "—", checkOut: data.checkOutDate || "—" });
-    setStatus(registrationStatus, registrationCopy(data.registrationStatus), data.registrationStatus === "not_started" ? "attention" : "success");
-    passportButton.textContent = data.registrationStatus === "passport_received"
-      ? "Upload another non-Thai guest passport"
-      : "Upload passport securely";
-    passportButton.disabled = false;
-    thaiButton.disabled = ["thai_exempt", "passport_received"].includes(data.registrationStatus);
-
-    spareKeyForm.hidden = true;
+    if (spareKeyForm) spareKeyForm.hidden = true;
     if (!data.activeStay) setStatus(spareKeyStatus, messages.keyNotActive, "attention");
     else if (!data.afterHours) setStatus(spareKeyStatus, messages.keyDaytime, "attention");
     else if (data.keyCodeRotationRequired) setStatus(spareKeyStatus, messages.keyRotation, "error");
     else if (data.spareKeyReleased) setStatus(spareKeyStatus, messages.keyAlreadyReleased, "attention");
     else {
-      spareKeyStatus.hidden = true;
-      spareKeyForm.hidden = false;
+      if (spareKeyStatus) spareKeyStatus.hidden = true;
+      if (spareKeyForm) spareKeyForm.hidden = false;
     }
-
-    if (window.location.hash === "#spareKeyAccess") spareKeySection.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
   async function loadStatus() {
     try {
       const data = await api(`/api/stay/status?room=${encodeURIComponent(room)}`);
-      if (data.verified) renderVerified(data);
+      if (!data.verified) return;
+      if (data.accessGranted && pendingPage) return window.location.reload();
+      if (!data.accessGranted && pendingPage) showRegistration(data);
+      if (data.accessGranted && !pendingPage) renderSpareKey(data);
     } catch (_error) {
-      // The verification form remains available as the safe fallback.
+      // Keep the safe verification screen available.
     }
   }
 
-  verificationForm.addEventListener("submit", async (event) => {
+  verificationForm?.addEventListener("submit", async (event) => {
     event.preventDefault();
-    const confirmationCode = String(confirmationInput.value || "").trim();
+    const confirmationCode = String(confirmationInput?.value || "").trim();
     if (!confirmationCode) return;
     const submit = verificationForm.querySelector('button[type="submit"]');
     setBusy(submit, true);
     setStatus(verificationStatus, messages.verifying, "working");
     try {
       await api("/api/stay/verify", { method: "POST", body: JSON.stringify({ room, confirmationCode }) });
-      confirmationInput.value = "";
-      renderVerified(await api(`/api/stay/status?room=${encodeURIComponent(room)}`));
+      if (confirmationInput) confirmationInput.value = "";
+      showRegistration(await api(`/api/stay/status?room=${encodeURIComponent(room)}`));
     } catch (error) {
-      const message = error.code === "rate_limited"
-        ? messages.rateLimited
-        : error.code === "reservation_not_found"
-          ? format(messages.wrongCode, { room })
-          : messages.unavailable;
+      const message = error.code === "rate_limited" ? messages.rateLimited
+        : error.code === "reservation_not_found" ? messages.wrongCode : messages.unavailable;
       setStatus(verificationStatus, message, "error");
     } finally {
       setBusy(submit, false);
+    }
+  });
+
+  thaiButton?.addEventListener("click", async () => {
+    setBusy(thaiButton, true);
+    setStatus(registrationStatus, messages.nationalitySaving, "working");
+    try {
+      await api("/api/stay/nationality", { method: "POST", body: JSON.stringify({ nationality: "thai", allGuestsThai: true }) });
+      window.location.reload();
+    } catch (_error) {
+      setStatus(registrationStatus, messages.nationalityError, "error");
+      setBusy(thaiButton, false);
+    }
+  });
+
+  foreignButton?.addEventListener("click", async () => {
+    const count = Number(foreignCount?.value);
+    if (!Number.isInteger(count) || count < 1 || count > 10) {
+      setStatus(registrationStatus, messages.countError, "error");
+      foreignCount?.focus();
+      return;
+    }
+    if (!allForeignGuestsConfirmed?.checked) {
+      setStatus(registrationStatus, messages.allGuestsError, "error");
+      allForeignGuestsConfirmed?.focus();
+      return;
+    }
+    setBusy(foreignButton, true);
+    setStatus(registrationStatus, messages.nationalitySaving, "working");
+    try {
+      await api("/api/stay/nationality", { method: "POST", body: JSON.stringify({ nationality: "foreign", nonThaiGuestCount: count, allNonThaiGuestsIncluded: true }) });
+      setStatus(registrationStatus, messages.passportCreating, "working");
+      const link = await api("/api/stay/passport-link", { method: "POST", body: "{}" });
+      window.location.assign(link.uploadUrl);
+    } catch (_error) {
+      setStatus(registrationStatus, messages.nationalityError, "error");
+      setBusy(foreignButton, false);
     }
   });
 
@@ -160,41 +202,28 @@
     }
   });
 
-  thaiButton?.addEventListener("click", async () => {
-    setBusy(thaiButton, true);
-    try {
-      const data = await api("/api/stay/thai-exemption", { method: "POST", body: JSON.stringify({ allGuestsThai: true }) });
-      setStatus(registrationStatus, registrationCopy(data.registrationStatus), "success");
-    } catch (_error) {
-      setStatus(registrationStatus, messages.thaiError, "error");
-      setBusy(thaiButton, false);
-    }
-  });
-
   spareKeyForm?.addEventListener("submit", async (event) => {
     event.preventDefault();
-    if (!feeCheckbox.checked) {
-      setStatus(spareKeyStatus, messages.keyConfirmFee, "error");
+    const confirmationCode = String(lostKeyConfirmationCode?.value || "").trim();
+    if (!confirmationCode) {
+      setStatus(spareKeyStatus, messages.keyConfirmStay, "error");
+      lostKeyConfirmationCode?.focus();
       return;
     }
+    if (!feeCheckbox?.checked) return setStatus(spareKeyStatus, messages.keyConfirmFee, "error");
     const submit = spareKeyForm.querySelector('button[type="submit"]');
     setBusy(submit, true);
     setStatus(spareKeyStatus, messages.keyReleasing, "working");
     try {
-      const data = await api("/api/stay/spare-key", { method: "POST", body: JSON.stringify({ feeAccepted: true }) });
+      const data = await api("/api/stay/spare-key", { method: "POST", body: JSON.stringify({ confirmationCode, feeAccepted: true }) });
+      if (lostKeyConfirmationCode) lostKeyConfirmationCode.value = "";
       spareKeyForm.hidden = true;
       keyCode.textContent = data.keyBoxCode;
       keyLocation.textContent = data.location;
       keyResult.hidden = false;
-      setStatus(spareKeyStatus, format(messages.keyReady, { room }), "success");
+      setStatus(spareKeyStatus, messages.keyReady, "success");
     } catch (error) {
-      const lookup = {
-        fee_acceptance_required: messages.keyConfirmFee,
-        active_stay_required: messages.keyNotActive,
-        available_after_hours_only: messages.keyDaytime,
-        spare_key_already_released: messages.keyAlreadyReleased,
-        key_code_rotation_required: messages.keyRotation
-      };
+      const lookup = { fresh_confirmation_required: messages.keyConfirmStay, confirmation_code_mismatch: messages.keyWrongCode, rate_limited: messages.keyRateLimited, fee_acceptance_required: messages.keyConfirmFee, active_stay_required: messages.keyNotActive, available_after_hours_only: messages.keyDaytime, spare_key_already_released: messages.keyAlreadyReleased, key_code_rotation_required: messages.keyRotation };
       setStatus(spareKeyStatus, lookup[error.code] || messages.keyUnavailable, "error");
       setBusy(submit, false);
     }
@@ -202,21 +231,12 @@
 
   document.getElementById("copySpareKeyCode")?.addEventListener("click", async (event) => {
     try {
-      await navigator.clipboard.writeText(keyCode.textContent || "");
+      await navigator.clipboard.writeText(keyCode?.textContent || "");
       event.currentTarget.textContent = messages.copied;
       window.setTimeout(() => { event.currentTarget.textContent = messages.copy; }, 1600);
     } catch (_error) {
-      // The large, selectable code remains visible if clipboard access is denied.
+      // The selectable code remains visible if clipboard access is denied.
     }
-  });
-
-  document.querySelectorAll('[data-concierge-action="registration"],[data-private-registration]').forEach((control) => {
-    control.addEventListener("click", (event) => {
-      event.preventDefault();
-      verificationSection.scrollIntoView({ behavior: "smooth", block: "start" });
-      if (!verifiedPanel.hidden) passportButton?.focus();
-      else confirmationInput?.focus();
-    });
   });
 
   loadStatus();

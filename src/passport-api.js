@@ -230,10 +230,19 @@ export async function handlePassportGuestRequest(request, env, path) {
       await env.PASSPORT_UPLOADS.delete(objectKey).catch(() => {});
       return json({ error: "link_already_used" }, 409);
     }
+    let registration = null;
     if (typeof store.markRegistrationFromPassport === "function") {
-      await store.markRegistrationFromPassport(completed.id, uploadedAt).catch(() => {});
+      registration = await store.markRegistrationFromPassport(completed.id, uploadedAt).catch(() => null);
     }
-    return json({ ok: true, room: completed.room, deleteAfter });
+    return json({
+      ok: true,
+      room: completed.room,
+      deleteAfter,
+      registrationStatus: registration?.status || "passport_pending",
+      requiredPassports: Number(registration?.requiredPassports) || 1,
+      receivedPassports: Number(registration?.receivedPassports) || 1,
+      accessGranted: registration?.status === "passport_complete"
+    });
   }
 
   return json({ error: "not_found" }, 404);

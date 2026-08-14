@@ -36,7 +36,7 @@ The platform is organized as configurable modules.
 
 `public/module-registry.js` controls which modules are enabled for each property.
 
-`src/stay-api.js` owns deterministic reservation verification, automatic passport entry and spare-key release. `airbnb-sync/Code.gs` sends minimum normalized Airbnb reservation data to the protected ingestion endpoint. `src/whatsapp-alerts.js` owns protected staff delivery. None of these sensitive operations is delegated to the language model.
+`src/stay-api.js` owns deterministic reservation verification, complete group passport-registration progress and spare-key release. The initial synchronized Airbnb confirmation check opens the registration journey; the private guide opens only when every declared non-Thai overnight guest has submitted a separate passport record. A spare-key request performs a fresh confirmation-code check against the same active reservation before the fee, after-hours, staff-alert and code-rotation safeguards run. `airbnb-sync/Code.gs` sends minimum normalized Airbnb reservation data to the protected ingestion endpoint. `src/whatsapp-alerts.js` owns protected staff delivery. None of these sensitive operations is delegated to the language model.
 
 The current public URLs remain unchanged for compatibility. Canonical module copies are stored under:
 

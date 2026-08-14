@@ -2,6 +2,52 @@
 
 All notable changes to The House – Koh Tao guest guide are recorded here.
 
+## v5.10.0 — Complete Group Registration & Private Guest Access
+
+### Added
+
+- A public verified-stay gate that withholds room information, arrival photographs, Wi-Fi and private House knowledge until registration is complete.
+- A required nationality-path choice after Airbnb verification: all overnight guests Thai, or a foreign/mixed group.
+- A required declaration of the total number of non-Thai overnight guests, including adults and children and explicitly excluding the unsafe assumption that only the booking guest needs registration.
+- Per-reservation passport progress showing received versus required submissions in both the guest flow and owner operations view.
+- A public-concierge access policy that provides verification and passport reminders without leaking private room knowledge, while preserving emergency handling and staff alerts.
+
+### Changed
+
+- Requires one separate passport submission for every declared non-Thai overnight guest before the private room guide opens.
+- Keeps all-Thai stays passport-free after confirmation-code verification and an explicit all-guests-Thai declaration.
+- Makes permanent room pages safe to place in Airbnb messages: the permanent URL itself reveals no room-specific content before successful verification and registration.
+- Revalidates every verified session against the current synchronized checkout date so a shortened or changed stay cannot retain obsolete private access.
+- Requires the guest to re-enter the Airbnb confirmation code for every after-hours lost-key release; the fresh HMAC match must resolve to the same active reservation and room.
+- Clarifies all scheduled Airbnb messages, secure upload pages, concierge answers and operational documentation that the passport requirement applies to every non-Thai overnight guest—not only the person who booked.
+
+### Security and privacy
+
+- Raw room data, protected room photographs, full room pages and private knowledge endpoints return no private content without a complete verified registration.
+- Each passport form remains private, reservation-bound, room-bound and single-use; passport files remain isolated from AI, public assets and WhatsApp.
+- The readable confirmation code supplied for a lost-key request is never stored, logged, sent to AI or included in staff alerts.
+- The 14-day R2 lifecycle remains the maximum retention rule, with earlier owner deletion and scheduled application cleanup available.
+- Thai-to-foreign or foreign-to-Thai downgrades that could bypass an existing requirement fail safely and require staff review.
+
+### Validation
+
+- Added regression coverage for multi-passport group completion, count confirmation, requirement non-reduction, nationality downgrade protection, public-concierge privacy, changed-checkout session expiry and fresh lost-key confirmation-code matching.
+- All 44 automated checks pass, including Durable Object SQLite schema initialization for the owner overview and scheduled alert paths.
+
+## v5.9.1 — Quota-Safe Airbnb Synchronization
+
+### Changed
+
+- Reduced the Airbnb reservation trigger from every ten minutes to once per hour to protect the Apps Script trigger-runtime quota shared with the existing housekeeping-calendar automation.
+- Changed routine synchronization to inspect only newly received Airbnb reservation email, with a short overlap to prevent boundary misses.
+- Skips all ten private iCal downloads and Worker submissions during routine runs when no reservation message has changed.
+- Retains one complete 400-day email and iCal audit every 24 hours so future stays and cancellation safety are still reconciled.
+
+### Safety
+
+- Incomplete incremental matching can add or update reservations but can never cancel a stored valid stay.
+- Full-audit diagnostics remain visible in `HOUSE_AIRBNB_LAST_DIAGNOSTICS`; `HOUSE_AIRBNB_LAST_AUDIT_AT` records the latest successful complete audit.
+
 ## v5.9.0 — Automatic Verified-Stay Access
 
 ### Added

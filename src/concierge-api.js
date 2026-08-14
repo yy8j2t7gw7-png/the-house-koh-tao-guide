@@ -18,13 +18,76 @@ import {
   dispatchConciergeAlert,
   whatsappAlertConfiguration
 } from "./whatsapp-alerts.js";
-import { handleStayAdminRequest, stayConfiguration } from "./stay-api.js";
+import { getGuestAccess, handleStayAdminRequest, stayConfiguration } from "./stay-api.js";
 
-const RELEASE = "5.9.0";
+const RELEASE = "5.10.0";
 const ROOM_OPTIONS = new Set(["1", "2", "3", "4", "5", "6", "8", "9", "10", "11"]);
 const MAX_HISTORY_ITEMS = 10;
 const MAX_QUESTION_LENGTH = 800;
 const FALLBACK_MINIMUM_SCORE = 0.62;
+
+function publicAccessResult(question, access, room) {
+  const normalized = normalizeText(question);
+  const emergency = /\b(?:emergency|accident|injur|bleed|cannot breathe|cant breathe|unconscious|fire|smoke|flood|water leak|electric shock|danger|help now|rescue)\b/.test(normalized);
+  if (emergency) {
+    const medical = /\b(?:accident|injur|bleed|cannot breathe|cant breathe|unconscious|medical|doctor|hospital|rescue)\b/.test(normalized);
+    const handoff = medical ? "medical_emergency" : "property_emergency";
+    return {
+      answer: medical
+        ? "For a serious accident or medical emergency, contact Koh Tao Rescue first because they know the island and local access points. You can also call Thailand's national medical emergency number 1669. Give your exact location and keep your phone nearby."
+        : "If there is immediate danger, fire, smoke, major flooding, a dangerous electrical problem or serious property damage, move to a safe place and use the urgent contact options below now.",
+      intentId: medical ? "public_medical_emergency" : "public_property_emergency",
+      category: medical ? "emergency" : "property-emergency",
+      confidence: 1,
+      needsHuman: true,
+      handoff,
+      learningGap: false,
+      actions: actionsForHandoff(handoff),
+      source: "access-policy"
+    };
+  }
+  const registrationHref = room ? `/room/${room}#verifiedStayAccess` : "/rooms.html";
+  const registrationAction = { label: "Complete guest access", type: "link", href: registrationHref };
+  if (access.verified && access.guestType === "foreign") {
+    const received = Number(access.receivedPassports) || 0;
+    const required = Math.max(1, Number(access.requiredPassports) || 1);
+    return {
+      answer: `Your Airbnb stay is verified, but passport registration is not complete. We have received ${received} of ${required} required passport submissions. Passport information is needed for every non-Thai person staying overnight—not only the person who made the booking. Open your secure Room page to upload the next passport.`,
+      intentId: "passport_registration_pending",
+      category: "arrival",
+      confidence: 1,
+      needsHuman: false,
+      handoff: "none",
+      learningGap: false,
+      actions: [registrationAction],
+      source: "access-policy"
+    };
+  }
+  if (access.verified) {
+    return {
+      answer: "Your Airbnb stay is verified. Before the private guide opens, choose whether all overnight guests are Thai nationals or whether any foreign guests are staying. Thai-only stays need no passport upload. For a foreign or mixed group, passport information is required for every non-Thai overnight guest—not only the booking guest.",
+      intentId: "nationality_selection_required",
+      category: "arrival",
+      confidence: 1,
+      needsHuman: false,
+      handoff: "none",
+      learningGap: false,
+      actions: [registrationAction],
+      source: "access-policy"
+    };
+  }
+  return {
+    answer: "Please verify your Airbnb stay from the permanent Room link in your arrival message. After verification, Thai-only stays need no passport upload. If any foreign guests are staying overnight, passport information is required for every non-Thai guest—not only the person who made the booking. The private guide opens after the required registration is complete.",
+    intentId: "stay_verification_required",
+    category: "arrival",
+    confidence: 1,
+    needsHuman: false,
+    handoff: "none",
+    learningGap: false,
+    actions: [registrationAction],
+    source: "access-policy"
+  };
+}
 
 const RESPONSE_SCHEMA = {
   type: "object",
@@ -419,6 +482,29 @@ async function interactionRecord({ env, store, interactionId, sessionId, room, q
   return interactionId;
 }
 
+async function recordInteractionAndAlert({ env, store, ctx, sessionId, room, roomVerified, question, result }) {
+  if (!store) return null;
+  let interactionId = `int_${crypto.randomUUID()}`;
+  const recordedId = await interactionRecord({ env, store, interactionId, sessionId, room, question, result })
+    .catch(() => null);
+  if (!recordedId) return null;
+  const alert = await createConciergeAlert({
+    env,
+    interactionId,
+    sessionId,
+    room,
+    roomVerified,
+    question,
+    result
+  }).catch(() => null);
+  if (alert && !alert.duplicate) {
+    const delivery = dispatchConciergeAlert(alert, env).catch(() => ({ attempted: 0, accepted: 0 }));
+    if (ctx?.waitUntil) ctx.waitUntil(delivery);
+    else await delivery;
+  }
+  return interactionId;
+}
+
 export async function handleConciergeRequest(request, env, ctx) {
   if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405, { allow: "POST" });
   let body;
@@ -434,7 +520,7 @@ export async function handleConciergeRequest(request, env, ctx) {
     ? "passport registration"
     : sanitizedQuestion;
   const sessionId = validSessionId(body.sessionId);
-  const room = validRoom(body.room);
+  const requestedRoom = validRoom(body.room);
   const language = validLanguage(body.language) || "en";
   const history = cleanHistory(body.history);
   if (!sessionId || question.length < 2 || question.length > MAX_QUESTION_LENGTH) {
@@ -442,6 +528,50 @@ export async function handleConciergeRequest(request, env, ctx) {
   }
   if (!(await enforceRateLimit(env, sessionId))) {
     return json({ error: "rate_limited", message: "Please wait a moment before sending another question." }, 429);
+  }
+
+  const store = getStore(env);
+  const enforceGuestAccess = String(env.GUEST_ACCESS_ENFORCEMENT || "true").toLowerCase() !== "false";
+  const access = enforceGuestAccess ? await getGuestAccess(request, env).catch(() => ({
+    verified: false,
+    accessGranted: false,
+    room: requestedRoom,
+    registrationStatus: "not_started"
+  })) : { verified: true, accessGranted: true, room: requestedRoom, registrationStatus: "test_bypass" };
+  const room = access.verified ? access.room : requestedRoom;
+  let publicResult = access.accessGranted ? null : publicAccessResult(question, access, room);
+  if (publicResult) {
+    if (language !== "en") {
+      try {
+        const [translatedAnswer] = await translateApprovedTexts(env, language, [publicResult.answer]);
+        publicResult = { ...publicResult, answer: translatedAnswer };
+      } catch (_error) {
+        // The approved English access message remains available.
+      }
+    }
+    const interactionId = await recordInteractionAndAlert({
+      env,
+      store,
+      ctx,
+      sessionId,
+      room,
+      roomVerified: access.verified,
+      question,
+      result: publicResult
+    });
+    return json({
+      answer: publicResult.answer,
+      intentId: publicResult.intentId,
+      category: publicResult.category,
+      confidence: publicResult.confidence,
+      needsHuman: publicResult.needsHuman,
+      handoff: publicResult.handoff,
+      learningGap: publicResult.learningGap,
+      actions: publicResult.actions,
+      source: publicResult.source,
+      language,
+      interactionId
+    });
   }
 
   let knowledge;
@@ -461,7 +591,6 @@ export async function handleConciergeRequest(request, env, ctx) {
     }, 200);
   }
 
-  const store = getStore(env);
   let approvedKnowledge = [];
   if (store) {
     try {
@@ -505,29 +634,16 @@ export async function handleConciergeRequest(request, env, ctx) {
     }
   }
 
-  let interactionId = null;
-  if (store) {
-    interactionId = `int_${crypto.randomUUID()}`;
-    const recordedId = await interactionRecord({ env, store, interactionId, sessionId, room, question, result })
-      .catch(() => null);
-    if (!recordedId) interactionId = null;
-  }
-
-  if (interactionId) {
-    const alert = await createConciergeAlert({
-      env,
-      interactionId,
-      sessionId,
-      room,
-      question,
-      result
-    }).catch(() => null);
-    if (alert && !alert.duplicate) {
-      const delivery = dispatchConciergeAlert(alert, env).catch(() => ({ attempted: 0, accepted: 0 }));
-      if (ctx?.waitUntil) ctx.waitUntil(delivery);
-      else await delivery;
-    }
-  }
+  const interactionId = await recordInteractionAndAlert({
+    env,
+    store,
+    ctx,
+    sessionId,
+    room,
+    roomVerified: access.verified,
+    question,
+    result
+  });
 
   return json({
     answer: result.answer,

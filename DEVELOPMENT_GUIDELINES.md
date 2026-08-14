@@ -100,9 +100,9 @@ Future recommendation logic may filter by guest type, budget, time, transport co
 
 ## Sensitive operations
 
-Never put key-box codes, readable Airbnb confirmation codes, private guest tokens or API credentials in public source or structured content. Follow `SECURE_AFTER_HOURS_ACCESS.md` for the protected spare-key flow. Real codes belong only in the encrypted `SPARE_KEY_CODES` Worker secret. Automatic release must fail closed unless a verified active stay, after-hours check, guest fee confirmation, automatic urgent-team notification with confirmed WhatsApp API submission, and rotation state all pass.
+Never put key-box codes, readable Airbnb confirmation codes, private guest tokens or API credentials in public source or structured content. Follow `SECURE_AFTER_HOURS_ACCESS.md` for the protected spare-key flow. Real codes belong only in the encrypted `SPARE_KEY_CODES` Worker secret. Automatic release must fail closed unless a verified active stay, a fresh confirmation-code match for that reservation, the after-hours check, guest fee confirmation, automatic urgent-team notification with confirmed WhatsApp API submission, and rotation state all pass.
 
-Passport images use the separate private R2 workflow documented in `PASSPORT_DATA_OPERATIONS.md`. It applies only to non-Thai guests; verified guests may self-declare the Thai exemption, but the system must never infer nationality. Never send passport content to the model, learning store, interaction log, Airbnb message or WhatsApp. Validate the verified reservation, room, expiry, single use, byte limit and file signature before storage. Keep manual TM30 fields disabled until the authoritative schema is supplied.
+Passport images use the separate private R2 workflow documented in `PASSPORT_DATA_OPERATIONS.md`. It applies only to non-Thai guests; verified guests may self-declare the all-Thai exemption, but the system must never infer nationality. A foreign or mixed group must declare the complete number of non-Thai adults and children, and one separate upload is required for every declared person—not only the booking guest—before private access is granted. Never send passport content to the model, learning store, interaction log, Airbnb message or WhatsApp. Validate the verified reservation, room, expiry, single use, byte limit and file signature before storage. Keep manual TM30 fields disabled until the authoritative schema is supplied.
 
 Action-needed alerts use the separate deterministic policy and protected delivery adapter documented in `WHATSAPP_ALERT_OPERATIONS.md`. Ordinary concierge requests remain usable when external delivery is unavailable. Verify signed webhooks, recipient authorization, duplicate suppression, escalation, sanitization and 30-day cleanup. The special spare-key operation intentionally fails closed until the automatically triggered protected notification is submitted successfully to WhatsApp, but the alert must never contain the code. The guest is not asked to approve that staff notification.
 
@@ -133,7 +133,7 @@ A coherent release must:
 - validate that public Contact Us actions open the concierge before human handoff
 - validate that no key-box code or messaging credential is present in the release
 - validate the fixed Airbnb listing-to-room map, cross-room rejection, HMAC-only confirmation storage and verified-session expiration
-- validate spare-key daytime, inactive-stay, missing-fee, missing-notification, duplicate-release and rotation-lock failures
+- validate spare-key missing/wrong fresh confirmation code, daytime, inactive-stay, missing-fee, missing-notification, duplicate-release and rotation-lock failures
 - validate passport token expiry and one-time use, private document retrieval, immediate deletion and retention cleanup
 - validate that passport data cannot enter the model, learning queue, public assets or ordinary WhatsApp messages
 - validate that passport requests require the non-Thai confirmation and Thai guests receive the exemption answer

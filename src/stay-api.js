@@ -23,6 +23,19 @@ const CONFIRMATION_CODE_PATTERN = /^[A-Z0-9]{8,20}$/;
 const SESSION_COOKIE = "house_verified_stay";
 const MAX_SYNC_RECORDS = 250;
 const LOST_KEY_FEE_THB = 500;
+const REGISTRATION_COMPLETE_STATUSES = new Set(["thai_exempt", "passport_complete"]);
+const ROOM_DETAILS = Object.freeze({
+  "1": { floor: "Upstairs", photo: "photo-06.jpeg", note: "Room 1 is upstairs and marked clearly in the building photo." },
+  "2": { floor: "Upstairs", photo: "photo-05.jpeg", note: "Room 2 is upstairs and marked clearly in the building photo." },
+  "3": { floor: "Upstairs", photo: "photo-09.jpeg", note: "Room 3 is upstairs and marked clearly in the building photo." },
+  "4": { floor: "Upstairs", photo: "photo-02.jpeg", note: "Room 4 is upstairs and marked clearly in the building photo." },
+  "5": { floor: "Upstairs", photo: "photo-01.jpeg", note: "Rooms 5 and 6 are upstairs around the corner." },
+  "6": { floor: "Upstairs", photo: "photo-01.jpeg", note: "Rooms 5 and 6 are upstairs around the corner." },
+  "8": { floor: "Downstairs", photo: "photo-10.jpeg", note: "Room 8 is downstairs and marked clearly in the building photo." },
+  "9": { floor: "Downstairs", photo: "photo-03.jpeg", note: "Room 9 is downstairs and marked clearly in the building photo." },
+  "10": { floor: "Downstairs", photo: "photo-08.jpeg", note: "Room 10 is downstairs and marked clearly in the building photo." },
+  "11": { floor: "Downstairs", photo: "photo-07.jpeg", note: "Room 11 is downstairs and marked clearly in the building photo." }
+});
 
 function json(data, status = 200, extraHeaders = {}) {
   return new Response(JSON.stringify(data), {
@@ -165,11 +178,54 @@ async function rateAllowed(env, request, purpose) {
   }
 }
 
-async function verifiedSession(request, env, store) {
+async function verifiedSession(request, env, store, now = new Date()) {
   const token = cookies(request)[SESSION_COOKIE] || "";
   if (!/^[A-Za-z0-9_-]{40,100}$/.test(token) || !env.STAY_TOKEN_PEPPER) return null;
   const tokenHash = await hmac(`session:${token}`, env.STAY_TOKEN_PEPPER);
-  return store.getVerifiedStaySession(tokenHash, new Date().toISOString());
+  const session = await store.getVerifiedStaySession(tokenHash, now.toISOString());
+  if (!session) return null;
+  const currentCheckout = new Date(`${session.checkOutDate}T11:00:00+07:00`);
+  if (!Number.isFinite(currentCheckout.getTime()) || now >= currentCheckout) return null;
+  return session;
+}
+
+function registrationComplete(status) {
+  return REGISTRATION_COMPLETE_STATUSES.has(String(status || ""));
+}
+
+export async function getGuestAccess(request, env, requestedRoom = "") {
+  const store = getStore(env);
+  if (!store || !env.STAY_TOKEN_PEPPER) {
+    return { verified: false, accessGranted: false, room: requestedRoom, registrationStatus: "not_started" };
+  }
+  const session = await verifiedSession(request, env, store);
+  if (!session || (requestedRoom && session.room !== requestedRoom)) {
+    return { verified: false, accessGranted: false, room: requestedRoom, registrationStatus: "not_started" };
+  }
+  const registration = await store.getStayRegistrationStatus(session.reservationId);
+  const registrationStatus = registration?.status || "not_started";
+  return {
+    verified: true,
+    accessGranted: registrationComplete(registrationStatus),
+    room: session.room,
+    session,
+    registrationStatus,
+    guestType: registration?.guestType || (registrationStatus === "thai_exempt" ? "thai" : ""),
+    requiredPassports: Number(registration?.requiredPassports) || 0,
+    receivedPassports: Number(registration?.receivedPassports) || (registrationStatus === "passport_received" ? 1 : 0)
+  };
+}
+
+async function protectedRoomAsset(request, env, access, assetName) {
+  if (!access.accessGranted || !assetName) return json({ error: "guest_registration_required" }, 403);
+  const assetUrl = new URL(`/assets/${assetName}`, request.url);
+  const response = await env.ASSETS.fetch(new Request(assetUrl, { headers: request.headers }));
+  const headers = new Headers(response.headers);
+  headers.set("cache-control", "private, no-store, max-age=0");
+  headers.set("x-content-type-options", "nosniff");
+  headers.set("cross-origin-resource-policy", "same-origin");
+  headers.set("referrer-policy", "no-referrer");
+  return new Response(response.body, { status: response.status, headers });
 }
 
 function parseKeyCodes(env) {
@@ -255,9 +311,10 @@ export async function handleStayGuestRequest(request, env, path, ctx, now = new 
     if (request.method !== "GET") return json({ error: "method_not_allowed" }, 405, { allow: "GET" });
     const room = new URL(request.url).searchParams.get("room") || "";
     if (!ACTIVE_ROOMS.has(room)) return json({ error: room === "7" ? "room_not_active" : "invalid_room" }, 400);
-    const session = await verifiedSession(request, env, store);
+    const session = await verifiedSession(request, env, store, now);
     if (!session || session.room !== room) return json({ verified: false, room });
     const registration = await store.getStayRegistrationStatus(session.reservationId);
+    const registrationStatus = registration?.status || "not_started";
     const spareKey = await store.getSpareKeyState(session.reservationId, room);
     return json({
       verified: true,
@@ -266,7 +323,11 @@ export async function handleStayGuestRequest(request, env, path, ctx, now = new 
       checkOutDate: session.checkOutDate,
       activeStay: activeStay(session, now),
       afterHours: isAfterHours(now),
-      registrationStatus: registration?.status || "not_started",
+      registrationStatus,
+      accessGranted: registrationComplete(registrationStatus),
+      guestType: registration?.guestType || (registrationStatus === "thai_exempt" ? "thai" : ""),
+      requiredPassports: Number(registration?.requiredPassports) || 0,
+      receivedPassports: Number(registration?.receivedPassports) || (registrationStatus === "passport_received" ? 1 : 0),
       lostKeyFeeThb: LOST_KEY_FEE_THB,
       spareKeyReleased: spareKey.releasedForReservation,
       keyCodeRotationRequired: spareKey.rotationRequired
@@ -315,12 +376,66 @@ export async function handleStayGuestRequest(request, env, path, ctx, now = new 
     return json({ ok: true }, 200, { "set-cookie": clearSessionCookie() });
   }
 
-  const session = await verifiedSession(request, env, store);
+  const session = await verifiedSession(request, env, store, now);
   if (!session) return json({ error: "stay_verification_required" }, 401);
+
+  const registration = await store.getStayRegistrationStatus(session.reservationId);
+  const registrationStatus = registration?.status || "not_started";
+
+  if (path === "/api/stay/nationality") {
+    if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405, { allow: "POST" });
+    const body = await readJson(request, 2_000);
+    if (body?.nationality === "thai") {
+      if (body?.allGuestsThai !== true) return json({ error: "all_thai_confirmation_required" }, 400);
+      if (registration?.guestType === "foreign" || Number(registration?.receivedPassports) > 0) {
+        return json({ error: "guest_type_change_requires_staff" }, 409);
+      }
+      const updatedAt = new Date().toISOString();
+      await store.closePendingPassportLinksForReservation(session.reservationId, updatedAt);
+      const result = typeof store.setStayRegistrationRequirement === "function"
+        ? await store.setStayRegistrationRequirement(session.reservationId, "thai", 0, updatedAt)
+        : await store.setStayRegistrationStatus(session.reservationId, "thai_exempt", updatedAt).then(() => ({ status: "thai_exempt" }));
+      return json({ ok: true, accessGranted: true, registrationStatus: result.status, guestType: "thai" });
+    }
+    if (body?.nationality === "foreign") {
+      const requiredPassports = Number(body?.nonThaiGuestCount);
+      if (body?.allNonThaiGuestsIncluded !== true) {
+        return json({ error: "all_non_thai_guests_confirmation_required" }, 400);
+      }
+      if (!Number.isInteger(requiredPassports) || requiredPassports < 1 || requiredPassports > 10) {
+        return json({ error: "invalid_non_thai_guest_count" }, 400);
+      }
+      if (registration?.guestType === "foreign" && requiredPassports < Number(registration?.requiredPassports || 0)) {
+        return json({ error: "passport_requirement_cannot_be_reduced" }, 409);
+      }
+      if (typeof store.setStayRegistrationRequirement !== "function") {
+        await store.setStayRegistrationStatus(session.reservationId, "passport_pending", new Date().toISOString());
+        return json({ ok: true, accessGranted: false, registrationStatus: "passport_pending", guestType: "foreign", requiredPassports, receivedPassports: 0 });
+      }
+      const result = await store.setStayRegistrationRequirement(
+        session.reservationId,
+        "foreign",
+        requiredPassports,
+        new Date().toISOString()
+      );
+      return json({
+        ok: true,
+        accessGranted: registrationComplete(result.status),
+        registrationStatus: result.status,
+        guestType: "foreign",
+        requiredPassports: result.requiredPassports,
+        receivedPassports: result.receivedPassports
+      });
+    }
+    return json({ error: "invalid_nationality" }, 400);
+  }
 
   if (path === "/api/stay/passport-link") {
     if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405, { allow: "POST" });
     if (!env.PASSPORT_UPLOADS || !env.PASSPORT_TOKEN_PEPPER) return json({ error: "passport_upload_unavailable" }, 503);
+    if (registration?.guestType !== "foreign" && !["passport_pending", "passport_complete"].includes(registrationStatus)) {
+      return json({ error: "foreign_registration_required" }, 409);
+    }
     const token = randomToken();
     const tokenHash = await hmac(token, env.PASSPORT_TOKEN_PEPPER);
     const createdAt = new Date().toISOString();
@@ -344,20 +459,56 @@ export async function handleStayGuestRequest(request, env, path, ctx, now = new 
     if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405, { allow: "POST" });
     const body = await readJson(request, 2_000);
     if (body?.allGuestsThai !== true) return json({ error: "all_thai_confirmation_required" }, 400);
-    const registration = await store.getStayRegistrationStatus(session.reservationId);
-    if (registration?.status === "passport_received") {
-      return json({ error: "passport_already_received" }, 409);
+    if (registration?.guestType === "foreign" || Number(registration?.receivedPassports) > 0 || registrationStatus === "passport_complete") {
+      return json({ error: "guest_type_change_requires_staff" }, 409);
     }
     const updatedAt = new Date().toISOString();
     await store.closePendingPassportLinksForReservation(session.reservationId, updatedAt);
-    await store.setStayRegistrationStatus(session.reservationId, "thai_exempt", updatedAt);
+    if (typeof store.setStayRegistrationRequirement === "function") {
+      await store.setStayRegistrationRequirement(session.reservationId, "thai", 0, updatedAt);
+    } else {
+      await store.setStayRegistrationStatus(session.reservationId, "thai_exempt", updatedAt);
+    }
     return json({ ok: true, registrationStatus: "thai_exempt" });
+  }
+
+  if (path === "/api/stay/room-content") {
+    if (request.method !== "GET") return json({ error: "method_not_allowed" }, 405, { allow: "GET" });
+    const room = new URL(request.url).searchParams.get("room") || "";
+    const access = await getGuestAccess(request, env, room);
+    if (!access.verified) return json({ error: "stay_verification_required" }, 401);
+    if (!access.accessGranted) return json({ error: "guest_registration_required" }, 403);
+    const details = ROOM_DETAILS[room];
+    if (!details) return json({ error: "invalid_room" }, 400);
+    return json({
+      room,
+      floor: details.floor,
+      note: details.note,
+      roomPhotoUrl: `/api/stay/room-photo?room=${encodeURIComponent(room)}`,
+      entrancePhotoUrl: `/api/stay/entrance-photo?room=${encodeURIComponent(room)}`
+    });
+  }
+
+  if (path === "/api/stay/room-photo" || path === "/api/stay/entrance-photo") {
+    if (request.method !== "GET") return json({ error: "method_not_allowed" }, 405, { allow: "GET" });
+    const room = new URL(request.url).searchParams.get("room") || "";
+    const access = await getGuestAccess(request, env, room);
+    const assetName = path.endsWith("entrance-photo") ? "photo-04.jpeg" : ROOM_DETAILS[room]?.photo;
+    return protectedRoomAsset(request, env, access, assetName);
   }
 
   if (path === "/api/stay/spare-key") {
     if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405, { allow: "POST" });
+    if (!registrationComplete(registrationStatus)) return json({ error: "guest_registration_required" }, 403);
     if (!(await rateAllowed(env, request, "spare-key"))) return json({ error: "rate_limited" }, 429);
     const body = await readJson(request, 2_000);
+    const confirmationCode = normalizeConfirmationCode(body?.confirmationCode);
+    if (!confirmationCode) return json({ error: "fresh_confirmation_required" }, 400);
+    const confirmationCodeHash = await hmac(`reservation:${confirmationCode}`, env.STAY_TOKEN_PEPPER);
+    const confirmedReservation = await store.getStayReservationByCodeHash(confirmationCodeHash, session.room);
+    if (!confirmedReservation || confirmedReservation.id !== session.reservationId) {
+      return json({ error: "confirmation_code_mismatch" }, 403);
+    }
     if (body?.feeAccepted !== true) return json({ error: "fee_acceptance_required" }, 400);
     if (!activeStay(session, now)) return json({ error: "active_stay_required" }, 403);
     if (!isAfterHours(now)) return json({ error: "available_after_hours_only" }, 403);

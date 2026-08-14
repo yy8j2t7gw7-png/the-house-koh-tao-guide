@@ -22,6 +22,7 @@ const COMMON_APPROVED_ASSETS = [
   "/passport-upload.js",
   "/platform-actions.js",
   "/registration-entry.js",
+  "/room-access.html",
   "/room-app.js",
   "/room-data.js"
 ];

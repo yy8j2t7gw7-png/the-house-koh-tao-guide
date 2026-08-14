@@ -193,11 +193,15 @@
     if (!reservations.length) stayReservations.appendChild(element("div", "concierge-admin-empty", "No synchronized future stays yet."));
     reservations.forEach((item) => {
       const card = element("article", "concierge-admin-registration-item");
+      const registrationDetail = item.guestType === "foreign"
+        ? `${item.receivedPassports || 0} of ${item.requiredPassports || 0} non-Thai guest passports received`
+        : item.guestType === "thai" ? "All overnight guests declared Thai" : "Nationality declaration not completed";
       card.append(
         element("strong", "", `Room ${item.room}`),
         element("span", "", `${item.checkInDate} to ${item.checkOutDate}`),
         element("span", "", `Airbnb listing ${item.listingId}`),
         element("span", "", `Guest registration: ${String(item.registrationStatus || "not_started").replaceAll("_", " ")}`),
+        element("span", "", registrationDetail),
         element("span", "", `Status: ${item.status} · updated ${bangkokDate(item.updatedAt)}`)
       );
       stayReservations.appendChild(card);

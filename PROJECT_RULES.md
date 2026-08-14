@@ -49,8 +49,8 @@ Medical or personal emergencies must remain separate from property emergencies a
 - A 500 THB replacement fee is added for a lost key.
 - Never store key-box codes in public files, URLs, structured content, repository history or release archives.
 - Never reveal a code based only on a selected room number.
-- Secure code delivery requires server-side secrets, current-guest verification, after-hours validation, confirmation and event logging.
-- Current-guest verification uses the Airbnb confirmation code from the guest's trip details, checked against the protected synchronized listing, room and stay dates.
+- Secure code delivery requires server-side secrets, current-guest verification, a fresh confirmation-code check for the lost-key request, after-hours validation, fee confirmation and event logging.
+- Current-guest verification and the fresh lost-key check use the Airbnb confirmation code from the guest's trip details, checked against the protected synchronized listing, room and stay dates. The readable code is never stored or sent to AI, alerts or logs.
 - Each active room may use one permanent public page, but that URL and a selected room are not proof of a reservation.
 - Store confirmation codes only as keyed one-way hashes; never store, log or export readable codes.
 - Verification sessions must be secure, HTTP-only, bound to one room and reservation, and expire no later than checkout.
@@ -61,7 +61,7 @@ Medical or personal emergencies must remain separate from property emergencies a
 ## Passport and Immigration registration data
 
 - TM30 accommodation registration and this passport-upload workflow apply only to non-Thai guests. Thai nationals must be told that they do not need to complete it.
-- A verified guest may either create a separate one-time passport form for each non-Thai overnight guest or declare that every overnight guest on the reservation is a Thai national. Do not infer nationality from chat or other data.
+- A verified guest may declare that every overnight guest is Thai, or declare the complete number of non-Thai adults and children in a foreign/mixed group. One separate passport form is required for every declared non-Thai overnight guest—not only the person who made the booking—and private guest information remains locked until all are received. Do not infer nationality from chat or other data.
 - Passport information is collected only through the separate private registration flow, never through AI chat, learning logs, public files or WhatsApp attachments.
 - Explain in guest-friendly language that The House needs the information for required TM30 Immigration accommodation registration and how the document is handled.
 - Use reservation- and room-bound, expiring, single-use upload links. Room selection or the permanent room URL alone must never authorize passport upload or retrieval.
@@ -134,9 +134,9 @@ Public interface rules:
 
 ## Current baseline
 
-Current release: v5.9.0.
+Current release: v5.10.0.
 
-Explore is intentionally disabled in the live v5.9.0 release. Do not delete its pages, structured records or media. Restore it only after the planned Explore rebuild and review by changing the protected deployment feature variable. Do not expose internal Explore detail paths in live concierge answers while the feature remains disabled; use approved external actions where supplied.
+Explore is intentionally disabled in the live v5.10.0 release. Do not delete its pages, structured records or media. Restore it only after the planned Explore rebuild and review by changing the protected deployment feature variable. Do not expose internal Explore detail paths in live concierge answers while the feature remains disabled; use approved external actions where supplied.
 
 Completed content modules:
 

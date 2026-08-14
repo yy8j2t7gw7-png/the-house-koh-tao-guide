@@ -52,7 +52,7 @@ export function classifyConciergeAlert({ result, question, room, now = new Date(
     afterHours: isAfterHours(now)
   };
 
-  if (result.intentId === "medical_emergency") {
+  if (result.handoff === "medical_emergency" || result.intentId === "medical_emergency" || result.intentId === "public_medical_emergency") {
     return {
       ...base,
       alertType: "medical_emergency",

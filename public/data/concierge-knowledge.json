@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0.0",
-  "release": "5.9.0",
+  "release": "5.10.0",
   "language": "en",
   "updated": "2026-08-13",
   "scope": "Verified accommodation, room, house-rule, support, booking and emergency answers for guests of The House – Koh Tao.",
@@ -445,7 +445,7 @@
         "tm30 registration",
         "send passport information"
       ],
-      "answer": "This TM30 Immigration accommodation registration applies only to non-Thai guests. Thai nationals do not need to complete it. Open your permanent Room welcome page, verify the Airbnb confirmation code shown in your trip details, then choose the secure passport upload option. Do not send passport information through this chat or WhatsApp. A passport image is automatically deleted 14 days after upload, or sooner after processing.",
+      "answer": "This TM30 Immigration accommodation registration applies only to non-Thai guests. Thai nationals do not need to complete it. Open your permanent Room welcome page, verify the Airbnb confirmation code shown in your trip details, then choose the secure passport upload option. Passport information is required for every non-Thai person staying overnight—not only the person who made the booking. Submit one passport per non-Thai overnight guest. Do not send passport information through this chat or WhatsApp. A passport image is automatically deleted 14 days after upload, or sooner after processing.",
       "actions": [
         {
           "label": "Continue Securely",

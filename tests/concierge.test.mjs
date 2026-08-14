@@ -111,6 +111,14 @@ function createStore() {
       this.registrationStatuses.set(reservationId, { status, updatedAt });
       return { ok: true };
     },
+    async setStayRegistrationRequirement(reservationId, guestType, requiredPassports, updatedAt) {
+      const receivedPassports = this.passportRecords.filter((item) => item.reservationId === reservationId && item.status === "uploaded").length;
+      const status = guestType === "thai" ? "thai_exempt"
+        : receivedPassports >= requiredPassports ? "passport_complete" : "passport_pending";
+      const value = { guestType, requiredPassports, receivedPassports, status, updatedAt };
+      this.registrationStatuses.set(reservationId, value);
+      return { ok: true, ...value };
+    },
     async getStayRegistrationStatus(reservationId) { return this.registrationStatuses.get(reservationId) || null; },
     async closePendingPassportLinksForReservation(reservationId, updatedAt) {
       this.passportRecords
@@ -120,8 +128,13 @@ function createStore() {
     },
     async markRegistrationFromPassport(passportId, updatedAt) {
       const passport = this.passportRecords.find((item) => item.id === passportId);
-      if (passport?.reservationId) this.registrationStatuses.set(passport.reservationId, { status: "passport_received", updatedAt });
-      return { ok: Boolean(passport?.reservationId) };
+      if (!passport?.reservationId) return { ok: false };
+      const current = this.registrationStatuses.get(passport.reservationId) || {};
+      const receivedPassports = this.passportRecords.filter((item) => item.reservationId === passport.reservationId && item.status === "uploaded").length;
+      const requiredPassports = Number(current.requiredPassports) || 1;
+      const status = receivedPassports >= requiredPassports ? "passport_complete" : "passport_pending";
+      this.registrationStatuses.set(passport.reservationId, { ...current, status, receivedPassports, updatedAt });
+      return { ok: true, reservationId: passport.reservationId, status, requiredPassports, receivedPassports };
     },
     async getSpareKeyState(reservationId, room) {
       return {
@@ -275,6 +288,7 @@ function createEnvironment(overrides = {}) {
       PASSPORT_RETENTION_DAYS: "14",
       OPENAI_MODEL: "gpt-5.6",
       OPENAI_REASONING_EFFORT: "medium",
+      GUEST_ACCESS_ENFORCEMENT: "false",
       ...overrides
     }
   };
@@ -320,6 +334,24 @@ test("medical emergencies offer Koh Tao Rescue first and 1669 second", async () 
   assert.match(body.answer, /1669/);
   assert.equal(body.actions[0].route, "rescueCall");
   assert.equal(body.actions[1].route, "medicalNationalCall");
+});
+
+test("public concierge protects private knowledge, reminds every non-Thai guest and still creates emergency alerts", async () => {
+  const { env, store } = createEnvironment({ GUEST_ACCESS_ENFORCEMENT: "true" });
+  const privateQuestion = await handleConciergeRequest(guestRequest("What is the Wi-Fi password?", { room: "2" }), env);
+  const privateBody = await privateQuestion.json();
+  assert.equal(privateBody.intentId, "stay_verification_required");
+  assert.match(privateBody.answer, /every non-Thai guest/i);
+  assert.doesNotMatch(privateBody.answer, /house12345/i);
+
+  const emergency = await handleConciergeRequest(guestRequest("I had a serious accident", { room: "2" }), env);
+  const emergencyBody = await emergency.json();
+  assert.equal(emergencyBody.intentId, "public_medical_emergency");
+  assert.equal(emergencyBody.handoff, "medical_emergency");
+  assert.match(emergencyBody.answer, /Koh Tao Rescue.*1669/s);
+  assert.equal(store.alerts.length, 1);
+  assert.equal(store.alerts[0].alertType, "medical_emergency");
+  assert.equal(store.alerts[0].roomVerified, false);
 });
 
 test("activity booking uses guest-service wording and the House booking route", async () => {
@@ -563,10 +595,13 @@ test("main and room welcome pages make required registration prominent", async (
   assert.match(room, /Upload passport securely/);
   assert.match(room, /All overnight guests are Thai nationals/);
   assert.match(room, /Show my spare-key code/);
+  assert.match(room, /id="lostKeyConfirmationCode"/);
+  assert.match(room, /Re-enter the HM code shown in your Airbnb trip details/);
   assert.match(room, /src="\/registration-entry\.js"/);
   assert.match(registrationEntry, /\/api\/stay\/verify/);
   assert.match(registrationEntry, /\/api\/stay\/passport-link/);
   assert.match(registrationEntry, /\/api\/stay\/spare-key/);
+  assert.match(registrationEntry, /JSON\.stringify\(\{ confirmationCode, feeAccepted: true \}\)/);
   assert.doesNotMatch(registrationEntry, /HOUSE_PRIVATE_REGISTRATION_URL/);
   assert.match(registrationForm, /Option 1 — Upload passport image/);
   assert.match(registrationForm, /Option 2 — Enter the required details/);
@@ -592,7 +627,7 @@ test("guest localization supports seven languages and keeps the owner dashboard 
   assert.doesNotMatch(admin, /src="\/i18n\.js"/);
   assert.match(runtime, /exploreContentDeferred/);
   assert.match(runtime, /element\.closest\("\.section,\.footer"\)/);
-  assert.match(runtime, /houseGuideTranslations:v5\.9\.0:/);
+  assert.match(runtime, /houseGuideTranslations:v5\.10\.0:/);
   assert.match(runtime, /MAX_REQUEST_RETRIES = 2/);
   assert.match(runtime, /let flushRunning = false/);
 });
@@ -606,7 +641,10 @@ test("critical emergency and registration wording is reviewed in every guest lan
     "Automatic deletion: 14 days after upload",
     "Thai nationals do not need to complete this registration.",
     "Thai national?",
-    "You do not need to upload a passport for this registration. Please tell The House so the unused request can be closed."
+    "You do not need to upload a passport for this registration. Please tell The House so the unused request can be closed.",
+    "Airbnb confirmation code for this lost-key request",
+    "Re-enter the Airbnb confirmation code for your verified active stay before continuing.",
+    "That confirmation code does not match your verified active stay. Check the HM code shown in your Airbnb trip details and try again."
   ];
 
   for (const language of ["en", "th", "zh-CN", "ru", "de", "fr", "es"]) {
@@ -1380,7 +1418,7 @@ test("Airbnb reservation sync fixes each listing to its verified room and hashes
   assert.equal(Object.values(listingRoomMap).includes("7"), false);
 });
 
-test("verified Airbnb stay creates its own passport form and Thai exemption", async () => {
+test("verified Airbnb stay creates its own passport form and prevents nationality downgrade", async () => {
   const { env, store } = createEnvironment();
   await handleReservationSyncRequest(new Request("https://guide.example/api/reservations/sync", {
     method: "POST",
@@ -1408,6 +1446,13 @@ test("verified Airbnb stay creates its own passport form and Thai exemption", as
   const cookie = verified.headers.get("set-cookie").split(";")[0];
   assert.match(verified.headers.get("set-cookie"), /HttpOnly; SameSite=Strict/);
 
+  const foreignRegistration = await handleStayGuestRequest(new Request("https://guide.example/api/stay/nationality", {
+    method: "POST",
+    headers: { origin: "https://guide.example", cookie, "content-type": "application/json" },
+    body: JSON.stringify({ nationality: "foreign", nonThaiGuestCount: 1, allNonThaiGuestsIncluded: true })
+  }), env, "/api/stay/nationality");
+  assert.equal(foreignRegistration.status, 200);
+
   const passportLink = await handleStayGuestRequest(new Request("https://guide.example/api/stay/passport-link", {
     method: "POST",
     headers: { origin: "https://guide.example", cookie, "content-type": "application/json" },
@@ -1431,12 +1476,185 @@ test("verified Airbnb stay creates its own passport form and Thai exemption", as
     headers: { origin: "https://guide.example", cookie, "content-type": "application/json" },
     body: JSON.stringify({ allGuestsThai: true })
   }), env, "/api/stay/thai-exemption");
-  assert.equal(exempt.status, 200);
-  assert.equal(store.registrationStatuses.get(store.stayReservations[0].id).status, "thai_exempt");
-  assert.equal(store.passportRecords.at(-1).status, "deleted");
+  assert.equal(exempt.status, 409);
+  assert.equal((await exempt.json()).error, "guest_type_change_requires_staff");
+  assert.equal(store.registrationStatuses.get(store.stayReservations[0].id).status, "passport_pending");
 });
 
-test("after-hours spare-key release requires a verified active stay, confirms the fee and never alerts the code", async () => {
+test("private guide stays locked until every declared non-Thai overnight guest passport is submitted", async () => {
+  const { env } = createEnvironment();
+  await handleReservationSyncRequest(new Request("https://guide.example/api/reservations/sync", {
+    method: "POST",
+    headers: { authorization: "Bearer reservation_sync_test_5500", "content-type": "application/json" },
+    body: JSON.stringify({
+      room: "2",
+      listingId: "1349840459014476583",
+      records: [{ confirmationCode: "HMALLGUESTS2", checkInDate: "2026-08-13", checkOutDate: "2026-08-15" }]
+    })
+  }), env);
+  const verified = await handleStayGuestRequest(new Request("https://guide.example/api/stay/verify", {
+    method: "POST",
+    headers: { origin: "https://guide.example", "content-type": "application/json" },
+    body: JSON.stringify({ room: "2", confirmationCode: "HMALLGUESTS2" })
+  }), env, "/api/stay/verify", null, new Date("2026-08-13T08:00:00.000Z"));
+  const cookie = verified.headers.get("set-cookie").split(";")[0];
+
+  const unconfirmedCount = await handleStayGuestRequest(new Request("https://guide.example/api/stay/nationality", {
+    method: "POST",
+    headers: { origin: "https://guide.example", cookie, "content-type": "application/json" },
+    body: JSON.stringify({ nationality: "foreign", nonThaiGuestCount: 2 })
+  }), env, "/api/stay/nationality");
+  assert.equal(unconfirmedCount.status, 400);
+  assert.equal((await unconfirmedCount.json()).error, "all_non_thai_guests_confirmation_required");
+
+  const registration = await handleStayGuestRequest(new Request("https://guide.example/api/stay/nationality", {
+    method: "POST",
+    headers: { origin: "https://guide.example", cookie, "content-type": "application/json" },
+    body: JSON.stringify({ nationality: "foreign", nonThaiGuestCount: 2, allNonThaiGuestsIncluded: true })
+  }), env, "/api/stay/nationality");
+  assert.equal((await registration.json()).requiredPassports, 2);
+  const reducedCount = await handleStayGuestRequest(new Request("https://guide.example/api/stay/nationality", {
+    method: "POST",
+    headers: { origin: "https://guide.example", cookie, "content-type": "application/json" },
+    body: JSON.stringify({ nationality: "foreign", nonThaiGuestCount: 1, allNonThaiGuestsIncluded: true })
+  }), env, "/api/stay/nationality");
+  assert.equal(reducedCount.status, 409);
+  assert.equal((await reducedCount.json()).error, "passport_requirement_cannot_be_reduced");
+
+  const uploadPassport = async () => {
+    const linkResponse = await handleStayGuestRequest(new Request("https://guide.example/api/stay/passport-link", {
+      method: "POST",
+      headers: { origin: "https://guide.example", cookie, "content-type": "application/json" },
+      body: "{}"
+    }), env, "/api/stay/passport-link");
+    const token = new URL((await linkResponse.json()).uploadUrl).hash.replace("#token=", "");
+    const jpeg = new Uint8Array(1024);
+    jpeg.set([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46]);
+    const response = await handlePassportGuestRequest(new Request("https://guide.example/api/passport-upload", {
+      method: "POST",
+      headers: { authorization: `Bearer ${token}`, "content-type": "image/jpeg" },
+      body: jpeg
+    }), env, "/api/passport-upload");
+    return response.json();
+  };
+
+  const first = await uploadPassport();
+  assert.equal(first.receivedPassports, 1);
+  assert.equal(first.requiredPassports, 2);
+  assert.equal(first.accessGranted, false);
+  const pending = await handleStayGuestRequest(new Request("https://guide.example/api/stay/status?room=2", {
+    headers: { origin: "https://guide.example", cookie }
+  }), env, "/api/stay/status");
+  assert.equal((await pending.json()).accessGranted, false);
+
+  const second = await uploadPassport();
+  assert.equal(second.receivedPassports, 2);
+  assert.equal(second.requiredPassports, 2);
+  assert.equal(second.accessGranted, true);
+  const complete = await handleStayGuestRequest(new Request("https://guide.example/api/stay/status?room=2", {
+    headers: { origin: "https://guide.example", cookie }
+  }), env, "/api/stay/status");
+  assert.equal((await complete.json()).accessGranted, true);
+});
+
+test("Worker routing keeps the room guide, photos and private knowledge behind completed registration", async () => {
+  const source = await readFile(new URL("../src/index.js", import.meta.url), "utf8");
+  assert.match(source, /const page = access\.accessGranted \? "\/room\.html" : "\/room-access\.html"/);
+  assert.match(source, /PRIVATE_DIRECT_ASSET\.test\(url\.pathname\) \|\| PRIVATE_ROOM_PHOTO\.test\(url\.pathname\)/);
+  assert.match(source, /access\.accessGranted \? roomAsset\(request, env, PRIVATE_KNOWLEDGE_PATH\) : notFound\(\)/);
+  assert.match(source, /headers\.set\("cache-control", "private, no-store, max-age=0"\)/);
+});
+
+test("Durable Object SQLite schema initializes every operational table used by admin and scheduled jobs", async () => {
+  const { DatabaseSync } = await import("node:sqlite");
+  const source = await readFile(new URL("../src/concierge-store.js", import.meta.url), "utf8");
+  const executable = source
+    .replace('import { DurableObject } from "cloudflare:workers";', "class DurableObject { constructor(ctx, env) { this.ctx = ctx; this.env = env; } }")
+    .replace("export class ConciergeStore", "class ConciergeStore")
+    .concat("\nexport { ConciergeStore };\n");
+  const moduleUrl = `data:text/javascript;base64,${Buffer.from(executable).toString("base64")}`;
+  const { ConciergeStore } = await import(moduleUrl);
+  const database = new DatabaseSync(":memory:");
+  let initialization;
+  const sql = {
+    exec(statement, ...values) {
+      const normalized = String(statement).trim();
+      if (values.length || /^(?:SELECT|WITH|PRAGMA)\b/i.test(normalized)) {
+        return database.prepare(statement).all(...values);
+      }
+      database.exec(statement);
+      return [];
+    }
+  };
+  const ctx = {
+    storage: { sql },
+    blockConcurrencyWhile(callback) { initialization = callback(); return initialization; }
+  };
+  const store = new ConciergeStore(ctx, {});
+  await initialization;
+
+  const tables = database.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all().map((row) => row.name);
+  for (const required of [
+    "concierge_alerts",
+    "concierge_alert_deliveries",
+    "stay_reservations",
+    "verified_stay_sessions",
+    "stay_registration_requirements",
+    "spare_key_events",
+    "spare_key_room_state",
+    "translation_cache"
+  ]) assert.ok(tables.includes(required), `${required} was not initialized`);
+
+  const overview = await store.getAdminOverview();
+  assert.equal(overview.totals.openAlerts, 0);
+  assert.deepEqual(await store.getDueAlertEscalations(new Date().toISOString()), []);
+  const synced = await store.syncStayReservations({
+    room: "2",
+    listingId: "1349840459014476583",
+    provider: "airbnb",
+    syncId: "local-schema-test",
+    syncedAt: "2026-08-13T08:00:00.000Z",
+    records: [{
+      confirmationCodeHash: "local_schema_confirmation_hash",
+      checkInDate: "2026-08-13",
+      checkOutDate: "2026-08-15",
+      status: "confirmed",
+      sourceRefHash: "local_schema_source_hash"
+    }]
+  });
+  assert.equal(synced.upserted, 1);
+  assert.equal((await store.getStayOperationsOverview()).reservations.length, 1);
+  database.close();
+});
+
+test("a verified session stops granting access when a synchronized reservation checkout is shortened", async () => {
+  const { env } = createEnvironment();
+  const sync = (checkOutDate) => handleReservationSyncRequest(new Request("https://guide.example/api/reservations/sync", {
+    method: "POST",
+    headers: { authorization: "Bearer reservation_sync_test_5500", "content-type": "application/json" },
+    body: JSON.stringify({
+      room: "2",
+      listingId: "1349840459014476583",
+      records: [{ confirmationCode: "HMSHORTENED2", checkInDate: "2026-08-10", checkOutDate }]
+    })
+  }), env);
+  await sync("2026-08-20");
+  const verifiedAt = new Date("2026-08-13T08:00:00.000Z");
+  const verified = await handleStayGuestRequest(new Request("https://guide.example/api/stay/verify", {
+    method: "POST",
+    headers: { origin: "https://guide.example", "content-type": "application/json" },
+    body: JSON.stringify({ room: "2", confirmationCode: "HMSHORTENED2" })
+  }), env, "/api/stay/verify", null, verifiedAt);
+  const cookie = verified.headers.get("set-cookie").split(";")[0];
+
+  await sync("2026-08-13");
+  const expired = await handleStayGuestRequest(new Request("https://guide.example/api/stay/status?room=2", {
+    headers: { origin: "https://guide.example", cookie }
+  }), env, "/api/stay/status", null, new Date("2026-08-13T08:01:00.000Z"));
+  assert.equal((await expired.json()).verified, false);
+});
+
+test("after-hours spare-key release freshly verifies the active reservation, confirms the fee and never alerts either code", async () => {
   const { env, store } = createEnvironment({
     SPARE_KEY_CODES: JSON.stringify({ "1": "8642" }),
     WHATSAPP_ALERT_RECIPIENTS: JSON.stringify({ urgent: [{ label: "Su", phone: "+66 64 000 0001" }] }),
@@ -1458,10 +1676,32 @@ test("after-hours spare-key release requires a verified active stay, confirms th
   }), env, "/api/stay/verify", null, afterHours);
   const cookie = verified.headers.get("set-cookie").split(";")[0];
 
-  const noFee = await handleStayGuestRequest(new Request("https://guide.example/api/stay/spare-key", {
+  await handleStayGuestRequest(new Request("https://guide.example/api/stay/nationality", {
+    method: "POST",
+    headers: { origin: "https://guide.example", cookie, "content-type": "application/json" },
+    body: JSON.stringify({ nationality: "thai", allGuestsThai: true })
+  }), env, "/api/stay/nationality", null, afterHours);
+
+  const missingFreshCode = await handleStayGuestRequest(new Request("https://guide.example/api/stay/spare-key", {
     method: "POST",
     headers: { origin: "https://guide.example", cookie, "content-type": "application/json" },
     body: JSON.stringify({ feeAccepted: false })
+  }), env, "/api/stay/spare-key", null, afterHours);
+  assert.equal(missingFreshCode.status, 400);
+  assert.equal((await missingFreshCode.json()).error, "fresh_confirmation_required");
+
+  const wrongFreshCode = await handleStayGuestRequest(new Request("https://guide.example/api/stay/spare-key", {
+    method: "POST",
+    headers: { origin: "https://guide.example", cookie, "content-type": "application/json" },
+    body: JSON.stringify({ confirmationCode: "HMWRONG999", feeAccepted: true })
+  }), env, "/api/stay/spare-key", null, afterHours);
+  assert.equal(wrongFreshCode.status, 403);
+  assert.equal((await wrongFreshCode.json()).error, "confirmation_code_mismatch");
+
+  const noFee = await handleStayGuestRequest(new Request("https://guide.example/api/stay/spare-key", {
+    method: "POST",
+    headers: { origin: "https://guide.example", cookie, "content-type": "application/json" },
+    body: JSON.stringify({ confirmationCode: "HMKEY12345", feeAccepted: false })
   }), env, "/api/stay/spare-key", null, afterHours);
   assert.equal(noFee.status, 400);
 
@@ -1474,7 +1714,7 @@ test("after-hours spare-key release requires a verified active stay, confirms th
     const released = await handleStayGuestRequest(new Request("https://guide.example/api/stay/spare-key", {
       method: "POST",
       headers: { origin: "https://guide.example", cookie, "content-type": "application/json" },
-      body: JSON.stringify({ feeAccepted: true })
+      body: JSON.stringify({ confirmationCode: "HMKEY12345", feeAccepted: true })
     }), env, "/api/stay/spare-key", null, afterHours);
     const body = await released.json();
     assert.equal(body.keyBoxCode, "8642");
@@ -1485,11 +1725,12 @@ test("after-hours spare-key release requires a verified active stay, confirms th
     assert.equal(store.spareKeyRotations.get("1"), true);
     assert.equal(store.alerts[0].roomVerified, true);
     assert.doesNotMatch(JSON.stringify(store.alerts), /8642/);
+    assert.doesNotMatch(JSON.stringify(store.alerts), /HMKEY12345/);
 
     const repeated = await handleStayGuestRequest(new Request("https://guide.example/api/stay/spare-key", {
       method: "POST",
       headers: { origin: "https://guide.example", cookie, "content-type": "application/json" },
-      body: JSON.stringify({ feeAccepted: true })
+      body: JSON.stringify({ confirmationCode: "HMKEY12345", feeAccepted: true })
     }), env, "/api/stay/spare-key", null, afterHours);
     assert.equal(repeated.status, 409);
     assert.equal((await repeated.json()).error, "key_code_rotation_required");
@@ -1523,6 +1764,12 @@ test("spare-key release automatically notifies the team and fails safely when Wh
   }), env, "/api/stay/verify", null, afterHours);
   const cookie = verified.headers.get("set-cookie").split(";")[0];
 
+  await handleStayGuestRequest(new Request("https://guide.example/api/stay/nationality", {
+    method: "POST",
+    headers: { origin: "https://guide.example", cookie, "content-type": "application/json" },
+    body: JSON.stringify({ nationality: "thai", allGuestsThai: true })
+  }), env, "/api/stay/nationality", null, afterHours);
+
   const originalFetch = globalThis.fetch;
   let automaticAttempts = 0;
   globalThis.fetch = async () => {
@@ -1536,7 +1783,7 @@ test("spare-key release automatically notifies the team and fails safely when Wh
     const failed = await handleStayGuestRequest(new Request("https://guide.example/api/stay/spare-key", {
       method: "POST",
       headers: { origin: "https://guide.example", cookie, "content-type": "application/json" },
-      body: JSON.stringify({ feeAccepted: true })
+      body: JSON.stringify({ confirmationCode: "HMKEYFAIL2", feeAccepted: true })
     }), env, "/api/stay/spare-key", null, afterHours);
     assert.equal(automaticAttempts, 2);
     assert.equal(failed.status, 503);
@@ -1571,5 +1818,5 @@ test("every guest page uses the same top navigation", async () => {
     assert.equal(normalized, expected, `Unexpected top navigation in ${path}`);
     checked += 1;
   }
-  assert.equal(checked, 41);
+  assert.equal(checked, 42);
 });

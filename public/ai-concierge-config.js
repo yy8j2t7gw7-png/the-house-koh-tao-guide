@@ -1,11 +1,11 @@
 window.AI_CONCIERGE_CONFIG = {
-  "release": "5.9.0",
+  "release": "5.10.0",
   "enabled": true,
   "propertyName": "The House",
   "buttonLabel": "Concierge",
   "welcomeTitle": "Welcome",
   "welcomeText": "Ask naturally in your preferred language about your room, check-in, Wi-Fi, house rules or help during your stay.",
-  "initialMessage": "Hello. I’m The House Concierge. What can I help you with during your stay?",
+  "initialMessage": "Hello. Booked guests must verify their Airbnb stay. Thai-only stays need no passport upload. If any foreign guests are staying overnight, passport information is required for every non-Thai guest—not only the booking guest. I can guide you through this or help with an emergency.",
   "placeholder": "Ask about your stay…",
   "apiUrl": "/api/concierge",
   "feedbackUrl": "/api/concierge/feedback",
@@ -79,17 +79,35 @@ window.AI_CONCIERGE_CONFIG = {
       "prompt": "There is a serious problem in my room."
     }
   ],
+  "publicQuickActions": [
+    {
+      "label": "Complete guest access",
+      "icon": "🛂",
+      "type": "registration"
+    },
+    {
+      "label": "Passport not uploaded",
+      "icon": "📄",
+      "type": "prompt",
+      "prompt": "I have not uploaded all required passports yet. What should I do?"
+    },
+    {
+      "label": "Emergency help",
+      "icon": "🚨",
+      "type": "link",
+      "href": "/emergency.html"
+    }
+  ],
   "pagePrompts": {
     "index.html": [
-      "I need my secure passport registration link.",
-      "What time is check-in?",
-      "What is the Wi-Fi password?",
-      "Where is The House?"
+      "How do I verify my stay?",
+      "I have not uploaded all required passports yet.",
+      "I need emergency help."
     ],
     "rooms.html": [
-      "Where is my room?",
-      "How does self check-in work?",
-      "What is the Wi-Fi password?"
+      "How do I verify my stay?",
+      "Who needs to submit passport information?",
+      "I need emergency help."
     ],
     "room.html": [
       "I need fresh towels.",

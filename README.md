@@ -1,4 +1,4 @@
-# Guest Guide Platform with AI Concierge — The House v5.9.0
+# Guest Guide Platform with AI Concierge — The House v5.10.0
 
 The House – Koh Tao guest guide is a production-oriented, mobile-first digital guest guide and concierge platform. It combines property information, curated island guidance, structured place and activity data, and centralized contact and booking routes.
 
@@ -17,6 +17,24 @@ The House – Koh Tao guest guide is a production-oriented, mobile-first digital
 - Model-powered, room-aware AI Concierge with controlled learning
 
 The Activities module contains 49 structured profiles covering diving, freediving, snorkelling, boat trips, beach experiences, kayaking, paddleboarding, hiking, viewpoints, climbing, yoga, Muay Thai, massage, cooking, wildlife, photography, night activities and rainy-day options.
+
+## v5.10.0 release focus
+
+- Keeps all room-specific content, arrival photographs, Wi-Fi and private House knowledge locked until the Airbnb stay and required guest registration are complete.
+- Gives verified guests an explicit choice between an all-Thai stay and a foreign or mixed group; all-Thai stays need only the Airbnb confirmation-code check.
+- Requires the guest to declare the complete number of non-Thai adults and children staying overnight—not only the Airbnb booking guest.
+- Requires one separate passport submission for every declared non-Thai overnight guest and opens the private guide only after all required submissions are received.
+- Explains the TM30 purpose, private processing and 14-day maximum deletion rule before upload; passport files remain outside AI, WhatsApp and public assets.
+- Restricts the unverified public concierge to verification, registration reminders and emergencies while keeping protected staff alerts available for serious incidents.
+- Revalidates verified sessions against the current synchronized checkout date, including after reservation changes.
+- Requires a fresh Airbnb confirmation-code match for every after-hours spare-key request before applying the existing active-stay, 500 THB fee, automatic staff-notification and code-rotation safeguards.
+- Preserves the seven-language operational interface, automatic Airbnb synchronization, protected after-hours key workflow, disabled Explore interface and all existing owner controls.
+
+## v5.9.1 release focus
+
+- Reduces the automatic Airbnb synchronizer from every ten minutes to once per hour so it safely shares Apps Script quota with the existing housekeeping-calendar automation.
+- Makes routine runs incremental: new Airbnb email is checked with a short overlap, and the ten private calendars are fetched only when something changed.
+- Keeps one complete reservation and cancellation audit every 24 hours, with the original fail-safe rule that incomplete matching can update records but cannot cancel valid stays.
 
 ## v5.9.0 release focus
 

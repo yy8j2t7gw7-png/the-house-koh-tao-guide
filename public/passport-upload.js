@@ -82,7 +82,12 @@
       window.sessionStorage.removeItem(tokenStorageKey);
       fileInput.value = "";
       form.hidden = true;
-      showStatus(window.HOUSE_I18N?.format("Thank you. The passport image for Room {room} was received securely. This one-time link is now closed.", { room: data.room }) || `Thank you. The passport image for Room ${data.room} was received securely. This one-time link is now closed.`, "success");
+      const progress = `${Number(data.receivedPassports) || 1} of ${Number(data.requiredPassports) || 1}`;
+      const completeMessage = data.accessGranted
+        ? `Thank you. All ${Number(data.requiredPassports) || 1} required passport submissions were received securely. Opening your private Room guide…`
+        : `Thank you. Passport submission ${progress} was received securely. Returning to your Room page so you can upload the next required passport…`;
+      showStatus(completeMessage, "success");
+      window.setTimeout(() => { window.location.assign(`/room/${encodeURIComponent(data.room)}`); }, 1400);
     } catch (error) {
       const messages = {
         unsupported_file_type: "That file is not a supported passport image. Please choose a JPEG, PNG, WebP or HEIC image.",

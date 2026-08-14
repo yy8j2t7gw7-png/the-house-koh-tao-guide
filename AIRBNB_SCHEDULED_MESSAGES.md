@@ -18,7 +18,7 @@ https://the-house-koh-tao-guide.7mf56yd45g.workers.dev/room/1
 For secure guest access, enter your Airbnb confirmation code when the page asks for it:
 [AIRBNB CONFIRMATION CODE]
 
-The page contains your arrival information, Wi-Fi, house guide and AI Concierge. Non-Thai guests who have not already provided the required passport information must complete the secure TM30 registration there before arrival. Thai nationals do not need to upload a passport.
+The page contains your arrival information, Wi-Fi, house guide and AI Concierge. Passport information is required for every non-Thai person staying overnight—not only the person who made the booking. Submit one passport for each non-Thai overnight guest through the secure TM30 registration before arrival. Thai nationals do not need to upload a passport.
 
 Please keep this message available during your stay.
 
@@ -34,7 +34,7 @@ https://the-house-koh-tao-guide.7mf56yd45g.workers.dev/room/2
 For secure guest access, enter your Airbnb confirmation code when the page asks for it:
 [AIRBNB CONFIRMATION CODE]
 
-The page contains your arrival information, Wi-Fi, house guide and AI Concierge. Non-Thai guests who have not already provided the required passport information must complete the secure TM30 registration there before arrival. Thai nationals do not need to upload a passport.
+The page contains your arrival information, Wi-Fi, house guide and AI Concierge. Passport information is required for every non-Thai person staying overnight—not only the person who made the booking. Submit one passport for each non-Thai overnight guest through the secure TM30 registration before arrival. Thai nationals do not need to upload a passport.
 
 Please keep this message available during your stay.
 
@@ -50,7 +50,7 @@ https://the-house-koh-tao-guide.7mf56yd45g.workers.dev/room/3
 For secure guest access, enter your Airbnb confirmation code when the page asks for it:
 [AIRBNB CONFIRMATION CODE]
 
-The page contains your arrival information, Wi-Fi, house guide and AI Concierge. Non-Thai guests who have not already provided the required passport information must complete the secure TM30 registration there before arrival. Thai nationals do not need to upload a passport.
+The page contains your arrival information, Wi-Fi, house guide and AI Concierge. Passport information is required for every non-Thai person staying overnight—not only the person who made the booking. Submit one passport for each non-Thai overnight guest through the secure TM30 registration before arrival. Thai nationals do not need to upload a passport.
 
 Please keep this message available during your stay.
 
@@ -66,7 +66,7 @@ https://the-house-koh-tao-guide.7mf56yd45g.workers.dev/room/4
 For secure guest access, enter your Airbnb confirmation code when the page asks for it:
 [AIRBNB CONFIRMATION CODE]
 
-The page contains your arrival information, Wi-Fi, house guide and AI Concierge. Non-Thai guests who have not already provided the required passport information must complete the secure TM30 registration there before arrival. Thai nationals do not need to upload a passport.
+The page contains your arrival information, Wi-Fi, house guide and AI Concierge. Passport information is required for every non-Thai person staying overnight—not only the person who made the booking. Submit one passport for each non-Thai overnight guest through the secure TM30 registration before arrival. Thai nationals do not need to upload a passport.
 
 Please keep this message available during your stay.
 
@@ -82,7 +82,7 @@ https://the-house-koh-tao-guide.7mf56yd45g.workers.dev/room/5
 For secure guest access, enter your Airbnb confirmation code when the page asks for it:
 [AIRBNB CONFIRMATION CODE]
 
-The page contains your arrival information, Wi-Fi, house guide and AI Concierge. Non-Thai guests who have not already provided the required passport information must complete the secure TM30 registration there before arrival. Thai nationals do not need to upload a passport.
+The page contains your arrival information, Wi-Fi, house guide and AI Concierge. Passport information is required for every non-Thai person staying overnight—not only the person who made the booking. Submit one passport for each non-Thai overnight guest through the secure TM30 registration before arrival. Thai nationals do not need to upload a passport.
 
 Please keep this message available during your stay.
 
@@ -98,7 +98,7 @@ https://the-house-koh-tao-guide.7mf56yd45g.workers.dev/room/6
 For secure guest access, enter your Airbnb confirmation code when the page asks for it:
 [AIRBNB CONFIRMATION CODE]
 
-The page contains your arrival information, Wi-Fi, house guide and AI Concierge. Non-Thai guests who have not already provided the required passport information must complete the secure TM30 registration there before arrival. Thai nationals do not need to upload a passport.
+The page contains your arrival information, Wi-Fi, house guide and AI Concierge. Passport information is required for every non-Thai person staying overnight—not only the person who made the booking. Submit one passport for each non-Thai overnight guest through the secure TM30 registration before arrival. Thai nationals do not need to upload a passport.
 
 Please keep this message available during your stay.
 
@@ -114,7 +114,7 @@ https://the-house-koh-tao-guide.7mf56yd45g.workers.dev/room/8
 For secure guest access, enter your Airbnb confirmation code when the page asks for it:
 [AIRBNB CONFIRMATION CODE]
 
-The page contains your arrival information, Wi-Fi, house guide and AI Concierge. Non-Thai guests who have not already provided the required passport information must complete the secure TM30 registration there before arrival. Thai nationals do not need to upload a passport.
+The page contains your arrival information, Wi-Fi, house guide and AI Concierge. Passport information is required for every non-Thai person staying overnight—not only the person who made the booking. Submit one passport for each non-Thai overnight guest through the secure TM30 registration before arrival. Thai nationals do not need to upload a passport.
 
 Please keep this message available during your stay.
 
@@ -130,7 +130,7 @@ https://the-house-koh-tao-guide.7mf56yd45g.workers.dev/room/9
 For secure guest access, enter your Airbnb confirmation code when the page asks for it:
 [AIRBNB CONFIRMATION CODE]
 
-The page contains your arrival information, Wi-Fi, house guide and AI Concierge. Non-Thai guests who have not already provided the required passport information must complete the secure TM30 registration there before arrival. Thai nationals do not need to upload a passport.
+The page contains your arrival information, Wi-Fi, house guide and AI Concierge. Passport information is required for every non-Thai person staying overnight—not only the person who made the booking. Submit one passport for each non-Thai overnight guest through the secure TM30 registration before arrival. Thai nationals do not need to upload a passport.
 
 Please keep this message available during your stay.
 
@@ -146,7 +146,7 @@ https://the-house-koh-tao-guide.7mf56yd45g.workers.dev/room/10
 For secure guest access, enter your Airbnb confirmation code when the page asks for it:
 [AIRBNB CONFIRMATION CODE]
 
-The page contains your arrival information, Wi-Fi, house guide and AI Concierge. Non-Thai guests who have not already provided the required passport information must complete the secure TM30 registration there before arrival. Thai nationals do not need to upload a passport.
+The page contains your arrival information, Wi-Fi, house guide and AI Concierge. Passport information is required for every non-Thai person staying overnight—not only the person who made the booking. Submit one passport for each non-Thai overnight guest through the secure TM30 registration before arrival. Thai nationals do not need to upload a passport.
 
 Please keep this message available during your stay.
 
@@ -162,6 +162,6 @@ https://the-house-koh-tao-guide.7mf56yd45g.workers.dev/room/11
 For secure guest access, enter your Airbnb confirmation code when the page asks for it:
 [AIRBNB CONFIRMATION CODE]
 
-The page contains your arrival information, Wi-Fi, house guide and AI Concierge. Non-Thai guests who have not already provided the required passport information must complete the secure TM30 registration there before arrival. Thai nationals do not need to upload a passport.
+The page contains your arrival information, Wi-Fi, house guide and AI Concierge. Passport information is required for every non-Thai person staying overnight—not only the person who made the booking. Submit one passport for each non-Thai overnight guest through the secure TM30 registration before arrival. Thai nationals do not need to upload a passport.
 
 Please keep this message available during your stay.

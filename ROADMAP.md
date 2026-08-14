@@ -1,6 +1,6 @@
 # Product Roadmap
 
-Baseline: v5.9.0
+Baseline: v5.10.0
 
 ## Completed
 
@@ -61,8 +61,15 @@ Baseline: v5.9.0
 - [x] Automatic official WhatsApp urgent-team notification with confirmed API submission required before key display
 - [x] Key-code rotation lock and owner confirmation workflow
 - [x] Prepared scheduled Airbnb arrival messages for every active listing
+- [x] Hide all private room information, arrival photographs and Wi-Fi until verified guest registration is complete
+- [x] Require an explicit all-Thai or foreign/mixed-group choice after Airbnb verification
+- [x] Require one passport for every declared non-Thai overnight adult and child, not only the Airbnb booking guest
+- [x] Keep the private guide locked until all declared non-Thai passport submissions are received
+- [x] Restrict the unverified public concierge to verification, registration reminders and emergency handling
+- [x] Revalidate verified access against updated synchronized checkout dates
+- [x] Require a fresh same-reservation Airbnb confirmation check for every after-hours spare-key release
 
-## Current priority — v5.9.x Verified Guest Launch
+## Current priority — v5.10.x Verified Guest Launch
 
 The concierge must be useful to real guests before further Explore expansion.
 
@@ -79,7 +86,7 @@ The concierge must be useful to real guests before further Explore expansion.
 - [ ] Establish a regular owner learning-queue review routine
 - [x] Create the private production R2 passport bucket
 - [x] Configure `PASSPORT_TOKEN_PEPPER` and the 14-day R2 lifecycle rule
-- [ ] Verify the complete passport flow with a non-sensitive test image
+- [x] Verify the complete passport flow with a non-sensitive test image
 - [ ] Supply the authoritative TM30 manual-entry field specification
 - [ ] Add the secure manual-details alternative after that specification is approved
 - [x] Prepare Airbnb scheduled messages as the automatic pre-arrival passport reminder
@@ -101,18 +108,20 @@ Guests may continue using ordinary WhatsApp handoffs. Automated internal alerts 
 
 - [x] Push the v5.5.0 release to the existing hosting workflow
 - [x] Confirm `/api/concierge/status` reports AI and learning enabled
-- [ ] Deploy v5.9.0 and confirm full-page language switching, recommendations, Bamboo social actions, booking wording, verified registration and alert console
-- [ ] Add `STAY_TOKEN_PEPPER`, `RESERVATION_SYNC_TOKEN` and protected `SPARE_KEY_CODES` Worker secrets
-- [ ] Install and authorize the included Airbnb Google Apps Script synchronizer
-- [ ] Add each listing's private Airbnb iCal URL to Apps Script properties
+- [ ] Deploy v5.10.0 and confirm full-page language switching, recommendations, Bamboo social actions, booking wording, verified group registration and alert console
+- [x] Add `STAY_TOKEN_PEPPER` and `RESERVATION_SYNC_TOKEN` Worker secrets
+- [ ] Add protected `SPARE_KEY_CODES` Worker secret before activating automatic spare-key release
+- [x] Install and authorize the included Airbnb Google Apps Script synchronizer
+- [x] Add each active listing's private Airbnb iCal URL to Apps Script properties
 - [ ] Add and activate the prepared scheduled Airbnb arrival message for each active listing
-- [ ] Confirm `HOUSE_AIRBNB_LAST_DIAGNOSTICS` is blank after the first full synchronization
+- [x] Confirm reservations synchronize and appear in the owner operations view
 - [ ] Configure the Meta production alert channel following `WHATSAPP_ALERT_OPERATIONS.md`
 - [ ] Test all seven languages on guest phones and review real guest feedback for wording refinements
 - [ ] Verify the protected `/concierge-admin` review workflow
-- [ ] Verify all ten active permanent room links; Room 7 must remain inactive
-- [ ] Test cross-room confirmation-code rejection in a private browser window
-- [ ] Test a non-sensitive reservation-linked passport upload and Thai exemption
+- [x] Verify the active permanent room links; Room 7 remains inactive
+- [x] Test cross-room confirmation-code rejection
+- [x] Test a non-sensitive reservation-linked passport upload
+- [ ] Test the all-Thai exemption on a suitable test reservation
 - [ ] Test spare-key release with a temporary code and automatic urgent-team WhatsApp submission, then rotate it
 - [ ] Test the concierge on guest phones
 - [ ] Test room persistence and room changes

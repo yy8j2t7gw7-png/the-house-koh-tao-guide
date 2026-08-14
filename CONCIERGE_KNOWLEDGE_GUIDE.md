@@ -91,7 +91,7 @@ Follow `SECURE_AFTER_HOURS_ACCESS.md` for spare-key access.
 
 Do not place telephone numbers or WhatsApp destinations inside learned answers. Contact actions are generated from protected, deterministic routing configuration.
 
-Passport and TM30 questions may explain the approved purpose and guide the guest to the permanent Room page. A verified stay can create a private single-use form automatically. Never add a WhatsApp request route, accept passport content inside chat or open an unauthenticated public upload. Follow `PASSPORT_DATA_OPERATIONS.md`.
+Passport and TM30 questions may explain the approved purpose and guide the guest to the permanent Room page. Thai-only groups need no passport. A foreign or mixed group must declare the complete number of non-Thai adults and children staying overnight, then create one private single-use form for every declared person—not only the booking guest. Never add a WhatsApp request route, accept passport content inside chat or open an unauthenticated public upload. Follow `PASSPORT_DATA_OPERATIONS.md`.
 
 ## Validation
 

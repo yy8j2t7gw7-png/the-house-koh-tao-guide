@@ -174,7 +174,7 @@ async function sendToGroup(alert, group, stage, env, store) {
   return { attempted: outcomes.length, accepted: outcomes.filter(Boolean).length };
 }
 
-export async function createConciergeAlert({ env, interactionId, sessionId, room, question, result, now = new Date() }) {
+export async function createConciergeAlert({ env, interactionId, sessionId, room, roomVerified = false, question, result, now = new Date() }) {
   const policy = classifyConciergeAlert({ result, question, room, now });
   const store = getStore(env);
   if (!policy || !store) return null;
@@ -191,7 +191,7 @@ export async function createConciergeAlert({ env, interactionId, sessionId, room
     alertType: policy.alertType,
     recipientGroup: policy.recipientGroup,
     room: policy.room,
-    roomVerified: policy.roomVerified,
+    roomVerified: Boolean(roomVerified),
     summary: safeAlertSummary(policy.summary),
     bangkokTime: policy.bangkokTime,
     createdAt: policy.createdAt,

@@ -2,6 +2,9 @@
   const cfg = window.AI_CONCIERGE_CONFIG;
   if (!cfg || !cfg.enabled) return;
 
+  const guestAccessMode = document.body.dataset.guestAccess || (currentPage === "emergency.html" ? "public" : "granted");
+  const isPublicAccess = guestAccessMode !== "granted";
+
   const contacts = window.HOUSE_GUIDE || {};
   const roomOptions = (cfg.roomOptions || ["1", "2", "3", "4", "5", "6", "8", "9", "10", "11"]).map(String);
   const pagePath = location.pathname;
@@ -9,6 +12,7 @@
     ? "room.html"
     : (pagePath.split("/").filter(Boolean).pop() || "index.html");
   const pagePrompts = cfg.pagePrompts?.[currentPage] || cfg.defaultPrompts || [];
+  const availableQuickActions = isPublicAccess ? (cfg.publicQuickActions || []) : (cfg.quickActions || []);
 
   function safeStorage(storage, operation, key, value) {
     try {
@@ -204,7 +208,7 @@
   panel.id = "aiConciergePanel";
   panel.setAttribute("aria-label", "AI Concierge");
 
-  const quickActionsHtml = (cfg.quickActions || []).map((action) => {
+  const quickActionsHtml = availableQuickActions.map((action) => {
     if (action.type === "registration" && selectedRoom) {
       return `<a class="ai-concierge-action" href="/room/${selectedRoom}#verifiedStayAccess">
         <span aria-hidden="true">${action.icon}</span><span>${action.label}</span>
@@ -434,6 +438,14 @@
   }
 
   async function fallbackAnswer(question) {
+    if (isPublicAccess) {
+      return {
+        answer: "Please complete guest access from your permanent Room link. Thai-only stays need only the Airbnb confirmation code and Thai-national selection. If any foreign guests are staying overnight, securely submit passport information for every non-Thai guest—not only the booking guest. Emergency help remains available without verification.",
+        actions: [{ label: "Complete guest access", type: "registration" }],
+        source: "public-fallback",
+        interactionId: null
+      };
+    }
     const engine = await loadEngine();
     return { ...engine.answer(question), source: "device-fallback", interactionId: null };
   }
@@ -507,7 +519,7 @@
   }
 
   appendMessage("concierge", cfg.initialMessage || "Hello. What can I help you with during your stay?");
-  loadEngine().catch(() => {});
+  if (!isPublicAccess) loadEngine().catch(() => {});
 
   const appearanceDelay = Number.isFinite(cfg.appearanceDelayMs) ? cfg.appearanceDelayMs : 1200;
   window.setTimeout(() => launcher.classList.add("is-visible"), appearanceDelay);

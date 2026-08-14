@@ -10,7 +10,7 @@
 
 This window defines after-hours handling only. It does not define reception, office or property operating hours.
 
-## v5.9.0 verified-stay flow
+## v5.10.0 verified-stay flow
 
 1. Every active Room 1–6 and 8–11 has one permanent page listed in `AIRBNB_AUTOMATION_SETUP.md`. Room 7 is inactive.
 2. The Airbnb synchronizer sends the minimum reservation record to the Worker: listing ID, room, confirmation code, check-in, checkout and status.
@@ -19,10 +19,11 @@ This window defines after-hours handling only. It does not define reception, off
 5. Verification succeeds only when the code, listing, room and unexpired reservation agree. A cross-room attempt fails.
 6. The browser receives a `Secure`, `HttpOnly`, `SameSite=Strict` session tied to that reservation and room. It expires no later than 11:00 AM on checkout day.
 7. Spare-key access is available only from check-in at 2:00 PM until checkout at 11:00 AM and only within the 19:30–10:30 after-hours window.
-8. The guest must explicitly confirm the 500 THB lost-key replacement fee. This confirmation is separate from the automatic staff notification.
-9. The Worker automatically creates and sends a verified urgent event to the configured owners/Su group, then waits for the WhatsApp API to confirm at least one message submission. The guest is not asked to approve this staff notification.
-10. Only then does the Worker record the access and return the room's code with the instruction that the box is next to the door.
-11. The room is immediately marked as requiring code rotation. No second automatic release is permitted until staff change the physical code, update the Cloudflare secret and confirm rotation in `/concierge-admin`.
+8. For each lost-key release, the guest re-enters the Airbnb confirmation code. The Worker HMAC-hashes it again and requires an exact match to the same active reservation and room. The readable code is never stored, logged, sent to AI or included in an alert.
+9. The guest must explicitly confirm the 500 THB lost-key replacement fee. This confirmation is separate from the automatic staff notification.
+10. The Worker automatically creates and sends a verified urgent event to the configured owners/Su group, then waits for the WhatsApp API to confirm at least one message submission. The guest is not asked to approve this staff notification.
+11. Only then does the Worker record the access and return the room's code with the instruction that the box is next to the door.
+12. The room is immediately marked as requiring code rotation. No second automatic release is permitted until staff change the physical code, update the Cloudflare secret and confirm rotation in `/concierge-admin`.
 
 ## Protected code storage
 
@@ -51,7 +52,7 @@ Automatic key release fails closed when WhatsApp is incomplete, no urgent recipi
 
 ## Activation checklist
 
-1. Deploy v5.9.0.
+1. Deploy v5.10.0.
 2. Add `STAY_TOKEN_PEPPER` and `RESERVATION_SYNC_TOKEN` as separate long random Worker secrets.
 3. Add real current codes only to the encrypted `SPARE_KEY_CODES` Worker secret.
 4. Configure the official WhatsApp Business Platform and protected `urgent` recipients using `WHATSAPP_ALERT_OPERATIONS.md`.

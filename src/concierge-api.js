@@ -11,6 +11,7 @@ import {
   shouldUseDeterministic
 } from "./concierge-core.js";
 import { handlePassportAdminRequest } from "./passport-api.js";
+import { handleMaintenanceAdminRequest } from "./maintenance-api.js";
 import { retrieveApprovedProjectKnowledge } from "./project-knowledge.js";
 import { LANGUAGE_NAMES, translateApprovedTexts, validLanguage } from "./i18n-api.js";
 import {
@@ -20,7 +21,7 @@ import {
 } from "./whatsapp-alerts.js";
 import { getGuestAccess, handleStayAdminRequest, stayConfiguration } from "./stay-api.js";
 
-const RELEASE = "5.10.1";
+const RELEASE = "5.11.0";
 const ROOM_OPTIONS = new Set(["1", "2", "3", "4", "5", "6", "8", "9", "10", "11"]);
 const MAX_HISTORY_ITEMS = 10;
 const MAX_QUESTION_LENGTH = 800;
@@ -52,7 +53,7 @@ function publicAccessResult(question, access, room) {
     const received = Number(access.receivedPassports) || 0;
     const required = Math.max(1, Number(access.requiredPassports) || 1);
     return {
-      answer: `Your Airbnb stay is verified, but passport registration is not complete. We have received ${received} of ${required} required passport submissions. Passport information is needed for every non-Thai person staying overnight—not only the person who made the booking. Open your secure Room page to upload the next passport.`,
+      answer: `Your stay is verified, but passport registration is not complete. We have received ${received} of ${required} required passport submissions. Passport information is needed for every non-Thai person staying overnight—not only the person who made the booking. Open your secure Room page to upload the next passport.`,
       intentId: "passport_registration_pending",
       category: "arrival",
       confidence: 1,
@@ -65,7 +66,7 @@ function publicAccessResult(question, access, room) {
   }
   if (access.verified) {
     return {
-      answer: "Your Airbnb stay is verified. Before the private guide opens, choose whether all overnight guests are Thai nationals or whether any foreign guests are staying. Thai-only stays need no passport upload. For a foreign or mixed group, passport information is required for every non-Thai overnight guest—not only the booking guest.",
+      answer: "Your stay is verified. Before the private guide opens, choose whether all overnight guests are Thai nationals or whether any foreign guests are staying. Thai-only stays need no passport upload. For a foreign or mixed group, passport information is required for every non-Thai overnight guest—not only the booking guest.",
       intentId: "nationality_selection_required",
       category: "arrival",
       confidence: 1,
@@ -77,7 +78,7 @@ function publicAccessResult(question, access, room) {
     };
   }
   return {
-    answer: "Please verify your Airbnb stay from the permanent Room link in your arrival message. After verification, Thai-only stays need no passport upload. If any foreign guests are staying overnight, passport information is required for every non-Thai guest—not only the person who made the booking. The private guide opens after the required registration is complete.",
+    answer: "Please verify your stay from the permanent Room link in your arrival message using the Airbnb confirmation code or private House stay code provided to you. After verification, Thai-only stays need no passport upload. If any foreign guests are staying overnight, passport information is required for every non-Thai guest—not only the person who made the booking. The private guide opens after the required registration is complete.",
     intentId: "stay_verification_required",
     category: "arrival",
     confidence: 1,
@@ -698,7 +699,12 @@ export async function handleAdminRequest(request, env, path) {
     if (passportResponse) return passportResponse;
   }
 
-  if (path.includes("/stays") || path.includes("/spare-key-rotation")) {
+  if (path.includes("/maintenance-")) {
+    const maintenanceResponse = await handleMaintenanceAdminRequest(request, env, path, store);
+    if (maintenanceResponse) return maintenanceResponse;
+  }
+
+  if (path.includes("/stays") || path.includes("/stay-extension") || path.includes("/spare-key-rotation")) {
     const stayResponse = await handleStayAdminRequest(request, env, path, store);
     if (stayResponse) return stayResponse;
   }

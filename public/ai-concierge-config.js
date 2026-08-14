@@ -1,11 +1,11 @@
 window.AI_CONCIERGE_CONFIG = {
-  "release": "5.10.1",
+  "release": "5.11.0",
   "enabled": true,
   "propertyName": "The House",
   "buttonLabel": "Concierge",
   "welcomeTitle": "Welcome",
   "welcomeText": "Ask naturally in your preferred language about your room, check-in, Wi-Fi, house rules or help during your stay.",
-  "initialMessage": "Hello. Booked guests must verify their Airbnb stay. Thai-only stays need no passport upload. If any foreign guests are staying overnight, passport information is required for every non-Thai guest—not only the booking guest. I can guide you through this or help with an emergency.",
+  "initialMessage": "Hello. Booked guests must verify their stay using the Airbnb confirmation code or private House stay code. Thai-only stays need no passport upload. If any foreign guests are staying overnight, passport information is required for every non-Thai guest—not only the booking guest. I can guide you through this or help with an emergency.",
   "placeholder": "Ask about your stay…",
   "apiUrl": "/api/concierge",
   "feedbackUrl": "/api/concierge/feedback",
@@ -21,7 +21,7 @@ window.AI_CONCIERGE_CONFIG = {
     "end": "10:30",
     "spareKeyLocation": "In the key box next to the room door",
     "lostKeyFeeThb": 500,
-    "airbnbConfirmationRequired": true,
+    "stayConfirmationRequired": true,
     "secureCodeDeliveryEnabled": true,
     "notificationPolicy": "configured owners and Su",
     "automaticNotificationsEnabled": true

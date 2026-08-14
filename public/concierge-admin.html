@@ -49,21 +49,40 @@
         <div class="concierge-admin-section-head">
           <div>
             <p class="concierge-admin-kicker">Verified guest access</p>
-            <h2>Airbnb stays & spare-key safety</h2>
+            <h2>Guest stays & spare-key safety</h2>
           </div>
         </div>
-        <p>The automatic Gmail and Airbnb iCal sync supplies confirmation codes and stay dates. Codes are hashed immediately and never shown here. Use the manual form only as a fallback if an Airbnb reservation has not synchronized.</p>
+        <p>The automatic Gmail and Airbnb iCal sync supplies confirmation codes and stay dates. Codes are hashed immediately and never shown here. Use the manual form only when an Airbnb reservation is missing because it has not synchronized.</p>
         <form id="manualStayForm" class="concierge-admin-registration-form">
           <div class="concierge-admin-field"><label for="manualStayRoom">Room</label><select id="manualStayRoom" required><option value="">Select room</option><option value="1">Room 1</option><option value="2">Room 2</option><option value="3">Room 3</option><option value="4">Room 4</option><option value="5">Room 5</option><option value="6">Room 6</option><option value="8">Room 8</option><option value="9">Room 9</option><option value="10">Room 10</option><option value="11">Room 11</option></select></div>
           <div class="concierge-admin-field"><label for="manualStayCode">Airbnb confirmation code</label><input id="manualStayCode" type="text" autocomplete="off" required></div>
           <div class="concierge-admin-field"><label for="manualStayCheckIn">Check-in</label><input id="manualStayCheckIn" type="date" required></div>
           <div class="concierge-admin-field"><label for="manualStayCheckOut">Checkout</label><input id="manualStayCheckOut" type="date" required></div>
-          <button type="submit">Add fallback stay</button>
+          <button type="submit">Add missing reservation</button>
         </form>
-        <div class="concierge-admin-registration-columns">
-          <div><h3>Upcoming and active reservations</h3><div id="stayReservations" class="concierge-admin-queue"></div></div>
-          <div><h3>Key-box codes requiring rotation</h3><div id="keyRotations" class="concierge-admin-queue"></div></div>
+        <div class="concierge-admin-direct-block">
+          <h3>Direct bookings and walk-ins</h3>
+          <p>Create a protected stay when a guest books directly or arrives without an Airbnb reservation. The private House stay code is shown once and is never stored in readable form.</p>
+          <form id="directStayForm" class="concierge-admin-registration-form concierge-admin-direct-form">
+            <div class="concierge-admin-field"><label for="directStayRoom">Room</label><select id="directStayRoom" required><option value="">Select room</option><option value="1">Room 1</option><option value="2">Room 2</option><option value="3">Room 3</option><option value="4">Room 4</option><option value="5">Room 5</option><option value="6">Room 6</option><option value="8">Room 8</option><option value="9">Room 9</option><option value="10">Room 10</option><option value="11">Room 11</option></select></div>
+            <div class="concierge-admin-field"><label for="directStayCheckIn">Check-in</label><input id="directStayCheckIn" type="date" required></div>
+            <div class="concierge-admin-field"><label for="directStayCheckOut">Checkout</label><input id="directStayCheckOut" type="date" required></div>
+            <button type="submit">Create direct stay</button>
+          </form>
+          <div id="directStayResult" class="concierge-admin-link-result" hidden>
+            <strong>Share these private access details with the guest now</strong>
+            <label for="directStayCodeResult">House stay code (shown once)</label>
+            <input id="directStayCodeResult" type="text" readonly>
+            <label for="directStayUrlResult">Permanent Room link</label>
+            <input id="directStayUrlResult" type="url" readonly>
+            <button type="button" id="copyDirectStayMessage">Copy guest message</button>
+          </div>
         </div>
+        <div class="concierge-admin-registration-columns">
+          <div><h3>Active stays</h3><div id="activeStayReservations" class="concierge-admin-queue"></div></div>
+          <div><h3>Upcoming stays</h3><div id="upcomingStayReservations" class="concierge-admin-queue"></div></div>
+        </div>
+        <div class="concierge-admin-operations-block"><h3>Key-box codes requiring rotation</h3><div id="keyRotations" class="concierge-admin-queue"></div></div>
       </section>
 
       <section class="concierge-admin-section">
@@ -76,6 +95,17 @@
         </div>
         <p>Critical incidents, after-hours lost keys and actionable guest requests are routed to the configured WhatsApp groups. Room numbers shown here come from the guest’s private room link or selection and must be confirmed before protected access is given.</p>
         <div id="conciergeAlerts" class="concierge-admin-queue"></div>
+      </section>
+
+      <section class="concierge-admin-section">
+        <div class="concierge-admin-section-head">
+          <div>
+            <p class="concierge-admin-kicker">Verified room reports</p>
+            <h2>Maintenance reports & private photos</h2>
+          </div>
+        </div>
+        <p>Reports below come from a verified, registered stay. Routine issues route to Su; serious water, electrical, overflow or room-security reports route to Su and the private owner group. Photos are private and automatically deleted within 30 days or sooner after resolution.</p>
+        <div id="maintenanceReports" class="concierge-admin-queue"></div>
       </section>
 
       <section class="concierge-admin-section">

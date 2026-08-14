@@ -50,10 +50,11 @@ Medical or personal emergencies must remain separate from property emergencies a
 - Never store key-box codes in public files, URLs, structured content, repository history or release archives.
 - Never reveal a code based only on a selected room number.
 - Secure code delivery requires server-side secrets, current-guest verification, a fresh confirmation-code check for the lost-key request, after-hours validation, fee confirmation and event logging.
-- Current-guest verification and the fresh lost-key check use the Airbnb confirmation code from the guest's trip details, checked against the protected synchronized listing, room and stay dates. The readable code is never stored or sent to AI, alerts or logs.
+- Current-guest verification and the fresh lost-key check use either the Airbnb HM confirmation code from the guest's trip details or the private House stay code created for a direct/walk-in reservation. The code is checked against the protected room and stay dates; the readable value is never stored or sent to AI, alerts or logs.
 - Each active room may use one permanent public page, but that URL and a selected room are not proof of a reservation.
 - Store confirmation codes only as keyed one-way hashes; never store, log or export readable codes.
 - Verification sessions must be secure, HTTP-only, bound to one room and reservation, and expire no later than checkout.
+- Direct/walk-in House stay codes may be displayed only in the authorized creation response and must be stored only as an HMAC hash. Stay extensions must preserve the existing reservation identity and may only move checkout to a later date.
 - Every approved spare-key event must notify the configured owners and Su when the protected messaging integration is enabled.
 - Notification recipient numbers and names are server-side configuration and must never appear in public files.
 - Staff notifications must not contain the key-box code or the guest's private access token.
@@ -80,6 +81,14 @@ Medical or personal emergencies must remain separate from property emergencies a
 - Stored delivery records use labels and salted hashes, never recipient telephone numbers.
 - Alerts must never contain passport information, key-box codes, private stay tokens or unredacted personal data.
 - WhatsApp delivery uses only the official WhatsApp Business Platform and requires a configured account, approved message template and signed webhook. Without that configuration, the protected owner console remains the alert fallback.
+
+## Maintenance reports
+
+- Only a verified guest may submit a room maintenance report, and the server—not the browser or model—determines its room and criticality.
+- Routine maintenance reports route to House support. Active leaks, toilet overflows, electrical danger and rooms that cannot be secured route to the urgent team.
+- Critical reports require a guest phone or WhatsApp reply contact. That contact may appear only in the transient protected delivery payload and must never be stored in the maintenance report, alert record, AI context, learning queue, Git or release archive.
+- Maintenance photos are optional, private and excluded from AI, public assets and ordinary WhatsApp content. They use authenticated owner retrieval, immediate deletion and a maximum 30-day retention policy under the `maintenance/` R2 prefix.
+- Only human waste may be flushed. Toilet paper, tissues, wipes, sanitary products and every other item go in the provided bin. A 1,000 THB clearance fee applies only when inspection confirms that a prohibited item caused the blockage.
 
 ## Global booking policy
 
@@ -134,9 +143,9 @@ Public interface rules:
 
 ## Current baseline
 
-Current release: v5.10.1.
+Current release: v5.11.0.
 
-Explore is intentionally disabled in the live v5.10.1 release. Do not delete its pages, structured records or media. Restore it only after the planned Explore rebuild and review by changing the protected deployment feature variable. Do not expose internal Explore detail paths in live concierge answers while the feature remains disabled; use approved external actions where supplied.
+Explore is intentionally disabled in the live v5.11.0 release. Do not delete its pages, structured records or media. Restore it only after the planned Explore rebuild and review by changing the protected deployment feature variable. Do not expose internal Explore detail paths in live concierge answers while the feature remains disabled; use approved external actions where supplied.
 
 Completed content modules:
 
@@ -148,4 +157,4 @@ Completed content modules:
 - Shopping & Essentials
 - Activities & Experiences
 
-The hybrid, room-aware AI Concierge, full operational translation path, controlled owner-review workflow, protected staff-alert channel and verified-stay automation are implemented. Production key release is fail-closed until the reservation sync, key-code secret and official urgent WhatsApp recipients are configured and verified. Room 7 remains inactive. Explore remains deferred, and Transport remains research-blocked until the required authoritative source is supplied.
+The hybrid, room-aware AI Concierge, full operational translation path, controlled owner-review workflow, protected staff-alert channel, verified-stay automation, direct/walk-in stay creation, stay extensions and verified maintenance reporting are implemented. Production key release is fail-closed until the reservation sync, key-code secret and official urgent WhatsApp recipients are configured and verified. Room 7 remains inactive. Explore remains deferred, and Transport remains research-blocked until the required authoritative source is supplied.

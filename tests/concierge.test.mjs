@@ -9,10 +9,12 @@ import {
 } from "../src/concierge-api.js";
 import { handlePassportGuestRequest } from "../src/passport-api.js";
 import {
+  handleStayAdminRequest,
   handleReservationSyncRequest,
   handleStayGuestRequest,
   listingRoomMap
 } from "../src/stay-api.js";
+import { handleMaintenanceGuestRequest } from "../src/maintenance-api.js";
 import {
   learningClusterKey,
   matchKnowledge,
@@ -44,6 +46,7 @@ function createStore() {
     registrationStatuses: new Map(),
     spareKeyEvents: [],
     spareKeyRotations: new Map(),
+    maintenanceReports: [],
     alerts: [],
     alertDeliveries: [],
     async getApprovedKnowledge() { return []; },
@@ -101,6 +104,17 @@ function createStore() {
       const session = this.staySessions.find((item) => item.tokenHash === tokenHash);
       if (session) session.revokedAt = now;
       return { ok: true };
+    },
+    async extendStayReservation(reservationId, checkOutDate, updatedAt) {
+      const reservation = this.stayReservations.find((item) => item.id === reservationId && item.status === "confirmed");
+      if (!reservation) return { ok: false, error: "reservation_not_found" };
+      if (checkOutDate <= reservation.checkOutDate) return { ok: false, error: "checkout_must_be_later" };
+      reservation.checkOutDate = checkOutDate;
+      reservation.updatedAt = updatedAt;
+      this.staySessions.filter((item) => item.reservationId === reservationId).forEach((item) => {
+        item.expiresAt = `${checkOutDate}T04:00:00.000Z`;
+      });
+      return { ok: true, reservationId, checkOutDate, updatedAt };
     },
     async createAutomaticPassportUpload(record) {
       await this.createPassportUpload(record);
@@ -205,8 +219,20 @@ function createStore() {
       target.objectKey = "";
       return { ok: true, objectKey };
     },
-    async cleanupPassportUploads() { return { records: [] }; }
-    ,
+    async cleanupPassportUploads() { return { records: [] }; },
+    async createMaintenanceReport(record) {
+      this.maintenanceReports.push({ ...record, status: "open", photoDeletedAt: "", resolvedAt: "" });
+      return { ok: true };
+    },
+    async getMaintenanceReport(id) { return this.maintenanceReports.find((item) => item.id === id) || null; },
+    async deleteMaintenancePhoto(id, now) {
+      const target = this.maintenanceReports.find((item) => item.id === id);
+      if (target) Object.assign(target, { photoObjectKey: "", photoDeletedAt: now });
+      return { ok: Boolean(target) };
+    },
+    async cleanupMaintenanceReports(now) {
+      return { records: this.maintenanceReports.filter((item) => item.photoObjectKey && item.deleteAfter <= now) };
+    },
     async createAlert(record) {
       const existing = this.alerts.find((alert) => alert.dedupeKey === record.dedupeKey && alert.status !== "resolved");
       if (existing) return { created: false, alert: existing };
@@ -590,8 +616,8 @@ test("main and room welcome pages make required registration prominent", async (
     assert.doesNotMatch(html, /href="\/passport-upload(?:\.html)?"/);
   });
   assert.match(home, /Open my Room page/);
-  assert.match(room, /Verify your Airbnb stay/);
-  assert.match(room, /Airbnb confirmation code/);
+  assert.match(room, /Verify your stay/);
+  assert.match(room, /Stay confirmation code/);
   assert.match(room, /Upload passport securely/);
   assert.match(room, /All overnight guests are Thai nationals/);
   assert.match(room, /Show my spare-key code/);
@@ -600,7 +626,7 @@ test("main and room welcome pages make required registration prominent", async (
   assert.ok(room.indexOf('id="openSpareKeyAccess"') < room.indexOf('id="spareKeyAccess"'));
   assert.match(room, /id="spareKeyAccess"[^>]*hidden/);
   assert.match(room, /id="lostKeyConfirmationCode"/);
-  assert.match(room, /Re-enter the HM code shown in your Airbnb trip details/);
+  assert.match(room, /Re-enter the Airbnb HM code or private House stay code provided to you/);
   assert.match(room, /src="\/registration-entry\.js"/);
   assert.match(registrationEntry, /\/api\/stay\/verify/);
   assert.match(registrationEntry, /\/api\/stay\/passport-link/);
@@ -633,7 +659,7 @@ test("guest localization supports seven languages and keeps the owner dashboard 
   assert.doesNotMatch(admin, /src="\/i18n\.js"/);
   assert.match(runtime, /exploreContentDeferred/);
   assert.match(runtime, /element\.closest\("\.section,\.footer"\)/);
-  assert.match(runtime, /houseGuideTranslations:v5\.10\.1:/);
+  assert.match(runtime, /houseGuideTranslations:v5\.11\.0:/);
   assert.match(runtime, /MAX_REQUEST_RETRIES = 2/);
   assert.match(runtime, /let flushRunning = false/);
 });
@@ -1603,7 +1629,9 @@ test("Durable Object SQLite schema initializes every operational table used by a
   for (const required of [
     "concierge_alerts",
     "concierge_alert_deliveries",
+    "maintenance_reports",
     "stay_reservations",
+    "stay_checkout_overrides",
     "verified_stay_sessions",
     "stay_registration_requirements",
     "spare_key_events",
@@ -1658,6 +1686,135 @@ test("a verified session stops granting access when a synchronized reservation c
     headers: { origin: "https://guide.example", cookie }
   }), env, "/api/stay/status", null, new Date("2026-08-13T08:01:00.000Z"));
   assert.equal((await expired.json()).verified, false);
+});
+
+test("direct and walk-in stays receive a one-time House code and active stays can be extended", async () => {
+  const { env, store } = createEnvironment();
+  const created = await handleStayAdminRequest(new Request("https://guide.example/api/concierge/admin/direct-stays", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ room: "3", checkInDate: "2026-08-14", checkOutDate: "2026-08-16" })
+  }), env, "/api/concierge/admin/direct-stays", store);
+  assert.equal(created.status, 200);
+  const direct = await created.json();
+  assert.match(direct.confirmationCode, /^HS[23456789A-HJ-NP-Z]{10}$/);
+  assert.equal(direct.welcomeUrl, "https://guide.example/room/3");
+  assert.equal(store.stayReservations[0].provider, "direct");
+  assert.notEqual(store.stayReservations[0].confirmationCodeHash, direct.confirmationCode);
+
+  const verified = await handleStayGuestRequest(new Request("https://guide.example/api/stay/verify", {
+    method: "POST",
+    headers: { origin: "https://guide.example", "content-type": "application/json" },
+    body: JSON.stringify({ room: "3", confirmationCode: direct.confirmationCode })
+  }), env, "/api/stay/verify", null, new Date("2026-08-14T08:00:00.000Z"));
+  assert.equal(verified.status, 200);
+
+  const extended = await handleStayAdminRequest(new Request("https://guide.example/api/concierge/admin/stay-extension", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ reservationId: store.stayReservations[0].id, checkOutDate: "2026-08-19" })
+  }), env, "/api/concierge/admin/stay-extension", store);
+  assert.equal(extended.status, 200);
+  assert.equal(store.stayReservations[0].checkOutDate, "2026-08-19");
+});
+
+test("owner operations separates active and upcoming stays and labels manual recovery clearly", async () => {
+  const html = await readFile(new URL("../public/concierge-admin.html", import.meta.url), "utf8");
+  const script = await readFile(new URL("../public/concierge-admin.js", import.meta.url), "utf8");
+  assert.match(html, /<h3>Active stays<\/h3>/);
+  assert.match(html, /<h3>Upcoming stays<\/h3>/);
+  assert.match(html, />Add missing reservation<\/button>/);
+  assert.match(html, />Create direct stay<\/button>/);
+  assert.match(html, /House stay code \(shown once\)/);
+  assert.doesNotMatch(html, /Upcoming and active reservations|Add fallback stay/);
+  assert.match(script, /data-extension-action/);
+  assert.match(script, /\/api\/concierge\/admin\/direct-stays/);
+  assert.match(script, /\/api\/concierge\/admin\/stay-extension/);
+});
+
+test("verified guests can report routine and critical room problems with protected routing", async () => {
+  const { env, store, passportBucket } = createEnvironment();
+  await handleReservationSyncRequest(new Request("https://guide.example/api/reservations/sync", {
+    method: "POST",
+    headers: { authorization: "Bearer reservation_sync_test_5500", "content-type": "application/json" },
+    body: JSON.stringify({
+      room: "2",
+      listingId: "1349840459014476583",
+      records: [{ confirmationCode: "HMREPORT22", checkInDate: "2026-08-13", checkOutDate: "2026-08-18" }]
+    })
+  }), env);
+  const verified = await handleStayGuestRequest(new Request("https://guide.example/api/stay/verify", {
+    method: "POST",
+    headers: { origin: "https://guide.example", "content-type": "application/json" },
+    body: JSON.stringify({ room: "2", confirmationCode: "HMREPORT22" })
+  }), env, "/api/stay/verify", null, new Date("2026-08-14T08:00:00.000Z"));
+  const cookie = verified.headers.get("set-cookie").split(";")[0];
+  await handleStayGuestRequest(new Request("https://guide.example/api/stay/nationality", {
+    method: "POST",
+    headers: { origin: "https://guide.example", cookie, "content-type": "application/json" },
+    body: JSON.stringify({ nationality: "thai", allGuestsThai: true })
+  }), env, "/api/stay/nationality", null, new Date("2026-08-14T08:01:00.000Z"));
+
+  const blockedCritical = new FormData();
+  blockedCritical.set("issueType", "active_water_leak");
+  const blocked = await handleMaintenanceGuestRequest(new Request("https://guide.example/api/maintenance/report", {
+    method: "POST",
+    headers: { origin: "https://guide.example", cookie },
+    body: blockedCritical
+  }), env);
+  assert.equal(blocked.status, 400);
+  assert.equal((await blocked.json()).error, "reply_contact_required");
+
+  const routineForm = new FormData();
+  routineForm.set("issueType", "wifi_problem");
+  routineForm.set("details", "Wi-Fi disconnects near the bed.");
+  const png = new Uint8Array(200);
+  png.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  routineForm.set("photo", new Blob([png], { type: "image/png" }), "room.png");
+  const routine = await handleMaintenanceGuestRequest(new Request("https://guide.example/api/maintenance/report", {
+    method: "POST",
+    headers: { origin: "https://guide.example", cookie },
+    body: routineForm
+  }), env);
+  assert.equal(routine.status, 200);
+  assert.equal(store.alerts.at(-1).recipientGroup, "support");
+  assert.ok([...passportBucket.objects.keys()].some((key) => key.startsWith("maintenance/")));
+
+  const criticalForm = new FormData();
+  criticalForm.set("issueType", "electrical_danger");
+  criticalForm.set("details", "Burning smell beside the wall switch.");
+  criticalForm.set("replyContact", "+66 81 234 5678");
+  Object.assign(env, {
+    WHATSAPP_ALERT_RECIPIENTS: JSON.stringify({ emergency: [{ label: "Duty team", phone: "+66 81 000 0002" }] }),
+    WHATSAPP_ACCESS_TOKEN: "meta-test-token",
+    WHATSAPP_PHONE_NUMBER_ID: "1234567890",
+    WHATSAPP_WEBHOOK_VERIFY_TOKEN: "verify-test",
+    META_APP_SECRET: "meta-secret-test"
+  });
+  const originalFetch = globalThis.fetch;
+  let whatsappPayload;
+  globalThis.fetch = async (_url, options) => {
+    whatsappPayload = JSON.parse(options.body);
+    return new Response(JSON.stringify({ messages: [{ id: "wamid.maintenance" }] }), {
+      status: 200,
+      headers: { "content-type": "application/json" }
+    });
+  };
+  try {
+    const critical = await handleMaintenanceGuestRequest(new Request("https://guide.example/api/maintenance/report", {
+      method: "POST",
+      headers: { origin: "https://guide.example", cookie },
+      body: criticalForm
+    }), env);
+    assert.equal(critical.status, 200);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+  assert.equal(store.alerts.at(-1).recipientGroup, "emergency");
+  assert.doesNotMatch(store.alerts.at(-1).summary, /66812345678|81 234 5678/);
+  assert.equal("privateReplyContact" in store.alerts.at(-1), false);
+  assert.match(whatsappPayload.template.components[0].parameters[4].text, /Guest reply: \+66812345678/);
+  assert.equal(store.maintenanceReports.length, 2);
 });
 
 test("after-hours spare-key release freshly verifies the active reservation, confirms the fee and never alerts either code", async () => {
@@ -1824,5 +1981,5 @@ test("every guest page uses the same top navigation", async () => {
     assert.equal(normalized, expected, `Unexpected top navigation in ${path}`);
     checked += 1;
   }
-  assert.equal(checked, 42);
+  assert.equal(checked, 43);
 });

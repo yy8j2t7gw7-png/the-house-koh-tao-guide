@@ -103,6 +103,12 @@ function randomToken() {
   return base64Url(crypto.getRandomValues(new Uint8Array(32)));
 }
 
+function randomDirectStayCode() {
+  const alphabet = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
+  const bytes = crypto.getRandomValues(new Uint8Array(10));
+  return `HS${Array.from(bytes, (byte) => alphabet[byte % alphabet.length]).join("")}`;
+}
+
 async function hmac(value, secret) {
   const key = await crypto.subtle.importKey(
     "raw",
@@ -540,7 +546,7 @@ export async function handleStayGuestRequest(request, env, path, ctx, now = new 
         alertType: "verified_spare_key_release",
         severity: "urgent",
         recipientGroup: "urgent",
-        summary: `Verified Airbnb guest in Room ${session.room} requested the spare key and confirmed the ${LOST_KEY_FEE_THB} THB lost-key fee. Rotate the key-box code before another automatic release.`,
+        summary: `Verified guest in Room ${session.room} requested the spare key and confirmed the ${LOST_KEY_FEE_THB} THB lost-key fee. Rotate the key-box code before another automatic release.`,
         escalationRequired: true,
         now
       });
@@ -598,6 +604,50 @@ export async function handleStayAdminRequest(request, env, path, store) {
       records: [{ confirmationCodeHash, checkInDate, checkOutDate, sourceRefHash: "" }]
     });
     return json({ ok: true, accepted: result.upserted });
+  }
+
+  if (path === "/api/concierge/admin/direct-stays") {
+    if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405, { allow: "POST" });
+    if (!env.STAY_TOKEN_PEPPER) return json({ error: "stay_verification_unavailable" }, 503);
+    const body = await readJson(request, 4_000);
+    const room = String(body?.room || "");
+    const checkInDate = validDate(body?.checkInDate);
+    const checkOutDate = validDate(body?.checkOutDate);
+    if (!ACTIVE_ROOMS.has(room) || !checkInDate || !checkOutDate || checkOutDate <= checkInDate) {
+      return json({ error: "invalid_request" }, 400);
+    }
+    const confirmationCode = randomDirectStayCode();
+    const confirmationCodeHash = await hmac(`reservation:${confirmationCode}`, env.STAY_TOKEN_PEPPER);
+    const result = await store.syncStayReservations({
+      provider: "direct",
+      listingId: `house-direct-${room}`,
+      room,
+      syncId: `direct_${crypto.randomUUID()}`,
+      complete: false,
+      syncedAt: new Date().toISOString(),
+      records: [{ confirmationCodeHash, checkInDate, checkOutDate, sourceRefHash: "" }]
+    });
+    if (result.upserted !== 1) return json({ error: "stay_creation_failed" }, 503);
+    return json({
+      ok: true,
+      room,
+      checkInDate,
+      checkOutDate,
+      confirmationCode,
+      welcomeUrl: `${new URL(request.url).origin}/room/${encodeURIComponent(room)}`
+    });
+  }
+
+  if (path === "/api/concierge/admin/stay-extension") {
+    if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405, { allow: "POST" });
+    const body = await readJson(request, 2_000);
+    const reservationId = String(body?.reservationId || "");
+    const checkOutDate = validDate(body?.checkOutDate);
+    if (!/^stay_[A-Za-z0-9-]{20,}$/.test(reservationId) || !checkOutDate) {
+      return json({ error: "invalid_request" }, 400);
+    }
+    const result = await store.extendStayReservation(reservationId, checkOutDate, new Date().toISOString());
+    return json(result, result.ok ? 200 : 400);
   }
 
   if (path === "/api/concierge/admin/spare-key-rotation") {

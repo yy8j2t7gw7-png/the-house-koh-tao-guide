@@ -5,6 +5,7 @@ import {
   handleFeedbackRequest
 } from "./concierge-api.js";
 import { cleanupPassportUploads, handlePassportGuestRequest } from "./passport-api.js";
+import { cleanupMaintenanceReports, handleMaintenanceGuestRequest } from "./maintenance-api.js";
 import { handleTranslationRequest } from "./i18n-api.js";
 import { handleWhatsAppWebhook, processDueAlertEscalations } from "./whatsapp-alerts.js";
 import {
@@ -17,7 +18,7 @@ export { ConciergeStore } from "./concierge-store.js";
 const EXPLORE_PAGE_PATTERN = /^\/(?:explore|activities|activity|diving|bars|bar|beaches|beach|cafes|cafe|restaurants|restaurant|shopping|shop)(?:\.html)?\/?$/;
 const EXPLORE_MODULE_PATTERN = /^\/modules\/(?:explore|activities|diving|bars|beaches|cafes|restaurants|shopping)\//;
 const ACTIVE_ROOM_PATH = /^\/room\/(1|2|3|4|5|6|8|9|10|11)\/?$/;
-const PRIVATE_PAGE_PATH = /^\/(?:house|practical|checkout)(?:\.html)?\/?$/;
+const PRIVATE_PAGE_PATH = /^\/(?:house|practical|checkout|report-problem)(?:\.html)?\/?$/;
 const PRIVATE_MODULE_PATH = /^\/modules\/(?:house|practical|departure)\//;
 const PRIVATE_DIRECT_ASSET = /^\/(?:room\.html|room-data\.js|modules\/house\/(?:room\.html|room-data\.js))$/;
 const PRIVATE_ROOM_PHOTO = /^\/assets\/(?:photo-(?:0[1-9]|10)\.jpeg|room-07-placeholder\.svg)$/;
@@ -127,6 +128,10 @@ export default {
       return handlePassportGuestRequest(request, env, url.pathname);
     }
 
+    if (url.pathname === "/api/maintenance/report") {
+      return handleMaintenanceGuestRequest(request, env);
+    }
+
     if (url.pathname.startsWith("/api/concierge/admin/")) {
       return handleAdminRequest(request, env, url.pathname);
     }
@@ -204,6 +209,9 @@ export default {
       ctx.waitUntil(processDueAlertEscalations(env));
       return;
     }
-    ctx.waitUntil(cleanupPassportUploads(env));
+    ctx.waitUntil(Promise.all([
+      cleanupPassportUploads(env),
+      cleanupMaintenanceReports(env)
+    ]));
   }
 };

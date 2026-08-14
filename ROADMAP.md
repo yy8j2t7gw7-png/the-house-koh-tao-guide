@@ -1,6 +1,6 @@
 # Product Roadmap
 
-Baseline: v5.10.1
+Baseline: v5.11.0
 
 ## Completed
 
@@ -43,6 +43,13 @@ Baseline: v5.10.1
 - [x] Guest-friendly TM30 purpose and passport-data treatment explanation
 - [x] Authenticated owner download, immediate deletion and 14-day scheduled cleanup
 - [x] Pending-arrival passport request and manual-reminder queue
+- [x] Verified multilingual room-problem reporting with structured maintenance categories
+- [x] Routine maintenance routing to House support and critical maintenance routing to the urgent team
+- [x] Private maintenance-photo storage, owner retrieval, immediate deletion and 30-day scheduled cleanup
+- [x] Toilet-use guidance and conditional 1,000 THB prohibited-item blockage fee
+- [x] Separate active and upcoming reservation sections in owner operations
+- [x] Active-stay extension without forcing completed guests to register again
+- [x] Direct and walk-in stay creation with one-time private House codes stored only as hashes
 - [x] Seven-language operational guest interface across welcome, rooms, House information, practical information, emergencies, departure, secure registration and AI Concierge
 - [x] Reviewed multilingual safety, passport and operational controls
 - [x] Protected approved-content translation cache without guest-message translation
@@ -109,7 +116,7 @@ Guests may continue using ordinary WhatsApp handoffs. Automated internal alerts 
 
 - [x] Push the v5.5.0 release to the existing hosting workflow
 - [x] Confirm `/api/concierge/status` reports AI and learning enabled
-- [ ] Deploy v5.10.1 and confirm full-page language switching, recommendations, Bamboo social actions, booking wording, verified group registration, on-demand lost-key access and alert console
+- [ ] Deploy v5.11.0 and confirm full-page language switching, recommendations, verified group registration, direct stays, stay extensions, maintenance reporting, on-demand lost-key access and alert console
 - [x] Add `STAY_TOKEN_PEPPER` and `RESERVATION_SYNC_TOKEN` Worker secrets
 - [ ] Add protected `SPARE_KEY_CODES` Worker secret before activating automatic spare-key release
 - [x] Install and authorize the included Airbnb Google Apps Script synchronizer
@@ -117,6 +124,9 @@ Guests may continue using ordinary WhatsApp handoffs. Automated internal alerts 
 - [ ] Add and activate the prepared scheduled Airbnb arrival message for each active listing
 - [x] Confirm reservations synchronize and appear in the owner operations view
 - [ ] Configure the Meta production alert channel following `WHATSAPP_ALERT_OPERATIONS.md`
+- [ ] Add the private R2 `maintenance/` lifecycle rule: delete uploaded objects after 30 days
+- [ ] Test a routine room report, a critical report with reply contact, authenticated photo download and immediate deletion
+- [ ] Test a direct/walk-in stay and an active-stay extension in production
 - [ ] Test all seven languages on guest phones and review real guest feedback for wording refinements
 - [ ] Verify the protected `/concierge-admin` review workflow
 - [x] Verify the active permanent room links; Room 7 remains inactive

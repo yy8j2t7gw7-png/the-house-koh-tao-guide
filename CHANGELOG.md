@@ -2,6 +2,39 @@
 
 All notable changes to The House – Koh Tao guest guide are recorded here.
 
+## v5.11.0 — Guest Maintenance, Direct Stays & Owner Operations
+
+### Added
+
+- A verified, room-specific **Report a Problem** journey covering water leaks and flooding, toilets, water and showers, air conditioning, electricity, doors and security, TV, refrigerator, fan, Wi-Fi, furniture and other issues.
+- Structured issue scenarios, optional private photo evidence and a guest reply contact for critical incidents.
+- Deterministic critical classification for active leaks, toilet overflows, electrical danger and rooms that cannot be secured.
+- Protected owner-console maintenance reports with authenticated photo download and immediate deletion.
+- A **Create direct stay** workflow for walk-ins and direct reservations. It generates a private House stay code, displays it only in the creation response and stores only its HMAC hash.
+- An **Extend stay** action for active reservations that moves the effective checkout date and updates the current verified session within its security limit.
+- Separate **Active stays** and **Upcoming stays** sections in the owner operations console.
+
+### Changed
+
+- Generalized the guest verification and lost-key wording to accept either the Airbnb HM code or the private House stay code.
+- Renamed the Airbnb-only manual recovery form from “Add fallback stay” to the clearer “Add missing reservation.”
+- Added the House toilet rule to the normal guest information: only human waste may be flushed; toilet paper, tissues, wipes, sanitary products and every other item go in the provided bin.
+- Explains that the 1,000 THB toilet-clearance fee applies only if inspection confirms that a prohibited item caused the blockage.
+- Extended reviewed operational translations for the complete maintenance-report journey in English, Thai, Simplified Chinese, Russian, German, French and Spanish.
+
+### Privacy and operations
+
+- Routine maintenance reports route to House support. Critical maintenance reports route to the urgent team and require a telephone or WhatsApp number so the team can reply quickly.
+- Guest reply contact is never written to the maintenance report or alert database. It is added only to the transient protected WhatsApp payload for the team handling that critical report.
+- Maintenance photos remain private, outside AI, public assets and ordinary WhatsApp content. They can be deleted immediately and have a 30-day maximum retention policy reinforced by scheduled cleanup and an R2 lifecycle rule.
+- Direct-stay confirmation codes remain readable only long enough to hand to the guest; neither direct nor Airbnb codes enter logs, alerts, AI, Git or release archives.
+- Cancelled reservations no longer appear in active or upcoming operational stay lists.
+
+### Validation
+
+- Added regression coverage for direct-stay code generation, HMAC-only verification, stay extensions, verified maintenance reporting, critical contact privacy and protected WhatsApp delivery.
+- All 47 automated tests pass.
+
 ## v5.10.1 — On-Demand Lost-Key Access
 
 ### Changed

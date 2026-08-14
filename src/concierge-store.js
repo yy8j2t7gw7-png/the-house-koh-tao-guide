@@ -134,6 +134,30 @@ export class ConciergeStore extends DurableObject {
         CREATE INDEX IF NOT EXISTS concierge_alert_deliveries_alert ON concierge_alert_deliveries(alert_id, created_at);
         CREATE INDEX IF NOT EXISTS concierge_alert_deliveries_provider ON concierge_alert_deliveries(provider_message_id);
 
+        CREATE TABLE IF NOT EXISTS maintenance_reports (
+          id TEXT PRIMARY KEY,
+          reservation_id TEXT NOT NULL,
+          room TEXT NOT NULL,
+          issue_type TEXT NOT NULL,
+          severity TEXT NOT NULL,
+          details TEXT NOT NULL DEFAULT '',
+          fee_accepted INTEGER NOT NULL DEFAULT 0,
+          photo_object_key TEXT NOT NULL DEFAULT '',
+          photo_media_type TEXT NOT NULL DEFAULT '',
+          photo_extension TEXT NOT NULL DEFAULT '',
+          photo_size_bytes INTEGER NOT NULL DEFAULT 0,
+          alert_id TEXT NOT NULL DEFAULT '',
+          status TEXT NOT NULL DEFAULT 'open',
+          created_at TEXT NOT NULL,
+          delete_after TEXT NOT NULL DEFAULT '',
+          photo_deleted_at TEXT NOT NULL DEFAULT '',
+          resolved_at TEXT NOT NULL DEFAULT ''
+        );
+        CREATE INDEX IF NOT EXISTS maintenance_reports_status
+          ON maintenance_reports(status, created_at);
+        CREATE INDEX IF NOT EXISTS maintenance_reports_alert
+          ON maintenance_reports(alert_id);
+
         CREATE TABLE IF NOT EXISTS stay_reservations (
           id TEXT PRIMARY KEY,
           provider TEXT NOT NULL DEFAULT 'airbnb',
@@ -150,6 +174,12 @@ export class ConciergeStore extends DurableObject {
         );
         CREATE INDEX IF NOT EXISTS stay_reservations_room_dates
           ON stay_reservations(room, status, check_in_date, check_out_date);
+
+        CREATE TABLE IF NOT EXISTS stay_checkout_overrides (
+          reservation_id TEXT PRIMARY KEY,
+          check_out_date TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        );
 
         CREATE TABLE IF NOT EXISTS verified_stay_sessions (
           id TEXT PRIMARY KEY,
@@ -411,6 +441,18 @@ export class ConciergeStore extends DurableObject {
                a.created_at DESC
       LIMIT 100
     `));
+    const maintenanceReports = rows(this.ctx.storage.sql.exec(`
+      SELECT id, room, issue_type AS issueType, severity, details,
+             fee_accepted AS feeAccepted, photo_object_key AS photoObjectKey,
+             photo_media_type AS photoMediaType, photo_extension AS photoExtension,
+             photo_size_bytes AS photoSizeBytes, alert_id AS alertId, status,
+             created_at AS createdAt, delete_after AS deleteAfter,
+             photo_deleted_at AS photoDeletedAt, resolved_at AS resolvedAt
+      FROM maintenance_reports
+      WHERE status IN ('open', 'acknowledged') OR julianday(created_at) >= julianday('now', '-7 days')
+      ORDER BY CASE severity WHEN 'critical' THEN 0 ELSE 1 END, created_at DESC
+      LIMIT 100
+    `));
     return {
       totals: {
         interactions24h: Number(totals.interactions24h) || 0,
@@ -423,6 +465,7 @@ export class ConciergeStore extends DurableObject {
         approved: approved.length,
         pendingRegistrations: Number(passportTotals.pendingRegistrations) || 0,
         storedPassportFiles: Number(passportTotals.storedPassportFiles) || 0,
+        openMaintenanceReports: maintenanceReports.filter((item) => item.status !== "resolved").length,
         openAlerts: Number(alertTotals.openAlerts) || 0,
         criticalAlerts: Number(alertTotals.criticalAlerts) || 0
       },
@@ -430,6 +473,12 @@ export class ConciergeStore extends DurableObject {
       approved,
       pendingRegistrations,
       passportUploads,
+      maintenanceReports: maintenanceReports.map((report) => ({
+        ...report,
+        feeAccepted: Boolean(report.feeAccepted),
+        hasPhoto: Boolean(report.photoObjectKey),
+        photoObjectKey: undefined
+      })),
       alerts: alerts.map((alert) => ({
         ...alert,
         roomVerified: Boolean(alert.roomVerified),
@@ -482,6 +531,70 @@ export class ConciergeStore extends DurableObject {
       "DELETE FROM concierge_alerts WHERE julianday(created_at) < julianday('now', '-30 days')"
     );
     return { created: true };
+  }
+
+  async createMaintenanceReport(record) {
+    this.ctx.storage.sql.exec(
+      `INSERT INTO maintenance_reports
+       (id, reservation_id, room, issue_type, severity, details, fee_accepted,
+        photo_object_key, photo_media_type, photo_extension, photo_size_bytes,
+        alert_id, status, created_at, delete_after)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'open', ?, ?)`,
+      cleanText(record.id, 100),
+      cleanText(record.reservationId, 100),
+      cleanText(record.room, 4),
+      cleanText(record.issueType, 80),
+      cleanText(record.severity, 20),
+      cleanText(record.details, 500),
+      record.feeAccepted ? 1 : 0,
+      cleanText(record.photoObjectKey, 400),
+      cleanText(record.photoMediaType, 80),
+      cleanText(record.photoExtension, 12),
+      Number(record.photoSizeBytes) || 0,
+      cleanText(record.alertId, 100),
+      cleanText(record.createdAt, 40) || new Date().toISOString(),
+      cleanText(record.deleteAfter, 40)
+    );
+    return { ok: true };
+  }
+
+  async getMaintenanceReport(id) {
+    return rows(this.ctx.storage.sql.exec(
+      `SELECT id, room, issue_type AS issueType, severity, details,
+              fee_accepted AS feeAccepted, photo_object_key AS photoObjectKey,
+              photo_media_type AS photoMediaType, photo_extension AS photoExtension,
+              photo_size_bytes AS photoSizeBytes, alert_id AS alertId, status,
+              created_at AS createdAt, delete_after AS deleteAfter,
+              photo_deleted_at AS photoDeletedAt, resolved_at AS resolvedAt
+       FROM maintenance_reports WHERE id = ? LIMIT 1`,
+      cleanText(id, 100)
+    ))[0] || null;
+  }
+
+  async deleteMaintenancePhoto(id, nowValue) {
+    this.ctx.storage.sql.exec(
+      `UPDATE maintenance_reports
+       SET photo_object_key = '', photo_deleted_at = ?
+       WHERE id = ?`,
+      cleanText(nowValue, 40) || new Date().toISOString(),
+      cleanText(id, 100)
+    );
+    return { ok: true };
+  }
+
+  async cleanupMaintenanceReports(nowValue) {
+    const now = cleanText(nowValue, 40) || new Date().toISOString();
+    const records = rows(this.ctx.storage.sql.exec(
+      `SELECT id, photo_object_key AS photoObjectKey
+       FROM maintenance_reports
+       WHERE photo_object_key != ''
+         AND ((delete_after != '' AND delete_after <= ?) OR status = 'resolved')`,
+      now
+    ));
+    this.ctx.storage.sql.exec(
+      "DELETE FROM maintenance_reports WHERE status = 'resolved' AND julianday(resolved_at) < julianday('now', '-30 days')"
+    );
+    return { records };
   }
 
   async recordAlertDelivery(record) {
@@ -552,16 +665,29 @@ export class ConciergeStore extends DurableObject {
       cleanText(actorHash, 100),
       cleanText(id, 100)
     );
+    this.ctx.storage.sql.exec(
+      "UPDATE maintenance_reports SET status = 'acknowledged' WHERE alert_id = ? AND status = 'open'",
+      cleanText(id, 100)
+    );
     return { ok: true };
   }
 
   async resolveAlert(id, actorHash, nowValue) {
+    const now = cleanText(nowValue, 40) || new Date().toISOString();
     this.ctx.storage.sql.exec(
       `UPDATE concierge_alerts
        SET status = 'resolved', resolved_at = ?, resolved_by_hash = ?
        WHERE id = ? AND status IN ('open', 'acknowledged')`,
-      cleanText(nowValue, 40) || new Date().toISOString(),
+      now,
       cleanText(actorHash, 100),
+      cleanText(id, 100)
+    );
+    this.ctx.storage.sql.exec(
+      `UPDATE maintenance_reports
+       SET status = 'resolved', resolved_at = ?, delete_after = ?
+       WHERE alert_id = ? AND status IN ('open', 'acknowledged')`,
+      now,
+      now,
       cleanText(id, 100)
     );
     return { ok: true };
@@ -697,9 +823,11 @@ export class ConciergeStore extends DurableObject {
   async getStayReservationByCodeHash(codeHash, room) {
     return rows(this.ctx.storage.sql.exec(
       `SELECT id, provider, listing_id AS listingId, room,
-              check_in_date AS checkInDate, check_out_date AS checkOutDate,
-              status, updated_at AS updatedAt
-       FROM stay_reservations
+              check_in_date AS checkInDate,
+              CASE WHEN o.check_out_date > r.check_out_date THEN o.check_out_date ELSE r.check_out_date END AS checkOutDate,
+              r.status, r.updated_at AS updatedAt
+       FROM stay_reservations r
+       LEFT JOIN stay_checkout_overrides o ON o.reservation_id = r.id
        WHERE confirmation_code_hash = ? AND room = ? AND status = 'confirmed'
        LIMIT 1`,
       cleanText(codeHash, 100),
@@ -727,10 +855,12 @@ export class ConciergeStore extends DurableObject {
     const session = rows(this.ctx.storage.sql.exec(
       `SELECT s.id, s.reservation_id AS reservationId, s.room, s.created_at AS createdAt,
               s.expires_at AS expiresAt, r.provider, r.listing_id AS listingId,
-              r.check_in_date AS checkInDate, r.check_out_date AS checkOutDate,
+              r.check_in_date AS checkInDate,
+              CASE WHEN o.check_out_date > r.check_out_date THEN o.check_out_date ELSE r.check_out_date END AS checkOutDate,
               r.status AS reservationStatus
        FROM verified_stay_sessions s
        JOIN stay_reservations r ON r.id = s.reservation_id
+       LEFT JOIN stay_checkout_overrides o ON o.reservation_id = r.id
        WHERE s.token_hash = ? AND s.revoked_at = '' AND s.expires_at > ?
          AND r.status = 'confirmed'
        LIMIT 1`,
@@ -1052,18 +1182,63 @@ export class ConciergeStore extends DurableObject {
     return { ok: true, room, rotationConfirmedAt: now };
   }
 
+  async extendStayReservation(reservationId, checkOutDate, nowValue) {
+    const id = cleanText(reservationId, 100);
+    const nextCheckout = cleanText(checkOutDate, 10);
+    const current = rows(this.ctx.storage.sql.exec(
+      `SELECT r.id, r.check_out_date AS synchronizedCheckout,
+              CASE WHEN o.check_out_date > r.check_out_date THEN o.check_out_date ELSE r.check_out_date END AS effectiveCheckout
+       FROM stay_reservations r
+       LEFT JOIN stay_checkout_overrides o ON o.reservation_id = r.id
+       WHERE r.id = ? AND r.status = 'confirmed' LIMIT 1`,
+      id
+    ))[0];
+    if (!current) return { ok: false, error: "reservation_not_found" };
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(nextCheckout) || nextCheckout <= current.effectiveCheckout) {
+      return { ok: false, error: "checkout_must_be_later" };
+    }
+    const now = cleanText(nowValue, 40) || new Date().toISOString();
+    this.ctx.storage.sql.exec(
+      `INSERT INTO stay_checkout_overrides (reservation_id, check_out_date, updated_at)
+       VALUES (?, ?, ?)
+       ON CONFLICT(reservation_id) DO UPDATE SET
+         check_out_date = excluded.check_out_date,
+         updated_at = excluded.updated_at`,
+      id,
+      nextCheckout,
+      now
+    );
+    const newCheckoutTime = new Date(`${nextCheckout}T11:00:00+07:00`).getTime();
+    for (const session of rows(this.ctx.storage.sql.exec(
+      "SELECT id, created_at AS createdAt FROM verified_stay_sessions WHERE reservation_id = ? AND revoked_at = ''",
+      id
+    ))) {
+      const maximumSessionTime = new Date(session.createdAt).getTime() + (30 * 86_400_000);
+      const expiresAt = new Date(Math.min(newCheckoutTime, maximumSessionTime)).toISOString();
+      this.ctx.storage.sql.exec(
+        "UPDATE verified_stay_sessions SET expires_at = ? WHERE id = ?",
+        expiresAt,
+        session.id
+      );
+    }
+    return { ok: true, reservationId: id, checkOutDate: nextCheckout, updatedAt: now };
+  }
+
   async getStayOperationsOverview() {
     const reservations = rows(this.ctx.storage.sql.exec(
-      `SELECT r.room, r.listing_id AS listingId, r.check_in_date AS checkInDate,
-              r.check_out_date AS checkOutDate, r.status, r.updated_at AS updatedAt,
+      `SELECT r.id, r.provider, r.room, r.listing_id AS listingId, r.check_in_date AS checkInDate,
+              CASE WHEN o.check_out_date > r.check_out_date THEN o.check_out_date ELSE r.check_out_date END AS checkOutDate,
+              r.status, r.updated_at AS updatedAt,
               COALESCE(q.status, g.status, 'not_started') AS registrationStatus,
               COALESCE(q.guest_type, '') AS guestType,
               COALESCE(q.required_passports, 0) AS requiredPassports,
               COALESCE(q.received_passports, 0) AS receivedPassports
        FROM stay_reservations r
+       LEFT JOIN stay_checkout_overrides o ON o.reservation_id = r.id
        LEFT JOIN stay_registration_status g ON g.reservation_id = r.id
        LEFT JOIN stay_registration_requirements q ON q.reservation_id = r.id
-       WHERE r.check_out_date >= date('now', '-1 day')
+       WHERE r.status = 'confirmed'
+         AND (CASE WHEN o.check_out_date > r.check_out_date THEN o.check_out_date ELSE r.check_out_date END) >= date('now', '-1 day')
        ORDER BY r.check_in_date ASC, r.room ASC LIMIT 250`
     ));
     const rotations = rows(this.ctx.storage.sql.exec(

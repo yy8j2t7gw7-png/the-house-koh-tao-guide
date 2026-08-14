@@ -14,10 +14,16 @@
   const passportLinkForm = document.getElementById("passportLinkForm");
   const passportLinkResult = document.getElementById("passportLinkResult");
   const alerts = document.getElementById("conciergeAlerts");
+  const maintenanceReports = document.getElementById("maintenanceReports");
   const alertStatus = document.getElementById("whatsappAlertStatus");
-  const stayReservations = document.getElementById("stayReservations");
+  const activeStayReservations = document.getElementById("activeStayReservations");
+  const upcomingStayReservations = document.getElementById("upcomingStayReservations");
   const keyRotations = document.getElementById("keyRotations");
   const manualStayForm = document.getElementById("manualStayForm");
+  const directStayForm = document.getElementById("directStayForm");
+  const directStayResult = document.getElementById("directStayResult");
+  const directStayCodeResult = document.getElementById("directStayCodeResult");
+  const directStayUrlResult = document.getElementById("directStayUrlResult");
   let token = "";
 
   const categories = [
@@ -68,6 +74,7 @@
       stat(`${totals.positive}/${totals.negative}`, "Helpful / not helpful"),
       stat(totals.pendingRegistrations, "Passport requests pending"),
       stat(totals.storedPassportFiles, "Passport files stored"),
+      stat(totals.openMaintenanceReports, "Open maintenance reports"),
       stat(totals.openAlerts, "Open concierge alerts"),
       stat(totals.criticalAlerts, "Critical alerts open")
     );
@@ -187,25 +194,101 @@
     });
   }
 
+  function renderMaintenanceReports(items) {
+    maintenanceReports.replaceChildren();
+    if (!items.length) {
+      maintenanceReports.appendChild(element("div", "concierge-admin-empty", "No maintenance reports yet."));
+      return;
+    }
+    items.forEach((item) => {
+      const card = element("article", `concierge-admin-alert is-${item.severity || "attention"}`);
+      card.dataset.maintenanceId = item.id;
+      card.append(
+        element("h3", "", `Room ${item.room} · ${String(item.issueType || "room issue").replaceAll("_", " ")}`),
+        element("p", "concierge-admin-alert-summary", item.details || "No additional details supplied."),
+        element("span", "concierge-admin-alert-time", `${bangkokDate(item.createdAt)} · ${item.status} · Reference ${item.id}`)
+      );
+      if (item.feeAccepted) card.appendChild(element("span", "concierge-admin-alert-escalation", "Guest acknowledged the conditional 1,000 THB toilet-clearance fee."));
+      const actions = element("div", "concierge-admin-card-actions");
+      if (item.hasPhoto) {
+        const download = element("button", "secondary", "Download private photo");
+        download.type = "button";
+        download.dataset.maintenanceAction = "download";
+        const remove = element("button", "danger", "Delete photo now");
+        remove.type = "button";
+        remove.dataset.maintenanceAction = "delete";
+        actions.append(download, remove);
+      } else {
+        actions.appendChild(element("span", "concierge-admin-source-note", "No photo stored."));
+      }
+      card.appendChild(actions);
+      maintenanceReports.appendChild(card);
+    });
+  }
+
   function renderStayOperations(data = {}) {
-    stayReservations.replaceChildren();
     const reservations = data.reservations || [];
-    if (!reservations.length) stayReservations.appendChild(element("div", "concierge-admin-empty", "No synchronized future stays yet."));
-    reservations.forEach((item) => {
+    const dateParts = Object.fromEntries(new Intl.DateTimeFormat("en-GB", {
+      timeZone: "Asia/Bangkok",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit"
+    }).formatToParts(new Date()).filter((part) => part.type !== "literal").map((part) => [part.type, part.value]));
+    const today = `${dateParts.year}-${dateParts.month}-${dateParts.day}`;
+    const active = reservations
+      .filter((item) => item.checkInDate <= today && item.checkOutDate >= today)
+      .sort((a, b) => a.checkOutDate.localeCompare(b.checkOutDate));
+    const upcoming = reservations
+      .filter((item) => item.checkInDate > today)
+      .sort((a, b) => a.checkInDate.localeCompare(b.checkInDate));
+
+    const appendReservation = (container, item, isActive = false) => {
       const card = element("article", "concierge-admin-registration-item");
+      card.dataset.reservationId = item.id || "";
       const registrationDetail = item.guestType === "foreign"
         ? `${item.receivedPassports || 0} of ${item.requiredPassports || 0} non-Thai guest passports received`
         : item.guestType === "thai" ? "All overnight guests declared Thai" : "Nationality declaration not completed";
+      const sourceDetail = item.provider === "direct"
+        ? "Source: direct booking or walk-in"
+        : item.provider === "manual"
+          ? `Source: manually added Airbnb reservation · listing ${item.listingId}`
+          : `Source: synchronized Airbnb reservation · listing ${item.listingId}`;
       card.append(
         element("strong", "", `Room ${item.room}`),
         element("span", "", `${item.checkInDate} to ${item.checkOutDate}`),
-        element("span", "", `Airbnb listing ${item.listingId}`),
+        element("span", "", sourceDetail),
         element("span", "", `Guest registration: ${String(item.registrationStatus || "not_started").replaceAll("_", " ")}`),
         element("span", "", registrationDetail),
         element("span", "", `Status: ${item.status} · updated ${bangkokDate(item.updatedAt)}`)
       );
-      stayReservations.appendChild(card);
-    });
+      if (isActive && item.id) {
+        const nextCheckout = new Date(`${item.checkOutDate}T00:00:00Z`);
+        nextCheckout.setUTCDate(nextCheckout.getUTCDate() + 1);
+        const extension = element("div", "concierge-admin-extension");
+        const label = element("label", "", "New checkout date");
+        const input = document.createElement("input");
+        input.type = "date";
+        input.min = nextCheckout.toISOString().slice(0, 10);
+        input.value = input.min;
+        input.dataset.extensionDate = "";
+        const button = element("button", "", "Extend stay");
+        button.type = "button";
+        button.dataset.extensionAction = "extend";
+        label.appendChild(input);
+        extension.append(label, button);
+        card.appendChild(extension);
+      }
+      container.appendChild(card);
+    };
+
+    activeStayReservations.replaceChildren();
+    if (!active.length) activeStayReservations.appendChild(element("div", "concierge-admin-empty", "No active stays today."));
+    active.forEach((item) => appendReservation(activeStayReservations, item, true));
+
+    upcomingStayReservations.replaceChildren();
+    if (!upcoming.length) upcomingStayReservations.appendChild(element("div", "concierge-admin-empty", "No upcoming synchronized stays."));
+    upcoming.forEach((item) => appendReservation(upcomingStayReservations, item));
+
     keyRotations.replaceChildren();
     const rotations = data.rotations || [];
     if (!rotations.length) keyRotations.appendChild(element("div", "concierge-admin-empty", "No key-box rotation is currently required."));
@@ -336,6 +419,7 @@
     renderApproved(data.approved || []);
     renderPendingRegistrations(data.pendingRegistrations || []);
     renderPassportUploads(data.passportUploads || []);
+    renderMaintenanceReports(data.maintenanceReports || []);
     renderAlerts(data.alerts || [], data.alertConfiguration || {});
     renderStayOperations(data.stayOperations || {});
     renderRecent(data.recent || []);
@@ -411,9 +495,65 @@
       manualStayForm.reset();
       await loadOverview();
     } catch (_error) {
-      window.alert("The fallback stay could not be saved. Check the room, code and dates.");
+      window.alert("The missing Airbnb reservation could not be saved. Check the room, code and dates.");
     } finally {
       submit.disabled = false;
+    }
+  });
+
+  directStayForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const submit = directStayForm.querySelector('button[type="submit"]');
+    submit.disabled = true;
+    directStayResult.hidden = true;
+    try {
+      const data = await api("/api/concierge/admin/direct-stays", {
+        method: "POST",
+        body: JSON.stringify({
+          room: document.getElementById("directStayRoom").value,
+          checkInDate: document.getElementById("directStayCheckIn").value,
+          checkOutDate: document.getElementById("directStayCheckOut").value
+        })
+      });
+      directStayCodeResult.value = data.confirmationCode;
+      directStayUrlResult.value = data.welcomeUrl;
+      directStayResult.hidden = false;
+      directStayForm.reset();
+      await loadOverview();
+    } catch (_error) {
+      window.alert("The direct stay could not be created. Check the room and dates.");
+    } finally {
+      submit.disabled = false;
+    }
+  });
+
+  document.getElementById("copyDirectStayMessage").addEventListener("click", async () => {
+    const message = `Welcome to The House – Koh Tao.\n\nOpen your private Room page:\n${directStayUrlResult.value}\n\nYour private House stay code is: ${directStayCodeResult.value}\n\nKeep this code private. Foreign or mixed groups must complete the secure passport registration for every non-Thai overnight guest.`;
+    try {
+      await navigator.clipboard.writeText(message);
+      window.alert("The guest access message was copied.");
+    } catch (_error) {
+      window.alert("Copy was not available. Select and copy the code and link above.");
+    }
+  });
+
+  activeStayReservations.addEventListener("click", async (event) => {
+    const button = event.target.closest("[data-extension-action]");
+    if (!button) return;
+    const card = button.closest("[data-reservation-id]");
+    const checkOutDate = card?.querySelector("[data-extension-date]")?.value || "";
+    if (!card?.dataset.reservationId || !checkOutDate) return;
+    if (!window.confirm(`Extend this stay until checkout on ${checkOutDate}?`)) return;
+    button.disabled = true;
+    try {
+      await api("/api/concierge/admin/stay-extension", {
+        method: "POST",
+        body: JSON.stringify({ reservationId: card.dataset.reservationId, checkOutDate })
+      });
+      await loadOverview();
+    } catch (_error) {
+      button.disabled = false;
+      window.alert("The stay could not be extended. Choose a date after the current checkout date.");
     }
   });
 
@@ -484,6 +624,33 @@
 
   pendingRegistrations.addEventListener("click", passportAction);
   passportUploads.addEventListener("click", passportAction);
+  maintenanceReports.addEventListener("click", async (event) => {
+    const button = event.target.closest("[data-maintenance-action]");
+    if (!button) return;
+    const card = button.closest("[data-maintenance-id]");
+    const id = card.dataset.maintenanceId;
+    button.disabled = true;
+    try {
+      if (button.dataset.maintenanceAction === "download") {
+        const response = await authorizedFetch(`/api/concierge/admin/maintenance-files/${id}`);
+        if (!response.ok) throw new Error("download_failed");
+        const url = URL.createObjectURL(await response.blob());
+        const link = document.createElement("a");
+        const extensions = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/heic": "heic" };
+        link.href = url;
+        link.download = `maintenance-${id}.${extensions[response.headers.get("content-type")] || "image"}`;
+        link.click();
+        window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      } else {
+        await api("/api/concierge/admin/maintenance-delete", { method: "POST", body: JSON.stringify({ id }) });
+        await loadOverview();
+      }
+    } catch (_error) {
+      window.alert("The maintenance photo action could not be completed.");
+    } finally {
+      button.disabled = false;
+    }
+  });
   alerts.addEventListener("click", async (event) => {
     const button = event.target.closest("[data-alert-action]");
     if (!button) return;

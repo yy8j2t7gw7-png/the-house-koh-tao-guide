@@ -17,7 +17,10 @@ The platform is organized as configurable modules.
 - AI Concierge with owner-reviewed knowledge
 - Seven-language operational interface
 - Airbnb verified-stay access
+- Direct and walk-in verified-stay access
+- Owner-managed stay extensions
 - Private passport upload
+- Verified room-maintenance reports
 - Protected staff alerts and after-hours spare-key operations
 
 ## Preserved but disabled for the live release
@@ -36,7 +39,9 @@ The platform is organized as configurable modules.
 
 `public/module-registry.js` controls which modules are enabled for each property.
 
-`src/stay-api.js` owns deterministic reservation verification, complete group passport-registration progress and spare-key release. The initial synchronized Airbnb confirmation check opens the registration journey; the private guide opens only when every declared non-Thai overnight guest has submitted a separate passport record. A spare-key request performs a fresh confirmation-code check against the same active reservation before the fee, after-hours, staff-alert and code-rotation safeguards run. `airbnb-sync/Code.gs` sends minimum normalized Airbnb reservation data to the protected ingestion endpoint. `src/whatsapp-alerts.js` owns protected staff delivery. None of these sensitive operations is delegated to the language model.
+`src/stay-api.js` owns deterministic reservation verification, direct/walk-in stay creation, stay extensions, complete group passport-registration progress and spare-key release. Airbnb HM codes and private House stay codes follow the same HMAC-only storage boundary. The initial confirmation check opens the registration journey; the private guide opens only when every declared non-Thai overnight guest has submitted a separate passport record. A spare-key request performs a fresh confirmation-code check against the same active reservation before the fee, after-hours, staff-alert and code-rotation safeguards run. `airbnb-sync/Code.gs` sends minimum normalized Airbnb reservation data to the protected ingestion endpoint.
+
+`src/maintenance-api.js` owns verified room-problem reporting and deterministic routine/critical classification. Optional images use the private R2 binding and never enter AI or public assets. `src/whatsapp-alerts.js` owns protected staff delivery; a critical guest reply contact remains transient and is added only to the delivery payload. None of these sensitive operations is delegated to the language model.
 
 The current public URLs remain unchanged for compatibility. Canonical module copies are stored under:
 

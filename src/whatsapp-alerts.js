@@ -18,6 +18,13 @@ function cleanLabel(value) {
   return String(value || "Team member").trim().slice(0, 80) || "Team member";
 }
 
+function privateReplyContact(value) {
+  const source = String(value || "").trim();
+  const number = digits(source);
+  if (number.length < 8 || number.length > 15) return "";
+  return source.startsWith("+") ? `+${number}` : number;
+}
+
 function parseRecipients(env) {
   let source;
   try {
@@ -86,6 +93,8 @@ function roomLabel(alert) {
 }
 
 function templatePayload(alert, recipient, env) {
+  const summary = safeAlertSummary(alert.summary);
+  const replyContact = privateReplyContact(alert.privateReplyContact);
   return {
     messaging_product: "whatsapp",
     recipient_type: "individual",
@@ -101,7 +110,7 @@ function templatePayload(alert, recipient, env) {
           { type: "text", text: roomLabel(alert) },
           { type: "text", text: String(alert.alertType || "guest_request").replaceAll("_", " ") },
           { type: "text", text: alert.bangkokTime || formatBangkokAlertTime(new Date(alert.createdAt)) },
-          { type: "text", text: safeAlertSummary(alert.summary) },
+          { type: "text", text: replyContact ? `${summary} · Guest reply: ${replyContact}` : summary },
           { type: "text", text: alert.id }
         ]
       }]
@@ -209,6 +218,7 @@ export async function createProtectedOperationsAlert({
   severity,
   recipientGroup,
   summary,
+  replyContact = "",
   escalationRequired = false,
   now = new Date()
 }) {
@@ -237,8 +247,9 @@ export async function createProtectedOperationsAlert({
     escalationDueAt
   };
   const created = await store.createAlert(alert);
-  if (!created?.created) return { ...created?.alert, duplicate: true };
-  return { ...alert, duplicate: false, configured: config.configured };
+  const ephemeralContact = privateReplyContact(replyContact);
+  if (!created?.created) return { ...created?.alert, duplicate: true, privateReplyContact: ephemeralContact };
+  return { ...alert, duplicate: false, configured: config.configured, privateReplyContact: ephemeralContact };
 }
 
 function normalizeDedupeSummary(value) {

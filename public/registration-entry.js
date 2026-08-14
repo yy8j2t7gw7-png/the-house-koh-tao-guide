@@ -29,9 +29,9 @@
   const keyLocation = document.getElementById("spareKeyLocation");
 
   const messages = {
-    verifying: "Verifying your Airbnb stay…",
-    verified: "Your Airbnb stay is verified. Please complete the guest registration step below.",
-    wrongCode: "That confirmation code does not match an active or upcoming reservation for this Room link. Check the HM code shown in your Airbnb trip details and try again.",
+    verifying: "Verifying your stay…",
+    verified: "Your stay is verified. Please complete the guest registration step below.",
+    wrongCode: "That confirmation code does not match an active or upcoming reservation for this Room link. Check the HM code shown in your Airbnb trip details or the private House stay code provided to you, then try again.",
     rateLimited: "Too many attempts. Please wait a minute before trying again.",
     unavailable: "Secure stay verification is temporarily unavailable. Please contact the concierge for help.",
     nationalitySaving: "Saving your guest type securely…",
@@ -48,8 +48,8 @@
     keyRotation: "Automatic release is temporarily paused while the key-box code is changed. The urgent team has been notified; please contact the concierge.",
     keyUnavailable: "Automatic spare-key access is not available right now. Please contact the concierge for urgent help.",
     keyConfirmFee: "Please confirm the 500 THB lost-key replacement fee before continuing.",
-    keyConfirmStay: "Re-enter the Airbnb confirmation code for your verified active stay before continuing.",
-    keyWrongCode: "That confirmation code does not match your verified active stay. Check the HM code shown in your Airbnb trip details and try again.",
+    keyConfirmStay: "Re-enter the stay confirmation code for your verified active stay before continuing.",
+    keyWrongCode: "That confirmation code does not match your verified active stay. Check the Airbnb HM code or private House stay code provided to you, then try again.",
     keyRateLimited: "Too many confirmation attempts. Please wait a minute before trying again.",
     keyReleasing: "Verifying the after-hours request and notifying the team…",
     keyReady: "Spare-key access approved for your verified room.",

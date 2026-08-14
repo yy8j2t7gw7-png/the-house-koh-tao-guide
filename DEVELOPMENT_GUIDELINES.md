@@ -89,8 +89,8 @@ The concierge must:
 - create action-needed alerts only through `src/alert-policy.js` and deliver them through `src/whatsapp-alerts.js`
 - keep recipient numbers in encrypted Worker configuration and persist only recipient labels and salted hashes
 - isolate approved page-translation items so one skipped source string cannot fail an entire translation batch
-- treat a room URL and selected room only as context; protected stay access requires the synchronized Airbnb confirmation-code check in `src/stay-api.js`
-- keep readable Airbnb confirmation codes out of storage and logs and bind verified sessions to one reservation and room
+- treat a room URL and selected room only as context; protected stay access requires a matching Airbnb HM code or private House stay code check in `src/stay-api.js`
+- keep all readable Airbnb and direct-stay confirmation codes out of storage and logs, store only keyed hashes and bind verified sessions to one reservation and room
 
 For accidents and urgent medical situations, present Koh Tao Rescue first because the team knows the island and local access points, then present Thailand's national medical emergency number 1669 as the second immediate option. Keep both actions visible and distinct.
 
@@ -100,11 +100,13 @@ Future recommendation logic may filter by guest type, budget, time, transport co
 
 ## Sensitive operations
 
-Never put key-box codes, readable Airbnb confirmation codes, private guest tokens or API credentials in public source or structured content. Follow `SECURE_AFTER_HOURS_ACCESS.md` for the protected spare-key flow. Real codes belong only in the encrypted `SPARE_KEY_CODES` Worker secret. Automatic release must fail closed unless a verified active stay, a fresh confirmation-code match for that reservation, the after-hours check, guest fee confirmation, automatic urgent-team notification with confirmed WhatsApp API submission, and rotation state all pass.
+Never put key-box codes, readable Airbnb or direct-stay confirmation codes, private guest tokens or API credentials in public source or structured content. Follow `SECURE_AFTER_HOURS_ACCESS.md` for the protected spare-key flow. Real key-box codes belong only in the encrypted `SPARE_KEY_CODES` Worker secret. Automatic release must fail closed unless a verified active stay, a fresh confirmation-code match for that reservation, the after-hours check, guest fee confirmation, automatic urgent-team notification with confirmed WhatsApp API submission, and rotation state all pass. Direct/walk-in codes must be generated server-side, shown only in the authorized creation response and persisted only as an HMAC hash. Extensions may move checkout later without changing the reservation identity or bypassing the verified-session limit.
 
 Passport images use the separate private R2 workflow documented in `PASSPORT_DATA_OPERATIONS.md`. It applies only to non-Thai guests; verified guests may self-declare the all-Thai exemption, but the system must never infer nationality. A foreign or mixed group must declare the complete number of non-Thai adults and children, and one separate upload is required for every declared person—not only the booking guest—before private access is granted. Never send passport content to the model, learning store, interaction log, Airbnb message or WhatsApp. Validate the verified reservation, room, expiry, single use, byte limit and file signature before storage. Keep manual TM30 fields disabled until the authoritative schema is supplied.
 
 Action-needed alerts use the separate deterministic policy and protected delivery adapter documented in `WHATSAPP_ALERT_OPERATIONS.md`. Ordinary concierge requests remain usable when external delivery is unavailable. Verify signed webhooks, recipient authorization, duplicate suppression, escalation, sanitization and 30-day cleanup. The special spare-key operation intentionally fails closed until the automatically triggered protected notification is submitted successfully to WhatsApp, but the alert must never contain the code. The guest is not asked to approve that staff notification.
+
+Verified maintenance reports use `src/maintenance-api.js` and the private R2 workflow documented in `MAINTENANCE_REPORTING_OPERATIONS.md`. The server determines the verified room and criticality. Critical reports require a guest reply contact, but that contact must remain transient and may appear only in the protected WhatsApp delivery payload—not in the maintenance or alert database. Optional photos use the `maintenance/` prefix, authenticated owner retrieval, file-signature validation, immediate deletion and a 30-day maximum retention rule. Never send maintenance photos to AI or public assets.
 
 After hours are 19:30–10:30 in Bangkok time. This does not define reception or property operating hours.
 
@@ -139,6 +141,8 @@ A coherent release must:
 - validate that passport requests require the non-Thai confirmation and Thai guests receive the exemption answer
 - validate full-page approved translation coverage and rejection of arbitrary guest-authored page-translation text
 - validate alert classification, deduplication, recipient privacy, delivery failure handling, signed webhook acknowledgement and escalation
+- validate direct-stay one-time code generation and HMAC-only storage, extension-only-later dates and separate active/upcoming owner views
+- validate maintenance room authorization, issue classification, conditional toilet-fee acknowledgement, private image handling, transient critical reply contact and 30-day cleanup
 - validate local routes and referenced assets
 - complete a production dry-run bundle
 - confirm `/api/concierge/status` reports the expected model and learning configuration after production secrets are installed

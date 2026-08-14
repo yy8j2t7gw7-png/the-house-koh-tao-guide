@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<meta name="description" content="Report a room problem securely to The House Koh Tao">
+<title>Report a Problem | The House – Koh Tao</title>
+<link rel="icon" href="/logo.svg">
+<link rel="stylesheet" href="/design-system.css">
+<link rel="stylesheet" href="/report-problem.css">
+<link rel="stylesheet" href="/ai-concierge.css">
+</head>
+<body>
+<div class="shell">
+  <header class="topbar">
+    <a class="brand" href="/"><img src="/logo.svg" alt="The House Koh Tao"></a>
+    <nav class="nav">
+      <a href="/rooms.html">Your Room</a>
+      <a href="/house.html">The House</a>
+      <a href="/practical.html">Guest Information</a>
+      <a href="/explore.html">Explore</a>
+      <a href="/emergency.html">Help & Emergency</a>
+      <a href="/checkout.html">Departure</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="report-hero">
+      <span class="report-kicker">ROOM-SPECIFIC SUPPORT</span>
+      <h1>Report a Problem</h1>
+      <p>Tell us what happened in your room. Routine reports go to our House team. Serious water, electrical or security problems alert the urgent team.</p>
+      <p class="report-room" id="reportRoom" role="status">Checking your room…</p>
+    </section>
+
+    <aside class="toilet-notice">
+      <strong>🚽 Please protect the toilet</strong>
+      <p>Only human waste may be flushed. Toilet paper, tissues, wipes, sanitary products and every other item must go in the bin provided.</p>
+      <p>If inspection confirms that paper, tissues or another prohibited item caused a blockage, a <strong>1,000 THB clearance fee</strong> applies.</p>
+    </aside>
+
+    <form id="problemReportForm" class="report-form">
+      <fieldset>
+        <legend>1. What needs attention?</legend>
+        <div class="issue-grid" id="issueCategories">
+          <button type="button" data-category="water">💧 <span>Water leak or flooding</span></button>
+          <button type="button" data-category="toilet">🚽 <span>Toilet</span></button>
+          <button type="button" data-category="shower">🚿 <span>Water or shower</span></button>
+          <button type="button" data-category="ac">❄️ <span>Air conditioning</span></button>
+          <button type="button" data-category="electricity">⚡ <span>Electricity</span></button>
+          <button type="button" data-category="security">🔒 <span>Door or security</span></button>
+          <button type="button" data-category="tv">📺 <span>TV</span></button>
+          <button type="button" data-category="fridge">🧊 <span>Refrigerator</span></button>
+          <button type="button" data-category="fan">🌀 <span>Fan</span></button>
+          <button type="button" data-category="wifi">📶 <span>Wi-Fi</span></button>
+          <button type="button" data-category="furniture">🪑 <span>Furniture or fixture</span></button>
+          <button type="button" data-category="other">🛠️ <span>Other issue</span></button>
+        </div>
+      </fieldset>
+
+      <fieldset id="scenarioField" hidden>
+        <legend>2. Choose the closest description</legend>
+        <div class="scenario-grid" id="issueScenarios"></div>
+      </fieldset>
+
+      <section id="toiletAcknowledgement" class="fee-warning" hidden>
+        <strong>Conditional toilet-clearance fee</strong>
+        <label><input type="checkbox" id="toiletFeeAccepted"> <span>I understand that a 1,000 THB clearance fee will be added only if inspection confirms that paper, tissues or another prohibited item caused the blockage.</span></label>
+      </section>
+
+      <fieldset>
+        <legend>3. Add useful details</legend>
+        <label for="problemDetails">Tell us what happened.</label>
+        <textarea id="problemDetails" name="details" rows="5" maxlength="500" placeholder="For example: where it is, when it started and whether it is getting worse."></textarea>
+        <label class="photo-label" for="problemPhoto">Add one photo (optional)</label>
+        <input id="problemPhoto" name="photo" type="file" accept="image/jpeg,image/png,image/webp,image/heic,.heic">
+        <span class="field-help">JPEG, PNG, WebP or HEIC; maximum 10 MB. The photo stays private, is never sent through the AI chat and is automatically deleted within 30 days or sooner after the report is resolved.</span>
+        <label class="photo-label" for="replyContact">Phone or WhatsApp number for a quick reply</label>
+        <input id="replyContact" name="replyContact" type="tel" inputmode="tel" autocomplete="tel" maxlength="30" placeholder="Include the country code, for example +66…">
+        <span class="field-help" id="replyContactHelp">Required for serious water, electrical, overflow or room-security emergencies. It is shared only with the team handling this report.</span>
+      </fieldset>
+
+      <div id="problemStatus" class="report-status" role="status" aria-live="polite" hidden></div>
+      <div class="report-actions">
+        <button class="primary" type="submit" id="submitProblem" disabled>Send report</button>
+        <a class="secondary" href="/rooms.html">Back to room guide</a>
+      </div>
+    </form>
+
+    <section id="problemSuccess" class="report-success" hidden>
+      <h2>Thank you. Your report has been recorded.</h2>
+      <p id="problemSuccessMessage"></p>
+      <p>Reference: <strong id="problemReference"></strong></p>
+      <div class="report-actions">
+        <a class="primary" href="/rooms.html">Return to room guide</a>
+        <a class="secondary" data-link="houseWhatsapp" target="_blank" rel="noopener" data-action="contact">Contact Us</a>
+      </div>
+    </section>
+  </main>
+  <footer class="footer">The House – Koh Tao · Guest support</footer>
+</div>
+<a class="float-wa" data-link="houseWhatsapp" target="_blank" rel="noopener" data-action="contact">Contact Us</a>
+<script src="/contacts.js"></script>
+<script src="/guide-app.js"></script>
+<script src="/report-problem.js"></script>
+<script src="/platform-actions.js"></script>
+<script src="/platform-action-runtime.js"></script>
+<script src="/ai-concierge-config.js"></script>
+<script src="/ai-concierge.js"></script>
+</body>
+</html>

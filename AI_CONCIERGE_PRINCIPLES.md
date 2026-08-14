@@ -93,7 +93,11 @@ Read the room from a room-specific URL and remember it on the guest's device. As
 
 Room context is not identity verification. Never reveal protected information from room selection alone.
 
-The verified-stay layer uses the Airbnb confirmation code from the guest's trip details and checks it against the protected synchronized listing, room and dates. The permanent room URL alone is not proof. Readable confirmation codes, verification cookies and key-box codes never enter model context or learning records.
+The verified-stay layer uses either the Airbnb HM confirmation code from the guest's trip details or a private House stay code created for a direct/walk-in reservation and checks it against the protected room and dates. The permanent room URL alone is not proof. Readable confirmation codes, verification cookies and key-box codes never enter model context or learning records.
+
+## Room maintenance
+
+Verified guests may submit structured room-problem reports. Routine reports route to House support; active leaks, toilet overflows, electrical danger and rooms that cannot be secured route to the urgent team. The server determines room and criticality without model judgment. Critical reports require a reply number, but it is used only in the transient protected delivery payload and is not stored. Optional maintenance photos remain private, outside AI and public assets, and expire within 30 days or sooner after deletion.
 
 ## Property-emergency behavior
 
@@ -119,7 +123,7 @@ Model replies must conform to the server's strict response schema. Model output 
 
 ## Privacy
 
-Do not ask guests for passport, payment, Airbnb confirmation-code or key-box information in chat. The confirmation code belongs only in the deterministic verified-stay form. Store only minimized, redacted questions and pseudonymous session identifiers for operational improvement. Routine interaction and feedback records expire after 30 days. API keys, admin credentials and private access information remain server-side.
+Do not ask guests for passport, payment, stay confirmation-code or key-box information in chat. The confirmation code belongs only in the deterministic verified-stay form. Store only minimized, redacted questions and pseudonymous session identifiers for operational improvement. Routine interaction and feedback records expire after 30 days. API keys, admin credentials and private access information remain server-side.
 
 When a guest asks about overnight visitors or passport registration, explain the approved TM30 purpose and guide them to verify the stay on the permanent room page. Thai nationals do not need to complete this registration or upload a passport. For a foreign or mixed group, one private single-use form is required for every non-Thai adult and child staying overnight—not only the booking guest—and the private guide remains locked until the declared total is received. Never infer nationality, and never accept passport details or images inside the concierge. Passport documents are not model context and must never enter learning or recommendation systems.
 

@@ -1,8 +1,8 @@
 {
   "schemaVersion": "1.0.0",
-  "release": "5.10.1",
+  "release": "5.11.0",
   "language": "en",
-  "updated": "2026-08-13",
+  "updated": "2026-08-14",
   "scope": "Verified accommodation, room, house-rule, support, booking and emergency answers for guests of The House – Koh Tao.",
   "fallbackClassifiers": [
     {
@@ -106,7 +106,7 @@
         "does a thai guest need to register",
         "thai national registration"
       ],
-      "answer": "Thai nationals do not need to complete this TM30 Immigration accommodation registration. After verifying the Airbnb stay on the permanent Room page, select ‘All overnight guests are Thai nationals’ only if the exemption applies to everyone staying overnight on that reservation. If any non-Thai guest is staying overnight, securely upload a passport for each one.",
+      "answer": "Thai nationals do not need to complete this TM30 Immigration accommodation registration. After verifying the stay on the permanent Room page, select ‘All overnight guests are Thai nationals’ only if the exemption applies to everyone staying overnight on that reservation. If any non-Thai guest is staying overnight, securely upload a passport for each one.",
       "actions": []
     },
     {
@@ -445,7 +445,7 @@
         "tm30 registration",
         "send passport information"
       ],
-      "answer": "This TM30 Immigration accommodation registration applies only to non-Thai guests. Thai nationals do not need to complete it. Open your permanent Room welcome page, verify the Airbnb confirmation code shown in your trip details, then choose the secure passport upload option. Passport information is required for every non-Thai person staying overnight—not only the person who made the booking. Submit one passport per non-Thai overnight guest. Do not send passport information through this chat or WhatsApp. A passport image is automatically deleted 14 days after upload, or sooner after processing.",
+      "answer": "This TM30 Immigration accommodation registration applies only to non-Thai guests. Thai nationals do not need to complete it. Open your permanent Room welcome page, verify the Airbnb confirmation code shown in your trip details or the private House stay code provided for a direct booking, then choose the secure passport upload option. Passport information is required for every non-Thai person staying overnight—not only the person who made the booking. Submit one passport per non-Thai overnight guest. Do not send passport information through this chat or WhatsApp. A passport image is automatically deleted 14 days after upload, or sooner after processing.",
       "actions": [
         {
           "label": "Continue Securely",
@@ -467,7 +467,7 @@
         "secure passport link",
         "extra guest"
       ],
-      "answer": "The House needs passport information for every non-Thai overnight visitor so we can complete the required TM30 Immigration accommodation registration. Thai nationals do not need to complete this registration. After verifying the Airbnb confirmation code on the permanent Room page, use the secure passport option once for each non-Thai overnight guest. Do not put passport information in this chat or send it through WhatsApp.",
+      "answer": "The House needs passport information for every non-Thai overnight visitor so we can complete the required TM30 Immigration accommodation registration. Thai nationals do not need to complete this registration. After verifying the Airbnb confirmation code or private House stay code on the permanent Room page, use the secure passport option once for each non-Thai overnight guest. Do not put passport information in this chat or send it through WhatsApp.",
       "actions": [
         {
           "label": "Continue Securely",

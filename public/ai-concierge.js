@@ -440,7 +440,7 @@
   async function fallbackAnswer(question) {
     if (isPublicAccess) {
       return {
-        answer: "Please complete guest access from your permanent Room link. Thai-only stays need only the Airbnb confirmation code and Thai-national selection. If any foreign guests are staying overnight, securely submit passport information for every non-Thai guest—not only the booking guest. Emergency help remains available without verification.",
+        answer: "Please complete guest access from your permanent Room link. Thai-only stays need only the Airbnb confirmation code or private House stay code and the Thai-national selection. If any foreign guests are staying overnight, securely submit passport information for every non-Thai guest—not only the booking guest. Emergency help remains available without verification.",
         actions: [{ label: "Complete guest access", type: "registration" }],
         source: "public-fallback",
         interactionId: null
@@ -575,11 +575,11 @@
       input.focus();
     } else if (actionButton?.dataset.conciergeAction === "registration") {
       appendMessage("concierge", selectedRoom
-        ? `Open the Room ${selectedRoom} page and verify your Airbnb confirmation code to continue securely.`
-        : "Please select your booked room first. Its permanent Room page will verify your Airbnb confirmation code before opening secure registration.");
+        ? `Open the Room ${selectedRoom} page and verify your Airbnb confirmation code or private House stay code to continue securely.`
+        : "Please select your booked room first. Its permanent Room page will verify your Airbnb confirmation code or private House stay code before opening secure registration.");
     } else if (actionButton?.dataset.conciergeAction === "spare-key") {
       appendMessage("concierge", selectedRoom
-        ? `Open the protected Room ${selectedRoom} access section. Your Airbnb confirmation code is required before any spare-key code can be shown.`
+        ? `Open the protected Room ${selectedRoom} access section. Your Airbnb confirmation code or private House stay code is required before any spare-key code can be shown.`
         : "Please select your booked room first. Protected spare-key access requires Airbnb reservation verification.");
     }
   });

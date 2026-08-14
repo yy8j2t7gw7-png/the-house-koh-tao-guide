@@ -717,7 +717,7 @@ test("guest localization supports seven languages and keeps the owner dashboard 
   assert.doesNotMatch(admin, /src="\/i18n\.js"/);
   assert.match(runtime, /exploreContentDeferred/);
   assert.match(runtime, /element\.closest\("\.section,\.footer"\)/);
-  assert.match(runtime, /houseGuideTranslations:v5\.11\.2:/);
+  assert.match(runtime, /houseGuideTranslations:v5\.11\.3:/);
   assert.match(runtime, /MAX_REQUEST_RETRIES = 2/);
   assert.match(runtime, /let flushRunning = false/);
 });
@@ -1889,6 +1889,8 @@ test("owner operations separates active and upcoming stays and labels manual rec
   assert.match(script, /data-extension-action/);
   assert.match(script, /\/api\/concierge\/admin\/direct-stays/);
   assert.match(script, /\/api\/concierge\/admin\/stay-extension/);
+  assert.match(script, /function maintenanceReference\(room, createdAt\)/);
+  assert.doesNotMatch(script, /Reference \$\{item\.id\}/);
 });
 
 test("verified guests can report routine and critical room problems with protected routing", async () => {
@@ -1936,6 +1938,10 @@ test("verified guests can report routine and critical room problems with protect
     body: routineForm
   }), env);
   assert.equal(routine.status, 200);
+  const routineBody = await routine.json();
+  assert.match(routineBody.reference, /^R2-D\d{8}-T\d{6}$/);
+  assert.doesNotMatch(routineBody.reference, /maint_|[a-f0-9]{8}-[a-f0-9-]{27}/i);
+  assert.match(store.alerts.at(-1).summary, new RegExp(`^${routineBody.reference} — wifi problem`));
   assert.equal(store.alerts.at(-1).recipientGroup, "support");
   assert.ok([...passportBucket.objects.keys()].some((key) => key.startsWith("maintenance/")));
 

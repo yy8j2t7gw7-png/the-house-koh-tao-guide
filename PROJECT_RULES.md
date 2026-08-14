@@ -89,6 +89,7 @@ Medical or personal emergencies must remain separate from property emergencies a
 - Routine maintenance reports route to House support. Active leaks, toilet overflows, electrical danger and rooms that cannot be secured route to the urgent team.
 - Critical reports require a guest phone or WhatsApp reply contact. That contact may appear only in the transient protected delivery payload and must never be stored in the maintenance report, alert record, AI context, learning queue, Git or release archive.
 - Maintenance photos are optional, private and excluded from AI, public assets and ordinary WhatsApp content. They use authenticated owner retrieval, immediate deletion and a maximum 30-day retention policy under the `maintenance/` R2 prefix.
+- Guest and staff maintenance references use the verified room plus Bangkok date and time. Internal maintenance UUIDs remain private and may be used only for protected storage and authenticated operations.
 - Only human waste may be flushed. Toilet paper, tissues, wipes, sanitary products and every other item go in the provided bin. A 1,000 THB clearance fee applies only when inspection confirms that a prohibited item caused the blockage.
 
 ## Guest essentials
@@ -151,9 +152,9 @@ Public interface rules:
 
 ## Current baseline
 
-Current release: v5.11.2.
+Current release: v5.11.3.
 
-Explore is intentionally disabled in the live v5.11.2 release. Do not delete its pages, structured records or media. Restore it only after the planned Explore rebuild and review by changing the protected deployment feature variable. Do not expose internal Explore detail paths in live concierge answers while the feature remains disabled; use approved external actions where supplied.
+Explore is intentionally disabled in the live v5.11.3 release. Do not delete its pages, structured records or media. Restore it only after the planned Explore rebuild and review by changing the protected deployment feature variable. Do not expose internal Explore detail paths in live concierge answers while the feature remains disabled; use approved external actions where supplied.
 
 Completed content modules:
 

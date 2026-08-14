@@ -92,6 +92,15 @@ function issueLabel(issueType) {
   return String(issueType || "other_issue").replaceAll("_", " ");
 }
 
+function publicReportReference(room, createdAt) {
+  const date = new Date(createdAt);
+  const bangkok = new Date(date.getTime() + (7 * 60 * 60 * 1000));
+  const part = (value) => String(value).padStart(2, "0");
+  const datePart = `${bangkok.getUTCFullYear()}${part(bangkok.getUTCMonth() + 1)}${part(bangkok.getUTCDate())}`;
+  const timePart = `${part(bangkok.getUTCHours())}${part(bangkok.getUTCMinutes())}${part(bangkok.getUTCSeconds())}`;
+  return `R${room}-D${datePart}-T${timePart}`;
+}
+
 function privateDownload(object, record) {
   return new Response(object.body, {
     headers: {
@@ -161,9 +170,10 @@ export async function handleMaintenanceGuestRequest(request, env) {
   const createdAt = new Date().toISOString();
   const deleteAfter = new Date(Date.now() + (retentionDays(env) * 86_400_000)).toISOString();
   const id = `maint_${crypto.randomUUID()}`;
-  const alertSummary = safeAlertSummary(
+  const reference = publicReportReference(access.room, createdAt);
+  const alertSummary = `${reference} — ${safeAlertSummary(
     `${issueLabel(issueType)}${details ? ` — ${details}` : ""}${issueType === "toilet_clogged" ? " — Guest acknowledged the conditional 1,000 THB clearance fee." : ""}`
-  );
+  )}`;
   let photoObjectKey = "";
   if (photoBytes) {
     if (!env.PASSPORT_UPLOADS?.put) return json({ error: "photo_storage_unavailable" }, 503);
@@ -216,7 +226,7 @@ export async function handleMaintenanceGuestRequest(request, env) {
     : { attempted: 0, accepted: 0 };
   return json({
     ok: true,
-    reference: id,
+    reference,
     room: access.room,
     critical,
     notified: Number(delivery.accepted) > 0,

@@ -40,7 +40,13 @@ If the official WhatsApp Business Platform is not configured, reports still appe
 
 Only human waste may be flushed. Toilet paper, tissues, wipes, sanitary products and every other item must go in the bin provided.
 
-For a clogged-toilet report, the guest acknowledges that a 1,000 THB clearance fee applies only if inspection confirms that paper, tissues or another prohibited item caused the blockage. The acknowledgment does not by itself create a charge and does not replace inspection.
+For a clogged-toilet report, the guest acknowledges within the normal rule text that a **1,000 THB clearance fee** applies only if inspection confirms that paper, tissues or another prohibited item caused the blockage. The acknowledgment does not by itself create a charge and does not replace inspection.
+
+## Report references
+
+Guests and staff use a concise public reference made from the verified room plus the Bangkok date and time, for example `R2-D20260814-T175123`. Date alone is not sufficient because the same room may submit more than one report on one day.
+
+The public reference appears in the guest confirmation, protected alert summary and owner dashboard. The internal UUID remains private and is used only for storage, authenticated photo operations and protected record updates.
 
 ## Private photos
 
@@ -77,3 +83,4 @@ Keep the existing `passport/` 14-day rule unchanged. Do not apply the maintenanc
 - Maintenance images are private and automatically deleted within 30 days, or sooner after owner deletion.
 - Passport and maintenance objects use different prefixes and different lifecycle periods.
 - No key-box code, stay confirmation code, passport information or private session token is included in a maintenance report or staff alert.
+- Internal maintenance UUIDs are never shown to guests or used as the operational reference shared with staff.

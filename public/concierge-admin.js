@@ -206,7 +206,7 @@
       card.append(
         element("h3", "", `Room ${item.room} · ${String(item.issueType || "room issue").replaceAll("_", " ")}`),
         element("p", "concierge-admin-alert-summary", item.details || "No additional details supplied."),
-        element("span", "concierge-admin-alert-time", `${bangkokDate(item.createdAt)} · ${item.status} · Reference ${item.id}`)
+        element("span", "concierge-admin-alert-time", `${bangkokDate(item.createdAt)} · ${item.status} · Reference ${maintenanceReference(item.room, item.createdAt)}`)
       );
       if (item.feeAccepted) card.appendChild(element("span", "concierge-admin-alert-escalation", "Guest acknowledged the conditional 1,000 THB toilet-clearance fee."));
       const actions = element("div", "concierge-admin-card-actions");
@@ -224,6 +224,21 @@
       card.appendChild(actions);
       maintenanceReports.appendChild(card);
     });
+  }
+
+  function maintenanceReference(room, createdAt) {
+    const date = new Date(createdAt);
+    const parts = new Intl.DateTimeFormat("en-GB", {
+      timeZone: "Asia/Bangkok",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hourCycle: "h23"
+    }).formatToParts(date).reduce((result, item) => ({ ...result, [item.type]: item.value }), {});
+    return `R${room}-D${parts.year}${parts.month}${parts.day}-T${parts.hour}${parts.minute}${parts.second}`;
   }
 
   function renderStayOperations(data = {}) {

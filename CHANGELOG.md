@@ -2,6 +2,20 @@
 
 All notable changes to The House – Koh Tao guest guide are recorded here.
 
+## v5.11.3 — Readable Maintenance References
+
+### Changed
+
+- Replaced the long UUID shown after a room-problem report with a concise reference containing the verified room and Bangkok date and time, for example `R2-D20260814-T175123`.
+- Shows the same readable reference in the guest confirmation, protected alert summary and owner dashboard while retaining a private internal UUID for storage, photo access and protected actions.
+- Integrated the conditional 1,000 THB toilet-clearance fee into the normal notice sentence and kept it bold at the standard body-text size.
+
+### Security and validation
+
+- Date and time are both retained to prevent same-room reports made on the same date from receiving indistinguishable public references.
+- Public references contain no guest identity, telephone number, confirmation code, passport information or internal object identifier.
+- All 52 automated tests pass, including readable-reference parity, internal-ID non-disclosure, alert routing and inline toilet-fee styling.
+
 ## v5.11.2 — Guest Essentials & Concise Verification
 
 ### Added

@@ -21,6 +21,10 @@
 .verified-stay-panel{border-top:1px solid #b9cec7;margin-top:20px;padding-top:18px}
 .spare-key-card{border-color:#b97d2e;background:linear-gradient(135deg,#fff8e8,#fff)}
 .spare-key-card .stay-access-label{background:#6c4c15}
+.spare-key-trigger{width:100%;font:inherit;text-align:left;cursor:pointer}
+.spare-key-trigger:focus-visible{outline:3px solid rgba(31,91,79,.28);outline-offset:3px}
+.spare-key-card-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.spare-key-card-heading .btn{flex:0 0 auto}
 .spare-key-form{display:grid;gap:10px;max-width:540px;margin-top:16px}
 .spare-key-form>label:not(.fee-confirmation){font-weight:800;color:var(--ink)}
 .spare-key-form input[type="text"]{width:100%;font:inherit;font-size:18px;text-transform:uppercase;letter-spacing:.06em;padding:13px 14px;border:1px solid #b99358;border-radius:12px;background:#fff;color:var(--ink)}

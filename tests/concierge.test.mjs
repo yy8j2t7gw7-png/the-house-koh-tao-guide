@@ -595,6 +595,10 @@ test("main and room welcome pages make required registration prominent", async (
   assert.match(room, /Upload passport securely/);
   assert.match(room, /All overnight guests are Thai nationals/);
   assert.match(room, /Show my spare-key code/);
+  assert.match(room, /id="openSpareKeyAccess"/);
+  assert.match(room, /Secure after-hours help if you cannot enter your room/);
+  assert.ok(room.indexOf('id="openSpareKeyAccess"') < room.indexOf('id="spareKeyAccess"'));
+  assert.match(room, /id="spareKeyAccess"[^>]*hidden/);
   assert.match(room, /id="lostKeyConfirmationCode"/);
   assert.match(room, /Re-enter the HM code shown in your Airbnb trip details/);
   assert.match(room, /src="\/registration-entry\.js"/);
@@ -602,6 +606,8 @@ test("main and room welcome pages make required registration prominent", async (
   assert.match(registrationEntry, /\/api\/stay\/passport-link/);
   assert.match(registrationEntry, /\/api\/stay\/spare-key/);
   assert.match(registrationEntry, /JSON\.stringify\(\{ confirmationCode, feeAccepted: true \}\)/);
+  assert.doesNotMatch(registrationEntry, /spareKeySection\.hidden = false;\s*if \(spareKeyForm\)/);
+  assert.match(registrationEntry, /spareKeyTrigger\?\.addEventListener\("click", \(event\) =>/);
   assert.doesNotMatch(registrationEntry, /HOUSE_PRIVATE_REGISTRATION_URL/);
   assert.match(registrationForm, /Option 1 — Upload passport image/);
   assert.match(registrationForm, /Option 2 — Enter the required details/);
@@ -627,7 +633,7 @@ test("guest localization supports seven languages and keeps the owner dashboard 
   assert.doesNotMatch(admin, /src="\/i18n\.js"/);
   assert.match(runtime, /exploreContentDeferred/);
   assert.match(runtime, /element\.closest\("\.section,\.footer"\)/);
-  assert.match(runtime, /houseGuideTranslations:v5\.10\.0:/);
+  assert.match(runtime, /houseGuideTranslations:v5\.10\.1:/);
   assert.match(runtime, /MAX_REQUEST_RETRIES = 2/);
   assert.match(runtime, /let flushRunning = false/);
 });

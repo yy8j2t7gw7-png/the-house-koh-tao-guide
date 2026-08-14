@@ -2,7 +2,7 @@
 
 ## Purpose
 
-v5.10.0 contains the protected server-side alert channel for guest requests that require attention. Guests continue to use the website concierge. The Worker can notify configured owners or staff through the official WhatsApp Business Platform without exposing recipient numbers in public files.
+v5.10.1 contains the protected server-side alert channel for guest requests that require attention. Guests continue to use the website concierge. The Worker can notify configured owners or staff through the official WhatsApp Business Platform without exposing recipient numbers in public files.
 
 The alert channel is separate from guest-facing contact buttons:
 

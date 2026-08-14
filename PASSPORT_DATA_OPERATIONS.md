@@ -2,7 +2,7 @@
 
 ## Purpose and current scope
 
-TM30 accommodation registration concerns foreign guests. Thai nationals do not need to complete this registration or upload a passport. For every non-Thai adult or child staying overnight—not only the person who made the Airbnb booking—v5.10.0 requires one reservation-bound private passport submission before private room information opens. The prominent seven-language registration flow keeps documents out of the AI Concierge, Airbnb messages and WhatsApp.
+TM30 accommodation registration concerns foreign guests. Thai nationals do not need to complete this registration or upload a passport. For every non-Thai adult or child staying overnight—not only the person who made the Airbnb booking—v5.10.1 requires one reservation-bound private passport submission before private room information opens. The prominent seven-language registration flow keeps documents out of the AI Concierge, Airbnb messages and WhatsApp.
 
 This scope was checked against the Thai Immigration Bureau TM30 service description, which states that Section 38 notification applies when accommodation is provided to foreign nationals. Operational wording must remain limited to this exemption and must not expand into unsourced legal advice.
 

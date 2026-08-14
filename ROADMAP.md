@@ -1,6 +1,6 @@
 # Product Roadmap
 
-Baseline: v5.10.0
+Baseline: v5.10.1
 
 ## Completed
 
@@ -68,6 +68,7 @@ Baseline: v5.10.0
 - [x] Restrict the unverified public concierge to verification, registration reminders and emergency handling
 - [x] Revalidate verified access against updated synchronized checkout dates
 - [x] Require a fresh same-reservation Airbnb confirmation check for every after-hours spare-key release
+- [x] Present protected lost-key access as an on-demand room-dashboard option rather than a prominent welcome panel
 
 ## Current priority — v5.10.x Verified Guest Launch
 
@@ -108,7 +109,7 @@ Guests may continue using ordinary WhatsApp handoffs. Automated internal alerts 
 
 - [x] Push the v5.5.0 release to the existing hosting workflow
 - [x] Confirm `/api/concierge/status` reports AI and learning enabled
-- [ ] Deploy v5.10.0 and confirm full-page language switching, recommendations, Bamboo social actions, booking wording, verified group registration and alert console
+- [ ] Deploy v5.10.1 and confirm full-page language switching, recommendations, Bamboo social actions, booking wording, verified group registration, on-demand lost-key access and alert console
 - [x] Add `STAY_TOKEN_PEPPER` and `RESERVATION_SYNC_TOKEN` Worker secrets
 - [ ] Add protected `SPARE_KEY_CODES` Worker secret before activating automatic spare-key release
 - [x] Install and authorize the included Airbnb Google Apps Script synchronizer

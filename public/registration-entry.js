@@ -17,6 +17,8 @@
   const foreignButton = document.getElementById("startForeignRegistration");
   const foreignCount = document.getElementById("nonThaiGuestCount");
   const allForeignGuestsConfirmed = document.getElementById("confirmAllNonThaiGuests");
+  const spareKeyTrigger = document.getElementById("openSpareKeyAccess");
+  const spareKeyClose = document.getElementById("closeSpareKeyAccess");
   const spareKeySection = document.getElementById("spareKeyAccess");
   const spareKeyForm = document.getElementById("spareKeyForm");
   const spareKeyStatus = document.getElementById("spareKeyStatus");
@@ -109,7 +111,7 @@
 
   function renderSpareKey(data) {
     if (!spareKeySection) return;
-    spareKeySection.hidden = false;
+    if (spareKeyTrigger) spareKeyTrigger.hidden = false;
     if (spareKeyForm) spareKeyForm.hidden = true;
     if (!data.activeStay) setStatus(spareKeyStatus, messages.keyNotActive, "attention");
     else if (!data.afterHours) setStatus(spareKeyStatus, messages.keyDaytime, "attention");
@@ -121,13 +123,31 @@
     }
   }
 
+  function openSpareKeyAccess() {
+    if (!spareKeySection) return;
+    spareKeySection.hidden = false;
+    spareKeyTrigger?.setAttribute("aria-expanded", "true");
+    window.requestAnimationFrame(() => spareKeySection.scrollIntoView({ behavior: "smooth", block: "start" }));
+  }
+
+  function closeSpareKeyAccess() {
+    if (!spareKeySection) return;
+    spareKeySection.hidden = true;
+    spareKeyTrigger?.setAttribute("aria-expanded", "false");
+    if (window.location.hash === "#spareKeyAccess") history.replaceState(null, "", window.location.pathname + window.location.search);
+    spareKeyTrigger?.focus();
+  }
+
   async function loadStatus() {
     try {
       const data = await api(`/api/stay/status?room=${encodeURIComponent(room)}`);
       if (!data.verified) return;
       if (data.accessGranted && pendingPage) return window.location.reload();
       if (!data.accessGranted && pendingPage) showRegistration(data);
-      if (data.accessGranted && !pendingPage) renderSpareKey(data);
+      if (data.accessGranted && !pendingPage) {
+        renderSpareKey(data);
+        if (window.location.hash === "#spareKeyAccess") openSpareKeyAccess();
+      }
     } catch (_error) {
       // Keep the safe verification screen available.
     }
@@ -201,6 +221,12 @@
       setBusy(passportButton, false);
     }
   });
+
+  spareKeyTrigger?.addEventListener("click", (event) => {
+    event.preventDefault();
+    openSpareKeyAccess();
+  });
+  spareKeyClose?.addEventListener("click", closeSpareKeyAccess);
 
   spareKeyForm?.addEventListener("submit", async (event) => {
     event.preventDefault();

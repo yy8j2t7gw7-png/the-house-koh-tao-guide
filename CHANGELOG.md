@@ -2,6 +2,20 @@
 
 All notable changes to The House – Koh Tao guest guide are recorded here.
 
+## v5.10.1 — On-Demand Lost-Key Access
+
+### Changed
+
+- Replaced the prominent lost-key panel at the top of the verified room page with a standard dashboard option alongside the other guest-guide choices.
+- Keeps the full protected after-hours form closed until the guest deliberately opens that option.
+- Preserves direct AI Concierge lost-key actions by opening the same protected section when the room page is loaded with its secure anchor.
+- Added a clear return-to-guide action and reviewed translations for the new controls in all seven guest languages.
+
+### Security and validation
+
+- The change is presentation-only: fresh Airbnb confirmation matching, active-stay validation, after-hours enforcement, explicit 500 THB fee acceptance, automatic team notification and key-code rotation remain unchanged.
+- All 44 automated checks pass, including canonical-page consistency, full operational translation coverage and the complete spare-key security flow.
+
 ## v5.10.0 — Complete Group Registration & Private Guest Access
 
 ### Added

@@ -98,9 +98,33 @@ a{color:inherit}
   <p class="small">Guest access is active after the required TM30 Immigration registration. Passport images are automatically deleted 14 days after upload, or sooner after processing.</p>
 </section>
 
+<section class="hero" style="min-height:360px">
+  <img id="roomPhoto" src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=" alt="Your room location" style="height:360px">
+  <div class="hero-copy">
+    <span class="badge">Your room</span>
+    <h1 id="heroRoom" style="font-size:38px">Room</h1>
+    <p id="roomNote">Loading room details…</p>
+  </div>
+</section>
+
+<section class="grid">
+  <a class="card" href="#arrival"><h3>📍 Find My Room</h3><p>Arrival photos and self check-in instructions.</p></a>
+  <a class="card" href="/explore.html"><h3>🌴 Explore Koh Tao</h3><p>Diving, beaches, food and island ideas.</p></a>
+  <a class="card" href="/house.html"><h3>🏡 House Information</h3><p>Rules, towels, laundry, parking, water and more.</p></a>
+  <a class="card" href="/practical.html"><h3>🚕 Practical Information</h3><p>Taxi, ferries, laundry, ATMs and shops.</p></a>
+  <a class="card emergency-card" href="/emergency.html"><h3>🚨 Help & Emergency</h3><p>Help & Emergency numbers and medical help.</p></a>
+  <a class="card" href="/checkout.html"><h3>👋 Checkout</h3><p>Checkout time, key return and departure reminders.</p></a>
+  <a class="card spare-key-trigger" id="openSpareKeyAccess" href="#spareKeyAccess" aria-controls="spareKeyAccess" aria-expanded="false"><h3>🔑 Lost key or locked out?</h3><p>Secure after-hours help if you cannot enter your room.</p></a>
+</section>
+
 <section class="spare-key-card" id="spareKeyAccess" aria-labelledby="spareKeyTitle" hidden>
-  <span class="stay-access-label">Protected after-hours access</span>
-  <h2 id="spareKeyTitle">Lost key or locked out?</h2>
+  <div class="spare-key-card-heading">
+    <div>
+      <span class="stay-access-label">Protected after-hours access</span>
+      <h2 id="spareKeyTitle">Lost key or locked out?</h2>
+    </div>
+    <button class="btn secondary" id="closeSpareKeyAccess" type="button">Back to room guide</button>
+  </div>
   <p>After hours—from 7:30 PM until 10:30 AM Bangkok time—a verified guest can obtain the spare-key code for this room. The key box is directly next to the room door.</p>
   <p>Re-enter your Airbnb confirmation code before the key-box code can be released. This fresh check is used only for this lost-key request.</p>
   <p>A lost-key replacement fee of <strong>500 THB</strong> will be added. The request is recorded and our urgent team is notified immediately. The key-box code is never included in that notification.</p>
@@ -119,24 +143,6 @@ a{color:inherit}
     <button class="btn secondary" id="copySpareKeyCode" type="button">Copy code</button>
     <p class="stay-privacy">Use the spare key, close the key box and contact the concierge if you need further help.</p>
   </div>
-</section>
-
-<section class="hero" style="min-height:360px">
-  <img id="roomPhoto" src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=" alt="Your room location" style="height:360px">
-  <div class="hero-copy">
-    <span class="badge">Your room</span>
-    <h1 id="heroRoom" style="font-size:38px">Room</h1>
-    <p id="roomNote">Loading room details…</p>
-  </div>
-</section>
-
-<section class="grid">
-  <a class="card" href="#arrival"><h3>📍 Find My Room</h3><p>Arrival photos and self check-in instructions.</p></a>
-  <a class="card" href="/explore.html"><h3>🌴 Explore Koh Tao</h3><p>Diving, beaches, food and island ideas.</p></a>
-  <a class="card" href="/house.html"><h3>🏡 House Information</h3><p>Rules, towels, laundry, parking, water and more.</p></a>
-  <a class="card" href="/practical.html"><h3>🚕 Practical Information</h3><p>Taxi, ferries, laundry, ATMs and shops.</p></a>
-  <a class="card emergency-card" href="/emergency.html"><h3>🚨 Help & Emergency</h3><p>Help & Emergency numbers and medical help.</p></a>
-  <a class="card" href="/checkout.html"><h3>👋 Checkout</h3><p>Checkout time, key return and departure reminders.</p></a>
 </section>
 
 <section class="section">

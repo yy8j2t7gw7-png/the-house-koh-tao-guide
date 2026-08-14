@@ -1,6 +1,6 @@
 # Product Roadmap
 
-Baseline: v5.11.1
+Baseline: v5.11.2
 
 ## Completed
 
@@ -79,6 +79,10 @@ Baseline: v5.11.1
 - [x] Standardize the secure verification page on the shared single-line desktop header and add a discreet owner-dashboard login entry
 - [x] Offer secure upload or in-person passport presentation for every declared non-Thai overnight guest
 - [x] Keep in-person registrations locked until protected owner confirmation of the manual passport check and TM30 completion
+- [x] Add verified luggage-storage windows and the current early-morning limitation across room, Departure and concierge guidance
+- [x] Add reviewed room guidance for conserving limited fresh water and island electricity
+- [x] Reduce secure guest-verification copy without removing any mandatory registration, privacy or group-coverage requirement
+- [x] Show the Thai-national exemption bilingually in English and Thai without duplicate copy in Thai-language mode
 
 ## Current priority — v5.10.x Verified Guest Launch
 
@@ -120,7 +124,7 @@ Guests may continue using ordinary WhatsApp handoffs. Automated internal alerts 
 
 - [x] Push the v5.5.0 release to the existing hosting workflow
 - [x] Confirm `/api/concierge/status` reports AI and learning enabled
-- [ ] Deploy v5.11.1 and confirm the shared verification header, admin login entry, full-page language switching, recommendations, verified group registration, direct stays, stay extensions, maintenance reporting, on-demand lost-key access and alert console
+- [ ] Deploy v5.11.2 and confirm concise verification, luggage and resource guidance, the shared header, admin login entry, full-page language switching, verified group registration, direct stays, stay extensions, maintenance reporting, on-demand lost-key access and alert console
 - [x] Add `STAY_TOKEN_PEPPER` and `RESERVATION_SYNC_TOKEN` Worker secrets
 - [ ] Add protected `SPARE_KEY_CODES` Worker secret before activating automatic spare-key release
 - [x] Install and authorize the included Airbnb Google Apps Script synchronizer

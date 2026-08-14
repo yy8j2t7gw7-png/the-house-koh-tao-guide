@@ -13,7 +13,7 @@
 <link rel="stylesheet" href="/ai-concierge.css">
 <style>
 body{margin:0;font-family:Arial,Helvetica,sans-serif;color:#26322f;background:#fbfcfb;line-height:1.55}
-.intro{margin:38px 0 22px}.intro h1{font-size:clamp(34px,7vw,56px);line-height:1.05;color:#173d35;margin:0 0 12px}.intro p{max-width:720px;color:#68736f;font-size:18px}.choice-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:18px}.choice{border:1px solid #dbe5e0;border-radius:16px;padding:18px;background:#fff}.choice h3{margin:0 0 8px;color:#173d35}.choice p{margin:0 0 14px}.choice label{display:block;font-weight:700;margin-bottom:6px}.choice input[type=number]{width:100%;padding:13px;border:1px solid #a8beb6;border-radius:10px;font:inherit;margin-bottom:12px}.important{padding:13px 15px;border-left:5px solid #1f5b4f;background:#eaf4f0;border-radius:10px}.public-help{margin-top:24px;padding:20px;border:1px solid #dbe5e0;border-radius:18px;background:#fff}.public-help h2{margin:0 0 8px;color:#173d35}.footer{display:flex;flex-direction:column;align-items:center;gap:10px;margin-top:42px;padding-top:18px;border-top:1px solid #dbe5e0;color:#68736f;font-size:13px}.admin-login-link{display:inline-flex;align-items:center;justify-content:center;min-height:34px;padding:6px 12px;border:1px solid #cbdad4;border-radius:999px;background:#fff;color:#51645d;text-decoration:none;font-size:12px;font-weight:700}.admin-login-link:hover{border-color:#9db8b0;color:#173d35;background:#f4f8f6}.admin-login-link:focus-visible{outline:3px solid rgba(31,91,79,.2);outline-offset:2px}@media(max-width:650px){.choice-grid{grid-template-columns:1fr}}
+.intro{margin:38px 0 22px}.intro h1{font-size:clamp(34px,7vw,56px);line-height:1.05;color:#173d35;margin:0 0 12px}.intro p{max-width:720px;color:#68736f;font-size:18px}.choice-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:18px}.choice{border:1px solid #dbe5e0;border-radius:16px;padding:18px;background:#fff}.choice h3{margin:0 0 8px;color:#173d35}.choice p{margin:0 0 14px}.choice label{display:block;font-weight:700;margin-bottom:6px}.choice input[type=number]{width:100%;padding:13px;border:1px solid #a8beb6;border-radius:10px;font:inherit;margin-bottom:12px}.thai-exemption-th{margin:-4px 0 10px!important;color:#1f5b4f;font-weight:700}.thai-button-label{display:block;margin-top:2px;font-size:.86em;font-weight:600}html[lang="th"] .thai-exemption-th,html[lang="th"] .thai-button-label{display:none}.important{padding:13px 15px;border-left:5px solid #1f5b4f;background:#eaf4f0;border-radius:10px}.public-help{margin-top:24px;padding:20px;border:1px solid #dbe5e0;border-radius:18px;background:#fff}.public-help h2{margin:0 0 8px;color:#173d35}.footer{display:flex;flex-direction:column;align-items:center;gap:10px;margin-top:42px;padding-top:18px;border-top:1px solid #dbe5e0;color:#68736f;font-size:13px}.admin-login-link{display:inline-flex;align-items:center;justify-content:center;min-height:34px;padding:6px 12px;border:1px solid #cbdad4;border-radius:999px;background:#fff;color:#51645d;text-decoration:none;font-size:12px;font-weight:700}.admin-login-link:hover{border-color:#9db8b0;color:#173d35;background:#f4f8f6}.admin-login-link:focus-visible{outline:3px solid rgba(31,91,79,.2);outline-offset:2px}@media(max-width:650px){.choice-grid{grid-template-columns:1fr}}
 </style>
 </head>
 <body data-guest-access="pending">
@@ -25,18 +25,18 @@ body{margin:0;font-family:Arial,Helvetica,sans-serif;color:#26322f;background:#f
 
 <section class="intro">
   <h1>Welcome to The House</h1>
-  <p>Complete secure guest verification to open your private room guide. Room location, arrival photos, Wi-Fi and stay instructions remain protected until this is complete.</p>
+  <p>Enter your stay code to unlock your private room guide.</p>
 </section>
 
 <section class="stay-access-card" id="verifiedStayAccess" aria-labelledby="stayAccessTitle">
   <span class="stay-access-label">Secure guest access</span>
   <h2 id="stayAccessTitle">Verify your stay</h2>
-  <p>Enter the Airbnb confirmation code shown in your trip details, or the private House stay code provided for a direct booking. This confirms that this permanent link belongs to your booked room.</p>
+  <p>Use the HM code in your Airbnb trip details, or your private House stay code.</p>
   <div id="stayVerificationFields">
     <form class="stay-access-form" id="stayVerificationForm">
       <label for="airbnbConfirmationCode">Stay confirmation code</label>
       <input id="airbnbConfirmationCode" name="confirmationCode" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="24" required aria-describedby="confirmationCodeHelp">
-      <span class="stay-privacy" id="confirmationCodeHelp">Usually begins with HM. The code is checked securely and is never stored in readable form.</span>
+      <span class="stay-privacy" id="confirmationCodeHelp">Your code is checked securely.</span>
       <button class="btn" type="submit">Verify my stay</button>
     </form>
   </div>
@@ -44,49 +44,51 @@ body{margin:0;font-family:Arial,Helvetica,sans-serif;color:#26322f;background:#f
 
   <div id="nationalityPanel" hidden>
     <h3>Who is staying overnight?</h3>
-    <p>Choose the option that applies to everyone staying in the room. If the group includes both Thai and foreign guests, choose <strong>Foreign guest(s)</strong>.</p>
+    <p>Choose one option for everyone staying overnight. Mixed groups should choose Foreign guest(s).</p>
     <div class="choice-grid">
       <div class="choice">
         <h3>Thai nationals only</h3>
-        <p>This TM30 Immigration accommodation registration applies only to non-Thai guests. Thai nationals do not need to upload a passport. No passport information is required when every overnight guest is a Thai national.</p>
-        <button class="btn secondary" id="confirmThaiNational" type="button">All overnight guests are Thai</button>
+        <p class="thai-exemption-th" lang="th" data-i18n-skip>เฉพาะผู้มีสัญชาติไทยเท่านั้น</p>
+        <p>No passport information is needed when every overnight guest is Thai.</p>
+        <p class="thai-exemption-th" lang="th" data-i18n-skip>ไม่ต้องส่งข้อมูลหนังสือเดินทาง หากผู้เข้าพักค้างคืนทุกคนมีสัญชาติไทย</p>
+        <button class="btn secondary" id="confirmThaiNational" type="button"><span>All overnight guests are Thai</span><span class="thai-button-label" lang="th" data-i18n-skip>ผู้เข้าพักค้างคืนทุกคนมีสัญชาติไทย</span></button>
       </div>
       <div class="choice">
         <h3>Foreign guest(s)</h3>
-        <p>Passport information is required for <strong>every non-Thai person staying overnight</strong>, not only the guest who made the booking.</p>
+        <p>Passport information is required for every non-Thai adult and child staying overnight.</p>
         <label for="nonThaiGuestCount">Number of non-Thai overnight guests</label>
         <input id="nonThaiGuestCount" type="number" inputmode="numeric" min="1" max="10" value="1" required>
         <label class="guest-count-confirmation"><input id="confirmAllNonThaiGuests" type="checkbox" required> I confirm this number includes every non-Thai adult and child staying overnight, not only the Airbnb booking guest.</label>
         <button class="btn" id="startForeignRegistration" type="button">Continue to passport options</button>
       </div>
     </div>
-    <p class="important">The information is required for Thailand's TM30 accommodation registration. Passport images are stored privately, never sent through the AI Concierge or WhatsApp, and deleted automatically 14 days after upload—or sooner after processing.</p>
+    <p class="important">Required for Thailand's TM30 registration. Passport images stay private and are deleted within 14 days—or sooner after processing.</p>
   </div>
 
   <div id="passportProgressPanel" hidden>
-    <h3 id="passportProgressTitle">Choose how to provide passport information</h3>
+    <h3 id="passportProgressTitle">Choose a passport option</h3>
     <p id="passportProgressText"></p>
-    <p><strong>Every non-Thai overnight guest must be submitted.</strong> This includes partners, family members, friends and children staying in the room, not only the Airbnb booking guest.</p>
+    <p>One passport is required for each non-Thai adult and child staying overnight.</p>
     <div class="choice-grid">
       <div class="choice" id="secureUploadChoice">
         <h3>Upload passports securely</h3>
-        <p>Use one private, room-bound and single-use form for each non-Thai overnight guest. Passport images are automatically deleted 14 days after upload—or sooner after processing.</p>
+        <p>Use one private, single-use form per guest. Images are deleted within 14 days—or sooner.</p>
         <button class="btn" id="createPassportUpload" type="button">Upload next passport securely</button>
       </div>
       <div class="choice" id="inPersonPassportChoice">
         <h3>Provide passports in person</h3>
-        <p>Bring the original passports of every non-Thai adult and child staying overnight to The House. No passport image upload is needed when you choose this option.</p>
+        <p>Bring every required original passport to The House. No upload is needed.</p>
         <button class="btn secondary" id="providePassportsInPerson" type="button">I will provide all passports in person</button>
       </div>
     </div>
-    <p class="stay-privacy">The required details are used only for Thailand's TM30 accommodation registration. The private room guide opens after all secure uploads are received, or after our team confirms the in-person passport check and registration are complete.</p>
+    <p class="stay-privacy">Used only for TM30 registration. Your room guide opens after all passports are uploaded or checked in person.</p>
   </div>
   <p class="stay-access-status" id="registrationStatus" role="status" aria-live="polite" hidden></p>
 </section>
 
 <section class="public-help">
   <h2>Need urgent help?</h2>
-  <p>Emergency information remains available without guest verification. The public concierge can also guide you through verification and remind you to submit passport information if it has not been completed.</p>
+  <p>Emergency help remains available without verification.</p>
   <div class="stay-access-actions"><a class="btn" href="/emergency.html">Open Help & Emergency</a></div>
 </section>
 

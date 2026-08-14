@@ -415,6 +415,38 @@ test("activity booking uses guest-service wording and the House booking route", 
   assert.equal(body.actions[1].route, "bookingCall");
 });
 
+test("luggage storage guidance states every available window without promising early-morning storage", async () => {
+  const { env } = createEnvironment({ OPENAI_API_KEY: "not-used" });
+  const response = await handleConciergeRequest(
+    guestRequest("Can I store my luggage after checkout?"),
+    env
+  );
+  const body = await response.json();
+  assert.equal(response.status, 200);
+  assert.equal(body.intentId, "luggage_storage");
+  assert.match(body.answer, /Tuesday–Sunday/);
+  assert.match(body.answer, /office working hours/);
+  assert.match(body.answer, /Bamboo Beach Bar from 11:00 AM/);
+  assert.match(body.answer, /do not currently have luggage storage for early-morning arrivals before 11:00 AM/);
+  assert.equal(body.actions[0].href, "/checkout.html");
+});
+
+test("island resource guidance accurately explains water and electricity conservation", async () => {
+  const { env } = createEnvironment({ OPENAI_API_KEY: "not-used" });
+  const response = await handleConciergeRequest(
+    guestRequest("Why should I save water and electricity?"),
+    env
+  );
+  const body = await response.json();
+  assert.equal(response.status, 200);
+  assert.equal(body.intentId, "island_resource_conservation");
+  assert.match(body.answer, /Fresh water is limited on Koh Tao/);
+  assert.match(body.answer, /undersea grid connection/);
+  assert.match(body.answer, /reduce reliance on local diesel generators/);
+  assert.match(body.answer, /switch off the air conditioning and lights/);
+  assert.deepEqual(body.actions, []);
+});
+
 test("The House recommendations answer Roctopus and Bamboo directly", async () => {
   const { env } = createEnvironment({ OPENAI_API_KEY: "not-used" });
   const divingResponse = await handleConciergeRequest(
@@ -619,10 +651,12 @@ test("Thai nationals are exempt from the TM30 passport upload flow", async () =>
 });
 
 test("main and room welcome pages make required registration prominent", async () => {
-  const [home, room, canonicalRoom, registrationEntry, registrationForm] = await Promise.all([
+  const [home, room, canonicalRoom, house, canonicalHouse, registrationEntry, registrationForm] = await Promise.all([
     readFile(new URL("../public/index.html", import.meta.url), "utf8"),
     readFile(new URL("../public/room.html", import.meta.url), "utf8"),
     readFile(new URL("../public/modules/house/room.html", import.meta.url), "utf8"),
+    readFile(new URL("../public/house.html", import.meta.url), "utf8"),
+    readFile(new URL("../public/modules/house/house.html", import.meta.url), "utf8"),
     readFile(new URL("../public/registration-entry.js", import.meta.url), "utf8"),
     readFile(new URL("../public/passport-upload.html", import.meta.url), "utf8")
   ]);
@@ -656,7 +690,13 @@ test("main and room welcome pages make required registration prominent", async (
   assert.match(registrationForm, /Option 1 — Upload passport image/);
   assert.match(registrationForm, /Option 2 — Enter the required details/);
   assert.match(registrationForm, /exact required TM30 fields/);
+  assert.match(room, /Please conserve water and electricity/);
+  assert.match(room, /undersea grid connection developed to reduce reliance on local diesel generators/);
+  assert.match(room, /switch off the air conditioning and lights whenever you leave the room/);
+  assert.match(house, /<b>1,000 THB clearance fee<\/b>/);
+  assert.doesNotMatch(house, /<strong>1,000 THB clearance fee<\/strong>/);
   assert.equal(room, canonicalRoom);
+  assert.equal(house, canonicalHouse);
 });
 
 test("guest localization supports seven languages and keeps the owner dashboard English", async () => {
@@ -677,7 +717,7 @@ test("guest localization supports seven languages and keeps the owner dashboard 
   assert.doesNotMatch(admin, /src="\/i18n\.js"/);
   assert.match(runtime, /exploreContentDeferred/);
   assert.match(runtime, /element\.closest\("\.section,\.footer"\)/);
-  assert.match(runtime, /houseGuideTranslations:v5\.11\.1:/);
+  assert.match(runtime, /houseGuideTranslations:v5\.11\.2:/);
   assert.match(runtime, /MAX_REQUEST_RETRIES = 2/);
   assert.match(runtime, /let flushRunning = false/);
 });
@@ -695,6 +735,26 @@ test("critical emergency and registration wording is reviewed in every guest lan
     "Provide passports in person",
     "I will provide all passports in person",
     "Your in-person passport handover is noted. Please bring the original passports of every non-Thai adult and child staying overnight. The private room guide will open after our team has checked them and completed the TM30 registration.",
+    "Luggage storage",
+    "Tuesday–Sunday during office working hours, or at Bamboo Beach Bar from 11:00 AM. No storage is currently available before 11:00 AM.",
+    "Luggage storage is available Tuesday–Sunday during office working hours. If the office is unavailable, luggage can be stored at Bamboo Beach Bar from 11:00 AM. We do not currently have luggage storage for early-morning arrivals before 11:00 AM.",
+    "💧 Please conserve water and electricity",
+    "Fresh water is limited on Koh Tao. Electricity reaches the island through an undersea grid connection developed to reduce reliance on local diesel generators. Please use water and power thoughtfully, and switch off the air conditioning and lights whenever you leave the room.",
+    "Enter your stay code to unlock your private room guide.",
+    "Use the HM code in your Airbnb trip details, or your private House stay code.",
+    "Your code is checked securely.",
+    "Stay verified. Complete the short guest registration below.",
+    "Choose one option for everyone staying overnight. Mixed groups should choose Foreign guest(s).",
+    "No passport information is needed when every overnight guest is Thai.",
+    "Passport information is required for every non-Thai adult and child staying overnight.",
+    "Required for Thailand's TM30 registration. Passport images stay private and are deleted within 14 days—or sooner after processing.",
+    "Choose a passport option",
+    "One passport is required for each non-Thai adult and child staying overnight.",
+    "Use one private, single-use form per guest. Images are deleted within 14 days—or sooner.",
+    "Bring every required original passport to The House. No upload is needed.",
+    "Used only for TM30 registration. Your room guide opens after all passports are uploaded or checked in person.",
+    "Choice saved. Bring every required original passport to The House. The guide opens after our team completes the check and TM30 registration.",
+    "Emergency help remains available without verification.",
     "Airbnb confirmation code for this lost-key request",
     "Re-enter the Airbnb confirmation code for your verified active stay before continuing.",
     "That confirmation code does not match your verified active stay. Check the HM code shown in your Airbnb trip details and try again."
@@ -737,6 +797,16 @@ test("critical emergency and registration wording is reviewed in every guest lan
     assert.match(i18n.t("Call Medical Emergency 1669"), /1669/);
     assert.match(i18n.t("Automatic deletion: 14 days after upload"), /14/);
   }
+});
+
+test("Thai-national exemption is bilingual without duplicating fixed Thai copy in Thai mode", async () => {
+  const html = await readFile(new URL("../public/room-access.html", import.meta.url), "utf8");
+  assert.match(html, /Thai nationals only/);
+  assert.match(html, /เฉพาะผู้มีสัญชาติไทยเท่านั้น/);
+  assert.match(html, /ไม่ต้องส่งข้อมูลหนังสือเดินทาง หากผู้เข้าพักค้างคืนทุกคนมีสัญชาติไทย/);
+  assert.match(html, /ผู้เข้าพักค้างคืนทุกคนมีสัญชาติไทย/);
+  assert.match(html, /lang="th" data-i18n-skip/);
+  assert.match(html, /html\[lang="th"\] \.thai-exemption-th,html\[lang="th"\] \.thai-button-label\{display:none\}/);
 });
 
 test("every guest HTML page loads the shared localization runtime", async () => {
@@ -855,7 +925,7 @@ test("one dynamic room phrase cannot block the rest of a translated page batch",
           "Welcome to Room 1",
           "Room 1 · Upstairs",
           "Thank you. I’ll use Room 1 for this conversation.",
-          "This TM30 Immigration accommodation registration applies only to non-Thai guests. Thai nationals do not need to upload a passport.",
+          "No passport information is needed when every overnight guest is Thai.",
           "My private guest message"
         ]
       })
@@ -866,7 +936,7 @@ test("one dynamic room phrase cannot block the rest of a translated page batch",
     assert.match(body.translations[0], /^Deutsch: Welcome to Room 1$/);
     assert.match(body.translations[1], /^Deutsch: Room 1 · Upstairs$/);
     assert.match(body.translations[2], /^Deutsch: Thank you\. I’ll use Room 1/);
-    assert.match(body.translations[3], /^Deutsch: This TM30 Immigration accommodation registration/);
+    assert.match(body.translations[3], /^Deutsch: No passport information is needed/);
     assert.equal(body.translations[4], null);
     assert.equal(body.untranslated, 1);
   } finally {
@@ -2083,7 +2153,11 @@ test("secure guest access uses the shared header and links discreetly to owner l
   assert.match(html, /<a class="admin-login-link" href="\/concierge-admin">Admin login<\/a>/);
   assert.match(html, /id="createPassportUpload"/);
   assert.match(html, /id="providePassportsInPerson"/);
-  assert.match(html, /original passports of every non-Thai adult and child/);
+  assert.match(html, /Enter your stay code to unlock your private room guide/);
+  assert.match(html, /Passport information is required for every non-Thai adult and child staying overnight/);
+  assert.match(html, /Bring every required original passport to The House/);
+  assert.doesNotMatch(html, /Room location, arrival photos, Wi-Fi and stay instructions remain protected until this is complete/);
+  assert.doesNotMatch(html, /This confirms that this permanent link belongs to your booked room/);
   const entry = await readFile(new URL("../public/registration-entry.js", import.meta.url), "utf8");
   assert.match(entry, /\/api\/stay\/in-person-passports/);
 });

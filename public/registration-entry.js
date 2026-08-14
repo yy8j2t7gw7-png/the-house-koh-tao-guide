@@ -33,18 +33,18 @@
 
   const messages = {
     verifying: "Verifying your stay…",
-    verified: "Your stay is verified. Please complete the guest registration step below.",
+    verified: "Stay verified. Complete the short guest registration below.",
     wrongCode: "That confirmation code does not match an active or upcoming reservation for this Room link. Check the HM code shown in your Airbnb trip details or the private House stay code provided to you, then try again.",
     rateLimited: "Too many attempts. Please wait a minute before trying again.",
     unavailable: "Secure stay verification is temporarily unavailable. Please contact the concierge for help.",
     nationalitySaving: "Saving your guest type securely…",
     passportCreating: "Opening a private one-time passport form…",
     passportProgress: "{received} of {required} required passport submissions received.",
-    allPassportsRequired: "Passport information is required for every non-Thai overnight guest, not only the person who made the booking.",
+    allPassportsRequired: "One passport is required for each non-Thai adult and child staying overnight.",
     passportError: "A secure upload form could not be opened. Please try again.",
-    passportOptions: "Choose how you would like to provide the required passport information.",
+    passportOptions: "Choose a passport option",
     inPersonSaving: "Recording your choice to provide passports in person…",
-    inPersonPending: "Your in-person passport handover is noted. Please bring the original passports of every non-Thai adult and child staying overnight. The private room guide will open after our team has checked them and completed the TM30 registration.",
+    inPersonPending: "Choice saved. Bring every required original passport to The House. The guide opens after our team completes the check and TM30 registration.",
     inPersonError: "The in-person passport option could not be saved. Please try again.",
     nationalityError: "The guest type could not be saved. Please check the information and try again.",
     countError: "Enter the number of non-Thai people who will stay overnight in this room.",
@@ -109,7 +109,7 @@
       const received = Number(data.receivedPassports) || 0;
       const required = Math.max(1, Number(data.requiredPassports) || 1);
       const inPersonPending = data.registrationStatus === "in_person_pending";
-      if (progressTitle) progressTitle.textContent = inPersonPending ? "Passports will be provided in person" : "Choose how to provide passport information";
+      if (progressTitle) progressTitle.textContent = inPersonPending ? "Passports will be provided in person" : "Choose a passport option";
       if (inPersonChoice) inPersonChoice.hidden = inPersonPending;
       if (progressText) progressText.textContent = inPersonPending
         ? messages.inPersonPending

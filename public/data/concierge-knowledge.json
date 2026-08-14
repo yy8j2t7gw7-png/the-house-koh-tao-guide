@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0.0",
-  "release": "5.11.1",
+  "release": "5.11.2",
   "language": "en",
   "updated": "2026-08-14",
   "scope": "Verified accommodation, room, house-rule, support, booking and emergency answers for guests of The House – Koh Tao.",
@@ -258,6 +258,34 @@
       ]
     },
     {
+      "id": "luggage_storage",
+      "category": "departure",
+      "priority": 35,
+      "triggers": [
+        "can you store my luggage",
+        "can i leave my luggage",
+        "can i leave my bags",
+        "where can i store my luggage",
+        "luggage storage",
+        "baggage storage",
+        "bag storage",
+        "store luggage before check in",
+        "store luggage after check out",
+        "leave bags before check in",
+        "leave bags after check out",
+        "early morning luggage",
+        "arriving early with luggage"
+      ],
+      "answer": "Luggage storage is available Tuesday–Sunday during office working hours. If the office is unavailable, luggage can be stored at Bamboo Beach Bar from 11:00 AM. We do not currently have luggage storage for early-morning arrivals before 11:00 AM.",
+      "actions": [
+        {
+          "label": "Departure Guide",
+          "type": "link",
+          "href": "/checkout.html"
+        }
+      ]
+    },
+    {
       "id": "wifi",
       "category": "room",
       "priority": 20,
@@ -373,6 +401,24 @@
           "message": "Hello, I am staying in {roomLabel} and need help with the air conditioning."
         }
       ]
+    },
+    {
+      "id": "island_resource_conservation",
+      "category": "house-rules",
+      "priority": 25,
+      "triggers": [
+        "why should i save water and electricity",
+        "why should i save water",
+        "is water limited",
+        "is electricity limited",
+        "how is electricity supplied",
+        "how is electricity generated",
+        "where does koh tao electricity come from",
+        "conserve water",
+        "conserve electricity"
+      ],
+      "answer": "Fresh water is limited on Koh Tao. Electricity reaches the island through an undersea grid connection developed to reduce reliance on local diesel generators. Please use water and power thoughtfully, and switch off the air conditioning and lights whenever you leave the room.",
+      "actions": []
     },
     {
       "id": "toilet",

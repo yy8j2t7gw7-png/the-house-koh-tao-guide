@@ -2,6 +2,26 @@
 
 All notable changes to The House – Koh Tao guest guide are recorded here.
 
+## v5.11.2 — Guest Essentials & Concise Verification
+
+### Added
+
+- Added accurate luggage-storage guidance to the verified room summary, Departure page and approved AI Concierge knowledge: Tuesday–Sunday during office working hours, or Bamboo Beach Bar from 11:00 AM when the office is unavailable.
+- Added an explicit statement that early-morning luggage storage before 11:00 AM is not currently available.
+- Added a room resource-conservation notice explaining that fresh water is limited and that Koh Tao receives electricity through an undersea grid connection developed to reduce reliance on local diesel generators.
+- Added deterministic concierge answers for luggage storage and island resource conservation.
+
+### Changed
+
+- Shortened every stage of the secure guest-verification page while preserving the stay-code instruction, Thai exemption, one-passport-per-non-Thai-adult-or-child requirement, TM30 purpose, private processing, 14-day deletion and in-person alternative.
+- Made the Thai-national exemption bilingual in English and Thai by default, while preventing duplicate Thai wording when the full interface is already set to Thai.
+- Kept the conditional 1,000 THB toilet-clearance fee bold but inline with the normal rule text instead of rendering it as a separate heading.
+- Added reviewed built-in translations for all new guest-facing wording in English, Thai, Simplified Chinese, Russian, German, French and Spanish.
+
+### Validation
+
+- All 52 automated tests pass, including luggage windows, resource-conservation facts, concise verification copy, bilingual Thai-exemption presentation, canonical page parity, inline fee styling and seven-language availability.
+
 ## v5.11.1 — Verification Header & Admin Entry
 
 ### Changed

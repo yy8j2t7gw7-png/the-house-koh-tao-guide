@@ -1,4 +1,4 @@
-# Guest Guide Platform with AI Concierge — The House v5.11.1
+# Guest Guide Platform with AI Concierge — The House v5.11.2
 
 The House – Koh Tao guest guide is a production-oriented, mobile-first digital guest guide and concierge platform. It combines property information, curated island guidance, structured place and activity data, and centralized contact and booking routes.
 
@@ -17,6 +17,18 @@ The House – Koh Tao guest guide is a production-oriented, mobile-first digital
 - Model-powered, room-aware AI Concierge with controlled learning
 
 The Activities module contains 49 structured profiles covering diving, freediving, snorkelling, boat trips, beach experiences, kayaking, paddleboarding, hiking, viewpoints, climbing, yoga, Muay Thai, massage, cooking, wildlife, photography, night activities and rainy-day options.
+
+## v5.11.2 release focus
+
+- Adds accurate luggage-storage guidance to the verified room summary, Departure page and AI Concierge.
+- States that office luggage storage is available Tuesday–Sunday during office working hours.
+- Directs guests to Bamboo Beach Bar from 11:00 AM when the office is unavailable.
+- Clearly explains that no early-morning luggage storage is currently available before 11:00 AM.
+- Keeps the confirmed 1,000 THB toilet-clearance fee bold but inline within the normal rule text instead of displaying it like a separate heading.
+- Adds a concise room notice asking guests to conserve Koh Tao's limited fresh water and electricity, with infrastructure wording checked against official PEA information.
+- Shortens the secure guest-verification journey while retaining the stay-code instruction, Thai exemption, complete non-Thai group requirement, TM30 purpose, private handling, 14-day deletion and in-person passport option.
+- Shows the Thai-national exemption in both English and Thai by default, without repeating the fixed Thai lines when the interface itself is set to Thai.
+- Retains manual TM30 submission, secure guest access, seven-language support and every v5.11.1 privacy safeguard.
 
 ## v5.11.1 release focus
 

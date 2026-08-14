@@ -91,6 +91,13 @@ Medical or personal emergencies must remain separate from property emergencies a
 - Maintenance photos are optional, private and excluded from AI, public assets and ordinary WhatsApp content. They use authenticated owner retrieval, immediate deletion and a maximum 30-day retention policy under the `maintenance/` R2 prefix.
 - Only human waste may be flushed. Toilet paper, tissues, wipes, sanitary products and every other item go in the provided bin. A 1,000 THB clearance fee applies only when inspection confirms that a prohibited item caused the blockage.
 
+## Guest essentials
+
+- Luggage storage is available Tuesday–Sunday during office working hours. If the office is unavailable, guests may store luggage at Bamboo Beach Bar from 11:00 AM. No luggage storage is currently available for early-morning arrivals before 11:00 AM.
+- Fresh water is limited on Koh Tao. Electricity reaches the island through an undersea grid connection developed to reduce reliance on local diesel generators. Guest wording should politely ask for thoughtful water and electricity use and for air conditioning and lights to be switched off when leaving the room.
+- The secure verification page must remain concise and action-led while retaining the stay-code instruction, Thai exemption, complete non-Thai group requirement, TM30 purpose, private handling, 14-day deletion and in-person passport option.
+- The Thai-national exemption must be shown in both English and Thai on the default English verification page. When the full interface is Thai, do not repeat identical Thai helper lines.
+
 ## Global booking policy
 
 All activities and services marked for House-arranged booking must route public booking enquiries through The House.
@@ -144,9 +151,9 @@ Public interface rules:
 
 ## Current baseline
 
-Current release: v5.11.1.
+Current release: v5.11.2.
 
-Explore is intentionally disabled in the live v5.11.1 release. Do not delete its pages, structured records or media. Restore it only after the planned Explore rebuild and review by changing the protected deployment feature variable. Do not expose internal Explore detail paths in live concierge answers while the feature remains disabled; use approved external actions where supplied.
+Explore is intentionally disabled in the live v5.11.2 release. Do not delete its pages, structured records or media. Restore it only after the planned Explore rebuild and review by changing the protected deployment feature variable. Do not expose internal Explore detail paths in live concierge answers while the feature remains disabled; use approved external actions where supplied.
 
 Completed content modules:
 

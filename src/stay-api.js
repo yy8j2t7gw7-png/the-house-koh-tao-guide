@@ -23,7 +23,7 @@ const CONFIRMATION_CODE_PATTERN = /^[A-Z0-9]{8,20}$/;
 const SESSION_COOKIE = "house_verified_stay";
 const MAX_SYNC_RECORDS = 250;
 const LOST_KEY_FEE_THB = 500;
-const REGISTRATION_COMPLETE_STATUSES = new Set(["thai_exempt", "passport_complete"]);
+const REGISTRATION_COMPLETE_STATUSES = new Set(["thai_exempt", "passport_complete", "in_person_complete"]);
 const ROOM_DETAILS = Object.freeze({
   "1": { floor: "Upstairs", photo: "photo-06.jpeg", note: "Room 1 is upstairs and marked clearly in the building photo." },
   "2": { floor: "Upstairs", photo: "photo-05.jpeg", note: "Room 2 is upstairs and marked clearly in the building photo." },
@@ -442,6 +442,14 @@ export async function handleStayGuestRequest(request, env, path, ctx, now = new 
     if (registration?.guestType !== "foreign" && !["passport_pending", "passport_complete"].includes(registrationStatus)) {
       return json({ error: "foreign_registration_required" }, 409);
     }
+    if (registrationStatus === "in_person_pending" && typeof store.setStayRegistrationRequirement === "function") {
+      await store.setStayRegistrationRequirement(
+        session.reservationId,
+        "foreign",
+        Math.max(1, Number(registration?.requiredPassports) || 1),
+        new Date().toISOString()
+      );
+    }
     const token = randomToken();
     const tokenHash = await hmac(token, env.PASSPORT_TOKEN_PEPPER);
     const createdAt = new Date().toISOString();
@@ -459,6 +467,34 @@ export async function handleStayGuestRequest(request, env, path, ctx, now = new 
     if (!result?.ok) return json({ error: result?.error || "passport_request_unavailable" }, 409);
     const origin = new URL(request.url).origin;
     return json({ ok: true, uploadUrl: `${origin}/passport-upload#token=${token}`, expiresAt });
+  }
+
+  if (path === "/api/stay/in-person-passports") {
+    if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405, { allow: "POST" });
+    const body = await readJson(request, 2_000);
+    if (body?.allPassportsInPerson !== true) return json({ error: "all_passports_confirmation_required" }, 400);
+    if (registration?.guestType !== "foreign" || Number(registration?.requiredPassports) < 1) {
+      return json({ error: "foreign_registration_required" }, 409);
+    }
+    if (typeof store.setInPersonRegistrationStatus !== "function") {
+      return json({ error: "in_person_registration_unavailable" }, 503);
+    }
+    const updatedAt = new Date().toISOString();
+    await store.closePendingPassportLinksForReservation(session.reservationId, updatedAt);
+    const result = await store.setInPersonRegistrationStatus(
+      session.reservationId,
+      "in_person_pending",
+      updatedAt
+    );
+    if (!result?.ok) return json({ error: result?.error || "in_person_registration_unavailable" }, 409);
+    return json({
+      ok: true,
+      accessGranted: false,
+      registrationStatus: result.status,
+      guestType: result.guestType,
+      requiredPassports: result.requiredPassports,
+      receivedPassports: result.receivedPassports
+    });
   }
 
   if (path === "/api/stay/thai-exemption") {
@@ -648,6 +684,24 @@ export async function handleStayAdminRequest(request, env, path, store) {
     }
     const result = await store.extendStayReservation(reservationId, checkOutDate, new Date().toISOString());
     return json(result, result.ok ? 200 : 400);
+  }
+
+  if (path === "/api/concierge/admin/in-person-registration") {
+    if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405, { allow: "POST" });
+    const body = await readJson(request, 2_000);
+    const reservationId = String(body?.reservationId || "");
+    if (!/^stay_[A-Za-z0-9-]{20,}$/.test(reservationId) || body?.registrationCompleted !== true) {
+      return json({ error: "invalid_request" }, 400);
+    }
+    if (typeof store.setInPersonRegistrationStatus !== "function") {
+      return json({ error: "in_person_registration_unavailable" }, 503);
+    }
+    const result = await store.setInPersonRegistrationStatus(
+      reservationId,
+      "in_person_complete",
+      new Date().toISOString()
+    );
+    return json(result, result.ok ? 200 : 409);
   }
 
   if (path === "/api/concierge/admin/spare-key-rotation") {

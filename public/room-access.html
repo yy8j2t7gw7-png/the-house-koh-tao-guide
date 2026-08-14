@@ -13,7 +13,7 @@
 <link rel="stylesheet" href="/ai-concierge.css">
 <style>
 body{margin:0;font-family:Arial,Helvetica,sans-serif;color:#26322f;background:#fbfcfb;line-height:1.55}
-.shell{max-width:900px;margin:auto;padding:0 18px 110px}.topbar{display:flex;align-items:center;justify-content:space-between;padding:14px 0;position:sticky;top:0;background:rgba(251,252,251,.96);backdrop-filter:blur(10px);z-index:20;border-bottom:1px solid #dbe5e0}.brand img{width:190px;display:block}.nav a{font-size:14px;text-decoration:none;margin-left:14px;color:#1f5b4f;font-weight:700}.intro{margin:38px 0 22px}.intro h1{font-size:clamp(34px,7vw,56px);line-height:1.05;color:#173d35;margin:0 0 12px}.intro p{max-width:720px;color:#68736f;font-size:18px}.choice-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:18px}.choice{border:1px solid #dbe5e0;border-radius:16px;padding:18px;background:#fff}.choice h3{margin:0 0 8px;color:#173d35}.choice p{margin:0 0 14px}.choice label{display:block;font-weight:700;margin-bottom:6px}.choice input[type=number]{width:100%;padding:13px;border:1px solid #a8beb6;border-radius:10px;font:inherit;margin-bottom:12px}.important{padding:13px 15px;border-left:5px solid #1f5b4f;background:#eaf4f0;border-radius:10px}.public-help{margin-top:24px;padding:20px;border:1px solid #dbe5e0;border-radius:18px;background:#fff}.public-help h2{margin:0 0 8px;color:#173d35}.footer{margin-top:42px;padding-top:18px;border-top:1px solid #dbe5e0;color:#68736f;font-size:13px}@media(max-width:650px){.nav a:not([href="/emergency.html"]){display:none}.choice-grid{grid-template-columns:1fr}.brand img{width:165px}}
+.intro{margin:38px 0 22px}.intro h1{font-size:clamp(34px,7vw,56px);line-height:1.05;color:#173d35;margin:0 0 12px}.intro p{max-width:720px;color:#68736f;font-size:18px}.choice-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:18px}.choice{border:1px solid #dbe5e0;border-radius:16px;padding:18px;background:#fff}.choice h3{margin:0 0 8px;color:#173d35}.choice p{margin:0 0 14px}.choice label{display:block;font-weight:700;margin-bottom:6px}.choice input[type=number]{width:100%;padding:13px;border:1px solid #a8beb6;border-radius:10px;font:inherit;margin-bottom:12px}.important{padding:13px 15px;border-left:5px solid #1f5b4f;background:#eaf4f0;border-radius:10px}.public-help{margin-top:24px;padding:20px;border:1px solid #dbe5e0;border-radius:18px;background:#fff}.public-help h2{margin:0 0 8px;color:#173d35}.footer{display:flex;flex-direction:column;align-items:center;gap:10px;margin-top:42px;padding-top:18px;border-top:1px solid #dbe5e0;color:#68736f;font-size:13px}.admin-login-link{display:inline-flex;align-items:center;justify-content:center;min-height:34px;padding:6px 12px;border:1px solid #cbdad4;border-radius:999px;background:#fff;color:#51645d;text-decoration:none;font-size:12px;font-weight:700}.admin-login-link:hover{border-color:#9db8b0;color:#173d35;background:#f4f8f6}.admin-login-link:focus-visible{outline:3px solid rgba(31,91,79,.2);outline-offset:2px}@media(max-width:650px){.choice-grid{grid-template-columns:1fr}}
 </style>
 </head>
 <body data-guest-access="pending">
@@ -57,18 +57,29 @@ body{margin:0;font-family:Arial,Helvetica,sans-serif;color:#26322f;background:#f
         <label for="nonThaiGuestCount">Number of non-Thai overnight guests</label>
         <input id="nonThaiGuestCount" type="number" inputmode="numeric" min="1" max="10" value="1" required>
         <label class="guest-count-confirmation"><input id="confirmAllNonThaiGuests" type="checkbox" required> I confirm this number includes every non-Thai adult and child staying overnight, not only the Airbnb booking guest.</label>
-        <button class="btn" id="startForeignRegistration" type="button">Continue to secure passport upload</button>
+        <button class="btn" id="startForeignRegistration" type="button">Continue to passport options</button>
       </div>
     </div>
     <p class="important">The information is required for Thailand's TM30 accommodation registration. Passport images are stored privately, never sent through the AI Concierge or WhatsApp, and deleted automatically 14 days after upload—or sooner after processing.</p>
   </div>
 
   <div id="passportProgressPanel" hidden>
-    <h3>Complete passport information</h3>
+    <h3 id="passportProgressTitle">Choose how to provide passport information</h3>
     <p id="passportProgressText"></p>
     <p><strong>Every non-Thai overnight guest must be submitted.</strong> This includes partners, family members, friends and children staying in the room, not only the Airbnb booking guest.</p>
-    <button class="btn" id="createPassportUpload" type="button">Upload next passport securely</button>
-    <p class="stay-privacy">Each form is private, room-bound and single-use. After the final required passport is received, this private room guide opens automatically.</p>
+    <div class="choice-grid">
+      <div class="choice" id="secureUploadChoice">
+        <h3>Upload passports securely</h3>
+        <p>Use one private, room-bound and single-use form for each non-Thai overnight guest. Passport images are automatically deleted 14 days after upload—or sooner after processing.</p>
+        <button class="btn" id="createPassportUpload" type="button">Upload next passport securely</button>
+      </div>
+      <div class="choice" id="inPersonPassportChoice">
+        <h3>Provide passports in person</h3>
+        <p>Bring the original passports of every non-Thai adult and child staying overnight to The House. No passport image upload is needed when you choose this option.</p>
+        <button class="btn secondary" id="providePassportsInPerson" type="button">I will provide all passports in person</button>
+      </div>
+    </div>
+    <p class="stay-privacy">The required details are used only for Thailand's TM30 accommodation registration. The private room guide opens after all secure uploads are received, or after our team confirms the in-person passport check and registration are complete.</p>
   </div>
   <p class="stay-access-status" id="registrationStatus" role="status" aria-live="polite" hidden></p>
 </section>
@@ -79,7 +90,10 @@ body{margin:0;font-family:Arial,Helvetica,sans-serif;color:#26322f;background:#f
   <div class="stay-access-actions"><a class="btn" href="/emergency.html">Open Help & Emergency</a></div>
 </section>
 
-<footer class="footer">The House – Koh Tao · Private guest access</footer>
+<footer class="footer">
+  <span>The House – Koh Tao · Private guest access</span>
+  <a class="admin-login-link" href="/concierge-admin">Admin login</a>
+</footer>
 </div>
 <script src="/contacts.js"></script>
 <script src="/guide-app.js"></script>

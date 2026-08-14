@@ -21,7 +21,7 @@ import {
 } from "./whatsapp-alerts.js";
 import { getGuestAccess, handleStayAdminRequest, stayConfiguration } from "./stay-api.js";
 
-const RELEASE = "5.11.0";
+const RELEASE = "5.11.1";
 const ROOM_OPTIONS = new Set(["1", "2", "3", "4", "5", "6", "8", "9", "10", "11"]);
 const MAX_HISTORY_ITEMS = 10;
 const MAX_QUESTION_LENGTH = 800;
@@ -704,7 +704,7 @@ export async function handleAdminRequest(request, env, path) {
     if (maintenanceResponse) return maintenanceResponse;
   }
 
-  if (path.includes("/stays") || path.includes("/stay-extension") || path.includes("/spare-key-rotation")) {
+  if (path.includes("/stays") || path.includes("/stay-extension") || path.includes("/in-person-registration") || path.includes("/spare-key-rotation")) {
     const stayResponse = await handleStayAdminRequest(request, env, path, store);
     if (stayResponse) return stayResponse;
   }

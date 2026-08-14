@@ -13,6 +13,9 @@
   const progressText = document.getElementById("passportProgressText");
   const registrationStatus = document.getElementById("registrationStatus");
   const passportButton = document.getElementById("createPassportUpload");
+  const inPersonButton = document.getElementById("providePassportsInPerson");
+  const inPersonChoice = document.getElementById("inPersonPassportChoice");
+  const progressTitle = document.getElementById("passportProgressTitle");
   const thaiButton = document.getElementById("confirmThaiNational");
   const foreignButton = document.getElementById("startForeignRegistration");
   const foreignCount = document.getElementById("nonThaiGuestCount");
@@ -39,6 +42,10 @@
     passportProgress: "{received} of {required} required passport submissions received.",
     allPassportsRequired: "Passport information is required for every non-Thai overnight guest, not only the person who made the booking.",
     passportError: "A secure upload form could not be opened. Please try again.",
+    passportOptions: "Choose how you would like to provide the required passport information.",
+    inPersonSaving: "Recording your choice to provide passports in person…",
+    inPersonPending: "Your in-person passport handover is noted. Please bring the original passports of every non-Thai adult and child staying overnight. The private room guide will open after our team has checked them and completed the TM30 registration.",
+    inPersonError: "The in-person passport option could not be saved. Please try again.",
     nationalityError: "The guest type could not be saved. Please check the information and try again.",
     countError: "Enter the number of non-Thai people who will stay overnight in this room.",
     allGuestsError: "Confirm that the number includes every non-Thai adult and child staying overnight, not only the Airbnb booking guest.",
@@ -96,13 +103,22 @@
   function showRegistration(data) {
     if (verificationFields) verificationFields.hidden = true;
     setStatus(verificationStatus, messages.verified, "success");
-    if (data.guestType === "foreign" || ["passport_pending", "passport_complete"].includes(data.registrationStatus)) {
+    if (data.guestType === "foreign" || ["passport_pending", "passport_complete", "in_person_pending", "in_person_complete"].includes(data.registrationStatus)) {
       if (nationalityPanel) nationalityPanel.hidden = true;
       if (progressPanel) progressPanel.hidden = false;
       const received = Number(data.receivedPassports) || 0;
       const required = Math.max(1, Number(data.requiredPassports) || 1);
-      if (progressText) progressText.textContent = `${format(messages.passportProgress, { received, required })} ${messages.allPassportsRequired}`;
-      setStatus(registrationStatus, format(messages.passportProgress, { received, required }), received >= required ? "success" : "attention");
+      const inPersonPending = data.registrationStatus === "in_person_pending";
+      if (progressTitle) progressTitle.textContent = inPersonPending ? "Passports will be provided in person" : "Choose how to provide passport information";
+      if (inPersonChoice) inPersonChoice.hidden = inPersonPending;
+      if (progressText) progressText.textContent = inPersonPending
+        ? messages.inPersonPending
+        : `${format(messages.passportProgress, { received, required })} ${messages.allPassportsRequired}`;
+      setStatus(registrationStatus, inPersonPending
+        ? messages.inPersonPending
+        : format(messages.passportProgress, { received, required }),
+      data.registrationStatus === "passport_complete" || data.registrationStatus === "in_person_complete" ? "success" : "attention");
+      window.HOUSE_I18N?.localize?.(progressPanel);
       return;
     }
     if (nationalityPanel) nationalityPanel.hidden = false;
@@ -200,10 +216,10 @@
     setBusy(foreignButton, true);
     setStatus(registrationStatus, messages.nationalitySaving, "working");
     try {
-      await api("/api/stay/nationality", { method: "POST", body: JSON.stringify({ nationality: "foreign", nonThaiGuestCount: count, allNonThaiGuestsIncluded: true }) });
-      setStatus(registrationStatus, messages.passportCreating, "working");
-      const link = await api("/api/stay/passport-link", { method: "POST", body: "{}" });
-      window.location.assign(link.uploadUrl);
+      const data = await api("/api/stay/nationality", { method: "POST", body: JSON.stringify({ nationality: "foreign", nonThaiGuestCount: count, allNonThaiGuestsIncluded: true }) });
+      showRegistration(data);
+      setStatus(registrationStatus, messages.passportOptions, "attention");
+      setBusy(foreignButton, false);
     } catch (_error) {
       setStatus(registrationStatus, messages.nationalityError, "error");
       setBusy(foreignButton, false);
@@ -219,6 +235,22 @@
     } catch (_error) {
       setStatus(registrationStatus, messages.passportError, "error");
       setBusy(passportButton, false);
+    }
+  });
+
+  inPersonButton?.addEventListener("click", async () => {
+    setBusy(inPersonButton, true);
+    setStatus(registrationStatus, messages.inPersonSaving, "working");
+    try {
+      const data = await api("/api/stay/in-person-passports", {
+        method: "POST",
+        body: JSON.stringify({ allPassportsInPerson: true })
+      });
+      showRegistration(data);
+      setStatus(registrationStatus, messages.inPersonPending, "success");
+    } catch (_error) {
+      setStatus(registrationStatus, messages.inPersonError, "error");
+      setBusy(inPersonButton, false);
     }
   });
 

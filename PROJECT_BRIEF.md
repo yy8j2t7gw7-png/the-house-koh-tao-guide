@@ -20,7 +20,7 @@ The product should feel like a competent hotel concierge in a guest’s pocket, 
 
 ### Current state
 
-Current release: v5.11.0.
+Current release: v5.11.1.
 
 The live release prioritizes the operational guest journey and AI Concierge. It supports seven guest languages across the complete live operational pages, with per-item translation isolation so one unsupported sentence cannot block an entire page. The concierge uses an animated-dot thinking state and approved external social actions for Bamboo Beach Bar. Explore is disabled through a reversible deployment feature switch; all Explore source content remains preserved for the final content phase.
 
@@ -56,7 +56,7 @@ The operational concierge now takes priority over further Explore development. T
 
 Unknown questions and negative feedback enter a private, privacy-minimized learning queue. An owner must approve every correction before it becomes active; the model is never allowed to publish new facts by itself.
 
-Each active room has one permanent guest page. Before verification it reveals no room information, arrival photographs, Wi-Fi or private House knowledge. The guest verifies the stay with either the Airbnb HM confirmation code from the trip details or a private House stay code for a direct/walk-in reservation, checked against the protected room and dates. Thai-only groups can record the exemption. A foreign or mixed group declares the complete number of non-Thai adults and children, then submits one room- and reservation-bound passport form for each person—not only the booking guest. The private guide opens only after all declared submissions are received. Passport files remain completely separate from the AI system.
+Each active room has one permanent guest page. Before verification it reveals no room information, arrival photographs, Wi-Fi or private House knowledge. The guest verifies the stay with either the Airbnb HM confirmation code from the trip details or a private House stay code for a direct/walk-in reservation, checked against the protected room and dates. Thai-only groups can record the exemption. A foreign or mixed group declares the complete number of non-Thai adults and children, then chooses either one room- and reservation-bound passport form for each person or in-person presentation of all required original passports. The private guide opens only after all uploads are received or an authorized owner confirms the in-person passport check and manual registration are complete. Passport files remain completely separate from the AI system.
 
 The owner console separates active and upcoming stays, can extend an active stay and can create a direct/walk-in stay without Airbnb. Verified guests can report structured room problems. Routine incidents route to House support; serious water, overflow, electrical and room-security incidents route to the urgent team and require a private reply number. Optional maintenance photos stay outside AI and public assets and expire within 30 days.
 

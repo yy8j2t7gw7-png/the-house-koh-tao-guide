@@ -2,13 +2,13 @@
 
 ## Purpose
 
-The v5.11.0 concierge combines six layers:
+The v5.11.1 concierge combines six layers:
 
 1. Deterministic safety and operational rules for emergencies, lost keys, fees, booking policy and human routing.
 2. Server-side model reasoning over approved House knowledge plus targeted retrieval from the existing Activities, Restaurants, Cafés, Beaches, Bars and Shopping records.
 3. A controlled learning queue that records knowledge gaps and negative feedback for owner review.
 4. A deterministic action-needed alert channel with protected owner-console delivery and optional official WhatsApp Business Platform notifications.
-5. A deterministic verified-stay layer for complete group passport registration and protected after-hours spare-key access, fully separated from model reasoning.
+5. A deterministic verified-stay layer for complete group passport registration, including secure upload or protected in-person handover, and protected after-hours spare-key access, fully separated from model reasoning.
 6. A verified room-maintenance layer for routine support, critical incident routing and private optional photo handling, also separated from model reasoning.
 
 The model cannot publish its own facts. An owner must approve or edit every knowledge addition before it becomes active.
@@ -21,7 +21,7 @@ Configure secrets on the existing Cloudflare Worker. Never place their values in
 
 ## Guest-language operations
 
-v5.11.0 supports English, Thai, Simplified Chinese, Russian, German, French and Spanish for the operational guest journey. Essential navigation, emergency, passport, lost-key, maintenance-reporting and concierge controls have reviewed built-in translations. Longer approved operational text is translated through `/api/i18n/translate` using strict structured output with `store: false` and cached in the existing Durable Object. Approved items use recoverable model sub-batches; incomplete groups are split automatically, browser requests retry temporary failures, and overlapping page flushes are prevented. A release audit verifies every static visible string and accessibility label on each live operational page is accepted by the protected endpoint.
+v5.11.1 supports English, Thai, Simplified Chinese, Russian, German, French and Spanish for the operational guest journey. Essential navigation, emergency, passport, lost-key, maintenance-reporting and concierge controls have reviewed built-in translations. Longer approved operational text is translated through `/api/i18n/translate` using strict structured output with `store: false` and cached in the existing Durable Object. Approved items use recoverable model sub-batches; incomplete groups are split automatically, browser requests retry temporary failures, and overlapping page flushes are prevented. A release audit verifies every static visible string and accessibility label on each live operational page is accepted by the protected endpoint.
 
 The visible concierge thinking state is an animated three-dot indicator rather than an operational status sentence. Venue website or social actions must use approved external URLs. Internal Explore detail paths are excluded from model context while Explore is disabled. Bamboo Beach Bar follow-up questions use the approved Facebook and Instagram actions in `public/data/concierge-knowledge.json`.
 
@@ -85,7 +85,7 @@ The core accommodation knowledge is already supplied directly from `public/data/
 8. Verify the passport flow with a non-sensitive test image before requesting any real document.
 9. Follow `AIRBNB_AUTOMATION_SETUP.md`, run the first reservation sync and confirm its diagnostic property is blank.
 10. Verify a future reservation from its correct permanent room page and confirm the same code fails for another room.
-11. Confirm the verified passport button opens the secure form directly and the all-Thai-overnight-guests option closes the reminder and revokes unused pending upload links.
+11. Confirm the verified foreign-guest flow offers secure upload and in-person presentation; the in-person route must stay locked until protected owner confirmation. Confirm the all-Thai-overnight-guests option closes the reminder and revokes unused pending upload links.
 12. Open the owner alert console and test a support, booking, urgent and emergency alert with non-sensitive text.
 13. Test spare-key release with a temporary key-box code. Confirm that a missing or incorrect fresh Airbnb confirmation code is rejected, the correct code matches the same active reservation, and the system automatically submits an urgent-team WhatsApp message before display. Confirm that neither code appears in the alert or operational storage.
 14. Rotate the physical test code, update the encrypted secret, redeploy and confirm rotation in the owner console.

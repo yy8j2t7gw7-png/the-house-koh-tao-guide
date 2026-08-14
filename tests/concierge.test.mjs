@@ -68,7 +68,10 @@ function createStore() {
       return {
         reservations: this.stayReservations.map(({ confirmationCodeHash, ...record }) => ({
           ...record,
-          registrationStatus: this.registrationStatuses.get(record.id)?.status || "not_started"
+          registrationStatus: this.registrationStatuses.get(record.id)?.status || "not_started",
+          guestType: this.registrationStatuses.get(record.id)?.guestType || "",
+          requiredPassports: this.registrationStatuses.get(record.id)?.requiredPassports || 0,
+          receivedPassports: this.registrationStatuses.get(record.id)?.receivedPassports || 0
         })),
         rotations: []
       };
@@ -134,6 +137,21 @@ function createStore() {
       return { ok: true, ...value };
     },
     async getStayRegistrationStatus(reservationId) { return this.registrationStatuses.get(reservationId) || null; },
+    async setInPersonRegistrationStatus(reservationId, status, updatedAt) {
+      const current = this.registrationStatuses.get(reservationId);
+      if (!current || current.guestType !== "foreign" || Number(current.requiredPassports) < 1) {
+        return { ok: false, error: "foreign_registration_required" };
+      }
+      if (status === "in_person_complete" && current.status !== "in_person_pending") {
+        return { ok: false, error: "in_person_handover_not_requested" };
+      }
+      if (!["in_person_pending", "in_person_complete"].includes(status)) {
+        return { ok: false, error: "invalid_registration_status" };
+      }
+      const value = { ...current, status, updatedAt };
+      this.registrationStatuses.set(reservationId, value);
+      return { ok: true, ...value };
+    },
     async closePendingPassportLinksForReservation(reservationId, updatedAt) {
       this.passportRecords
         .filter((item) => item.reservationId === reservationId && item.status === "pending")
@@ -659,7 +677,7 @@ test("guest localization supports seven languages and keeps the owner dashboard 
   assert.doesNotMatch(admin, /src="\/i18n\.js"/);
   assert.match(runtime, /exploreContentDeferred/);
   assert.match(runtime, /element\.closest\("\.section,\.footer"\)/);
-  assert.match(runtime, /houseGuideTranslations:v5\.11\.0:/);
+  assert.match(runtime, /houseGuideTranslations:v5\.11\.1:/);
   assert.match(runtime, /MAX_REQUEST_RETRIES = 2/);
   assert.match(runtime, /let flushRunning = false/);
 });
@@ -674,6 +692,9 @@ test("critical emergency and registration wording is reviewed in every guest lan
     "Thai nationals do not need to complete this registration.",
     "Thai national?",
     "You do not need to upload a passport for this registration. Please tell The House so the unused request can be closed.",
+    "Provide passports in person",
+    "I will provide all passports in person",
+    "Your in-person passport handover is noted. Please bring the original passports of every non-Thai adult and child staying overnight. The private room guide will open after our team has checked them and completed the TM30 registration.",
     "Airbnb confirmation code for this lost-key request",
     "Re-enter the Airbnb confirmation code for your verified active stay before continuing.",
     "That confirmation code does not match your verified active stay. Check the HM code shown in your Airbnb trip details and try again."
@@ -1589,6 +1610,74 @@ test("private guide stays locked until every declared non-Thai overnight guest p
   assert.equal((await complete.json()).accessGranted, true);
 });
 
+test("foreign guests may present every passport in person and only admin completion unlocks the guide", async () => {
+  const { env, store } = createEnvironment();
+  await handleReservationSyncRequest(new Request("https://guide.example/api/reservations/sync", {
+    method: "POST",
+    headers: { authorization: "Bearer reservation_sync_test_5500", "content-type": "application/json" },
+    body: JSON.stringify({
+      room: "3",
+      listingId: "1384302186705645424",
+      records: [{ confirmationCode: "HMINPERSON3", checkInDate: "2026-08-13", checkOutDate: "2026-08-16" }]
+    })
+  }), env);
+  const verified = await handleStayGuestRequest(new Request("https://guide.example/api/stay/verify", {
+    method: "POST",
+    headers: { origin: "https://guide.example", "content-type": "application/json" },
+    body: JSON.stringify({ room: "3", confirmationCode: "HMINPERSON3" })
+  }), env, "/api/stay/verify", null, new Date("2026-08-14T08:00:00.000Z"));
+  const cookie = verified.headers.get("set-cookie").split(";")[0];
+
+  await handleStayGuestRequest(new Request("https://guide.example/api/stay/nationality", {
+    method: "POST",
+    headers: { origin: "https://guide.example", cookie, "content-type": "application/json" },
+    body: JSON.stringify({ nationality: "foreign", nonThaiGuestCount: 2, allNonThaiGuestsIncluded: true })
+  }), env, "/api/stay/nationality");
+  const handover = await handleStayGuestRequest(new Request("https://guide.example/api/stay/in-person-passports", {
+    method: "POST",
+    headers: { origin: "https://guide.example", cookie, "content-type": "application/json" },
+    body: JSON.stringify({ allPassportsInPerson: true })
+  }), env, "/api/stay/in-person-passports");
+  const pendingBody = await handover.json();
+  assert.equal(handover.status, 200);
+  assert.equal(pendingBody.registrationStatus, "in_person_pending");
+  assert.equal(pendingBody.requiredPassports, 2);
+  assert.equal(pendingBody.accessGranted, false);
+
+  const locked = await handleStayGuestRequest(new Request("https://guide.example/api/stay/status?room=3", {
+    headers: { origin: "https://guide.example", cookie }
+  }), env, "/api/stay/status");
+  assert.equal((await locked.json()).accessGranted, false);
+
+  const unauthorized = await handleAdminRequest(new Request("https://guide.example/api/concierge/admin/in-person-registration", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ reservationId: store.stayReservations[0].id, registrationCompleted: true })
+  }), env, "/api/concierge/admin/in-person-registration");
+  assert.equal(unauthorized.status, 401);
+
+  const premature = await handleAdminRequest(new Request("https://guide.example/api/concierge/admin/in-person-registration", {
+    method: "POST",
+    headers: { authorization: "Bearer admin_token_test_5500", "content-type": "application/json" },
+    body: JSON.stringify({ reservationId: store.stayReservations[0].id })
+  }), env, "/api/concierge/admin/in-person-registration");
+  assert.equal(premature.status, 400);
+
+  const completed = await handleAdminRequest(new Request("https://guide.example/api/concierge/admin/in-person-registration", {
+    method: "POST",
+    headers: { authorization: "Bearer admin_token_test_5500", "content-type": "application/json" },
+    body: JSON.stringify({ reservationId: store.stayReservations[0].id, registrationCompleted: true })
+  }), env, "/api/concierge/admin/in-person-registration");
+  assert.equal(completed.status, 200);
+  assert.equal((await completed.json()).status, "in_person_complete");
+
+  const unlocked = await handleStayGuestRequest(new Request("https://guide.example/api/stay/status?room=3", {
+    headers: { origin: "https://guide.example", cookie }
+  }), env, "/api/stay/status");
+  assert.equal((await unlocked.json()).accessGranted, true);
+  assert.equal(store.registrationStatuses.get(store.stayReservations[0].id).requiredPassports, 2);
+});
+
 test("Worker routing keeps the room guide, photos and private knowledge behind completed registration", async () => {
   const source = await readFile(new URL("../src/index.js", import.meta.url), "utf8");
   assert.match(source, /const page = access\.accessGranted \? "\/room\.html" : "\/room-access\.html"/);
@@ -1982,4 +2071,19 @@ test("every guest page uses the same top navigation", async () => {
     checked += 1;
   }
   assert.equal(checked, 43);
+});
+
+test("secure guest access uses the shared header and links discreetly to owner login", async () => {
+  const html = await readFile(new URL("../public/room-access.html", import.meta.url), "utf8");
+  const inlineStyles = html.match(/<style>([\s\S]*?)<\/style>/)?.[1] || "";
+
+  assert.doesNotMatch(inlineStyles, /\.shell\s*\{/);
+  assert.doesNotMatch(inlineStyles, /\.topbar\s*\{/);
+  assert.doesNotMatch(inlineStyles, /\.nav\s+a\s*\{/);
+  assert.match(html, /<a class="admin-login-link" href="\/concierge-admin">Admin login<\/a>/);
+  assert.match(html, /id="createPassportUpload"/);
+  assert.match(html, /id="providePassportsInPerson"/);
+  assert.match(html, /original passports of every non-Thai adult and child/);
+  const entry = await readFile(new URL("../public/registration-entry.js", import.meta.url), "utf8");
+  assert.match(entry, /\/api\/stay\/in-person-passports/);
 });

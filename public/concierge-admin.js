@@ -246,7 +246,11 @@
       const card = element("article", "concierge-admin-registration-item");
       card.dataset.reservationId = item.id || "";
       const registrationDetail = item.guestType === "foreign"
-        ? `${item.receivedPassports || 0} of ${item.requiredPassports || 0} non-Thai guest passports received`
+        ? item.registrationStatus === "in_person_pending"
+          ? `In-person handover requested for all ${item.requiredPassports || 0} non-Thai overnight guests`
+          : item.registrationStatus === "in_person_complete"
+            ? `In-person passport check and TM30 registration confirmed complete`
+            : `${item.receivedPassports || 0} of ${item.requiredPassports || 0} non-Thai guest passports received`
         : item.guestType === "thai" ? "All overnight guests declared Thai" : "Nationality declaration not completed";
       const sourceDetail = item.provider === "direct"
         ? "Source: direct booking or walk-in"
@@ -277,6 +281,14 @@
         label.appendChild(input);
         extension.append(label, button);
         card.appendChild(extension);
+      }
+      if (item.registrationStatus === "in_person_pending" && item.id) {
+        const actions = element("div", "concierge-admin-card-actions");
+        const complete = element("button", "secondary", "Confirm in-person registration complete");
+        complete.type = "button";
+        complete.dataset.inPersonAction = "complete";
+        actions.appendChild(complete);
+        card.appendChild(actions);
       }
       container.appendChild(card);
     };
@@ -537,10 +549,26 @@
     }
   });
 
-  activeStayReservations.addEventListener("click", async (event) => {
-    const button = event.target.closest("[data-extension-action]");
+  async function stayOperationAction(event) {
+    const button = event.target.closest("[data-extension-action],[data-in-person-action]");
     if (!button) return;
     const card = button.closest("[data-reservation-id]");
+    if (button.dataset.inPersonAction) {
+      if (!card?.dataset.reservationId) return;
+      if (!window.confirm("Confirm only after every required non-Thai overnight guest passport has been checked in person and the TM30 registration has been completed. Continue?")) return;
+      button.disabled = true;
+      try {
+        await api("/api/concierge/admin/in-person-registration", {
+          method: "POST",
+          body: JSON.stringify({ reservationId: card.dataset.reservationId, registrationCompleted: true })
+        });
+        await loadOverview();
+      } catch (_error) {
+        button.disabled = false;
+        window.alert("The in-person registration could not be confirmed.");
+      }
+      return;
+    }
     const checkOutDate = card?.querySelector("[data-extension-date]")?.value || "";
     if (!card?.dataset.reservationId || !checkOutDate) return;
     if (!window.confirm(`Extend this stay until checkout on ${checkOutDate}?`)) return;
@@ -555,7 +583,10 @@
       button.disabled = false;
       window.alert("The stay could not be extended. Choose a date after the current checkout date.");
     }
-  });
+  }
+
+  activeStayReservations.addEventListener("click", stayOperationAction);
+  upcomingStayReservations.addEventListener("click", stayOperationAction);
 
   keyRotations.addEventListener("click", async (event) => {
     const button = event.target.closest("[data-rotation-action]");

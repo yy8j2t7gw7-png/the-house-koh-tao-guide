@@ -62,7 +62,7 @@ Medical or personal emergencies must remain separate from property emergencies a
 ## Passport and Immigration registration data
 
 - TM30 accommodation registration and this passport-upload workflow apply only to non-Thai guests. Thai nationals must be told that they do not need to complete it.
-- A verified guest may declare that every overnight guest is Thai, or declare the complete number of non-Thai adults and children in a foreign/mixed group. One separate passport form is required for every declared non-Thai overnight guest—not only the person who made the booking—and private guest information remains locked until all are received. Do not infer nationality from chat or other data.
+- A verified guest may declare that every overnight guest is Thai, or declare the complete number of non-Thai adults and children in a foreign/mixed group. Every declared non-Thai overnight guest—not only the person who made the booking—must be covered either by a separate secure passport form or by presentation of all original passports to The House in person. Private guest information remains locked until all uploads are received or an authorized owner confirms the in-person passport check and manual registration are complete. Do not infer nationality from chat or other data.
 - Passport information is collected only through the separate private registration flow, never through AI chat, learning logs, public files or WhatsApp attachments.
 - Explain in guest-friendly language that The House needs the information for required TM30 Immigration accommodation registration and how the document is handled.
 - Use reservation- and room-bound, expiring, single-use upload links. Room selection or the permanent room URL alone must never authorize passport upload or retrieval.
@@ -70,6 +70,7 @@ Medical or personal emergencies must remain separate from property emergencies a
 - Main file retention is 14 days after upload, with immediate owner deletion and a daily application cleanup reinforcing the R2 lifecycle rule.
 - Do not use passport data for marketing, AI training or recommendation logic.
 - Do not invent the manual TM30 field schema. The structured details option stays disabled until the authoritative field list is supplied.
+- Do not automate submission to the Immigration portal. TM30 filing remains a manual authorized-owner operation.
 - Use Airbnb's scheduled arrival message as the automatic pre-arrival reminder. Passport images and details must never be sent through Airbnb messages or WhatsApp.
 
 ## Protected staff alerts
@@ -143,9 +144,9 @@ Public interface rules:
 
 ## Current baseline
 
-Current release: v5.11.0.
+Current release: v5.11.1.
 
-Explore is intentionally disabled in the live v5.11.0 release. Do not delete its pages, structured records or media. Restore it only after the planned Explore rebuild and review by changing the protected deployment feature variable. Do not expose internal Explore detail paths in live concierge answers while the feature remains disabled; use approved external actions where supplied.
+Explore is intentionally disabled in the live v5.11.1 release. Do not delete its pages, structured records or media. Restore it only after the planned Explore rebuild and review by changing the protected deployment feature variable. Do not expose internal Explore detail paths in live concierge answers while the feature remains disabled; use approved external actions where supplied.
 
 Completed content modules:
 

@@ -991,6 +991,42 @@ export class ConciergeStore extends DurableObject {
     ))[0] || null;
   }
 
+  async setInPersonRegistrationStatus(reservationId, status, nowValue) {
+    const nextStatus = status === "in_person_complete" ? "in_person_complete"
+      : status === "in_person_pending" ? "in_person_pending" : "";
+    if (!nextStatus) return { ok: false, error: "invalid_registration_status" };
+    const cleanReservationId = cleanText(reservationId, 100);
+    const current = rows(this.ctx.storage.sql.exec(
+      `SELECT guest_type AS guestType, required_passports AS requiredPassports,
+              received_passports AS receivedPassports, status
+       FROM stay_registration_requirements WHERE reservation_id = ? LIMIT 1`,
+      cleanReservationId
+    ))[0];
+    if (!current || current.guestType !== "foreign" || Number(current.requiredPassports) < 1) {
+      return { ok: false, error: "foreign_registration_required" };
+    }
+    if (nextStatus === "in_person_complete" && current.status !== "in_person_pending") {
+      return { ok: false, error: "in_person_handover_not_requested" };
+    }
+    const updatedAt = cleanText(nowValue, 40) || new Date().toISOString();
+    this.ctx.storage.sql.exec(
+      `UPDATE stay_registration_requirements SET status = ?, updated_at = ?
+       WHERE reservation_id = ?`,
+      nextStatus,
+      updatedAt,
+      cleanReservationId
+    );
+    await this.setStayRegistrationStatus(cleanReservationId, nextStatus, updatedAt);
+    return {
+      ok: true,
+      guestType: current.guestType,
+      requiredPassports: Number(current.requiredPassports) || 0,
+      receivedPassports: Number(current.receivedPassports) || 0,
+      status: nextStatus,
+      updatedAt
+    };
+  }
+
   async closePendingPassportLinksForReservation(reservationId, nowValue) {
     const now = cleanText(nowValue, 40) || new Date().toISOString();
     this.ctx.storage.sql.exec(

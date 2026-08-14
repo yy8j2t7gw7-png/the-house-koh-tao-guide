@@ -1,6 +1,6 @@
 # Product Roadmap
 
-Baseline: v5.11.0
+Baseline: v5.11.1
 
 ## Completed
 
@@ -76,6 +76,9 @@ Baseline: v5.11.0
 - [x] Revalidate verified access against updated synchronized checkout dates
 - [x] Require a fresh same-reservation Airbnb confirmation check for every after-hours spare-key release
 - [x] Present protected lost-key access as an on-demand room-dashboard option rather than a prominent welcome panel
+- [x] Standardize the secure verification page on the shared single-line desktop header and add a discreet owner-dashboard login entry
+- [x] Offer secure upload or in-person passport presentation for every declared non-Thai overnight guest
+- [x] Keep in-person registrations locked until protected owner confirmation of the manual passport check and TM30 completion
 
 ## Current priority — v5.10.x Verified Guest Launch
 
@@ -97,6 +100,7 @@ The concierge must be useful to real guests before further Explore expansion.
 - [x] Verify the complete passport flow with a non-sensitive test image
 - [ ] Supply the authoritative TM30 manual-entry field specification
 - [ ] Add the secure manual-details alternative after that specification is approved
+- [x] Add a no-upload in-person passport-handover alternative without collecting passport details in the platform
 - [x] Prepare Airbnb scheduled messages as the automatic pre-arrival passport reminder
 - [ ] Confirm the dedicated 24/7 property-emergency person and number
 - [x] Use one permanent URL per active room with protected reservation verification
@@ -116,7 +120,7 @@ Guests may continue using ordinary WhatsApp handoffs. Automated internal alerts 
 
 - [x] Push the v5.5.0 release to the existing hosting workflow
 - [x] Confirm `/api/concierge/status` reports AI and learning enabled
-- [ ] Deploy v5.11.0 and confirm full-page language switching, recommendations, verified group registration, direct stays, stay extensions, maintenance reporting, on-demand lost-key access and alert console
+- [ ] Deploy v5.11.1 and confirm the shared verification header, admin login entry, full-page language switching, recommendations, verified group registration, direct stays, stay extensions, maintenance reporting, on-demand lost-key access and alert console
 - [x] Add `STAY_TOKEN_PEPPER` and `RESERVATION_SYNC_TOKEN` Worker secrets
 - [ ] Add protected `SPARE_KEY_CODES` Worker secret before activating automatic spare-key release
 - [x] Install and authorize the included Airbnb Google Apps Script synchronizer

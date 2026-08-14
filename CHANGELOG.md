@@ -2,6 +2,30 @@
 
 All notable changes to The House – Koh Tao guest guide are recorded here.
 
+## v5.11.1 — Verification Header & Admin Entry
+
+### Changed
+
+- Removed the legacy narrow page-level header rules from secure guest verification so it now uses the canonical shared top bar, width, spacing and responsive menu.
+- Added a discreet translated **Admin login** button at the bottom of the secure guest-verification page, linking to the existing token-protected owner dashboard.
+- Refreshed translation-cache and release metadata to v5.11.1.
+- Replaced the upload-only foreign-guest step with two explicit routes: secure one-time upload or in-person presentation of all required passports.
+- Added reviewed seven-language wording for the in-person choice, pending state and privacy explanation.
+
+### Added
+
+- A reservation-bound in-person passport-handover status that stores no passport details.
+- A protected owner-dashboard confirmation action for completing the in-person passport check and manual TM30 registration.
+
+### Security
+
+- The new footer link exposes no owner data or credential. The dashboard remains protected by `CONCIERGE_ADMIN_TOKEN` and the existing no-store security policy.
+- Choosing in-person presentation never unlocks the guide. Access is granted only after the protected admin confirmation; the government TM30 submission remains manual.
+
+### Validation
+
+- All 49 automated tests pass, including seven-language coverage, protected admin authorization and the locked-until-confirmed in-person registration workflow.
+
 ## v5.11.0 — Guest Maintenance, Direct Stays & Owner Operations
 
 ### Added

@@ -2,6 +2,25 @@
 
 All notable changes to The House – Koh Tao guest guide are recorded here.
 
+## v5.11.4 — Concierge Startup & Contact Routing Fix
+
+### Fixed
+
+- Fixed a JavaScript initialization-order error that stopped the AI Concierge before its launcher, panel and contact interception were registered.
+- Restored the Concierge launcher and panel on operational guest pages, including Safari.
+- Restored concierge-first behavior for ordinary **Contact Us** buttons and extended it to ordinary House-support call buttons.
+
+### Preserved routing
+
+- Human handoff from inside the Concierge still routes stay support to Su.
+- House-arranged booking actions continue to use the centralized booking number.
+- Koh Tao Rescue, 1669 and other explicit emergency call actions remain direct and are never delayed by the Concierge.
+
+### Validation
+
+- Added a regression test that verifies page context is initialized before access-mode evaluation and that both House-support contact routes are intercepted.
+- All 53 automated tests pass.
+
 ## v5.11.3 — Readable Maintenance References
 
 ### Changed

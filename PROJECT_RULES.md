@@ -32,7 +32,7 @@ This route covers fresh towels, room cleaning, lost keys and lockouts, room supp
 
 The future AI Concierge should conduct routine stay-support conversations end-to-end. When human action or escalation is required, the handoff remains Su. Do not send routine stay requests to the booking route.
 
-All general public “Contact Us” actions must open the concierge first. Direct human telephone or WhatsApp actions appear only when the guest asks for a person, the concierge cannot resolve the request, or a human must take operational action.
+All general public “Contact Us” actions and ordinary House-support call actions must open the concierge first. Direct human telephone or WhatsApp actions appear only when the guest asks for a person, the concierge cannot resolve the request, or a human must take operational action. House-arranged booking calls and explicit emergency calls remain direct.
 
 ## Urgent property emergencies
 
@@ -152,9 +152,9 @@ Public interface rules:
 
 ## Current baseline
 
-Current release: v5.11.3.
+Current release: v5.11.4.
 
-Explore is intentionally disabled in the live v5.11.3 release. Do not delete its pages, structured records or media. Restore it only after the planned Explore rebuild and review by changing the protected deployment feature variable. Do not expose internal Explore detail paths in live concierge answers while the feature remains disabled; use approved external actions where supplied.
+Explore is intentionally disabled in the live v5.11.4 release. Do not delete its pages, structured records or media. Restore it only after the planned Explore rebuild and review by changing the protected deployment feature variable. Do not expose internal Explore detail paths in live concierge answers while the feature remains disabled; use approved external actions where supplied.
 
 Completed content modules:
 

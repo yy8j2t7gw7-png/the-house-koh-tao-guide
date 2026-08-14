@@ -699,6 +699,15 @@ test("main and room welcome pages make required registration prominent", async (
   assert.equal(house, canonicalHouse);
 });
 
+test("concierge initializes safely and keeps public support buttons concierge-first", async () => {
+  const script = await readFile(new URL("../public/ai-concierge.js", import.meta.url), "utf8");
+  const pageDeclaration = script.indexOf("const currentPage =");
+  const accessDeclaration = script.indexOf("const guestAccessMode =");
+  assert.ok(pageDeclaration >= 0 && accessDeclaration > pageDeclaration);
+  assert.match(script, /\[data-link="houseWhatsapp"\],\[data-link="houseCall"\]/);
+  assert.match(script, /event\.preventDefault\(\);\s*openPanel\(\{ askRoom: true \}\)/);
+});
+
 test("guest localization supports seven languages and keeps the owner dashboard English", async () => {
   const [runtime, guideApp, passport, admin] = await Promise.all([
     readFile(new URL("../public/i18n.js", import.meta.url), "utf8"),
@@ -717,7 +726,7 @@ test("guest localization supports seven languages and keeps the owner dashboard 
   assert.doesNotMatch(admin, /src="\/i18n\.js"/);
   assert.match(runtime, /exploreContentDeferred/);
   assert.match(runtime, /element\.closest\("\.section,\.footer"\)/);
-  assert.match(runtime, /houseGuideTranslations:v5\.11\.3:/);
+  assert.match(runtime, /houseGuideTranslations:v5\.11\.4:/);
   assert.match(runtime, /MAX_REQUEST_RETRIES = 2/);
   assert.match(runtime, /let flushRunning = false/);
 });

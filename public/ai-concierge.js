@@ -2,15 +2,15 @@
   const cfg = window.AI_CONCIERGE_CONFIG;
   if (!cfg || !cfg.enabled) return;
 
+  const pagePath = location.pathname;
+  const currentPage = /^\/room\/(?:\d+)\/?$/.test(pagePath)
+    ? "room.html"
+    : (pagePath.split("/").filter(Boolean).pop() || "index.html");
   const guestAccessMode = document.body.dataset.guestAccess || (currentPage === "emergency.html" ? "public" : "granted");
   const isPublicAccess = guestAccessMode !== "granted";
 
   const contacts = window.HOUSE_GUIDE || {};
   const roomOptions = (cfg.roomOptions || ["1", "2", "3", "4", "5", "6", "8", "9", "10", "11"]).map(String);
-  const pagePath = location.pathname;
-  const currentPage = /^\/room\/(?:\d+)\/?$/.test(pagePath)
-    ? "room.html"
-    : (pagePath.split("/").filter(Boolean).pop() || "index.html");
   const pagePrompts = cfg.pagePrompts?.[currentPage] || cfg.defaultPrompts || [];
   const availableQuickActions = isPublicAccess ? (cfg.publicQuickActions || []) : (cfg.quickActions || []);
 
@@ -597,7 +597,7 @@
       submitQuestion(promptTrigger.dataset.conciergePrompt);
       return;
     }
-    const contactLink = event.target.closest('[data-action="contact"],[data-link="houseWhatsapp"]');
+    const contactLink = event.target.closest('[data-action="contact"],[data-link="houseWhatsapp"],[data-link="houseCall"]');
     if (!contactLink || panel.contains(contactLink) || contactLink.dataset.conciergeHumanHandoff) return;
     event.preventDefault();
     openPanel({ askRoom: true });

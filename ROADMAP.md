@@ -1,6 +1,6 @@
 # Product Roadmap
 
-Baseline: v5.11.7
+Baseline: v5.11.8
 
 ## Completed
 
@@ -83,6 +83,7 @@ Baseline: v5.11.7
 - [x] Revalidate verified access against updated synchronized checkout dates
 - [x] Use the verified active room-bound session for after-hours spare-key release without asking the guest to repeat the stay code
 - [x] Present protected lost-key access as an on-demand room-dashboard option rather than a prominent welcome panel
+- [x] Wire the rendered AI Concierge spare-key CTA to the protected two-step fee flow on the active room page
 - [x] Standardize the secure verification page on the shared single-line desktop header and add a discreet owner-dashboard login entry
 - [x] Offer secure upload or in-person passport presentation for every declared non-Thai overnight guest
 - [x] Keep in-person registrations locked until protected owner confirmation of the manual passport check and TM30 completion
@@ -132,7 +133,7 @@ Guests may continue using ordinary WhatsApp handoffs. Automated internal alerts 
 
 - [x] Push the v5.5.0 release to the existing hosting workflow
 - [x] Confirm `/api/concierge/status` reports AI and learning enabled
-- [ ] Deploy v5.11.7 and confirm concierge startup, owner-inclusive actionable routing, confirmed urgent-property alerts, verified-session lost-key release, first-name greeting, office-hours, luggage handling, full-page language switching, registration, maintenance reporting and the alert console
+- [ ] Deploy v5.11.8 and confirm concierge startup, owner-inclusive actionable routing, confirmed urgent-property alerts, verified-session lost-key release, first-name greeting, office-hours, luggage handling, full-page language switching, registration, maintenance reporting and the alert console
 - [x] Add `STAY_TOKEN_PEPPER` and `RESERVATION_SYNC_TOKEN` Worker secrets
 - [ ] Add protected `SPARE_KEY_CODES` Worker secret before activating automatic spare-key release
 - [x] Install and authorize the included Airbnb Google Apps Script synchronizer

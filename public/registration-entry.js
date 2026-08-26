@@ -257,6 +257,10 @@
     event.preventDefault();
     openSpareKeyAccess();
   });
+  window.addEventListener("house:open-spare-key", openSpareKeyAccess);
+  window.addEventListener("hashchange", () => {
+    if (window.location.hash === "#spareKeyAccess") openSpareKeyAccess();
+  });
   spareKeyClose?.addEventListener("click", closeSpareKeyAccess);
   document.getElementById("continueLostKeyRequest")?.addEventListener("click", () => {
     if (lostKeyFeeIntroduction) lostKeyFeeIntroduction.hidden = true;

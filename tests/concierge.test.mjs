@@ -362,6 +362,8 @@ test("critical guest requests stay deterministic and room-aware", async () => {
   assert.equal(response.status, 200);
   assert.equal(body.intentId, "lost_key");
   assert.match(body.answer, /500 THB/);
+  assert.equal(body.actions[0].type, "spare-key");
+  assert.equal(body.actions[0].label, "Secure spare-key access");
   assert.equal(body.source, "approved");
   assert.match(body.interactionId, /^int_/);
   assert.equal(store.interactions[0].room, "6");
@@ -744,6 +746,29 @@ test("concierge initializes safely and keeps public support buttons concierge-fi
   assert.match(script, /event\.preventDefault\(\);\s*openPanel\(\{ askRoom: true \}\)/);
 });
 
+test("rendered Concierge spare-key CTA opens the protected fee flow", async () => {
+  const [concierge, registrationEntry, room] = await Promise.all([
+    readFile(new URL("../public/ai-concierge.js", import.meta.url), "utf8"),
+    readFile(new URL("../public/registration-entry.js", import.meta.url), "utf8"),
+    readFile(new URL("../public/room.html", import.meta.url), "utf8")
+  ]);
+
+  assert.match(concierge, /type: "spare-key",\s*label: interpolate/);
+  assert.match(concierge, /data-spare-key-access="true"/);
+  assert.match(concierge, /link\.dataset\.spareKeyAccess = "true"/);
+  assert.match(concierge, /event\.target\.closest\("\[data-spare-key-access\]"\)/);
+  assert.match(concierge, /event\.preventDefault\(\);[\s\S]*closePanel\(\);[\s\S]*house:open-spare-key/);
+  assert.match(concierge, /window\.location\.assign\(target\.href\)/);
+  assert.match(registrationEntry, /window\.addEventListener\("house:open-spare-key", openSpareKeyAccess\)/);
+  assert.match(registrationEntry, /window\.addEventListener\("hashchange", \(\) =>/);
+  assert.match(registrationEntry, /if \(window\.location\.hash === "#spareKeyAccess"\) openSpareKeyAccess\(\)/);
+  assert.match(room, /id="lostKeyFeeIntroduction"/);
+  assert.match(room, /id="lostKeyFeeConfirmation" hidden/);
+  assert.match(room, /id="lostKeyFeeAccepted"[^>]*required/);
+  assert.match(room, />Accept fee &amp; continue<\/button>/);
+  assert.doesNotMatch(room, /lostKeyConfirmationCode/);
+});
+
 test("guest localization supports seven languages and keeps the owner dashboard English", async () => {
   const [runtime, guideApp, passport, admin] = await Promise.all([
     readFile(new URL("../public/i18n.js", import.meta.url), "utf8"),
@@ -762,7 +787,7 @@ test("guest localization supports seven languages and keeps the owner dashboard 
   assert.doesNotMatch(admin, /src="\/i18n\.js"/);
   assert.match(runtime, /exploreContentDeferred/);
   assert.match(runtime, /element\.closest\("\.section,\.footer"\)/);
-  assert.match(runtime, /houseGuideTranslations:v5\.11\.7:/);
+  assert.match(runtime, /houseGuideTranslations:v5\.11\.8:/);
   assert.match(runtime, /MAX_REQUEST_RETRIES = 2/);
   assert.match(runtime, /let flushRunning = false/);
 });

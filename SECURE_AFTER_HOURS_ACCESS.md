@@ -10,7 +10,7 @@
 
 This window defines after-hours handling only. It does not define reception, office or property operating hours.
 
-## v5.11.7 verified-stay flow
+## v5.11.8 verified-stay flow
 
 1. Every active Room 1–6 and 8–11 has one permanent page listed in `AIRBNB_AUTOMATION_SETUP.md`. Room 7 is inactive.
 2. Airbnb reservations arrive through the synchronizer with the minimum record: listing ID, room, confirmation code, check-in, checkout and status. An authorized owner may create a direct/walk-in reservation from the console with room and dates.
@@ -52,7 +52,7 @@ Automatic key release fails closed when WhatsApp is incomplete, no urgent recipi
 
 ## Activation checklist
 
-1. Deploy v5.11.7.
+1. Deploy v5.11.8.
 2. Add `STAY_TOKEN_PEPPER` and `RESERVATION_SYNC_TOKEN` as separate long random Worker secrets.
 3. Add real current codes only to the encrypted `SPARE_KEY_CODES` Worker secret.
 4. Configure the official WhatsApp Business Platform and protected `urgent` recipients using `WHATSAPP_ALERT_OPERATIONS.md`.

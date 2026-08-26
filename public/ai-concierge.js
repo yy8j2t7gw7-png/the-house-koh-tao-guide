@@ -146,6 +146,7 @@
     if (action.type === "spare-key") {
       const href = selectedRoom ? `/room/${selectedRoom}#spareKeyAccess` : "";
       return href ? {
+        type: "spare-key",
         label: interpolate(action.label || "Secure spare-key access", context),
         href,
         style: action.style || "",
@@ -218,7 +219,7 @@
       </a>`;
     }
     if (action.type === "spare-key" && selectedRoom) {
-      return `<a class="ai-concierge-action" href="/room/${selectedRoom}#spareKeyAccess">
+      return `<a class="ai-concierge-action" href="/room/${selectedRoom}#spareKeyAccess" data-spare-key-access="true">
         <span aria-hidden="true">${action.icon}</span><span>${action.label}</span>
       </a>`;
     }
@@ -325,6 +326,8 @@
           link.dataset.serverQuestion = action.question || question;
         } else if (action.type === "dismiss") {
           link.dataset.dismissAction = "true";
+        } else if (action.type === "spare-key") {
+          link.dataset.spareKeyAccess = "true";
         } else {
           link.dataset.action = "conciergeHandoff";
           link.dataset.conciergeHumanHandoff = "true";
@@ -576,6 +579,19 @@
   panel.querySelector("[data-close-room-selector]").addEventListener("click", closeRoomSelector);
 
   panel.addEventListener("click", (event) => {
+    const spareKeyAccess = event.target.closest("[data-spare-key-access]");
+    if (spareKeyAccess) {
+      event.preventDefault();
+      const target = new URL(spareKeyAccess.href, window.location.href);
+      closePanel();
+      if (target.pathname === window.location.pathname) {
+        if (window.location.hash !== "#spareKeyAccess") history.pushState(null, "", target.href);
+        window.dispatchEvent(new CustomEvent("house:open-spare-key"));
+      } else {
+        window.location.assign(target.href);
+      }
+      return;
+    }
     const serverAction = event.target.closest("[data-server-action]");
     if (serverAction) {
       runServerAction(serverAction);

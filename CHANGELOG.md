@@ -2,6 +2,24 @@
 
 All notable changes to The House – Koh Tao guest guide are recorded here.
 
+## v5.11.8 — Secure Spare-Key CTA Wiring Fix
+
+### Fixed
+
+- Fixed the AI Concierge **Secure spare-key access** CTA doing nothing when selected from an already-open verified Room page.
+- Preserved the `spare-key` action type when the server action is rendered so the browser can distinguish it from an ordinary human-handoff link.
+- Added explicit handling that closes the Concierge, navigates to the protected room section and dispatches the lost-key opening transition on the same room page.
+- Added hash-change and dedicated event listeners to open the protected fee flow even when the room page does not reload.
+- Wired the optional Concierge quick-action CTA through the same protected path.
+
+### Security and validation
+
+- Fee acceptance remains explicit and the protected alert is sent only after acceptance.
+- No accepted WhatsApp submission means no key-box code release.
+- Verified active stay, room binding, after-hours timing and rotation lock remain mandatory.
+- Lost-key alerts remain excluded from generic urgent escalation.
+- Added a rendered-path regression test covering the Concierge CTA, browser transition and protected fee UI.
+
 ## v5.11.7 — Operational Alert Routing & Confirmed Emergency Actions
 
 ### Changed

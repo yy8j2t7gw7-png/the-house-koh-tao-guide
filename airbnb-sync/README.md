@@ -8,7 +8,7 @@ It combines:
 - Airbnb host confirmation/change/cancellation emails in the connected Gmail account, for reservation codes when the iCal event does not include them;
 - the protected Cloudflare reservation-ingestion endpoint.
 
-Only the minimum normalized fields are sent to the Worker: listing ID, room number, confirmation code, check-in date, check-out date and reservation status. The Worker immediately hashes the confirmation code. Full email bodies, names, phone numbers, email addresses and payment information are never transmitted.
+Only the minimum normalized fields are sent to the Worker: listing ID, room number, confirmation code, check-in date, check-out date, reservation status and—when it can be extracted conservatively—the guest's first name. The Worker immediately hashes the confirmation code. Full names, full email bodies, phone numbers, email addresses and payment information are never transmitted. The optional first name is validated, stored only with the protected reservation record and used only for the verified room greeting.
 
 Room 7 is intentionally inactive. The active mapping is fixed to the ten verified Airbnb listing IDs supplied by the owner.
 

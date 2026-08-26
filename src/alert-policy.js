@@ -82,6 +82,16 @@ export function classifyConciergeAlert({ result, question, room, now = new Date(
     };
   }
 
+  if (result.intentId === "luggage_storage") {
+    return {
+      ...base,
+      alertType: "luggage_storage",
+      severity: "attention",
+      recipientGroup: "support",
+      escalationRequired: false
+    };
+  }
+
   if (result.handoff === "stay_support") {
     return {
       ...base,

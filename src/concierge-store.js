@@ -164,6 +164,7 @@ export class ConciergeStore extends DurableObject {
           listing_id TEXT NOT NULL,
           room TEXT NOT NULL,
           confirmation_code_hash TEXT NOT NULL UNIQUE,
+          guest_first_name TEXT NOT NULL DEFAULT '',
           check_in_date TEXT NOT NULL,
           check_out_date TEXT NOT NULL,
           status TEXT NOT NULL DEFAULT 'confirmed',
@@ -241,6 +242,11 @@ export class ConciergeStore extends DurableObject {
           updated_at TEXT NOT NULL
         );
       `);
+      try {
+        this.ctx.storage.sql.exec("ALTER TABLE stay_reservations ADD COLUMN guest_first_name TEXT NOT NULL DEFAULT ''");
+      } catch (_error) {
+        // Existing deployments already have the column after the first v5.11.5 initialization.
+      }
     });
   }
 
@@ -768,13 +774,14 @@ export class ConciergeStore extends DurableObject {
       const status = record.status === "cancelled" ? "cancelled" : "confirmed";
       this.ctx.storage.sql.exec(
         `INSERT INTO stay_reservations
-         (id, provider, listing_id, room, confirmation_code_hash, check_in_date,
+         (id, provider, listing_id, room, confirmation_code_hash, guest_first_name, check_in_date,
           check_out_date, status, source_ref_hash, last_seen_sync, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(confirmation_code_hash) DO UPDATE SET
            provider = excluded.provider,
            listing_id = excluded.listing_id,
            room = excluded.room,
+           guest_first_name = CASE WHEN excluded.guest_first_name != '' THEN excluded.guest_first_name ELSE stay_reservations.guest_first_name END,
            check_in_date = excluded.check_in_date,
            check_out_date = excluded.check_out_date,
            status = excluded.status,
@@ -786,6 +793,7 @@ export class ConciergeStore extends DurableObject {
         listingId,
         room,
         codeHash,
+        cleanText(record.guestFirstName, 40),
         checkInDate,
         checkOutDate,
         status,
@@ -822,7 +830,7 @@ export class ConciergeStore extends DurableObject {
 
   async getStayReservationByCodeHash(codeHash, room) {
     return rows(this.ctx.storage.sql.exec(
-      `SELECT id, provider, listing_id AS listingId, room,
+      `SELECT id, provider, listing_id AS listingId, room, guest_first_name AS guestFirstName,
               check_in_date AS checkInDate,
               CASE WHEN o.check_out_date > r.check_out_date THEN o.check_out_date ELSE r.check_out_date END AS checkOutDate,
               r.status, r.updated_at AS updatedAt
@@ -854,7 +862,7 @@ export class ConciergeStore extends DurableObject {
   async getVerifiedStaySession(tokenHash, nowValue) {
     const session = rows(this.ctx.storage.sql.exec(
       `SELECT s.id, s.reservation_id AS reservationId, s.room, s.created_at AS createdAt,
-              s.expires_at AS expiresAt, r.provider, r.listing_id AS listingId,
+              s.expires_at AS expiresAt, r.provider, r.listing_id AS listingId, r.guest_first_name AS guestFirstName,
               r.check_in_date AS checkInDate,
               CASE WHEN o.check_out_date > r.check_out_date THEN o.check_out_date ELSE r.check_out_date END AS checkOutDate,
               r.status AS reservationStatus
@@ -1262,7 +1270,7 @@ export class ConciergeStore extends DurableObject {
 
   async getStayOperationsOverview() {
     const reservations = rows(this.ctx.storage.sql.exec(
-      `SELECT r.id, r.provider, r.room, r.listing_id AS listingId, r.check_in_date AS checkInDate,
+      `SELECT r.id, r.provider, r.room, r.listing_id AS listingId, r.guest_first_name AS guestFirstName, r.check_in_date AS checkInDate,
               CASE WHEN o.check_out_date > r.check_out_date THEN o.check_out_date ELSE r.check_out_date END AS checkOutDate,
               r.status, r.updated_at AS updatedAt,
               COALESCE(q.status, g.status, 'not_started') AS registrationStatus,

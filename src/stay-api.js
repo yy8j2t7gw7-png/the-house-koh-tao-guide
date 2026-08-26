@@ -172,6 +172,11 @@ function activeStay(reservation, now = new Date()) {
     && now < new Date(`${reservation.checkOutDate}T11:00:00+07:00`);
 }
 
+function cleanGuestFirstName(value) {
+  const name = String(value || "").trim().replace(/[^\p{L}' -]/gu, "").replace(/\s+/g, " ").slice(0, 40);
+  return name.length >= 2 ? name : "";
+}
+
 async function rateAllowed(env, request, purpose) {
   const binding = purpose === "spare-key" ? env.SPARE_KEY_RATE_LIMITER : env.STAY_VERIFY_RATE_LIMITER;
   if (!binding?.limit) return true;
@@ -287,6 +292,7 @@ export async function handleReservationSyncRequest(request, env) {
     if (!confirmationCode || !checkInDate || !checkOutDate || checkOutDate < checkInDate) continue;
     records.push({
       confirmationCodeHash: await hmac(`reservation:${confirmationCode}`, env.STAY_TOKEN_PEPPER),
+      guestFirstName: cleanGuestFirstName(record?.guestFirstName),
       checkInDate,
       checkOutDate,
       status: record?.status === "cancelled" ? "cancelled" : "confirmed",
@@ -331,6 +337,7 @@ export async function handleStayGuestRequest(request, env, path, ctx, now = new 
       afterHours: isAfterHours(now),
       registrationStatus,
       accessGranted: registrationComplete(registrationStatus),
+      guestFirstName: session.guestFirstName || "",
       guestType: registration?.guestType || (registrationStatus === "thai_exempt" ? "thai" : ""),
       requiredPassports: Number(registration?.requiredPassports) || 0,
       receivedPassports: Number(registration?.receivedPassports) || (registrationStatus === "passport_received" ? 1 : 0),
@@ -367,6 +374,7 @@ export async function handleStayGuestRequest(request, env, path, ctx, now = new 
       ok: true,
       verified: true,
       room,
+      guestFirstName: reservation.guestFirstName || "",
       checkInDate: reservation.checkInDate,
       checkOutDate: reservation.checkOutDate
     }, 200, { "set-cookie": sessionCookie(token, maximumAge) });
@@ -524,6 +532,7 @@ export async function handleStayGuestRequest(request, env, path, ctx, now = new 
     if (!details) return json({ error: "invalid_room" }, 400);
     return json({
       room,
+      guestFirstName: access.session?.guestFirstName || "",
       floor: details.floor,
       note: details.note,
       roomPhotoUrl: `/api/stay/room-photo?room=${encodeURIComponent(room)}`,

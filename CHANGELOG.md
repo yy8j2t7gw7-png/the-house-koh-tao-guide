@@ -2,6 +2,27 @@
 
 All notable changes to The House – Koh Tao guest guide are recorded here.
 
+## v5.11.5 — Production WhatsApp Routing & Guest Operations
+
+### Added
+
+- Added separate Meta Utility-template payloads for service, booking, luggage, urgent and verified lost-key staff alerts.
+- Added actionable luggage-request classification and structured Su notifications containing room, arrival/departure context, bag count, requested time and sanitized notes.
+- Added conservative first-name-only extraction to Airbnb synchronization and personalized verified room greetings when a safe first name is available.
+- Added signed `RECEIVED <reference>` acknowledgement support while retaining `ACK` and `RESOLVE`.
+- Added reviewed translations for the exact office-hours and luggage-storage wording in all seven supported languages.
+
+### Changed
+
+- Published office hours as 10:30 AM–7:30 PM Bangkok time, Tuesday–Sunday, while preserving the 7:30 PM–10:30 AM after-hours window.
+- Routes routine stay support and luggage requests to Su, booking requests to Fah, and urgent or lost-key events to the protected configured team.
+
+### Security and validation
+
+- Full Airbnb names, email bodies, contact details, confirmation codes, passport data and key-box codes remain excluded from WhatsApp messages and public artifacts.
+- Automatic spare-key release remains fail closed until stay verification, after-hours timing, fee acceptance and at least one protected team-message submission all succeed.
+- All 54 automated tests pass, including template selection, luggage routing, guest-first-name synchronization and signed acknowledgement.
+
 ## v5.11.4 — Concierge Startup & Contact Routing Fix
 
 ### Fixed

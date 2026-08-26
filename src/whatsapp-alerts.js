@@ -5,10 +5,16 @@ import {
 } from "./alert-policy.js";
 
 const DEFAULT_GRAPH_VERSION = "v23.0";
-const DEFAULT_TEMPLATE_NAME = "house_concierge_alert";
 const DEFAULT_TEMPLATE_LANGUAGE = "en_US";
 const DEFAULT_ESCALATION_MINUTES = 10;
 const MAX_RECIPIENTS_PER_GROUP = 12;
+const TEMPLATE_DEFAULTS = Object.freeze({
+  service: "house_service_alert_v1",
+  booking: "house_booking_alert_v1",
+  luggage: "house_luggage_alert_v1",
+  urgent: "house_urgent_alert_v1",
+  lostKey: "house_lost_key_alert_v1"
+});
 
 function digits(value) {
   return String(value || "").replace(/\D/g, "");
@@ -57,10 +63,20 @@ export function whatsappAlertConfiguration(env) {
       env.META_APP_SECRET &&
       Object.values(groupCounts).some((count) => count > 0)
     ),
-    templateName: String(env.WHATSAPP_ALERT_TEMPLATE_NAME || DEFAULT_TEMPLATE_NAME),
+    templateNames: templateNames(env),
     templateLanguage: String(env.WHATSAPP_ALERT_TEMPLATE_LANGUAGE || DEFAULT_TEMPLATE_LANGUAGE),
     groupCounts,
     escalationMinutes: Math.min(60, Math.max(2, Number(env.WHATSAPP_ALERT_ESCALATION_MINUTES) || DEFAULT_ESCALATION_MINUTES))
+  };
+}
+
+function templateNames(env) {
+  return {
+    service: String(env.WHATSAPP_SERVICE_TEMPLATE_NAME || TEMPLATE_DEFAULTS.service),
+    booking: String(env.WHATSAPP_BOOKING_TEMPLATE_NAME || TEMPLATE_DEFAULTS.booking),
+    luggage: String(env.WHATSAPP_LUGGAGE_TEMPLATE_NAME || TEMPLATE_DEFAULTS.luggage),
+    urgent: String(env.WHATSAPP_URGENT_TEMPLATE_NAME || TEMPLATE_DEFAULTS.urgent),
+    lostKey: String(env.WHATSAPP_LOST_KEY_TEMPLATE_NAME || TEMPLATE_DEFAULTS.lostKey)
   };
 }
 
@@ -79,40 +95,63 @@ async function recipientHash(phone, env) {
   return sha256(`${env.CONCIERGE_HASH_SALT || env.META_APP_SECRET || "the-house-alert"}:${digits(phone)}`);
 }
 
-function severityLabel(severity) {
-  return {
-    critical: "CRITICAL",
-    urgent: "URGENT",
-    attention: "NEEDS ATTENTION"
-  }[severity] || "NOTICE";
-}
-
 function roomLabel(alert) {
   if (!alert.room) return "Room not selected";
   return alert.roomVerified ? `Room ${alert.room} (stay verified)` : `Room ${alert.room} (guest-selected)`;
 }
 
+function firstMatch(value, pattern, fallback) {
+  const match = String(value || "").match(pattern);
+  return String(match?.[1] || fallback).trim().slice(0, 120);
+}
+
+function textParameters(values) {
+  return values.map((value) => ({ type: "text", text: String(value || "Not provided").slice(0, 900) }));
+}
+
+function templateForAlert(alert, env) {
+  const names = templateNames(env);
+  // The stored alert summary is sanitized before this function is called.
+  // A validated reply number may be appended transiently for an urgent team message.
+  const summary = String(alert.summary || "Guest requested assistance.").slice(0, 900);
+  const room = roomLabel(alert);
+  const time = alert.bangkokTime || formatBangkokAlertTime(new Date(alert.createdAt));
+  const reference = alert.id;
+  if (alert.alertType === "verified_spare_key_release" || alert.alertType === "lost_key") {
+    return { name: names.lostKey, parameters: [reference, room, time] };
+  }
+  if (alert.alertType === "luggage_storage") {
+    const context = /\b(?:before|arrival|arriv(?:e|ing)|check[ -]?in)\b/i.test(summary) ? "Arrival" : /\b(?:after|departure|depart(?:ure|ing)|check[ -]?out)\b/i.test(summary) ? "Departure" : "Not provided";
+    const bags = firstMatch(summary, /\b(\d{1,2})\s*(?:bags?|suitcases?|pieces?)\b/i, "Not provided");
+    const requestedTime = firstMatch(summary, /\b(?:at|around|by)\s*((?:[01]?\d|2[0-3])(?::[0-5]\d)?\s*(?:am|pm)?)/i, "Not provided");
+    return { name: names.luggage, parameters: [reference, room, context, bags, requestedTime, summary] };
+  }
+  if (alert.alertType === "booking_request") {
+    const preferredTime = firstMatch(summary, /\b((?:today|tomorrow|tonight|(?:mon|tues|wednes|thurs|fri|satur|sun)day)(?:[^,.]{0,40})?)/i, "Not provided");
+    const guests = firstMatch(summary, /\b(\d{1,2})\s*(?:guests?|people|persons?|adults?)\b/i, "Not provided");
+    return { name: names.booking, parameters: [reference, room, summary, preferredTime, guests, summary] };
+  }
+  if (alert.severity === "critical" || alert.severity === "urgent") {
+    return { name: names.urgent, parameters: [reference, room, String(alert.alertType || "urgent request").replaceAll("_", " "), time, summary] };
+  }
+  return { name: names.service, parameters: [reference, room, String(alert.alertType || "guest request").replaceAll("_", " "), time, summary] };
+}
+
 function templatePayload(alert, recipient, env) {
   const summary = safeAlertSummary(alert.summary);
   const replyContact = privateReplyContact(alert.privateReplyContact);
+  const selected = templateForAlert({ ...alert, summary: replyContact ? `${summary} · Guest reply: ${replyContact}` : summary }, env);
   return {
     messaging_product: "whatsapp",
     recipient_type: "individual",
     to: recipient.phone,
     type: "template",
     template: {
-      name: String(env.WHATSAPP_ALERT_TEMPLATE_NAME || DEFAULT_TEMPLATE_NAME),
+      name: selected.name,
       language: { code: String(env.WHATSAPP_ALERT_TEMPLATE_LANGUAGE || DEFAULT_TEMPLATE_LANGUAGE) },
       components: [{
         type: "body",
-        parameters: [
-          { type: "text", text: severityLabel(alert.severity) },
-          { type: "text", text: roomLabel(alert) },
-          { type: "text", text: String(alert.alertType || "guest_request").replaceAll("_", " ") },
-          { type: "text", text: alert.bangkokTime || formatBangkokAlertTime(new Date(alert.createdAt)) },
-          { type: "text", text: replyContact ? `${summary} · Guest reply: ${replyContact}` : summary },
-          { type: "text", text: alert.id }
-        ]
+        parameters: textParameters(selected.parameters)
       }]
     }
   };
@@ -346,10 +385,10 @@ export async function handleWhatsAppWebhook(request, env) {
     }
     const from = digits(item.message?.from);
     const text = String(item.message?.text?.body || "").trim();
-    const match = text.match(/^(ACK|RESOLVE)\s+(alert_[A-Za-z0-9-]{20,})$/i);
+    const match = text.match(/^(RECEIVED|ACK|RESOLVE)\s+(alert_[A-Za-z0-9-]{20,})$/i);
     if (!match || !recipientIsAuthorized(from, env)) continue;
     const actor = await recipientHash(from, env);
-    if (match[1].toUpperCase() === "ACK") await store.acknowledgeAlert(match[2], actor, new Date().toISOString());
+    if (["RECEIVED", "ACK"].includes(match[1].toUpperCase())) await store.acknowledgeAlert(match[2], actor, new Date().toISOString());
     else await store.resolveAlert(match[2], actor, new Date().toISOString());
   }
   return new Response("OK", { status: 200 });

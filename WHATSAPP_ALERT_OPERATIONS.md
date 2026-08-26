@@ -2,54 +2,69 @@
 
 ## Purpose
 
-v5.10.1 contains the protected server-side alert channel for guest requests that require attention. Guests continue to use the website concierge. The Worker can notify configured owners or staff through the official WhatsApp Business Platform without exposing recipient numbers in public files.
+v5.11.5 provides a protected server-side staff-alert channel through the official Meta WhatsApp Business Platform. Guests continue to use the website Concierge. Recipient telephone numbers, access tokens and app secrets stay in encrypted Cloudflare secrets and never appear in public files, Git or release archives.
 
-The alert channel is separate from guest-facing contact buttons:
+Routing is role based:
 
-- routine stay requests route to the protected `support` group;
-- actionable House-arranged bookings route to `booking`;
-- after-hours lost keys route to `urgent`;
-- medical and serious property incidents route to `emergency`;
+- routine stay requests and actionable luggage requests route to Su through `support`;
+- House-arranged booking requests route to Fah through `booking`;
+- verified spare-key releases notify Su and the configured owners through `urgent`;
+- urgent or critical property incidents notify the configured urgent/emergency recipients;
 - unacknowledged urgent or critical alerts route to `escalation` after 10 minutes.
 
-A recommendation question alone does not create a booking alert. The guest must ask to book, reserve, arrange or check availability. Repeated identical alerts from the same session are deduplicated for five minutes.
+A recommendation question alone does not create a booking alert. The guest must ask to book, reserve, arrange or check availability. A luggage-information question remains informational; a request to store or arrange luggage creates an actionable support alert. Identical alerts from the same session are deduplicated for five minutes.
 
 ## Safety and privacy
 
-- Recipient names and numbers are stored only in a Cloudflare Worker secret.
-- The operational database stores recipient labels and salted one-way hashes, never the phone numbers.
-- Guest descriptions are sanitized before an alert is created.
-- Passport fields, key-box codes and private stay tokens are never included.
-- A displayed room number is guest-selected context, not identity verification.
-- The alert channel never contains or has access to a key-box code. Automatic spare-key release is a separate verified-stay operation: the system sends the protected `urgent` notification automatically and fails closed unless the WhatsApp API confirms at least one message submission. The guest confirms only the 500 THB fee and does not approve the staff notification.
+- Recipient numbers are stored only in `WHATSAPP_ALERT_RECIPIENTS`.
+- Delivery records contain recipient labels and salted one-way hashes, never telephone numbers.
+- Guest descriptions are sanitized before storage or delivery.
+- Passport data, confirmation codes, stay tokens, payment information and key-box codes are never included.
+- A verified guest reply number may be added only to the transient urgent delivery payload; it is not stored in the alert record.
+- A displayed room number is guest-selected context unless the alert explicitly says the stay is verified.
+- Automatic spare-key release remains separate and fail closed: a current verified stay, the 19:30–10:30 Bangkok window, 500 THB fee acceptance and at least one accepted protected team notification are all required. The guest does not approve the staff notification.
 - Alert records and delivery metadata are removed after 30 days.
+- The platform does not send automated outbound messages to Koh Tao Rescue, 1669, police, hospitals or clinics. Guest-facing emergency call actions remain direct.
 
-## Meta prerequisites
+## Production Meta templates
 
-Use the official Meta-hosted WhatsApp Cloud API. Meta requires a business portfolio, WhatsApp Business Account and business phone number. For production, use a system-user token with `whatsapp_business_management` and `whatsapp_business_messaging` rather than the short-lived test token.
+These English (`en_US`) Utility templates were created in WhatsApp Manager. The latest non-secret handover recorded them as **In review**. Confirm final approval before production activation. Names, body text and parameter order must remain exactly aligned with the code.
 
-Create and approve this Utility template in WhatsApp Manager:
-
-- Template name: `house_concierge_alert`
-- Language: English (`en_US`)
-- Body:
+### `house_service_alert_v1`
 
 ```text
-{{1}} guest alert from The House
-Location: {{2}}
-Type: {{3}}
-Bangkok time: {{4}}
-Details: {{5}}
-Reference: {{6}}
-
-Reply ACK {{6}} to acknowledge or RESOLVE {{6}} when handled.
+The House service request {{1}}. Room: {{2}}. Request: {{3}}. Time: {{4}} Bangkok time. Details: {{5}}. Please reply RECEIVED {{1}} to acknowledge this request.
 ```
 
-Internal recipients must agree to receive these operational messages. Template category and approval remain subject to Meta review.
+### `house_booking_alert_v1`
+
+```text
+The House booking enquiry {{1}}. Room: {{2}}. Service requested: {{3}}. Preferred date or time: {{4}}. Number of guests: {{5}}. Notes: {{6}}. Please reply RECEIVED {{1}} to acknowledge this enquiry.
+```
+
+### `house_luggage_alert_v1`
+
+```text
+The House luggage request {{1}}. Room: {{2}}. Arrival or departure: {{3}}. Number of bags: {{4}}. Requested time: {{5}} Bangkok time. Notes: {{6}}. Please reply RECEIVED {{1}} to acknowledge this request.
+```
+
+### `house_urgent_alert_v1`
+
+```text
+URGENT — The House alert {{1}}. Room: {{2}}. Type: {{3}}. Time: {{4}} Bangkok time. Summary: {{5}}. Please respond immediately and reply RECEIVED {{1}} to acknowledge this alert.
+```
+
+### `house_lost_key_alert_v1`
+
+```text
+The House lost-key alert {{1}}. Room: {{2}}. Time: {{3}} Bangkok time. The guest has requested urgent assistance. Please reply RECEIVED {{1}} to acknowledge this alert.
+```
+
+Template category and approval remain subject to Meta review. Do not activate production delivery until every template is approved.
 
 ## Cloudflare secrets
 
-Add these values in Worker **Settings → Variables and Secrets** as encrypted secrets:
+Add these values under Worker **Settings → Variables and Secrets** as encrypted secrets:
 
 ```text
 WHATSAPP_ACCESS_TOKEN
@@ -59,22 +74,14 @@ META_APP_SECRET
 WHATSAPP_ALERT_RECIPIENTS
 ```
 
-Keep the existing `CONCIERGE_HASH_SALT` configured as well. It salts the one-way recipient hashes stored with delivery metadata. If it is unavailable, the adapter falls back to the private Meta app secret rather than a public value.
+Keep `CONCIERGE_HASH_SALT` configured. `WHATSAPP_PHONE_NUMBER_ID` is Meta's numeric phone-number ID, not the displayed telephone number. Never copy any secret into this document, Git, screenshots or a release ZIP.
 
-`WHATSAPP_PHONE_NUMBER_ID` is Meta's numeric phone-number ID, not the displayed telephone number.
-
-Generate `WHATSAPP_WEBHOOK_VERIFY_TOKEN` as a new long random secret. `META_APP_SECRET` comes from the Meta app settings.
-
-Use this JSON structure for `WHATSAPP_ALERT_RECIPIENTS`. Replace every example with a real protected recipient. Use international digits and no `+` sign.
+Use this structure for `WHATSAPP_ALERT_RECIPIENTS`, replacing examples directly in Cloudflare:
 
 ```json
 {
-  "support": [
-    { "label": "Stay support", "phone": "66XXXXXXXXX" }
-  ],
-  "booking": [
-    { "label": "Booking", "phone": "66XXXXXXXXX" }
-  ],
+  "support": [{ "label": "Stay support", "phone": "66XXXXXXXXX" }],
+  "booking": [{ "label": "Booking", "phone": "66XXXXXXXXX" }],
   "urgent": [
     { "label": "Owner 1", "phone": "66XXXXXXXXX" },
     { "label": "Stay support", "phone": "66XXXXXXXXX" }
@@ -92,54 +99,53 @@ Use this JSON structure for `WHATSAPP_ALERT_RECIPIENTS`. Replace every example w
 }
 ```
 
-The same person may appear in more than one role. A maximum of 12 unique numbers is accepted per group.
+The same person may appear in multiple roles. Each group accepts at most 12 unique numbers.
 
-## Webhook
+## Webhook and acknowledgements
 
-In the Meta app dashboard, configure the callback URL:
+Configure this callback in the Meta app:
 
 ```text
 https://YOUR-WORKER-DOMAIN/api/whatsapp/webhook
 ```
 
-Use the same value stored in `WHATSAPP_WEBHOOK_VERIFY_TOKEN` for webhook verification. Subscribe the WhatsApp Business Account to message and message-status webhooks. Incoming POST events are rejected unless their `x-hub-signature-256` matches `META_APP_SECRET`.
+Use `WHATSAPP_WEBHOOK_VERIFY_TOKEN` for verification and subscribe the WhatsApp Business Account to message and message-status webhooks. Incoming POST events are rejected unless `x-hub-signature-256` matches `META_APP_SECRET`.
 
 Authorized recipients may reply:
 
 ```text
-ACK alert_REFERENCE
+RECEIVED alert_REFERENCE
 RESOLVE alert_REFERENCE
 ```
 
-Acknowledgement stops the pending escalation. Resolution closes the alert. The protected owner console also provides **Acknowledge** and **Resolve** buttons.
+`ACK alert_REFERENCE` remains accepted for backwards compatibility. Acknowledgement stops escalation; resolution closes the alert. The protected owner console also provides both actions.
 
 ## Non-secret variables
 
-The release contains these defaults in `wrangler.jsonc`:
+`wrangler.jsonc` contains these defaults:
 
 ```text
 WHATSAPP_GRAPH_API_VERSION=v23.0
-WHATSAPP_ALERT_TEMPLATE_NAME=house_concierge_alert
+WHATSAPP_SERVICE_TEMPLATE_NAME=house_service_alert_v1
+WHATSAPP_BOOKING_TEMPLATE_NAME=house_booking_alert_v1
+WHATSAPP_LUGGAGE_TEMPLATE_NAME=house_luggage_alert_v1
+WHATSAPP_URGENT_TEMPLATE_NAME=house_urgent_alert_v1
+WHATSAPP_LOST_KEY_TEMPLATE_NAME=house_lost_key_alert_v1
 WHATSAPP_ALERT_TEMPLATE_LANGUAGE=en_US
 WHATSAPP_ALERT_ESCALATION_MINUTES=10
 ```
 
-Change the Graph API version only after reviewing Meta's current supported versions. The scheduled Worker trigger checks once per minute for overdue escalations.
+Review Meta's supported Graph API versions before changing the version. The Worker checks once per minute for overdue escalations.
 
-## Verification
+## Production verification
 
-1. Deploy after all secrets and the approved template are ready.
-2. Open `/api/concierge/status` and confirm `whatsappAlertsConfigured: true`.
-3. Open `/concierge-admin` and confirm the alert panel says **WhatsApp connected**.
-4. Use non-sensitive test text from a room page:
-   - “Please clean my room.” → support
-   - “Can you help me book snorkelling?” → booking
-   - “I lost my key.” after 19:30 Bangkok → urgent
-   - “There is a serious water leak in my room.” → emergency
-5. Confirm the expected recipients receive only the sanitized summary and guest-selected room context.
-6. Reply `ACK` with the exact alert reference, then confirm the owner console changes to acknowledged.
-7. Repeat a critical test without acknowledgement and confirm the escalation group receives it after approximately 10 minutes.
-8. Resolve every test alert and remove test recipient values if they are no longer needed.
-9. With a temporary `SPARE_KEY_CODES` value and verified test stay, confirm the guest sees no code when the urgent group is missing or WhatsApp rejects delivery.
+1. Confirm business verification, the WhatsApp display name and all five templates are approved.
+2. Add the secrets and recipient groups, then deploy.
+3. Confirm `/api/concierge/status` reports `whatsappAlertsConfigured: true` and the owner console says **WhatsApp connected**.
+4. Test with non-sensitive requests: room cleaning → support, luggage arrangement → support/Su, snorkelling booking → booking/Fah, serious leak → emergency, and a verified lost-key event → urgent team.
+5. Confirm messages use the correct template and contain only the intended sanitized fields.
+6. Reply `RECEIVED` with the exact reference and confirm escalation stops; then test `RESOLVE`.
+7. Test one unacknowledged urgent event and confirm escalation after approximately 10 minutes.
+8. Only after the protected channel passes should a temporary `SPARE_KEY_CODES` value be tested. Rotate it immediately afterward.
 
-If the WhatsApp configuration is incomplete, alerts still appear in the protected owner console and the guest concierge remains usable. Delivery attempts show `not_configured` without exposing a credential error to guests.
+If configuration is incomplete, alerts remain visible in the protected owner console and ordinary Concierge use continues. Automatic spare-key release remains unavailable by design.

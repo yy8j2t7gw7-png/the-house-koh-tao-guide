@@ -17,7 +17,11 @@
     "PASSPORT_RETENTION_DAYS": "14",
     "MAINTENANCE_RETENTION_DAYS": "30",
     "WHATSAPP_GRAPH_API_VERSION": "v23.0",
-    "WHATSAPP_ALERT_TEMPLATE_NAME": "house_concierge_alert",
+    "WHATSAPP_SERVICE_TEMPLATE_NAME": "house_service_alert_v1",
+    "WHATSAPP_BOOKING_TEMPLATE_NAME": "house_booking_alert_v1",
+    "WHATSAPP_LUGGAGE_TEMPLATE_NAME": "house_luggage_alert_v1",
+    "WHATSAPP_URGENT_TEMPLATE_NAME": "house_urgent_alert_v1",
+    "WHATSAPP_LOST_KEY_TEMPLATE_NAME": "house_lost_key_alert_v1",
     "WHATSAPP_ALERT_TEMPLATE_LANGUAGE": "en_US",
     "WHATSAPP_ALERT_ESCALATION_MINUTES": "10"
   },

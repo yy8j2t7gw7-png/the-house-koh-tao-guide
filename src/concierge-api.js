@@ -21,7 +21,7 @@ import {
 } from "./whatsapp-alerts.js";
 import { getGuestAccess, handleStayAdminRequest, stayConfiguration } from "./stay-api.js";
 
-const RELEASE = "5.11.4";
+const RELEASE = "5.11.5";
 const ROOM_OPTIONS = new Set(["1", "2", "3", "4", "5", "6", "8", "9", "10", "11"]);
 const MAX_HISTORY_ITEMS = 10;
 const MAX_QUESTION_LENGTH = 800;
@@ -451,6 +451,18 @@ function applyLiveFeaturePolicy(result, env) {
   return { ...result, actions };
 }
 
+function applyActionableLuggagePolicy(result, question) {
+  if (result.intentId !== "luggage_storage") return result;
+  const actionable = /\b(?:please\s+(?:store|keep|arrange)|can\s+(?:you|we)\s+(?:store|leave|keep|arrange)|could\s+you\s+(?:store|keep|arrange)|i\s+(?:want|need|would\s+like)\s+(?:to\s+)?(?:store|leave|arrange)|arrange\s+(?:luggage|baggage|bag))\b/i.test(question);
+  if (!actionable) return result;
+  return {
+    ...result,
+    needsHuman: true,
+    handoff: "stay_support",
+    actions: actionsForHandoff("stay_support")
+  };
+}
+
 async function enforceRateLimit(env, sessionId) {
   if (!env.CONCIERGE_RATE_LIMITER?.limit) return true;
   const result = await env.CONCIERGE_RATE_LIMITER.limit({ key: `guest:${sessionId}` });
@@ -624,6 +636,7 @@ export async function handleConciergeRequest(request, env, ctx) {
     result = deterministicResult(fallbackMatch, fallbackMatch.matched ? "approved-fallback" : "fallback");
   }
   result = finalizeResult(result);
+  result = applyActionableLuggagePolicy(result, question);
   result = applyLiveFeaturePolicy(result, env);
 
   if (language !== "en" && result.source !== "ai") {

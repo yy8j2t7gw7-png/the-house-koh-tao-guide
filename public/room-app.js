@@ -16,7 +16,9 @@
       return;
     }
 
-    const title = `Welcome to Room ${room}`;
+    const title = data.guestFirstName
+      ? `Welcome ${data.guestFirstName} to Room ${room}`
+      : `Welcome to Room ${room}`;
     document.title = `Room ${room} | The House – Koh Tao`;
     document.getElementById("roomBadge").textContent = `Room ${room} · ${data.floor}`;
     titleElement.textContent = title;

@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0.0",
-  "release": "5.11.4",
+  "release": "5.11.5",
   "language": "en",
   "updated": "2026-08-14",
   "scope": "Verified accommodation, room, house-rule, support, booking and emergency answers for guests of The House – Koh Tao.",
@@ -276,7 +276,7 @@
         "early morning luggage",
         "arriving early with luggage"
       ],
-      "answer": "Luggage storage is available Tuesday–Sunday during office working hours. If the office is unavailable, luggage can be stored at Bamboo Beach Bar from 11:00 AM. We do not currently have luggage storage for early-morning arrivals before 11:00 AM.",
+      "answer": "Our office working hours are 10:30 AM–7:30 PM Bangkok time. Luggage storage is available Tuesday–Sunday during those hours. If the office is unavailable, luggage can be stored at Bamboo Beach Bar from 11:00 AM when applicable. We do not currently have luggage storage for early-morning arrivals before 11:00 AM. If you want us to arrange storage, please tell me whether this is for arrival or departure, your requested time, number of bags and any useful notes.",
       "actions": [
         {
           "label": "Departure Guide",

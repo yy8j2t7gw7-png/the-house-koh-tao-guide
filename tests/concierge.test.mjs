@@ -431,6 +431,39 @@ test("luggage storage guidance states every available window without promising e
   assert.equal(body.actions[0].href, "/checkout.html");
 });
 
+test("an actionable luggage request routes to Su with the dedicated production template", async () => {
+  const { env, store } = createEnvironment({
+    OPENAI_API_KEY: "not-used",
+    WHATSAPP_ACCESS_TOKEN: "meta-test-token",
+    WHATSAPP_PHONE_NUMBER_ID: "1234567890",
+    WHATSAPP_WEBHOOK_VERIFY_TOKEN: "verify-test",
+    META_APP_SECRET: "app-secret-test",
+    WHATSAPP_ALERT_RECIPIENTS: JSON.stringify({ support: [{ label: "Su", phone: "+66 64 000 0001" }] })
+  });
+  const originalFetch = globalThis.fetch;
+  let payload;
+  globalThis.fetch = async (_url, options) => {
+    payload = JSON.parse(options.body);
+    return new Response(JSON.stringify({ messages: [{ id: "wamid.luggage" }] }), { status: 200, headers: { "content-type": "application/json" } });
+  };
+  try {
+    const response = await handleConciergeRequest(
+      guestRequest("Please arrange luggage storage after checkout at 3 pm for 2 bags."),
+      env
+    );
+    const body = await response.json();
+    assert.equal(body.intentId, "luggage_storage");
+    assert.equal(body.needsHuman, true);
+    assert.equal(body.handoff, "stay_support");
+    assert.equal(store.alerts.at(-1).recipientGroup, "support");
+    assert.equal(payload.template.name, "house_luggage_alert_v1");
+    assert.equal(payload.template.components[0].parameters[2].text, "Departure");
+    assert.equal(payload.template.components[0].parameters[3].text, "2");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("island resource guidance accurately explains water and electricity conservation", async () => {
   const { env } = createEnvironment({ OPENAI_API_KEY: "not-used" });
   const response = await handleConciergeRequest(
@@ -644,7 +677,7 @@ test("Thai nationals are exempt from the TM30 passport upload flow", async () =>
   const rejected = await handleAdminRequest(new Request("https://guide.example/api/concierge/admin/passport-links", {
     method: "POST",
     headers: { authorization: "Bearer admin_token_test_5500", "content-type": "application/json" },
-    body: JSON.stringify({ room: "1", arrivalAt: "2026-08-13T07:00:00.000Z", expiresHours: 24 })
+    body: JSON.stringify({ room: "1", arrivalAt: "2027-08-13T07:00:00.000Z", expiresHours: 24 })
   }), env, "/api/concierge/admin/passport-links");
   assert.equal(rejected.status, 400);
   assert.equal((await rejected.json()).error, "non_thai_confirmation_required");
@@ -726,7 +759,7 @@ test("guest localization supports seven languages and keeps the owner dashboard 
   assert.doesNotMatch(admin, /src="\/i18n\.js"/);
   assert.match(runtime, /exploreContentDeferred/);
   assert.match(runtime, /element\.closest\("\.section,\.footer"\)/);
-  assert.match(runtime, /houseGuideTranslations:v5\.11\.4:/);
+  assert.match(runtime, /houseGuideTranslations:v5\.11\.5:/);
   assert.match(runtime, /MAX_REQUEST_RETRIES = 2/);
   assert.match(runtime, /let flushRunning = false/);
 });
@@ -1117,16 +1150,16 @@ test("every static text and accessibility label on live operational pages is tra
 });
 
 test("alert policy uses Bangkok after-hours and routes only actionable requests", () => {
-  assert.equal(isAfterHours(new Date("2026-08-12T12:29:00.000Z")), false);
-  assert.equal(isAfterHours(new Date("2026-08-12T12:30:00.000Z")), true);
-  assert.equal(isAfterHours(new Date("2026-08-13T03:29:00.000Z")), true);
-  assert.equal(isAfterHours(new Date("2026-08-13T03:30:00.000Z")), false);
+  assert.equal(isAfterHours(new Date("2027-08-12T12:29:00.000Z")), false);
+  assert.equal(isAfterHours(new Date("2027-08-12T12:30:00.000Z")), true);
+  assert.equal(isAfterHours(new Date("2027-08-13T03:29:00.000Z")), true);
+  assert.equal(isAfterHours(new Date("2027-08-13T03:30:00.000Z")), false);
 
   const afterHoursKey = classifyConciergeAlert({
     result: { needsHuman: true, intentId: "lost_key", category: "room", handoff: "stay_support" },
     question: "I lost my key",
     room: "7",
-    now: new Date("2026-08-12T13:00:00.000Z")
+    now: new Date("2027-08-12T13:00:00.000Z")
   });
   assert.equal(afterHoursKey.severity, "urgent");
   assert.equal(afterHoursKey.recipientGroup, "urgent");
@@ -1137,7 +1170,7 @@ test("alert policy uses Bangkok after-hours and routes only actionable requests"
     result: { needsHuman: true, intentId: "diving_recommendation", category: "booking", handoff: "booking" },
     question: "Which dive school do you recommend?",
     room: "1",
-    now: new Date("2026-08-12T05:00:00.000Z")
+    now: new Date("2027-08-12T05:00:00.000Z")
   });
   assert.equal(diveRecommendation, null);
   assert.equal(safeAlertSummary("Passport number AB123456, nationality French, date of birth 1 January 1990").includes("AB123456"), false);
@@ -1182,7 +1215,7 @@ test("critical concierge requests send a sanitized WhatsApp template without sto
     assert.match(outbound[0].url, /graph\.facebook\.com\/v23\.0\/1234567890\/messages$/);
     assert.equal(outbound[0].body.to, "66810000002");
     assert.equal(outbound[0].body.type, "template");
-    assert.equal(outbound[0].body.template.name, "house_concierge_alert");
+    assert.equal(outbound[0].body.template.name, "house_urgent_alert_v1");
     assert.equal(store.alertDeliveries[0].recipientLabel, "Owner 1");
     assert.notEqual(store.alertDeliveries[0].recipientHash, "66810000002");
     assert.doesNotMatch(JSON.stringify(store.alertDeliveries), /66810000002|66820000003/);
@@ -1215,8 +1248,8 @@ test("unacknowledged critical alerts escalate and authorized WhatsApp replies ca
     roomVerified: false,
     summary: "There is smoke in my room",
     bangkokTime: "13 Aug 2026, 02:00",
-    createdAt: "2026-08-12T19:00:00.000Z",
-    escalationDueAt: "2026-08-12T19:10:00.000Z",
+    createdAt: "2027-08-12T19:00:00.000Z",
+    escalationDueAt: "2027-08-12T19:10:00.000Z",
     escalatedAt: "",
     status: "open"
   });
@@ -1230,10 +1263,29 @@ test("unacknowledged critical alerts escalate and authorized WhatsApp replies ca
     });
   };
   try {
-    const escalated = await processDueAlertEscalations(env, new Date("2026-08-12T19:11:00.000Z"));
+    const escalated = await processDueAlertEscalations(env, new Date("2027-08-12T19:11:00.000Z"));
     assert.deepEqual(escalated, { due: 1, sent: 1 });
     assert.equal(outbound[0].to, "66820000003");
     assert.ok(store.alerts[0].escalatedAt);
+
+    const receivedBody = JSON.stringify({
+      entry: [{ changes: [{ value: { messages: [{ from: "66820000003", text: { body: `RECEIVED ${alertId}` } }] } }] }]
+    });
+    const acknowledgementKey = await crypto.subtle.importKey(
+      "raw",
+      new TextEncoder().encode(env.META_APP_SECRET),
+      { name: "HMAC", hash: "SHA-256" },
+      false,
+      ["sign"]
+    );
+    const receivedSignatureBytes = await crypto.subtle.sign("HMAC", acknowledgementKey, new TextEncoder().encode(receivedBody));
+    const receivedResponse = await handleWhatsAppWebhook(new Request("https://guide.example/api/whatsapp/webhook", {
+      method: "POST",
+      headers: { "x-hub-signature-256": `sha256=${Buffer.from(receivedSignatureBytes).toString("hex")}` },
+      body: receivedBody
+    }), env);
+    assert.equal(receivedResponse.status, 200);
+    assert.equal(store.alerts[0].status, "acknowledged");
 
     const webhookBody = JSON.stringify({
       entry: [{ changes: [{ value: { messages: [{ from: "66820000003", text: { body: `RESOLVE ${alertId}` } }] } }] }]
@@ -1446,7 +1498,7 @@ test("one-time passport links keep documents outside the concierge and close aft
   const createResponse = await handleAdminRequest(new Request("https://guide.example/api/concierge/admin/passport-links", {
     method: "POST",
     headers: { authorization: "Bearer admin_token_test_5500", "content-type": "application/json" },
-    body: JSON.stringify({ room: "6", arrivalAt: "2026-08-13T07:00:00.000Z", expiresHours: 72, nonThaiConfirmed: true })
+    body: JSON.stringify({ room: "6", arrivalAt: "2027-08-13T07:00:00.000Z", expiresHours: 72, nonThaiConfirmed: true })
   }), env, "/api/concierge/admin/passport-links");
   const created = await createResponse.json();
   assert.equal(createResponse.status, 200);
@@ -1497,7 +1549,7 @@ test("one-time passport links keep documents outside the concierge and close aft
   const secondResponse = await handleAdminRequest(new Request("https://guide.example/api/concierge/admin/passport-links", {
     method: "POST",
     headers: { authorization: "Bearer admin_token_test_5500", "content-type": "application/json" },
-    body: JSON.stringify({ room: "5", arrivalAt: "2026-08-13T07:00:00.000Z", expiresHours: 24, nonThaiConfirmed: true })
+    body: JSON.stringify({ room: "5", arrivalAt: "2027-08-13T07:00:00.000Z", expiresHours: 24, nonThaiConfirmed: true })
   }), env, "/api/concierge/admin/passport-links");
   const second = await secondResponse.json();
   const secondToken = new URL(second.uploadUrl).hash.replace("#token=", "");
@@ -1526,12 +1578,13 @@ test("Airbnb reservation sync fixes each listing to its verified room and hashes
       room: "2",
       listingId: "1349840459014476583",
       complete: false,
-      records: [{ confirmationCode: "HMABC12345", checkInDate: "2026-08-13", checkOutDate: "2026-08-15" }]
+      records: [{ confirmationCode: "HMABC12345", guestFirstName: "Maya", checkInDate: "2027-08-13", checkOutDate: "2027-08-15" }]
     })
   }), env);
   assert.equal(sync.status, 200);
   assert.equal(store.stayReservations.length, 1);
   assert.equal(store.stayReservations[0].room, "2");
+  assert.equal(store.stayReservations[0].guestFirstName, "Maya");
   assert.notEqual(store.stayReservations[0].confirmationCodeHash, "HMABC12345");
   assert.doesNotMatch(JSON.stringify(store.stayReservations), /HMABC12345/);
 
@@ -1541,7 +1594,7 @@ test("Airbnb reservation sync fixes each listing to its verified room and hashes
     body: JSON.stringify({
       room: "3",
       listingId: "1349840459014476583",
-      records: [{ confirmationCode: "HMMISMATCH1", checkInDate: "2026-08-13", checkOutDate: "2026-08-15" }]
+      records: [{ confirmationCode: "HMMISMATCH1", checkInDate: "2027-08-13", checkOutDate: "2027-08-15" }]
     })
   }), env);
   assert.equal(mismatch.status, 400);
@@ -1558,7 +1611,7 @@ test("verified Airbnb stay creates its own passport form and prevents nationalit
     body: JSON.stringify({
       room: "1",
       listingId: "1376393324098439141",
-      records: [{ confirmationCode: "HMROOM1234", checkInDate: "2026-08-13", checkOutDate: "2026-08-15" }]
+      records: [{ confirmationCode: "HMROOM1234", checkInDate: "2027-08-13", checkOutDate: "2027-08-15" }]
     })
   }), env);
 
@@ -1566,14 +1619,14 @@ test("verified Airbnb stay creates its own passport form and prevents nationalit
     method: "POST",
     headers: { origin: "https://guide.example", "content-type": "application/json" },
     body: JSON.stringify({ room: "2", confirmationCode: "HMROOM1234" })
-  }), env, "/api/stay/verify", null, new Date("2026-08-13T08:00:00.000Z"));
+  }), env, "/api/stay/verify", null, new Date("2027-08-13T08:00:00.000Z"));
   assert.equal(wrongRoom.status, 404);
 
   const verified = await handleStayGuestRequest(new Request("https://guide.example/api/stay/verify", {
     method: "POST",
     headers: { origin: "https://guide.example", "content-type": "application/json" },
     body: JSON.stringify({ room: "1", confirmationCode: "HMROOM1234" })
-  }), env, "/api/stay/verify", null, new Date("2026-08-13T08:00:00.000Z"));
+  }), env, "/api/stay/verify", null, new Date("2027-08-13T08:00:00.000Z"));
   assert.equal(verified.status, 200);
   const cookie = verified.headers.get("set-cookie").split(";")[0];
   assert.match(verified.headers.get("set-cookie"), /HttpOnly; SameSite=Strict/);
@@ -1621,14 +1674,14 @@ test("private guide stays locked until every declared non-Thai overnight guest p
     body: JSON.stringify({
       room: "2",
       listingId: "1349840459014476583",
-      records: [{ confirmationCode: "HMALLGUESTS2", checkInDate: "2026-08-13", checkOutDate: "2026-08-15" }]
+      records: [{ confirmationCode: "HMALLGUESTS2", checkInDate: "2027-08-13", checkOutDate: "2027-08-15" }]
     })
   }), env);
   const verified = await handleStayGuestRequest(new Request("https://guide.example/api/stay/verify", {
     method: "POST",
     headers: { origin: "https://guide.example", "content-type": "application/json" },
     body: JSON.stringify({ room: "2", confirmationCode: "HMALLGUESTS2" })
-  }), env, "/api/stay/verify", null, new Date("2026-08-13T08:00:00.000Z"));
+  }), env, "/api/stay/verify", null, new Date("2027-08-13T08:00:00.000Z"));
   const cookie = verified.headers.get("set-cookie").split(";")[0];
 
   const unconfirmedCount = await handleStayGuestRequest(new Request("https://guide.example/api/stay/nationality", {
@@ -1697,14 +1750,14 @@ test("foreign guests may present every passport in person and only admin complet
     body: JSON.stringify({
       room: "3",
       listingId: "1384302186705645424",
-      records: [{ confirmationCode: "HMINPERSON3", checkInDate: "2026-08-13", checkOutDate: "2026-08-16" }]
+      records: [{ confirmationCode: "HMINPERSON3", checkInDate: "2027-08-13", checkOutDate: "2027-08-16" }]
     })
   }), env);
   const verified = await handleStayGuestRequest(new Request("https://guide.example/api/stay/verify", {
     method: "POST",
     headers: { origin: "https://guide.example", "content-type": "application/json" },
     body: JSON.stringify({ room: "3", confirmationCode: "HMINPERSON3" })
-  }), env, "/api/stay/verify", null, new Date("2026-08-14T08:00:00.000Z"));
+  }), env, "/api/stay/verify", null, new Date("2027-08-14T08:00:00.000Z"));
   const cookie = verified.headers.get("set-cookie").split(";")[0];
 
   await handleStayGuestRequest(new Request("https://guide.example/api/stay/nationality", {
@@ -1815,11 +1868,11 @@ test("Durable Object SQLite schema initializes every operational table used by a
     listingId: "1349840459014476583",
     provider: "airbnb",
     syncId: "local-schema-test",
-    syncedAt: "2026-08-13T08:00:00.000Z",
+    syncedAt: "2027-08-13T08:00:00.000Z",
     records: [{
       confirmationCodeHash: "local_schema_confirmation_hash",
-      checkInDate: "2026-08-13",
-      checkOutDate: "2026-08-15",
+      checkInDate: "2027-08-13",
+      checkOutDate: "2027-08-15",
       status: "confirmed",
       sourceRefHash: "local_schema_source_hash"
     }]
@@ -1837,11 +1890,11 @@ test("a verified session stops granting access when a synchronized reservation c
     body: JSON.stringify({
       room: "2",
       listingId: "1349840459014476583",
-      records: [{ confirmationCode: "HMSHORTENED2", checkInDate: "2026-08-10", checkOutDate }]
+      records: [{ confirmationCode: "HMSHORTENED2", checkInDate: "2027-08-10", checkOutDate }]
     })
   }), env);
-  await sync("2026-08-20");
-  const verifiedAt = new Date("2026-08-13T08:00:00.000Z");
+  await sync("2027-08-20");
+  const verifiedAt = new Date("2027-08-13T08:00:00.000Z");
   const verified = await handleStayGuestRequest(new Request("https://guide.example/api/stay/verify", {
     method: "POST",
     headers: { origin: "https://guide.example", "content-type": "application/json" },
@@ -1849,10 +1902,10 @@ test("a verified session stops granting access when a synchronized reservation c
   }), env, "/api/stay/verify", null, verifiedAt);
   const cookie = verified.headers.get("set-cookie").split(";")[0];
 
-  await sync("2026-08-13");
+  await sync("2027-08-13");
   const expired = await handleStayGuestRequest(new Request("https://guide.example/api/stay/status?room=2", {
     headers: { origin: "https://guide.example", cookie }
-  }), env, "/api/stay/status", null, new Date("2026-08-13T08:01:00.000Z"));
+  }), env, "/api/stay/status", null, new Date("2027-08-13T08:01:00.000Z"));
   assert.equal((await expired.json()).verified, false);
 });
 
@@ -1861,7 +1914,7 @@ test("direct and walk-in stays receive a one-time House code and active stays ca
   const created = await handleStayAdminRequest(new Request("https://guide.example/api/concierge/admin/direct-stays", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ room: "3", checkInDate: "2026-08-14", checkOutDate: "2026-08-16" })
+    body: JSON.stringify({ room: "3", checkInDate: "2027-08-14", checkOutDate: "2027-08-16" })
   }), env, "/api/concierge/admin/direct-stays", store);
   assert.equal(created.status, 200);
   const direct = await created.json();
@@ -1874,16 +1927,16 @@ test("direct and walk-in stays receive a one-time House code and active stays ca
     method: "POST",
     headers: { origin: "https://guide.example", "content-type": "application/json" },
     body: JSON.stringify({ room: "3", confirmationCode: direct.confirmationCode })
-  }), env, "/api/stay/verify", null, new Date("2026-08-14T08:00:00.000Z"));
+  }), env, "/api/stay/verify", null, new Date("2027-08-14T08:00:00.000Z"));
   assert.equal(verified.status, 200);
 
   const extended = await handleStayAdminRequest(new Request("https://guide.example/api/concierge/admin/stay-extension", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ reservationId: store.stayReservations[0].id, checkOutDate: "2026-08-19" })
+    body: JSON.stringify({ reservationId: store.stayReservations[0].id, checkOutDate: "2027-08-19" })
   }), env, "/api/concierge/admin/stay-extension", store);
   assert.equal(extended.status, 200);
-  assert.equal(store.stayReservations[0].checkOutDate, "2026-08-19");
+  assert.equal(store.stayReservations[0].checkOutDate, "2027-08-19");
 });
 
 test("owner operations separates active and upcoming stays and labels manual recovery clearly", async () => {
@@ -1910,20 +1963,20 @@ test("verified guests can report routine and critical room problems with protect
     body: JSON.stringify({
       room: "2",
       listingId: "1349840459014476583",
-      records: [{ confirmationCode: "HMREPORT22", checkInDate: "2026-08-13", checkOutDate: "2026-08-18" }]
+      records: [{ confirmationCode: "HMREPORT22", checkInDate: "2027-08-13", checkOutDate: "2027-08-18" }]
     })
   }), env);
   const verified = await handleStayGuestRequest(new Request("https://guide.example/api/stay/verify", {
     method: "POST",
     headers: { origin: "https://guide.example", "content-type": "application/json" },
     body: JSON.stringify({ room: "2", confirmationCode: "HMREPORT22" })
-  }), env, "/api/stay/verify", null, new Date("2026-08-14T08:00:00.000Z"));
+  }), env, "/api/stay/verify", null, new Date("2027-08-14T08:00:00.000Z"));
   const cookie = verified.headers.get("set-cookie").split(";")[0];
   await handleStayGuestRequest(new Request("https://guide.example/api/stay/nationality", {
     method: "POST",
     headers: { origin: "https://guide.example", cookie, "content-type": "application/json" },
     body: JSON.stringify({ nationality: "thai", allGuestsThai: true })
-  }), env, "/api/stay/nationality", null, new Date("2026-08-14T08:01:00.000Z"));
+  }), env, "/api/stay/nationality", null, new Date("2027-08-14T08:01:00.000Z"));
 
   const blockedCritical = new FormData();
   blockedCritical.set("issueType", "active_water_leak");
@@ -2003,9 +2056,9 @@ test("after-hours spare-key release freshly verifies the active reservation, con
   await handleReservationSyncRequest(new Request("https://guide.example/api/reservations/sync", {
     method: "POST",
     headers: { authorization: "Bearer reservation_sync_test_5500", "content-type": "application/json" },
-    body: JSON.stringify({ room: "1", listingId: "1376393324098439141", records: [{ confirmationCode: "HMKEY12345", checkInDate: "2026-08-13", checkOutDate: "2026-08-15" }] })
+    body: JSON.stringify({ room: "1", listingId: "1376393324098439141", records: [{ confirmationCode: "HMKEY12345", checkInDate: "2027-08-13", checkOutDate: "2027-08-15" }] })
   }), env);
-  const afterHours = new Date("2026-08-13T14:00:00.000Z");
+  const afterHours = new Date("2027-08-13T14:00:00.000Z");
   const verified = await handleStayGuestRequest(new Request("https://guide.example/api/stay/verify", {
     method: "POST",
     headers: { origin: "https://guide.example", "content-type": "application/json" },
@@ -2091,9 +2144,9 @@ test("spare-key release automatically notifies the team and fails safely when Wh
   await handleReservationSyncRequest(new Request("https://guide.example/api/reservations/sync", {
     method: "POST",
     headers: { authorization: "Bearer reservation_sync_test_5500", "content-type": "application/json" },
-    body: JSON.stringify({ room: "2", listingId: "1349840459014476583", records: [{ confirmationCode: "HMKEYFAIL2", checkInDate: "2026-08-13", checkOutDate: "2026-08-15" }] })
+    body: JSON.stringify({ room: "2", listingId: "1349840459014476583", records: [{ confirmationCode: "HMKEYFAIL2", checkInDate: "2027-08-13", checkOutDate: "2027-08-15" }] })
   }), env);
-  const afterHours = new Date("2026-08-13T14:00:00.000Z");
+  const afterHours = new Date("2027-08-13T14:00:00.000Z");
   const verified = await handleStayGuestRequest(new Request("https://guide.example/api/stay/verify", {
     method: "POST",
     headers: { origin: "https://guide.example", "content-type": "application/json" },

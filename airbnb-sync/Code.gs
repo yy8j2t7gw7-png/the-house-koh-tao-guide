@@ -147,8 +147,9 @@ function readAirbnbReservationEmails_(options) {
       var dates = datesFromEmail_(combined);
       var cancelled = /\b(?:cancelled|canceled|reservation was cancelled|booking was cancelled)\b/i.test(combined);
       codes.forEach(function (code) {
-        var record = {
+      var record = {
           confirmationCode: code,
+          guestFirstName: guestFirstNameFromEmail_(subject, body),
           listingId: listing,
           checkInDate: dates.checkInDate,
           checkOutDate: dates.checkOutDate,
@@ -198,6 +199,7 @@ function readRoomCalendar_(calendarUrl, room, emailsByCode, fullAudit) {
     }
     records.push({
       confirmationCode: code,
+      guestFirstName: emailMatch && emailMatch.guestFirstName || "",
       checkInDate: checkInDate,
       checkOutDate: checkOutDate,
       status: emailMatch && emailMatch.status === "cancelled" ? "cancelled" : "confirmed",
@@ -211,6 +213,7 @@ function readRoomCalendar_(calendarUrl, room, emailsByCode, fullAudit) {
     if (!records.some(function (record) { return record.confirmationCode === code; })) {
       records.push({
         confirmationCode: code,
+        guestFirstName: item.guestFirstName || "",
         checkInDate: item.checkInDate,
         checkOutDate: item.checkOutDate,
         status: item.status,
@@ -300,6 +303,24 @@ function matchEmailToCalendar_(emailsByCode, listingId, checkInDate, checkOutDat
 function firstConfirmationCode_(text) {
   var match = String(text).match(HOUSE_SYNC_SETTINGS.codePattern);
   return match && match[0] ? String(match[0]).toUpperCase() : "";
+}
+
+function guestFirstNameFromEmail_(subject, body) {
+  var combined = String(subject || "") + "\n" + String(body || "");
+  var patterns = [
+    /(?:guest\s+name|guest)\s*[:\-]\s*([A-Za-z][A-Za-z'\-]{1,39})/i,
+    /(?:reservation|booking)\s+(?:confirmed|accepted)[^\n\r]{0,40}?[-:]\s*([A-Za-z][A-Za-z'\-]{1,39})/i,
+    /([A-Za-z][A-Za-z'\-]{1,39})\s+(?:arrives|is arriving|checks in)/i
+  ];
+  for (var index = 0; index < patterns.length; index += 1) {
+    var match = combined.match(patterns[index]);
+    if (!match) continue;
+    var value = String(match[1] || "").trim();
+    if (!/^(?:airbnb|guest|reservation|booking|the|house)$/i.test(value)) {
+      return value.charAt(0).toUpperCase() + value.slice(1);
+    }
+  }
+  return "";
 }
 
 function icalDate_(eventText, key) {

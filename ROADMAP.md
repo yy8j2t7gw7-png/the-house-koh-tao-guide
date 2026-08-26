@@ -1,6 +1,6 @@
 # Product Roadmap
 
-Baseline: v5.11.10
+Baseline: v5.11.11
 
 ## Completed
 
@@ -24,6 +24,7 @@ Baseline: v5.11.10
 - [x] Concierge startup and concierge-first House-support contact routing protected by regression tests
 - [x] Five-purpose Meta WhatsApp template integration for service, booking, luggage, urgent and verified lost-key alerts
 - [x] Actionable luggage requests routed to Su with structured operational details
+- [x] Complete-field luggage workflow requiring arrival/departure, requested time, bag count and a transient international reply contact before submission
 - [x] Conservative Airbnb first-name-only synchronization and verified guest greeting
 - [x] Signed `RECEIVED` acknowledgement with backwards-compatible `ACK`
 - [x] Public Privacy Policy, data-deletion instructions and Terms of Use for Meta app review
@@ -135,7 +136,7 @@ Guests may continue using ordinary WhatsApp handoffs. Automated internal alerts 
 
 - [x] Push the v5.5.0 release to the existing hosting workflow
 - [x] Confirm `/api/concierge/status` reports AI and learning enabled
-- [ ] Deploy v5.11.10 and confirm critical property messages interrupt stale ordinary workflows, sitewide legal links are present, concierge startup, owner-inclusive actionable routing, confirmed urgent-property alerts, verified-session lost-key release, first-name greeting, office-hours, luggage handling, full-page language switching, registration, maintenance reporting and the alert console
+- [ ] Deploy v5.11.11 and confirm incomplete luggage requests remain pending until all required fields are supplied, critical property messages interrupt stale ordinary workflows, sitewide legal links are present, concierge startup, owner-inclusive actionable routing, confirmed urgent-property alerts, verified-session lost-key release, first-name greeting, office-hours, full-page language switching, registration, maintenance reporting and the alert console
 - [x] Add `STAY_TOKEN_PEPPER` and `RESERVATION_SYNC_TOKEN` Worker secrets
 - [ ] Add protected `SPARE_KEY_CODES` Worker secret before activating automatic spare-key release
 - [x] Install and authorize the included Airbnb Google Apps Script synchronizer

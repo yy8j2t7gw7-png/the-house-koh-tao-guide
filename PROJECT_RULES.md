@@ -95,6 +95,7 @@ Medical or personal emergencies must remain separate from property emergencies a
 ## Guest essentials
 
 - Luggage storage is available Tuesday–Sunday during office working hours. If the office is unavailable, guests may store luggage at Bamboo Beach Bar from 11:00 AM. No luggage storage is currently available for early-morning arrivals before 11:00 AM.
+- An actionable luggage request requires arrival/departure context, requested time, bag count and a usable international WhatsApp or telephone number before submission. The raw contact is transient protected delivery data and must not enter browser history, AI context, interaction records, alert records, dashboards, learning data or logs. Informational luggage questions remain non-actionable.
 - Fresh water is limited on Koh Tao. Electricity reaches the island through an undersea grid connection developed to reduce reliance on local diesel generators. Guest wording should politely ask for thoughtful water and electricity use and for air conditioning and lights to be switched off when leaving the room.
 - The secure verification page must remain concise and action-led while retaining the stay-code instruction, Thai exemption, complete non-Thai group requirement, TM30 purpose, private handling, 14-day deletion and in-person passport option.
 - The Thai-national exemption must be shown in both English and Thai on the default English verification page. When the full interface is Thai, do not repeat identical Thai helper lines.
@@ -152,7 +153,7 @@ Public interface rules:
 
 ## Current baseline
 
-Current release: v5.11.10.
+Current release: v5.11.11.
 
 Explore is intentionally disabled in the live v5.11.6 release. Do not delete its pages, structured records or media. Restore it only after the planned Explore rebuild and review by changing the protected deployment feature variable. Do not expose internal Explore detail paths in live concierge answers while the feature remains disabled; use approved external actions where supplied.
 

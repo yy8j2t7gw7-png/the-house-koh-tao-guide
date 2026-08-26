@@ -23,7 +23,7 @@ import {
 } from "./whatsapp-alerts.js";
 import { getGuestAccess, handleStayAdminRequest, stayConfiguration } from "./stay-api.js";
 
-const RELEASE = "5.11.10";
+const RELEASE = "5.11.11";
 const ROOM_OPTIONS = new Set(["1", "2", "3", "4", "5", "6", "8", "9", "10", "11"]);
 const MAX_HISTORY_ITEMS = 10;
 const MAX_QUESTION_LENGTH = 800;
@@ -182,8 +182,10 @@ function cleanHistory(history) {
 }
 
 const CONTACT_PROMPT = "What WhatsApp or phone number can our team use to contact you? Please include the country code.";
-const ACTIONABLE_OPERATIONAL_REQUEST = /\b(?:please\s+(?:book|reserve|arrange|store|keep)|can\s+(?:you|we)\s+(?:book|reserve|arrange|store|leave|keep)|could\s+you\s+(?:book|reserve|arrange|store|keep)|i\s+(?:want|need|would\s+like)\s+(?:you\s+)?(?:to\s+)?(?:book|reserve|arrange|store|leave|keep)|book\s+(?:me|us)|arrange\s+(?:luggage|baggage|a\s+taxi|transport|diving|snorkelling|snorkeling|a\s+boat))\b/i;
+const ACTIONABLE_OPERATIONAL_REQUEST = /\b(?:please\s+(?:book|reserve|arrange|store|keep)|can\s+(?:you|we)\s+(?:book|reserve|arrange|store|leave|keep)|could\s+you\s+(?:book|reserve|arrange|store|keep)|i\s+(?:want|wanna|need|would\s+like)\s+(?:you\s+)?(?:to\s+)?(?:book|reserve|arrange|store|leave|keep)|book\s+(?:me|us)|arrange\s+(?:luggage|baggage|a\s+taxi|transport|diving|snorkelling|snorkeling|a\s+boat))\b/i;
 const OPERATIONAL_REQUEST = /\b(?:luggage|baggage|book|booking|reserve|arrange|diving|snorkel|boat|taxi|transfer|transport|scooter)\b/i;
+const ACTIONABLE_LUGGAGE_REQUEST = /\b(?:please\s+(?:store|keep|arrange)|can\s+(?:you|we)\s+(?:store|leave|keep|arrange)|could\s+you\s+(?:store|keep|arrange)|i\s+(?:want|wanna|need|would\s+like)\s+(?:(?:you\s+)?to\s+)?(?:store|leave|arrange|keep)|arrange\s+(?:luggage|baggage|bags?))\b[^.?!]*(?:luggage|baggage|bags?)/i;
+const DIRECT_LUGGAGE_REQUEST = /^\s*(?:please\s+)?(?:store|keep|arrange)\s+(?:my\s+|our\s+)?(?:luggage|baggage|bags?)\b/i;
 
 function extractReplyContact(values) {
   for (const value of values) {
@@ -193,6 +195,12 @@ function extractReplyContact(values) {
     }
   }
   return "";
+}
+
+function validInternationalReplyContact(value) {
+  const contact = extractReplyContact([value]);
+  if (!contact || !/^(?:\+|00)/.test(contact.replace(/^\s+/, ""))) return "";
+  return contact;
 }
 
 function withoutReplyContact(value) {
@@ -220,6 +228,129 @@ function immediatePendingContactWorkflow(history) {
   if (!/\bwhatsapp\b/i.test(assistant.content)) return "";
   if (!ACTIONABLE_OPERATIONAL_REQUEST.test(user.content) && !OPERATIONAL_REQUEST.test(user.content)) return "";
   return user.content;
+}
+
+function isActionableLuggageMessage(value) {
+  const text = String(value || "");
+  return ACTIONABLE_LUGGAGE_REQUEST.test(text) || DIRECT_LUGGAGE_REQUEST.test(text);
+}
+
+function isLuggageCollectionPrompt(value) {
+  const text = String(value || "");
+  return /\b(?:arrival or departure|what time (?:do )?you need luggage storage|how many bags)\b/i.test(text)
+    || (/\bWhatsApp or phone number\b/i.test(text) && /\bluggage\b/i.test(text));
+}
+
+function activeLuggageWorkflowMessages(history) {
+  if (!history.length || history.at(-1)?.role !== "assistant") return [];
+  const recent = history.slice(-8);
+  const lastAssistant = recent.at(-1)?.content || "";
+  const hasCollectionPrompt = isLuggageCollectionPrompt(lastAssistant)
+    || (/\bWhatsApp or phone number\b/i.test(lastAssistant)
+      && recent.some((item) => (item.role === "assistant" && isLuggageCollectionPrompt(item.content))
+        || (item.role === "user" && isActionableLuggageMessage(item.content))));
+  if (!hasCollectionPrompt) return [];
+  for (let index = recent.length - 2; index >= 0; index -= 1) {
+    const item = recent[index];
+    if (item.role === "assistant" && /\bluggage request has been sent\b/i.test(item.content)) return [];
+    if (item.role === "user" && isActionableLuggageMessage(item.content)) {
+      return recent.slice(index).filter((entry) => entry.role === "user").map((entry) => entry.content);
+    }
+  }
+  return [];
+}
+
+function luggageContext(value) {
+  const normalized = normalizeText(value);
+  if (/\b(?:arrival|arrive|arriving|before check in|before checking in|check in day)\b/.test(normalized)) return "Arrival";
+  if (/\b(?:departure|depart|departing|after checkout|after check out|after checking out|check out day|leaving day)\b/.test(normalized)) return "Departure";
+  return "";
+}
+
+function luggageRequestedTime(value) {
+  const source = String(value || "");
+  const match = source.match(/\b(?:at|around|by|from)\s*((?:[01]?\d|2[0-3])(?::[0-5]\d)?\s*(?:am|pm)?)\b/i)
+    || source.match(/\b((?:1[0-2]|0?[1-9])(?::[0-5]\d)?\s*(?:am|pm))\b/i);
+  return String(match?.[1] || "").trim();
+}
+
+function luggageBagCount(value) {
+  const source = String(value || "");
+  const numeric = source.match(/\b(\d{1,2})\s*(?:bags?|suitcases?|pieces?|luggage items?)\b/i);
+  if (numeric) return String(Number(numeric[1]));
+  const words = { one: "1", two: "2", three: "3", four: "4", five: "5", six: "6", seven: "7", eight: "8", nine: "9", ten: "10" };
+  const written = source.match(/\b(one|two|three|four|five|six|seven|eight|nine|ten)\s+(?:bags?|suitcases?|pieces?|luggage items?)\b/i);
+  return written ? words[written[1].toLowerCase()] : "";
+}
+
+function luggageCollectionAnswer(missing) {
+  const operational = [];
+  if (missing.includes("context")) operational.push("whether this is for arrival or departure");
+  if (missing.includes("time")) operational.push("what time you need luggage storage");
+  if (missing.includes("bags")) operational.push("how many bags you have");
+  const detailPrompt = operational.length
+    ? `Sure. Please tell me ${operational.length === 1 ? operational[0] : `${operational.slice(0, -1).join(", ")}, and ${operational.at(-1)}`}.`
+    : "";
+  const contactPrompt = missing.includes("contact") ? CONTACT_PROMPT : "";
+  return [detailPrompt, contactPrompt, operational.length ? "You may also include any useful notes." : ""].filter(Boolean).join(" ");
+}
+
+function applyLuggageRequestPolicy(result, question, history, currentReplyContact = "") {
+  const priorMessages = activeLuggageWorkflowMessages(history);
+  const actionableNow = isActionableLuggageMessage(question);
+  if (isCriticalPropertyResult(result) || (!actionableNow && !priorMessages.length)) {
+    return { handled: false, result, alertQuestion: question, workflow: null };
+  }
+  if (/^\s*(?:cancel|never\s*mind|nevermind|forget\s+it)\s*[.!]?\s*$/i.test(question)) {
+    return {
+      handled: true,
+      result: { ...result, answer: "No problem. I have cancelled the luggage request.", intentId: "luggage_storage_cancelled", category: "departure", needsHuman: false, handoff: "none", actions: [] },
+      alertQuestion: question,
+      workflow: { type: "luggage", status: "cancelled", retainPrivateContact: false, missing: [] }
+    };
+  }
+  const messages = actionableNow ? [question] : [...priorMessages, question];
+  const details = withoutReplyContact(messages.join(" ")).replace(/\[number removed\]|\[contact supplied privately\]/gi, " ").replace(/\s+/g, " ").trim();
+  const context = luggageContext(details);
+  const requestedTime = luggageRequestedTime(details);
+  const bags = luggageBagCount(details);
+  const contact = validInternationalReplyContact(currentReplyContact);
+  const missing = [];
+  if (!context) missing.push("context");
+  if (!requestedTime) missing.push("time");
+  if (!bags) missing.push("bags");
+  if (!contact) missing.push("contact");
+  if (missing.length) {
+    return {
+      handled: true,
+      result: {
+        ...result,
+        answer: luggageCollectionAnswer(missing),
+        intentId: "luggage_storage",
+        category: "departure",
+        needsHuman: false,
+        handoff: "stay_support",
+        actions: []
+      },
+      alertQuestion: details || "Luggage storage request details pending.",
+      workflow: { type: "luggage", status: "collecting", retainPrivateContact: Boolean(contact), missing }
+    };
+  }
+  const summary = `Luggage storage request for ${context} at ${requestedTime}, ${bags} ${bags === "1" ? "bag" : "bags"}. Guest details: ${details}`;
+  return {
+    handled: true,
+    result: {
+      ...result,
+      intentId: "luggage_storage",
+      category: "stay-support",
+      handoff: "stay_support",
+      needsHuman: true,
+      actions: [],
+      privateReplyContact: contact
+    },
+    alertQuestion: summary,
+    workflow: { type: "luggage", status: "ready", retainPrivateContact: false, missing: [] }
+  };
 }
 
 function applyContactRequirement(result, question, history, currentReplyContact = "") {
@@ -534,18 +665,6 @@ function applyLiveFeaturePolicy(result, env) {
   return { ...result, actions };
 }
 
-function applyActionableLuggagePolicy(result, question) {
-  if (result.intentId !== "luggage_storage") return result;
-  const actionable = /\b(?:please\s+(?:store|keep|arrange)|can\s+(?:you|we)\s+(?:store|leave|keep|arrange)|could\s+you\s+(?:store|keep|arrange)|i\s+(?:want|need|would\s+like)\s+(?:to\s+)?(?:store|leave|arrange)|arrange\s+(?:luggage|baggage|bag))\b/i.test(question);
-  if (!actionable) return result;
-  return {
-    ...result,
-    needsHuman: true,
-    handoff: "stay_support",
-    actions: actionsForHandoff("stay_support")
-  };
-}
-
 async function enforceRateLimit(env, sessionId) {
   if (!env.CONCIERGE_RATE_LIMITER?.limit) return true;
   const result = await env.CONCIERGE_RATE_LIMITER.limit({ key: `guest:${sessionId}` });
@@ -609,7 +728,7 @@ export async function handleConciergeRequest(request, env, ctx) {
   }
 
   const sanitizedQuestion = sanitizeQuestion(body.question);
-  const currentReplyContact = extractReplyContact([body.question]);
+  const currentReplyContact = extractReplyContact([body.question, body.privateReplyContact]);
   const question = sanitizedQuestion === "[passport information removed]"
     ? "passport registration"
     : sanitizedQuestion;
@@ -721,7 +840,11 @@ export async function handleConciergeRequest(request, env, ctx) {
   const criticalPropertyMatch = isCriticalPropertyMessage(question)
     ? matchKnowledge("major water leak", effectiveKnowledge, 0.44)
     : null;
-  const contextualMatch = criticalPropertyMatch || bambooSocialFollowUpMatch(question, history, effectiveKnowledge);
+  const luggageWorkflowActive = isActionableLuggageMessage(question) || activeLuggageWorkflowMessages(history).length > 0;
+  const luggageWorkflowMatch = !criticalPropertyMatch && luggageWorkflowActive
+    ? matchKnowledge("luggage storage", effectiveKnowledge, 0.44)
+    : null;
+  const contextualMatch = criticalPropertyMatch || luggageWorkflowMatch || bambooSocialFollowUpMatch(question, history, effectiveKnowledge);
   const match = contextualMatch || matchKnowledge(question, effectiveKnowledge, 0.44);
   let result;
   if (contextualMatch || shouldUseDeterministic(match, history)) {
@@ -743,7 +866,6 @@ export async function handleConciergeRequest(request, env, ctx) {
     result = deterministicResult(fallbackMatch, fallbackMatch.matched ? "approved-fallback" : "fallback");
   }
   result = finalizeResult(result);
-  result = applyActionableLuggagePolicy(result, question);
   result = applyLiveFeaturePolicy(result, env);
   if (result.handoff === "property_emergency" || result.intentId === "property_emergency") {
     result = {
@@ -757,7 +879,10 @@ export async function handleConciergeRequest(request, env, ctx) {
     };
   }
 
-  const contactPolicy = applyContactRequirement(result, question, history, currentReplyContact);
+  const luggagePolicy = applyLuggageRequestPolicy(result, question, history, currentReplyContact);
+  const contactPolicy = luggagePolicy.handled
+    ? luggagePolicy
+    : applyContactRequirement(result, question, history, currentReplyContact);
   result = contactPolicy.result;
 
   if (language !== "en" && result.source !== "ai") {
@@ -784,6 +909,7 @@ export async function handleConciergeRequest(request, env, ctx) {
   if (recorded.alert && recorded.delivery.accepted > 0 && result.needsHuman) {
     const role = result.intentId === "luggage_storage" ? "luggage request" : result.handoff === "booking" ? "booking request" : "request";
     result = { ...result, answer: `Your ${role} has been sent to The House team ✓ We will handle it from here.`, actions: [] };
+    if (luggagePolicy.handled) luggagePolicy.workflow.status = "submitted";
   }
   return json({
     answer: result.answer,
@@ -796,7 +922,8 @@ export async function handleConciergeRequest(request, env, ctx) {
     actions: result.actions,
     source: result.source,
     language,
-    interactionId: recorded.interactionId
+    interactionId: recorded.interactionId,
+    workflow: luggagePolicy.workflow
   });
 }
 

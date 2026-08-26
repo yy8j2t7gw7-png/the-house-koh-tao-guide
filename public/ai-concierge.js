@@ -25,6 +25,18 @@
     return null;
   }
 
+  function redactPrivateContact(value) {
+    return String(value || "").replace(/(?:\+|00)?\d[\d ()-]{6,20}\d/g, "[contact supplied privately]");
+  }
+
+  function internationalContact(value) {
+    for (const match of String(value || "").match(/(?:\+|00)\d[\d ()-]{6,20}\d/g) || []) {
+      const number = match.replace(/\D/g, "");
+      if (number.length >= 8 && number.length <= 15) return match.trim();
+    }
+    return "";
+  }
+
   function roomFromPath() {
     const match = location.pathname.match(/^\/room\/(\d+)\/?$/);
     return match && roomOptions.includes(match[1]) ? match[1] : null;
@@ -65,6 +77,7 @@
       if (!Array.isArray(stored)) return [];
       return stored
         .filter((item) => item && ["user", "assistant"].includes(item.role) && typeof item.content === "string")
+        .map((item) => ({ ...item, content: redactPrivateContact(item.content) }))
         .slice(-historyLimit);
     } catch (_error) {
       return [];
@@ -78,6 +91,7 @@
   let dragStartY = null;
   let dragCurrentY = null;
   let enginePromise = null;
+  let privateWorkflowContact = "";
 
   function contextValues(question = "") {
     return {
@@ -93,8 +107,8 @@
 
   function rememberExchange(question, answer) {
     conversationHistory.push(
-      { role: "user", content: String(question || "").slice(0, 700) },
-      { role: "assistant", content: String(answer || "").slice(0, 700) }
+      { role: "user", content: redactPrivateContact(question).slice(0, 700) },
+      { role: "assistant", content: redactPrivateContact(answer).slice(0, 700) }
     );
     conversationHistory = conversationHistory.slice(-historyLimit);
     safeStorage(window.sessionStorage, "set", historyStorageKey, JSON.stringify(conversationHistory));
@@ -440,6 +454,7 @@
         room: selectedRoom || "",
         sessionId,
         history,
+        privateReplyContact: privateWorkflowContact,
         page: currentPage,
         language: window.HOUSE_I18N?.language || window.localStorage.getItem("houseGuideLanguage") || "en"
       })
@@ -498,6 +513,12 @@
   }
 
   function deliverAnswer(result, question) {
+    const suppliedContact = internationalContact(question);
+    if (result.workflow?.type === "luggage" && result.workflow.status === "collecting" && result.workflow.retainPrivateContact) {
+      privateWorkflowContact = suppliedContact || privateWorkflowContact;
+    } else {
+      privateWorkflowContact = "";
+    }
     if (result.category === "stay-support" && !selectedRoom) {
       pendingAnswer = { result, question };
       appendMessage("concierge", "Before I continue, which room are you staying in?");

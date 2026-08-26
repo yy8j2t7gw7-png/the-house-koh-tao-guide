@@ -444,12 +444,18 @@ test("an actionable luggage request routes to Su and owners with the dedicated p
     WHATSAPP_PHONE_NUMBER_ID: "1234567890",
     WHATSAPP_WEBHOOK_VERIFY_TOKEN: "verify-test",
     META_APP_SECRET: "app-secret-test",
-    WHATSAPP_ALERT_RECIPIENTS: JSON.stringify({ support: [{ label: "Su", phone: "+66 64 000 0001" }] })
+    WHATSAPP_ALERT_RECIPIENTS: JSON.stringify({
+      support: [{ label: "Su", phone: "+66 64 000 0001" }],
+      emergency: [
+        { label: "Owner 1", phone: "+66 81 000 0002" },
+        { label: "Owner 2", phone: "+66 82 000 0003" }
+      ]
+    })
   });
   const originalFetch = globalThis.fetch;
-  let payload;
+  const payloads = [];
   globalThis.fetch = async (_url, options) => {
-    payload = JSON.parse(options.body);
+    payloads.push(JSON.parse(options.body));
     return new Response(JSON.stringify({ messages: [{ id: "wamid.luggage" }] }), { status: 200, headers: { "content-type": "application/json" } });
   };
   try {
@@ -470,9 +476,152 @@ test("an actionable luggage request routes to Su and owners with the dedicated p
     assert.equal(store.alerts.at(-1).recipientGroup, "support_with_owners");
     assert.match(body.answer, /sent to The House team/);
     assert.deepEqual(body.actions, []);
-    assert.equal(payload.template.name, "house_luggage_alert_v1");
-    assert.equal(payload.template.components[0].parameters[2].text, "Departure");
-    assert.equal(payload.template.components[0].parameters[3].text, "2");
+    assert.equal(payloads.length, 3);
+    assert.deepEqual(payloads.map((item) => item.to).sort(), ["66640000001", "66810000002", "66820000003"]);
+    assert.equal(payloads.every((item) => item.template.name === "house_luggage_alert_v1"), true);
+    assert.equal(payloads[0].template.components[0].parameters[2].text, "Departure");
+    assert.equal(payloads[0].template.components[0].parameters[3].text, "2");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("a vague actionable luggage request collects every required field before creating an alert", async () => {
+  const { env, store } = createEnvironment({ OPENAI_API_KEY: "not-used" });
+  const response = await handleConciergeRequest(guestRequest("I wanna store my luggage"), env);
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(body.intentId, "luggage_storage");
+  assert.equal(body.needsHuman, false);
+  assert.match(body.answer, /arrival or departure/i);
+  assert.match(body.answer, /what time/i);
+  assert.match(body.answer, /how many bags/i);
+  assert.match(body.answer, /WhatsApp or phone number/i);
+  assert.deepEqual(body.workflow.missing.sort(), ["bags", "contact", "context", "time"]);
+  assert.equal(store.alerts.length, 0);
+});
+
+test("each required luggage field independently blocks submission when missing", async () => {
+  const cases = [
+    { question: "Please store 2 bags at 1 PM. My WhatsApp is +66 81 234 5678.", missing: "context" },
+    { question: "Please store 2 bags for departure. My WhatsApp is +66 81 234 5678.", missing: "time" },
+    { question: "Please store my luggage for departure at 1 PM. My WhatsApp is +66 81 234 5678.", missing: "bags" },
+    { question: "Please store 2 bags for departure at 1 PM.", missing: "contact" }
+  ];
+
+  for (const item of cases) {
+    const { env, store } = createEnvironment({ OPENAI_API_KEY: "not-used" });
+    const response = await handleConciergeRequest(guestRequest(item.question), env);
+    const body = await response.json();
+    assert.equal(response.status, 200, item.missing);
+    assert.equal(body.needsHuman, false, item.missing);
+    assert.equal(body.workflow.status, "collecting", item.missing);
+    assert.equal(body.workflow.missing.includes(item.missing), true, item.missing);
+    assert.equal(store.alerts.length, 0, item.missing);
+  }
+});
+
+test("a local-format luggage contact is rejected until a country code is supplied", async () => {
+  const { env, store } = createEnvironment({ OPENAI_API_KEY: "not-used" });
+  const response = await handleConciergeRequest(guestRequest(
+    "Please store 2 bags for departure at 1 PM. My phone is 081 234 5678."
+  ), env);
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(body.workflow.status, "collecting");
+  assert.equal(body.workflow.missing.includes("contact"), true);
+  assert.match(body.answer, /country code/i);
+  assert.equal(store.alerts.length, 0);
+});
+
+test("a complete luggage request with an international contact submits without redundant questions", async () => {
+  const { env, store } = createEnvironment({
+    OPENAI_API_KEY: "not-used",
+    WHATSAPP_ACCESS_TOKEN: "meta-test-token",
+    WHATSAPP_PHONE_NUMBER_ID: "1234567890",
+    WHATSAPP_ALERT_RECIPIENTS: JSON.stringify({ support: [{ label: "Su", phone: "+66 64 000 0001" }] })
+  });
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => new Response(JSON.stringify({ messages: [{ id: "wamid.complete-luggage" }] }), {
+    status: 200,
+    headers: { "content-type": "application/json" }
+  });
+  try {
+    const response = await handleConciergeRequest(guestRequest(
+      "Please store 3 bags for departure at 1 PM. My WhatsApp is +66 81 234 5678. One bag is fragile."
+    ), env);
+    const body = await response.json();
+    assert.equal(response.status, 200);
+    assert.equal(body.workflow.status, "submitted");
+    assert.match(body.answer, /luggage request has been sent/i);
+    assert.doesNotMatch(body.answer, /What WhatsApp or phone number/i);
+    assert.equal(store.alerts.length, 1);
+    assert.match(store.alerts[0].summary, /fragile/i);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("a protected contact retained for the active luggage workflow is not requested again", async () => {
+  const { env, store } = createEnvironment({
+    OPENAI_API_KEY: "not-used",
+    WHATSAPP_ACCESS_TOKEN: "meta-test-token",
+    WHATSAPP_PHONE_NUMBER_ID: "1234567890",
+    WHATSAPP_ALERT_RECIPIENTS: JSON.stringify({ support: [{ label: "Su", phone: "+66 64 000 0001" }] })
+  });
+  const first = await handleConciergeRequest(guestRequest("I wanna store my luggage. My WhatsApp is +66 81 234 5678."), env);
+  const firstBody = await first.json();
+  assert.equal(firstBody.workflow.retainPrivateContact, true);
+  assert.doesNotMatch(firstBody.answer, /WhatsApp or phone number/i);
+  assert.equal(store.alerts.length, 0);
+
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => new Response(JSON.stringify({ messages: [{ id: "wamid.retained-contact" }] }), {
+    status: 200,
+    headers: { "content-type": "application/json" }
+  });
+  try {
+    const response = await handleConciergeRequest(guestRequest("It is for departure at 2 PM and I have 2 bags.", {
+      privateReplyContact: "+66 81 234 5678",
+      history: [
+        { role: "user", content: "I wanna store my luggage. [contact supplied privately]" },
+        { role: "assistant", content: firstBody.answer }
+      ]
+    }), env);
+    const body = await response.json();
+    assert.equal(body.workflow.status, "submitted");
+    assert.doesNotMatch(body.answer, /WhatsApp or phone number/i);
+    assert.equal(store.alerts.length, 1);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("luggage contact data stays out of normal interaction, alert and delivery storage", async () => {
+  const rawContact = "+66 81 234 5678";
+  const digits = "66812345678";
+  const { env, store } = createEnvironment({
+    OPENAI_API_KEY: "not-used",
+    WHATSAPP_ACCESS_TOKEN: "meta-test-token",
+    WHATSAPP_PHONE_NUMBER_ID: "1234567890",
+    WHATSAPP_ALERT_RECIPIENTS: JSON.stringify({ support: [{ label: "Su", phone: "+66 64 000 0001" }] })
+  });
+  const originalFetch = globalThis.fetch;
+  let protectedPayload = "";
+  globalThis.fetch = async (_url, options) => {
+    protectedPayload = options.body;
+    return new Response(JSON.stringify({ messages: [{ id: "wamid.private-contact" }] }), { status: 200, headers: { "content-type": "application/json" } });
+  };
+  try {
+    await handleConciergeRequest(guestRequest(`Please store 2 bags for departure at 1 PM. My WhatsApp is ${rawContact}.`), env);
+    assert.doesNotMatch(JSON.stringify(store.interactions), new RegExp(digits));
+    assert.doesNotMatch(JSON.stringify(store.interactions), /81 234 5678/);
+    assert.doesNotMatch(JSON.stringify(store.alerts), new RegExp(digits));
+    assert.doesNotMatch(JSON.stringify(store.alerts), /81 234 5678/);
+    assert.doesNotMatch(JSON.stringify(store.alertDeliveries), new RegExp(digits));
+    assert.match(protectedPayload, /Guest reply/);
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -755,6 +904,14 @@ test("concierge initializes safely and keeps public support buttons concierge-fi
   assert.match(script, /event\.preventDefault\(\);\s*openPanel\(\{ askRoom: true \}\)/);
 });
 
+test("browser luggage workflow keeps a supplied contact out of ordinary session history", async () => {
+  const script = await readFile(new URL("../public/ai-concierge.js", import.meta.url), "utf8");
+  assert.match(script, /redactPrivateContact\(question\)\.slice\(0, 700\)/);
+  assert.match(script, /privateReplyContact: privateWorkflowContact/);
+  assert.match(script, /result\.workflow\?\.type === "luggage"/);
+  assert.doesNotMatch(script, /houseConciergeHistory[^\n]{0,200}privateWorkflowContact/);
+});
+
 test("rendered Concierge spare-key CTA opens the protected fee flow", async () => {
   const [concierge, registrationEntry, room] = await Promise.all([
     readFile(new URL("../public/ai-concierge.js", import.meta.url), "utf8"),
@@ -796,7 +953,7 @@ test("guest localization supports seven languages and keeps the owner dashboard 
   assert.doesNotMatch(admin, /src="\/i18n\.js"/);
   assert.match(runtime, /exploreContentDeferred/);
   assert.match(runtime, /element\.closest\("\.section,\.footer"\)/);
-  assert.match(runtime, /houseGuideTranslations:v5\.11\.10:/);
+  assert.match(runtime, /houseGuideTranslations:v5\.11\.11:/);
   assert.match(runtime, /MAX_REQUEST_RETRIES = 2/);
   assert.match(runtime, /let flushRunning = false/);
 });

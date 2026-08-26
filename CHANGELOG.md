@@ -2,6 +2,21 @@
 
 All notable changes to The House – Koh Tao guest guide are recorded here.
 
+## v5.11.11 — Complete Luggage Request Validation
+
+### Fixed
+
+- Added deterministic detection for actionable luggage language such as “I wanna store my luggage” so it cannot bypass operational field collection through a model-generated handoff.
+- Prevented luggage alerts from being created until arrival/departure context, requested time, bag count and a usable international WhatsApp or telephone number are all available.
+- Bound multi-turn answers and transient contact data to the active luggage workflow while keeping informational luggage questions non-actionable.
+- Preserved critical-property precedence so a flooding, serious leak, dangerous electrical or similar message interrupts and clears the pending luggage workflow immediately.
+
+### Privacy and delivery
+
+- Keeps reply contact data only in transient memory and the protected staff-delivery payload; browser session history now redacts phone-like values before storage.
+- Keeps raw reply numbers out of Concierge interaction records, alert records, dashboard summaries, learning data and application logs.
+- Preserves protected delivery to Su plus both owners only after every required luggage field is complete.
+
 ## v5.11.10 — Critical-Intent Precedence & Sitewide Legal Navigation
 
 ### Fixed

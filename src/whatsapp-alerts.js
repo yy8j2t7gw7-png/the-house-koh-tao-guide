@@ -32,6 +32,21 @@ function privateReplyContact(value) {
   return source.startsWith("+") ? `+${number}` : number;
 }
 
+function validatedLuggageSubmission(result) {
+  const request = result?.luggageRequest;
+  const context = request?.context === "Arrival" || request?.context === "Departure"
+    ? request.context
+    : "";
+  const requestedTime = String(request?.requestedTime || "").trim().slice(0, 80);
+  const bagCount = Number(String(request?.bagCount || "").trim());
+  const sourceContact = String(result?.privateReplyContact || "").trim();
+  const contact = /^(?:\+|00)/.test(sourceContact) ? privateReplyContact(sourceContact) : "";
+  if (!context || !requestedTime || !Number.isInteger(bagCount) || bagCount < 1 || bagCount > 99 || !contact) {
+    return null;
+  }
+  return { context, requestedTime, bagCount: String(bagCount), contact };
+}
+
 function parseRecipients(env) {
   let source;
   try {
@@ -141,10 +156,8 @@ function templateForAlert(alert, env) {
     return { name: names.lostKey, parameters: [reference, room, time] };
   }
   if (alert.alertType === "luggage_storage") {
-    const context = /\b(?:before|arrival|arriv(?:e|ing)|check[ -]?in)\b/i.test(summary) ? "Arrival" : /\b(?:after|departure|depart(?:ure|ing)|check[ -]?out)\b/i.test(summary) ? "Departure" : "Not provided";
-    const bags = firstMatch(summary, /\b(\d{1,2})\s*(?:bags?|suitcases?|pieces?)\b/i, "Not provided");
-    const requestedTime = firstMatch(summary, /\b(?:at|around|by)\s*((?:[01]?\d|2[0-3])(?::[0-5]\d)?\s*(?:am|pm)?)/i, "Not provided");
-    return { name: names.luggage, parameters: [reference, room, context, bags, requestedTime, summary] };
+    const luggage = alert.luggageRequest || {};
+    return { name: names.luggage, parameters: [reference, room, luggage.context, luggage.bagCount, luggage.requestedTime, summary] };
   }
   if (alert.alertType === "booking_request") {
     const preferredTime = alert.requestedDateTime || normalizeBangkokRequestedDate(summary, new Date(alert.createdAt));
@@ -253,6 +266,12 @@ export async function createConciergeAlert({ env, interactionId, sessionId, room
   const policy = classifyConciergeAlert({ result, question, room, now });
   const store = getStore(env);
   if (!policy || !store) return null;
+  // Final submission boundary: conversational or model output can never create
+  // a luggage alert unless every operational field and protected contact exists.
+  const luggageRequest = policy.alertType === "luggage_storage"
+    ? validatedLuggageSubmission(result)
+    : null;
+  if (policy.alertType === "luggage_storage" && !luggageRequest) return null;
   const config = whatsappAlertConfiguration(env);
   const dedupeKey = await sha256(`${env.CONCIERGE_HASH_SALT || env.META_APP_SECRET || "the-house-alert"}:${sessionId}:${room}:${policy.alertType}:${normalizeDedupeSummary(policy.summary)}`);
   const escalationDueAt = policy.escalationRequired
@@ -274,7 +293,18 @@ export async function createConciergeAlert({ env, interactionId, sessionId, room
   };
   const created = await store.createAlert(alert);
   if (!created?.created) return { ...created?.alert, duplicate: true };
-  return { ...alert, duplicate: false, configured: config.configured, privateReplyContact: privateReplyContact(result.privateReplyContact), requestedDateTime: result.requestedDateTime || "" };
+  return {
+    ...alert,
+    duplicate: false,
+    configured: config.configured,
+    privateReplyContact: luggageRequest?.contact || privateReplyContact(result.privateReplyContact),
+    requestedDateTime: result.requestedDateTime || "",
+    luggageRequest: luggageRequest ? {
+      context: luggageRequest.context,
+      requestedTime: luggageRequest.requestedTime,
+      bagCount: luggageRequest.bagCount
+    } : undefined
+  };
 }
 
 export async function createProtectedOperationsAlert({

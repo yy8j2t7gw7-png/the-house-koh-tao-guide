@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The v5.11.11 concierge combines six layers:
+The v5.11.12 concierge combines six layers:
 
 1. Deterministic safety and operational rules for emergencies, lost keys, fees, booking policy and human routing.
 2. Server-side model reasoning over approved House knowledge plus targeted retrieval from the existing Activities, Restaurants, Cafés, Beaches, Bars and Shopping records.
@@ -21,9 +21,9 @@ Configure secrets on the existing Cloudflare Worker. Never place their values in
 
 ## Guest-language operations
 
-v5.11.11 supports English, Thai, Simplified Chinese, Russian, German, French and Spanish for the operational guest journey. Essential navigation, emergency, passport, lost-key, maintenance-reporting, luggage, resource-conservation, legal-navigation and concierge controls have reviewed built-in translations. Longer approved operational text is translated through `/api/i18n/translate` using strict structured output with `store: false` and cached in the existing Durable Object. Approved items use recoverable model sub-batches; incomplete groups are split automatically, browser requests retry temporary failures, and overlapping page flushes are prevented. A release audit verifies every static visible string and accessibility label on each live operational page is accepted by the protected endpoint.
+v5.11.12 supports English, Thai, Simplified Chinese, Russian, German, French and Spanish for the operational guest journey. Essential navigation, emergency, passport, lost-key, maintenance-reporting, luggage, resource-conservation, legal-navigation and concierge controls have reviewed built-in translations. Longer approved operational text is translated through `/api/i18n/translate` using strict structured output with `store: false` and cached in the existing Durable Object. Approved items use recoverable model sub-batches; incomplete groups are split automatically, browser requests retry temporary failures, and overlapping page flushes are prevented. A release audit verifies every static visible string and accessibility label on each live operational page is accepted by the protected endpoint.
 
-Actionable luggage-storage requests use a deterministic multi-turn workflow. Arrival/departure context, requested time, bag count and a usable international reply contact are mandatory before an alert is created. Informational questions do not enter the workflow. The raw contact is held only in browser memory for the active request, sent separately from normal conversation history, and included only in the transient protected staff-delivery payload. A new critical property incident interrupts and clears this ordinary workflow before its message can be consumed as luggage data.
+Actionable luggage-storage requests use a deterministic multi-turn workflow. Arrival/departure context, requested time, bag count and a usable international reply contact are mandatory before an alert is created. The final alert-creation boundary validates the structured fields again and refuses incomplete submissions even if a conversational or model layer produces an incorrect handoff. Every new actionable request starts clean after a completed request. Informational questions do not enter the workflow. A raw contact is redacted immediately from the visible Concierge bubble for every request type, held only in browser memory for the active request, sent separately from normal conversation history, and included only in the transient protected staff-delivery payload. A new critical property incident interrupts and clears this ordinary workflow before its message can be consumed as luggage data.
 
 The visible concierge thinking state is an animated three-dot indicator rather than an operational status sentence. Venue website or social actions must use approved external URLs. Internal Explore detail paths are excluded from model context while Explore is disabled. Bamboo Beach Bar follow-up questions use the approved Facebook and Instagram actions in `public/data/concierge-knowledge.json`.
 

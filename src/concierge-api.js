@@ -23,7 +23,7 @@ import {
 } from "./whatsapp-alerts.js";
 import { getGuestAccess, handleStayAdminRequest, stayConfiguration } from "./stay-api.js";
 
-const RELEASE = "5.11.11";
+const RELEASE = "5.11.12";
 const ROOM_OPTIONS = new Set(["1", "2", "3", "4", "5", "6", "8", "9", "10", "11"]);
 const MAX_HISTORY_ITEMS = 10;
 const MAX_QUESTION_LENGTH = 800;
@@ -346,7 +346,12 @@ function applyLuggageRequestPolicy(result, question, history, currentReplyContac
       handoff: "stay_support",
       needsHuman: true,
       actions: [],
-      privateReplyContact: contact
+      privateReplyContact: contact,
+      luggageRequest: {
+        context,
+        requestedTime,
+        bagCount: bags
+      }
     },
     alertQuestion: summary,
     workflow: { type: "luggage", status: "ready", retainPrivateContact: false, missing: [] }

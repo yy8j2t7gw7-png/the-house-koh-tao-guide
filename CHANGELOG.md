@@ -2,6 +2,20 @@
 
 All notable changes to The House – Koh Tao guest guide are recorded here.
 
+## v5.11.12 — Luggage Submission Boundary & Universal Contact Redaction
+
+### Fixed
+
+- Enforced the four required luggage fields at the final server-side alert-creation boundary, independent of conversational prompting or model output.
+- Prevented a second vague luggage request from submitting after a previously completed request in the same Concierge session.
+- Passed validated structured luggage data into the protected WhatsApp template and eliminated new luggage alerts containing `Not provided` operational fields.
+- Kept each new luggage request isolated until its own arrival/departure context, requested time, bag count and international reply contact are supplied.
+
+### Privacy
+
+- Redacts phone and WhatsApp numbers immediately in every visible guest message, for every request type, while the original value is used only transiently by the protected server request.
+- Continues excluding raw contacts from ordinary browser history, AI context, interaction records, alerts, dashboards, learning data and application logs.
+
 ## v5.11.11 — Complete Luggage Request Validation
 
 ### Fixed

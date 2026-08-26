@@ -2,7 +2,7 @@
 
 ## Purpose
 
-v5.11.11 provides a protected server-side staff-alert channel through the official Meta WhatsApp Business Platform. Guests continue to use the website Concierge. Recipient telephone numbers, access tokens and app secrets stay in encrypted Cloudflare secrets and never appear in public files, Git or release archives.
+v5.11.12 provides a protected server-side staff-alert channel through the official Meta WhatsApp Business Platform. Guests continue to use the website Concierge. Recipient telephone numbers, access tokens and app secrets stay in encrypted Cloudflare secrets and never appear in public files, Git or release archives.
 
 Routing is role based:
 
@@ -11,6 +11,8 @@ Routing is role based:
 - verified spare-key releases notify Su plus both owners through derived `lost_key_team` and do not use generic escalation;
 - explicitly confirmed urgent or critical property incidents notify Fah plus both owners, without Su, through derived `urgent_response`;
 - unacknowledged urgent or critical property alerts route to the configured future on-call `escalation` group after 10 minutes, with the owners as the current safe fallback.
+
+Every luggage alert is independently validated at the final server-side creation boundary. That boundary refuses storage and WhatsApp delivery unless the individual request contains arrival/departure context, requested time, bag count and a usable international contact. Template fields come from this validated structure, so a newly created luggage alert must never contain `Not provided` for a required field.
 
 A recommendation question alone does not create a booking alert. The guest must ask to book, reserve, arrange or check availability. A luggage-information question remains informational. An actionable luggage request enters a deterministic collection workflow and creates an alert only after arrival/departure context, requested time, bag count and a usable international reply contact are all available. Identical alerts from the same session are deduplicated for five minutes.
 
@@ -21,7 +23,7 @@ A recommendation question alone does not create a booking alert. The guest must 
 - Guest descriptions are sanitized before storage or delivery.
 - Passport data, confirmation codes, stay tokens, payment information and key-box codes are never included.
 - A verified guest reply number may be added only to the transient urgent delivery payload; it is not stored in the alert record.
-- Actionable booking, luggage and ordinary maintenance requests require a usable contact number. It is added only to the transient protected delivery payload and never to interaction, alert or application logs. Genuine urgent incidents are not blocked if no number is available.
+- Actionable booking, luggage and ordinary maintenance requests require a usable contact number. It is added only to the transient protected delivery payload and never to visible chat, browser history, AI context, interaction, alert or application logs. Immediate visible redaction applies to every request type. Genuine urgent incidents are not blocked if no number is available.
 - A displayed room number is guest-selected context unless the alert explicitly says the stay is verified.
 - Automatic spare-key release remains separate and fail closed: a current verified room-bound session, the 19:30–10:30 Bangkok window, two-step 500 THB fee acceptance and at least one accepted protected team notification are all required. The guest does not approve the staff notification.
 - Alert records and delivery metadata are removed after 30 days.

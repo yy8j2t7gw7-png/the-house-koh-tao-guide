@@ -547,7 +547,9 @@
     }
     const priorHistory = conversationHistory.slice(-historyLimit);
     input.value = "";
-    appendMessage("guest", question);
+    // Send the original value only to the protected request handler. Every
+    // visible guest bubble is redacted immediately for every request type.
+    appendMessage("guest", redactPrivateContact(question));
     sendButton.disabled = true;
     input.disabled = true;
     const status = appendStatus();

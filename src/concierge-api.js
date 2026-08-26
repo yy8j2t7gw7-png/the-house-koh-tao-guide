@@ -23,7 +23,7 @@ import {
 } from "./whatsapp-alerts.js";
 import { getGuestAccess, handleStayAdminRequest, stayConfiguration } from "./stay-api.js";
 
-const RELEASE = "5.11.9";
+const RELEASE = "5.11.10";
 const ROOM_OPTIONS = new Set(["1", "2", "3", "4", "5", "6", "8", "9", "10", "11"]);
 const MAX_HISTORY_ITEMS = 10;
 const MAX_QUESTION_LENGTH = 800;
@@ -182,6 +182,8 @@ function cleanHistory(history) {
 }
 
 const CONTACT_PROMPT = "What WhatsApp or phone number can our team use to contact you? Please include the country code.";
+const ACTIONABLE_OPERATIONAL_REQUEST = /\b(?:please\s+(?:book|reserve|arrange|store|keep)|can\s+(?:you|we)\s+(?:book|reserve|arrange|store|leave|keep)|could\s+you\s+(?:book|reserve|arrange|store|keep)|i\s+(?:want|need|would\s+like)\s+(?:you\s+)?(?:to\s+)?(?:book|reserve|arrange|store|leave|keep)|book\s+(?:me|us)|arrange\s+(?:luggage|baggage|a\s+taxi|transport|diving|snorkelling|snorkeling|a\s+boat))\b/i;
+const OPERATIONAL_REQUEST = /\b(?:luggage|baggage|book|booking|reserve|arrange|diving|snorkel|boat|taxi|transfer|transport|scooter)\b/i;
 
 function extractReplyContact(values) {
   for (const value of values) {
@@ -197,19 +199,55 @@ function withoutReplyContact(value) {
   return String(value || "").replace(/(?:\+|00)?\d[\d ()-]{6,20}\d/g, "[contact supplied privately]");
 }
 
-function applyContactRequirement(result, question, history, rawReplyContact = "") {
-  const actionable = /\b(?:please\s+(?:book|reserve|arrange|store|keep)|can\s+(?:you|we)\s+(?:book|reserve|arrange|store|leave|keep)|could\s+you\s+(?:book|reserve|arrange|store|keep)|i\s+(?:want|need|would\s+like)\s+(?:you\s+)?(?:to\s+)?(?:book|reserve|arrange|store|leave|keep)|book\s+(?:me|us)|arrange\s+(?:luggage|baggage|a\s+taxi|transport|diving|snorkelling|snorkeling|a\s+boat))\b/i;
-  const prior = [...history].reverse().find((item) => item.role === "user" && actionable.test(item.content));
-  const contactNow = rawReplyContact;
-  const priorOperational = [...history].reverse().find((item) => item.role === "user" && /\b(?:luggage|baggage|book|booking|reserve|arrange|diving|snorkel|boat|taxi|transfer|transport|scooter)\b/i.test(item.content));
-  const continuation = Boolean(contactNow && priorOperational);
-  const base = actionable.test(question) ? question : prior?.content || priorOperational?.content || question;
-  if (!actionable.test(base) && !continuation) return { result, alertQuestion: question };
+function isCriticalPropertyResult(result) {
+  return result?.handoff === "property_emergency"
+    || result?.intentId === "property_emergency"
+    || result?.category === "property-emergency";
+}
+
+function isCriticalPropertyMessage(question) {
+  const normalized = normalizeText(question);
+  const waterHazard = /\b(?:flood|flooded|flooding|major water leak|serious water leak|water leak|water leakage|water leaking|leaking everywhere|burst water pipe|burst pipe|water coming through the ceiling|toilet overflowing)\b/.test(normalized);
+  const electricalHazard = /\b(?:dangerous electrical|electrical danger|electric shock|electrical sparks|sparks from|burning electrical|electrical burning|smoke from electricity|live wire|exposed wire)\b/.test(normalized);
+  const fireOrDamage = /\b(?:fire in|room is on fire|there is smoke|smoke in|something is burning|major property damage|serious property damage|immediate room danger|immediate property danger)\b/.test(normalized);
+  return waterHazard || electricalHazard || fireOrDamage;
+}
+
+function immediatePendingContactWorkflow(history) {
+  const assistant = history.at(-1);
+  const user = history.at(-2);
+  if (assistant?.role !== "assistant" || user?.role !== "user") return "";
+  if (!/\bwhatsapp\b/i.test(assistant.content)) return "";
+  if (!ACTIONABLE_OPERATIONAL_REQUEST.test(user.content) && !OPERATIONAL_REQUEST.test(user.content)) return "";
+  return user.content;
+}
+
+function applyContactRequirement(result, question, history, currentReplyContact = "") {
+  if (isCriticalPropertyResult(result)) return { result, alertQuestion: question };
+  const actionableNow = ACTIONABLE_OPERATIONAL_REQUEST.test(question);
+  const pendingWorkflow = currentReplyContact ? immediatePendingContactWorkflow(history) : "";
+  const continuation = Boolean(currentReplyContact && pendingWorkflow);
+  if (currentReplyContact && !actionableNow && !continuation) {
+    return {
+      result: {
+        ...result,
+        answer: "That contact number is not attached to an active request. Please tell me what you need help with.",
+        needsHuman: false,
+        handoff: "none",
+        actions: []
+      },
+      alertQuestion: question
+    };
+  }
+  const base = actionableNow ? question : pendingWorkflow;
+  if (!base || (!ACTIONABLE_OPERATIONAL_REQUEST.test(base) && !continuation)) {
+    return { result, alertQuestion: question };
+  }
   const luggage = result.intentId === "luggage_storage" || /\b(?:luggage|baggage)\b/i.test(base);
   const booking = result.handoff === "booking" || /\b(?:book|booking|reserve|arrange|diving|snorkel|boat|taxi|transfer|transport|scooter)\b/i.test(base);
   if (!luggage && !booking) return { result, alertQuestion: question };
-  if (!result.needsHuman && !prior && !continuation) return { result, alertQuestion: question };
-  const contact = rawReplyContact || extractReplyContact([question, ...history.map((item) => item.content)]);
+  if (!result.needsHuman && !actionableNow && !continuation) return { result, alertQuestion: question };
+  const contact = currentReplyContact;
   if (!contact) return { result: { ...result, answer: CONTACT_PROMPT, needsHuman: false, actions: [] }, alertQuestion: base };
   return { result: {
     ...result,
@@ -571,7 +609,7 @@ export async function handleConciergeRequest(request, env, ctx) {
   }
 
   const sanitizedQuestion = sanitizeQuestion(body.question);
-  const rawReplyContact = extractReplyContact([body.question, ...(Array.isArray(body.history) ? body.history.map((item) => item?.content) : [])]);
+  const currentReplyContact = extractReplyContact([body.question]);
   const question = sanitizedQuestion === "[passport information removed]"
     ? "passport registration"
     : sanitizedQuestion;
@@ -680,7 +718,10 @@ export async function handleConciergeRequest(request, env, ctx) {
   }
 
   const effectiveKnowledge = mergeApprovedKnowledge(knowledge, approvedKnowledge);
-  const contextualMatch = bambooSocialFollowUpMatch(question, history, effectiveKnowledge);
+  const criticalPropertyMatch = isCriticalPropertyMessage(question)
+    ? matchKnowledge("major water leak", effectiveKnowledge, 0.44)
+    : null;
+  const contextualMatch = criticalPropertyMatch || bambooSocialFollowUpMatch(question, history, effectiveKnowledge);
   const match = contextualMatch || matchKnowledge(question, effectiveKnowledge, 0.44);
   let result;
   if (contextualMatch || shouldUseDeterministic(match, history)) {
@@ -716,7 +757,7 @@ export async function handleConciergeRequest(request, env, ctx) {
     };
   }
 
-  const contactPolicy = applyContactRequirement(result, question, history, rawReplyContact);
+  const contactPolicy = applyContactRequirement(result, question, history, currentReplyContact);
   result = contactPolicy.result;
 
   if (language !== "en" && result.source !== "ai") {

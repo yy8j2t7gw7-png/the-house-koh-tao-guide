@@ -796,7 +796,7 @@ test("guest localization supports seven languages and keeps the owner dashboard 
   assert.doesNotMatch(admin, /src="\/i18n\.js"/);
   assert.match(runtime, /exploreContentDeferred/);
   assert.match(runtime, /element\.closest\("\.section,\.footer"\)/);
-  assert.match(runtime, /houseGuideTranslations:v5\.11\.9:/);
+  assert.match(runtime, /houseGuideTranslations:v5\.11\.10:/);
   assert.match(runtime, /MAX_REQUEST_RETRIES = 2/);
   assert.match(runtime, /let flushRunning = false/);
 });
@@ -905,6 +905,34 @@ test("every guest HTML page loads the shared localization runtime", async () => 
     const html = await readFile(page, "utf8");
     const loadsLocalization = html.includes('src="/guide-app.js"') || html.includes('src="/i18n.js"');
     assert.ok(loadsLocalization, `${page.pathname} does not load the shared localization runtime`);
+  }
+});
+
+test("privacy, data protection and terms are reachable from every public HTML page", async () => {
+  const publicRoot = new URL("../public/", import.meta.url);
+  const runtime = await readFile(new URL("../public/i18n.js", import.meta.url), "utf8");
+  assert.match(runtime, /function addLegalFooter\(\)/);
+  assert.match(runtime, /addLegalFooter\(\);/);
+  assert.match(runtime, /href="\/privacy"/);
+  assert.match(runtime, /href="\/data-deletion"/);
+  assert.match(runtime, /href="\/terms"/);
+
+  const pages = [];
+  async function collect(directory) {
+    for (const entry of await readdir(directory, { withFileTypes: true })) {
+      if (entry.isDirectory()) await collect(new URL(`${entry.name}/`, directory));
+      else if (entry.isFile() && entry.name.endsWith(".html")) pages.push(new URL(entry.name, directory));
+    }
+  }
+  await collect(publicRoot);
+
+  for (const page of pages) {
+    const html = await readFile(page, "utf8");
+    const hasStaticLinks = html.includes('href="/privacy"')
+      && html.includes('href="/data-deletion"')
+      && html.includes('href="/terms"');
+    const inheritsSharedFooter = html.includes('src="/guide-app.js"') || html.includes('src="/i18n.js"');
+    assert.ok(hasStaticLinks || inheritsSharedFooter, `${page.pathname} has no legal navigation`);
   }
 });
 
@@ -1220,8 +1248,12 @@ test("alert policy uses Bangkok after-hours and routes only actionable requests"
 test("critical concierge requests require explicit confirmation before sending WhatsApp", async () => {
   const recipients = JSON.stringify({
     support: [{ label: "Su", phone: "+66 64 000 0001" }],
-    emergency: [{ label: "Owner 1", phone: "+66 81 000 0002" }],
-    escalation: [{ label: "Owner 2", phone: "+66 82 000 0003" }]
+    booking: [{ label: "Fah", phone: "+66 96 000 0001" }],
+    emergency: [
+      { label: "Owner 1", phone: "+66 81 000 0002" },
+      { label: "Owner 2", phone: "+66 82 000 0003" }
+    ],
+    escalation: [{ label: "24/7 responder", phone: "+66 83 000 0004" }]
   });
   const { env, store } = createEnvironment({
     WHATSAPP_ACCESS_TOKEN: "meta-test-token",
@@ -1264,14 +1296,81 @@ test("critical concierge requests require explicit confirmation before sending W
     assert.match(confirmedBody.answer, /Urgent alert sent/);
     assert.equal(store.alerts.length, 1);
     assert.equal(store.alerts[0].recipientGroup, "urgent_response");
-    assert.equal(outbound.length, 1);
-    assert.equal(outbound[0].body.to, "66810000002");
-    assert.equal(outbound[0].body.template.name, "house_urgent_alert_v1");
-    assert.doesNotMatch(JSON.stringify(store.alertDeliveries), /66810000002|66820000003/);
+    assert.equal(outbound.length, 3);
+    assert.deepEqual(outbound.map((item) => item.body.to).sort(), ["66810000002", "66820000003", "66960000001"]);
+    assert.equal(outbound.every((item) => item.body.template.name === "house_urgent_alert_v1"), true);
+    assert.doesNotMatch(JSON.stringify(outbound), /66640000001/);
+    assert.doesNotMatch(JSON.stringify(store.alertDeliveries), /66810000002|66820000003|66960000001/);
     assert.equal(whatsappAlertConfiguration(env).configured, true);
   } finally {
     globalThis.fetch = originalFetch;
   }
+});
+
+test("critical property messages override every stale ordinary contact workflow", async () => {
+  const pendingWorkflows = [
+    "Please arrange luggage storage after checkout at 3 pm for 2 bags.",
+    "Please book snorkelling tomorrow for 2 guests.",
+    "Please arrange help for the dripping bathroom tap.",
+    "Please send fresh towels to my room."
+  ];
+
+  for (const pendingQuestion of pendingWorkflows) {
+    const { env, store } = createEnvironment({ OPENAI_API_KEY: "" });
+    const response = await handleConciergeRequest(guestRequest("I have a water leak and everything is flooded", {
+      history: [
+        { role: "user", content: pendingQuestion },
+        { role: "assistant", content: "What WhatsApp or phone number can our team use to contact you? Please include the country code." }
+      ]
+    }), env);
+    const body = await response.json();
+
+    assert.equal(response.status, 200, pendingQuestion);
+    assert.equal(body.intentId, "property_emergency", pendingQuestion);
+    assert.equal(body.handoff, "property_emergency", pendingQuestion);
+    assert.equal(body.actions[0].action, "confirm_urgent_property", pendingQuestion);
+    assert.equal(body.actions[0].label, "Send urgent alert", pendingQuestion);
+    assert.doesNotMatch(body.answer, /What WhatsApp or phone number/i, pendingQuestion);
+    assert.equal(store.alerts.length, 0, pendingQuestion);
+  }
+});
+
+test("an interrupted contact workflow cannot be submitted by a later phone number", async () => {
+  const { env, store } = createEnvironment({ OPENAI_API_KEY: "" });
+  const urgentQuestion = "I have a water leak and everything is flooded";
+  const urgentAnswer = "This sounds serious. Move away from the danger first. Send an urgent alert to The House emergency team now?";
+  const response = await handleConciergeRequest(guestRequest("+66 81 234 5678", {
+    history: [
+      { role: "user", content: "Please arrange luggage storage after checkout at 3 pm for 2 bags." },
+      { role: "assistant", content: "What WhatsApp or phone number can our team use to contact you? Please include the country code." },
+      { role: "user", content: urgentQuestion },
+      { role: "assistant", content: urgentAnswer }
+    ]
+  }), env);
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.notEqual(body.intentId, "luggage_storage");
+  assert.doesNotMatch(body.answer, /luggage request has been sent/i);
+  assert.equal(store.alerts.length, 0);
+});
+
+test("a contact collected for one workflow cannot satisfy a different later workflow", async () => {
+  const { env, store } = createEnvironment({ OPENAI_API_KEY: "" });
+  const response = await handleConciergeRequest(guestRequest("Please book snorkelling tomorrow for 2 guests", {
+    history: [
+      { role: "user", content: "Please arrange luggage storage after checkout." },
+      { role: "assistant", content: "What WhatsApp or phone number can our team use to contact you? Please include the country code." },
+      { role: "user", content: "+66 81 234 5678" },
+      { role: "assistant", content: "Your luggage request has been sent to The House team ✓ We will handle it from here." }
+    ]
+  }), env);
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(body.handoff, "booking");
+  assert.match(body.answer, /country code/i);
+  assert.equal(store.alerts.length, 0);
 });
 
 test("unacknowledged critical alerts escalate and authorized WhatsApp replies can resolve them", async () => {

@@ -2,6 +2,21 @@
 
 All notable changes to The House – Koh Tao guest guide are recorded here.
 
+## v5.11.10 — Critical-Intent Precedence & Sitewide Legal Navigation
+
+### Fixed
+
+- Re-evaluated every new guest message for critical property danger before consuming it as a continuation of a pending lower-priority workflow.
+- Prevented stale luggage, booking, maintenance and routine-service contact prompts from swallowing flooding, serious water-leak, electrical-danger, fire or major-property-damage reports.
+- Bound a supplied contact number only to the immediately pending operational request and prevented an interrupted request from being submitted later.
+- Preserved deliberate **Send urgent alert** confirmation, no-alert cancellation and recipient routing to Fah plus both owners without Su.
+
+### Guest interface
+
+- Added Privacy, Data Protection and Terms links to every guest page through the shared page runtime.
+- Added the same legal navigation directly to the private owner console and retained static links on the homepage and legal pages.
+- Added reviewed labels for the seven supported guest languages and regression coverage for every HTML page.
+
 ## v5.11.9 — Production Contact, Date and Alert-Status Hardening
 
 ### Fixed

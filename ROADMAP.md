@@ -1,6 +1,6 @@
 # Product Roadmap
 
-Baseline: v5.11.9
+Baseline: v5.11.10
 
 ## Completed
 
@@ -27,6 +27,8 @@ Baseline: v5.11.9
 - [x] Conservative Airbnb first-name-only synchronization and verified guest greeting
 - [x] Signed `RECEIVED` acknowledgement with backwards-compatible `ACK`
 - [x] Public Privacy Policy, data-deletion instructions and Terms of Use for Meta app review
+- [x] Privacy, Data Protection and Terms navigation available from every page
+- [x] Critical property intent overrides stale ordinary Concierge and contact-number workflows
 - [x] Required passport registration made prominent on main and room-specific welcome pages
 - [x] Private Room welcome link opens the room-bound secure registration form directly without a WhatsApp handoff
 - [x] Registration page presents image-upload and manual-entry choices without activating unverified fields
@@ -133,7 +135,7 @@ Guests may continue using ordinary WhatsApp handoffs. Automated internal alerts 
 
 - [x] Push the v5.5.0 release to the existing hosting workflow
 - [x] Confirm `/api/concierge/status` reports AI and learning enabled
-- [ ] Deploy v5.11.9 and confirm concierge startup, owner-inclusive actionable routing, confirmed urgent-property alerts, verified-session lost-key release, first-name greeting, office-hours, luggage handling, full-page language switching, registration, maintenance reporting and the alert console
+- [ ] Deploy v5.11.10 and confirm critical property messages interrupt stale ordinary workflows, sitewide legal links are present, concierge startup, owner-inclusive actionable routing, confirmed urgent-property alerts, verified-session lost-key release, first-name greeting, office-hours, luggage handling, full-page language switching, registration, maintenance reporting and the alert console
 - [x] Add `STAY_TOKEN_PEPPER` and `RESERVATION_SYNC_TOKEN` Worker secrets
 - [ ] Add protected `SPARE_KEY_CODES` Worker secret before activating automatic spare-key release
 - [x] Install and authorize the included Airbnb Google Apps Script synchronizer

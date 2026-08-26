@@ -2,7 +2,7 @@
   if (window.HOUSE_I18N) return;
 
   const STORAGE_KEY = "houseGuideLanguage";
-  const CACHE_PREFIX = "houseGuideTranslations:v5.11.9:";
+  const CACHE_PREFIX = "houseGuideTranslations:v5.11.10:";
   const MAX_REQUEST_RETRIES = 2;
   const languages = Object.freeze([
     { code: "en", label: "English" },
@@ -26,6 +26,12 @@
   function add(en, th, zh, ru, de, fr, es) {
     dictionary.set(en, { en, th, "zh-CN": zh, ru, de, fr, es });
   }
+
+  // Permanent legal navigation shared by every operational guest page.
+  add("Privacy", "ความเป็นส่วนตัว", "隐私", "Конфиденциальность", "Datenschutz", "Confidentialité", "Privacidad");
+  add("Data Protection", "การคุ้มครองข้อมูล", "数据保护", "Защита данных", "Datenschutz", "Protection des données", "Protección de datos");
+  add("Terms", "ข้อกำหนด", "条款", "Условия", "Nutzungsbedingungen", "Conditions", "Términos");
+  add("Legal information", "ข้อมูลทางกฎหมาย", "法律信息", "Правовая информация", "Rechtliche Informationen", "Informations légales", "Información legal");
 
   // Reviewed stay-access wording for both Airbnb and direct/walk-in reservations.
   add("Verify your stay", "ยืนยันการเข้าพักของคุณ", "验证您的住宿", "Подтвердите проживание", "Aufenthalt verifizieren", "Vérifiez votre séjour", "Verifica tu estancia");
@@ -637,10 +643,30 @@
     document.body.appendChild(button);
   }
 
+  function addLegalFooter() {
+    let footer = document.querySelector("footer.footer");
+    if (!footer) {
+      footer = document.createElement("footer");
+      footer.className = "footer site-legal-footer";
+      footer.innerHTML = "<div>The House – Koh Tao</div>";
+      const shell = document.querySelector(".shell");
+      (shell || document.body).appendChild(footer);
+    } else {
+      footer.classList.add("site-legal-footer");
+    }
+    if (footer.querySelector(".legal-footer-links")) return;
+    const navigation = document.createElement("nav");
+    navigation.className = "legal-footer-links";
+    navigation.setAttribute("aria-label", "Legal information");
+    navigation.innerHTML = '<a href="/privacy">Privacy</a><a href="/data-deletion">Data Protection</a><a href="/terms">Terms</a>';
+    footer.appendChild(navigation);
+  }
+
   function start() {
     addMobileNavigation();
     addSelector();
     addAlwaysVisibleLanguageButton();
+    addLegalFooter();
     if (language !== "en") {
       processRoot(document.body);
       if (!exploreContentDeferred) {

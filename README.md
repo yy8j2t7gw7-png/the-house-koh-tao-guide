@@ -1,4 +1,4 @@
-# Guest Guide Platform with AI Concierge — The House v5.11.8
+# Guest Guide Platform with AI Concierge — The House v5.11.9
 
 The House – Koh Tao guest guide is a production-oriented, mobile-first digital guest guide and concierge platform. It combines property information, curated island guidance, structured place and activity data, and centralized contact and booking routes.
 
@@ -18,12 +18,18 @@ The House – Koh Tao guest guide is a production-oriented, mobile-first digital
 
 The Activities module contains 49 structured profiles covering diving, freediving, snorkelling, boat trips, beach experiences, kayaking, paddleboarding, hiking, viewpoints, climbing, yoga, Muay Thai, massage, cooking, wildlife, photography, night activities and rainy-day options.
 
+## v5.11.9 release focus
+
+- Routes **Call The House Emergency Support** to West / Owner 2 from the protected server-side recipient configuration instead of Su.
+- Requires a usable country-code contact before actionable booking, luggage and routine maintenance requests are submitted, while urgent incidents and lost-key access remain non-blocking.
+- Normalizes relative booking dates such as “tomorrow”, “in 5 days” and “next Friday at 9” into Bangkok-local calendar dates and times.
+- Adds optional approved-template support for notifying all other assigned recipients when an authorized recipient acknowledges or resolves an alert; duplicate webhook delivery does not repeat the update.
+- Keeps the working v1 Meta templates as production defaults until the reviewed replacement templates are Active.
+
 ## v5.11.8 release focus
 
-- Fixes the rendered **Secure spare-key access** CTA inside the AI Concierge so it opens the protected room-bound lost-key flow instead of becoming a same-page dead anchor behind the open Concierge panel.
-- Preserves the spare-key action type through rendering and wires both generated and quick-action CTAs to an explicit same-room state transition or cross-room navigation.
-- Adds a hash-change and dedicated browser event bridge that opens the protected two-step 500 THB fee flow reliably.
-- Keeps verified-session, WhatsApp-delivery, rotation-lock and secret-exclusion safeguards unchanged.
+- Fixed the rendered **Secure spare-key access** CTA so it reliably opens the protected room-bound lost-key flow.
+- Preserved verified-session, fee-acceptance, WhatsApp-delivery, rotation-lock and secret-exclusion safeguards.
 
 ## v5.11.7 release focus
 

@@ -2,6 +2,23 @@
 
 All notable changes to The House – Koh Tao guest guide are recorded here.
 
+## v5.11.9 — Production Contact, Date and Alert-Status Hardening
+
+### Fixed
+
+- Corrected the House emergency-call action to resolve West / Owner 2 from the protected owner recipient configuration instead of falling back to Su.
+- Added mandatory contact collection before actionable booking, luggage and routine maintenance submission; urgent incidents, routine towel/cleaning requests and lost-key access retain their required exceptions.
+- Kept supplied contact numbers out of interaction and alert storage and added them only to transient protected staff-delivery payloads.
+- Normalized relative booking dates into actual Bangkok-local dates and preserved date-only requests without inventing a time.
+- Improved routine-service template labels, including **Fresh towels** and **Room cleaning**.
+
+### WhatsApp readiness
+
+- Preserved production v1 template defaults while adding compatibility for the reviewed service v3, luggage v2, booking v2, urgent v2 and lost-key v3 templates through the existing Cloudflare variables.
+- Added optional `WHATSAPP_STATUS_TEMPLATE_NAME` support for non-recursive acknowledgement/resolution updates to other assigned recipients only.
+- Duplicate inbound webhook deliveries do not repeat status notifications; unauthorized senders and invalid references remain harmless.
+- Added regression coverage for emergency-call separation, contact privacy and blocking, Bangkok date normalization and status-recipient exclusion.
+
 ## v5.11.8 — Secure Spare-Key CTA Wiring Fix
 
 ### Fixed

@@ -38,8 +38,8 @@
     feeBox.hidden = value !== "toilet_clogged";
     if (feeBox.hidden) feeInput.checked = false;
     const critical = ["active_water_leak", "toilet_overflowing", "electrical_danger", "room_cannot_secure"].includes(value);
-    replyContact.required = critical;
-    document.getElementById("replyContactHelp").classList.toggle("is-required", critical);
+    replyContact.required = !critical;
+    document.getElementById("replyContactHelp").classList.toggle("is-required", !critical);
     submit.disabled = false;
   }
   function showScenarios(category, selectedButton) {
@@ -88,7 +88,7 @@
       return;
     }
     if (replyContact.required && replyContact.value.replace(/\D/g, "").length < 8) {
-      setStatus("Please add a phone or WhatsApp number so the urgent team can reply quickly.", false);
+      setStatus("Please add a phone or WhatsApp number with country code so our team can contact you.", false);
       replyContact.focus();
       return;
     }
@@ -118,7 +118,7 @@
         unsupported_file_type: "That photo format is not supported. Please choose a JPEG, PNG, WebP or HEIC image.",
         toilet_fee_acknowledgement_required: "Please acknowledge the conditional toilet-clearance fee before sending.",
         details_required: "Please tell us what happened.",
-        reply_contact_required: "Please add a phone or WhatsApp number so the urgent team can reply quickly."
+        reply_contact_required: "Please add a phone or WhatsApp number with country code so our team can contact you."
       };
       setStatus(messages[error.message] || "The report could not be sent. Please try again or use Contact Us.", false);
       submit.disabled = false;

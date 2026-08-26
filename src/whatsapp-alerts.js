@@ -3,6 +3,7 @@ import {
   formatBangkokAlertTime,
   safeAlertSummary
 } from "./alert-policy.js";
+import { normalizeBangkokRequestedDate } from "./alert-policy.js";
 
 const DEFAULT_GRAPH_VERSION = "v23.0";
 const DEFAULT_TEMPLATE_LANGUAGE = "en_US";
@@ -63,6 +64,12 @@ function parseRecipients(env) {
   result.urgent_response = union("emergency", "booking");
   if (!result.escalation.length) result.escalation = union("emergency");
   return result;
+}
+
+export function houseEmergencyContact(env) {
+  const owners = parseRecipients(env).emergency || [];
+  const target = owners.find((item) => /(?:owner\s*2|west)/i.test(item.label)) || owners[1] || owners[0];
+  return target ? { label: "The House Emergency Support", phoneTel: `+${target.phone}` } : null;
 }
 
 export function whatsappAlertConfiguration(env) {
@@ -140,14 +147,21 @@ function templateForAlert(alert, env) {
     return { name: names.luggage, parameters: [reference, room, context, bags, requestedTime, summary] };
   }
   if (alert.alertType === "booking_request") {
-    const preferredTime = firstMatch(summary, /\b((?:today|tomorrow|tonight|(?:mon|tues|wednes|thurs|fri|satur|sun)day)(?:[^,.]{0,40})?)/i, "Not provided");
+    const preferredTime = alert.requestedDateTime || normalizeBangkokRequestedDate(summary, new Date(alert.createdAt));
     const guests = firstMatch(summary, /\b(\d{1,2})\s*(?:guests?|people|persons?|adults?)\b/i, "Not provided");
     return { name: names.booking, parameters: [reference, room, summary, preferredTime, guests, summary] };
   }
   if (alert.severity === "critical" || alert.severity === "urgent") {
     return { name: names.urgent, parameters: [reference, room, String(alert.alertType || "urgent request").replaceAll("_", " "), time, summary] };
   }
-  return { name: names.service, parameters: [reference, room, String(alert.alertType || "guest request").replaceAll("_", " "), time, summary] };
+  const labels = { maintenance_broken_light: "Broken light", maintenance_wifi_problem: "Wi-Fi problem" };
+  let requestLabel = labels[alert.alertType] || String(alert.alertType || "guest request").replaceAll("_", " ");
+  if (alert.alertType === "stay_support") {
+    if (/\b(?:fresh\s+)?towels?\b/i.test(summary)) requestLabel = "Fresh towels";
+    else if (/\b(?:clean|cleaning|housekeeping)\b/i.test(summary)) requestLabel = "Room cleaning";
+    else requestLabel = "Guest request";
+  }
+  return { name: names.service, parameters: [reference, room, requestLabel, time, summary] };
 }
 
 function templatePayload(alert, recipient, env) {
@@ -260,7 +274,7 @@ export async function createConciergeAlert({ env, interactionId, sessionId, room
   };
   const created = await store.createAlert(alert);
   if (!created?.created) return { ...created?.alert, duplicate: true };
-  return { ...alert, duplicate: false, configured: config.configured };
+  return { ...alert, duplicate: false, configured: config.configured, privateReplyContact: privateReplyContact(result.privateReplyContact), requestedDateTime: result.requestedDateTime || "" };
 }
 
 export async function createProtectedOperationsAlert({
@@ -367,6 +381,34 @@ function recipientIsAuthorized(phone, env) {
   return Object.values(parseRecipients(env)).flat().some((recipient) => recipient.phone === target);
 }
 
+function statusTemplatePayload(alert, recipient, status, actorLabel, env) {
+  const name = String(env.WHATSAPP_STATUS_TEMPLATE_NAME || "").trim();
+  if (!name) return null;
+  const category = String(alert.alertType || "guest request").replaceAll("_", " ");
+  return {
+    messaging_product: "whatsapp", recipient_type: "individual", to: recipient.phone, type: "template",
+    template: { name, language: { code: String(env.WHATSAPP_ALERT_TEMPLATE_LANGUAGE || DEFAULT_TEMPLATE_LANGUAGE) }, components: [{ type: "body", parameters: textParameters([alert.id, `Room ${alert.room || "not selected"}`, category, actorLabel, status]) }] }
+  };
+}
+
+async function notifyStatusChange(alert, actorPhone, status, env, store) {
+  if (!env.WHATSAPP_STATUS_TEMPLATE_NAME) return { attempted: 0, accepted: 0 };
+  const assigned = parseRecipients(env)[alert.recipientGroup] || [];
+  const actor = assigned.find((item) => item.phone === digits(actorPhone));
+  const others = assigned.filter((item) => item.phone !== digits(actorPhone));
+  let accepted = 0;
+  for (const recipient of others) {
+    const payload = statusTemplatePayload(alert, recipient, status, actor?.label || "A team member", env);
+    if (!payload) continue;
+    const graphVersion = String(env.WHATSAPP_GRAPH_API_VERSION || DEFAULT_GRAPH_VERSION).replace(/[^A-Za-z0-9.]/g, "");
+    const response = await fetch(`https://graph.facebook.com/${graphVersion}/${digits(env.WHATSAPP_PHONE_NUMBER_ID)}/messages`, {
+      method: "POST", headers: { authorization: `Bearer ${env.WHATSAPP_ACCESS_TOKEN}`, "content-type": "application/json" }, body: JSON.stringify(payload)
+    }).catch(() => null);
+    if (response?.ok) accepted += 1;
+  }
+  return { attempted: others.length, accepted };
+}
+
 export async function handleWhatsAppWebhook(request, env) {
   const url = new URL(request.url);
   if (request.method === "GET") {
@@ -406,8 +448,14 @@ export async function handleWhatsAppWebhook(request, env) {
     const match = text.match(/^(RECEIVED|ACK|RESOLVE)\s+(alert_[A-Za-z0-9-]{20,})$/i);
     if (!match || !recipientIsAuthorized(from, env)) continue;
     const actor = await recipientHash(from, env);
-    if (["RECEIVED", "ACK"].includes(match[1].toUpperCase())) await store.acknowledgeAlert(match[2], actor, new Date().toISOString());
+    const command = match[1].toUpperCase();
+    const before = store.getAlert ? await store.getAlert(match[2]) : store.alerts?.find((alert) => alert.id === match[2]);
+    if (!before) continue;
+    const eligible = ["RECEIVED", "ACK"].includes(command) ? before.status === "open" : ["open", "acknowledged"].includes(before.status);
+    if (!eligible) continue;
+    if (["RECEIVED", "ACK"].includes(command)) await store.acknowledgeAlert(match[2], actor, new Date().toISOString());
     else await store.resolveAlert(match[2], actor, new Date().toISOString());
+    await notifyStatusChange(before, from, ["RECEIVED", "ACK"].includes(command) ? "ACKNOWLEDGED" : "RESOLVED", env, store);
   }
   return new Response("OK", { status: 200 });
 }

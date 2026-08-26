@@ -32,6 +32,36 @@ export function formatBangkokAlertTime(date = new Date()) {
   }).format(date);
 }
 
+export function normalizeBangkokRequestedDate(value, now = new Date()) {
+  const text = String(value || "");
+  const lower = text.toLowerCase();
+  const today = bangkokParts(now);
+  const base = new Date(Date.UTC(Number(today.year), Number(today.month) - 1, Number(today.day), 12));
+  let target = null;
+  if (/\btomorrow\b/.test(lower)) target = new Date(base.getTime() + 86_400_000);
+  const days = lower.match(/\bin\s+(\d{1,3})\s+days?\b/);
+  if (days) target = new Date(base.getTime() + (Number(days[1]) * 86_400_000));
+  const weekdays = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+  const weekday = lower.match(/\bnext\s+(sunday|monday|tuesday|wednesday|thursday|friday|saturday)\b/);
+  if (weekday) {
+    const desired = weekdays.indexOf(weekday[1]);
+    let add = (desired - base.getUTCDay() + 7) % 7;
+    if (add === 0) add = 7;
+    target = new Date(base.getTime() + (add * 86_400_000));
+  }
+  if (!target) return "Not provided";
+  const date = new Intl.DateTimeFormat("en-GB", { timeZone: "UTC", day: "2-digit", month: "short", year: "numeric" }).format(target);
+  const time = lower.match(/\b(?:at|around|by)\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\b/);
+  if (!time) return date;
+  let hour = Number(time[1]);
+  const minute = Number(time[2] || 0);
+  if (time[3] === "pm" && hour < 12) hour += 12;
+  if (time[3] === "am" && hour === 12) hour = 0;
+  const formatted = new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", hour12: true, timeZone: "UTC" })
+    .format(new Date(Date.UTC(2020, 0, 1, hour, minute)));
+  return `${date}, ${formatted}`;
+}
+
 function bookingNeedsAttention(question, intentId) {
   const normalizedIntent = normalizeText(intentId).replaceAll(" ", "_");
   if (/booking|reservation|transport_request/.test(normalizedIntent)) return true;

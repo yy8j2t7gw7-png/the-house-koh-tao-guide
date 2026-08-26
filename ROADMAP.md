@@ -1,6 +1,6 @@
 # Product Roadmap
 
-Baseline: v5.11.8
+Baseline: v5.11.9
 
 ## Completed
 
@@ -133,7 +133,7 @@ Guests may continue using ordinary WhatsApp handoffs. Automated internal alerts 
 
 - [x] Push the v5.5.0 release to the existing hosting workflow
 - [x] Confirm `/api/concierge/status` reports AI and learning enabled
-- [ ] Deploy v5.11.8 and confirm concierge startup, owner-inclusive actionable routing, confirmed urgent-property alerts, verified-session lost-key release, first-name greeting, office-hours, luggage handling, full-page language switching, registration, maintenance reporting and the alert console
+- [ ] Deploy v5.11.9 and confirm concierge startup, owner-inclusive actionable routing, confirmed urgent-property alerts, verified-session lost-key release, first-name greeting, office-hours, luggage handling, full-page language switching, registration, maintenance reporting and the alert console
 - [x] Add `STAY_TOKEN_PEPPER` and `RESERVATION_SYNC_TOKEN` Worker secrets
 - [ ] Add protected `SPARE_KEY_CODES` Worker secret before activating automatic spare-key release
 - [x] Install and authorize the included Airbnb Google Apps Script synchronizer

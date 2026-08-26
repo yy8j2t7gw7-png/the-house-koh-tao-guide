@@ -110,7 +110,7 @@
       bookingWhatsapp: contacts.bookings?.whatsapp,
       bookingCall: contacts.bookings?.phoneTel ? `tel:${contacts.bookings.phoneTel}` : "",
       propertyEmergencyWhatsapp: propertyEmergency?.whatsapp,
-      propertyEmergencyCall: propertyEmergency?.phoneTel ? `tel:${propertyEmergency.phoneTel}` : "",
+      propertyEmergencyCall: "#house-emergency-call",
       medicalNationalCall: contacts.emergency?.medicalNational?.phoneTel
         ? `tel:${contacts.emergency.medicalNational.phoneTel}` : "",
       rescueCall: contacts.emergency?.kohTaoRescue?.phoneTel
@@ -331,6 +331,7 @@
         } else {
           link.dataset.action = "conciergeHandoff";
           link.dataset.conciergeHumanHandoff = "true";
+          if (action.href === "#house-emergency-call") link.dataset.houseEmergencyCall = "true";
         }
         if (action.external) {
           link.target = "_blank";
@@ -579,6 +580,15 @@
   panel.querySelector("[data-close-room-selector]").addEventListener("click", closeRoomSelector);
 
   panel.addEventListener("click", (event) => {
+    const emergencyCall = event.target.closest("[data-house-emergency-call]");
+    if (emergencyCall) {
+      event.preventDefault();
+      fetch("/api/concierge/emergency-contact", { credentials: "same-origin", headers: { accept: "application/json" } })
+        .then((response) => response.ok ? response.json() : Promise.reject(new Error("unavailable")))
+        .then((contact) => { if (contact.phoneTel) window.location.href = `tel:${contact.phoneTel}`; })
+        .catch(() => appendMessage("concierge", "The House emergency call line is temporarily unavailable. Please call Koh Tao Rescue if anyone is in immediate danger."));
+      return;
+    }
     const spareKeyAccess = event.target.closest("[data-spare-key-access]");
     if (spareKeyAccess) {
       event.preventDefault();

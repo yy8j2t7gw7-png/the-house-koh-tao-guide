@@ -151,7 +151,7 @@ export async function handleMaintenanceGuestRequest(request, env) {
   if (issueType === "toilet_clogged" && !feeAccepted) {
     return json({ error: "toilet_fee_acknowledgement_required" }, 400);
   }
-  if (CRITICAL_ISSUES.has(issueType) && replyContact.replace(/\D/g, "").length < 8) {
+  if (!CRITICAL_ISSUES.has(issueType) && replyContact.replace(/\D/g, "").length < 8) {
     return json({ error: "reply_contact_required" }, 400);
   }
 
@@ -197,7 +197,7 @@ export async function handleMaintenanceGuestRequest(request, env) {
       severity: critical ? "critical" : "attention",
       recipientGroup: critical ? "urgent_response" : "support_with_owners",
       summary: alertSummary,
-      replyContact: critical ? replyContact : "",
+      replyContact,
       escalationRequired: critical
     });
     await store.createMaintenanceReport({

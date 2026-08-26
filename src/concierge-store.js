@@ -678,6 +678,15 @@ export class ConciergeStore extends DurableObject {
     return { ok: true };
   }
 
+  async getAlert(id) {
+    return rows(this.ctx.storage.sql.exec(
+      `SELECT id, severity, alert_type AS alertType, recipient_group AS recipientGroup, room,
+              room_verified AS roomVerified, summary, bangkok_time AS bangkokTime, status,
+              created_at AS createdAt, escalation_due_at AS escalationDueAt, escalated_at AS escalatedAt
+       FROM concierge_alerts WHERE id = ? LIMIT 1`, cleanText(id, 100)
+    ))[0] || null;
+  }
+
   async resolveAlert(id, actorHash, nowValue) {
     const now = cleanText(nowValue, 40) || new Date().toISOString();
     this.ctx.storage.sql.exec(

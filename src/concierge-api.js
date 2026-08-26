@@ -18,11 +18,12 @@ import {
   createConciergeAlert,
   createProtectedOperationsAlert,
   dispatchConciergeAlert,
+  houseEmergencyContact,
   whatsappAlertConfiguration
 } from "./whatsapp-alerts.js";
 import { getGuestAccess, handleStayAdminRequest, stayConfiguration } from "./stay-api.js";
 
-const RELEASE = "5.11.8";
+const RELEASE = "5.11.9";
 const ROOM_OPTIONS = new Set(["1", "2", "3", "4", "5", "6", "8", "9", "10", "11"]);
 const MAX_HISTORY_ITEMS = 10;
 const MAX_QUESTION_LENGTH = 800;
@@ -178,6 +179,46 @@ function cleanHistory(history) {
       content: sanitizeQuestion(item?.content).slice(0, 700)
     }))
     .filter((item) => item.content);
+}
+
+const CONTACT_PROMPT = "What WhatsApp or phone number can our team use to contact you? Please include the country code.";
+
+function extractReplyContact(values) {
+  for (const value of values) {
+    for (const match of String(value || "").match(/(?:\+|00)?\d[\d ()-]{6,20}\d/g) || []) {
+      const number = match.replace(/\D/g, "");
+      if (number.length >= 8 && number.length <= 15) return match.trim();
+    }
+  }
+  return "";
+}
+
+function withoutReplyContact(value) {
+  return String(value || "").replace(/(?:\+|00)?\d[\d ()-]{6,20}\d/g, "[contact supplied privately]");
+}
+
+function applyContactRequirement(result, question, history, rawReplyContact = "") {
+  const actionable = /\b(?:please\s+(?:book|reserve|arrange|store|keep)|can\s+(?:you|we)\s+(?:book|reserve|arrange|store|leave|keep)|could\s+you\s+(?:book|reserve|arrange|store|keep)|i\s+(?:want|need|would\s+like)\s+(?:you\s+)?(?:to\s+)?(?:book|reserve|arrange|store|leave|keep)|book\s+(?:me|us)|arrange\s+(?:luggage|baggage|a\s+taxi|transport|diving|snorkelling|snorkeling|a\s+boat))\b/i;
+  const prior = [...history].reverse().find((item) => item.role === "user" && actionable.test(item.content));
+  const contactNow = rawReplyContact;
+  const priorOperational = [...history].reverse().find((item) => item.role === "user" && /\b(?:luggage|baggage|book|booking|reserve|arrange|diving|snorkel|boat|taxi|transfer|transport|scooter)\b/i.test(item.content));
+  const continuation = Boolean(contactNow && priorOperational);
+  const base = actionable.test(question) ? question : prior?.content || priorOperational?.content || question;
+  if (!actionable.test(base) && !continuation) return { result, alertQuestion: question };
+  const luggage = result.intentId === "luggage_storage" || /\b(?:luggage|baggage)\b/i.test(base);
+  const booking = result.handoff === "booking" || /\b(?:book|booking|reserve|arrange|diving|snorkel|boat|taxi|transfer|transport|scooter)\b/i.test(base);
+  if (!luggage && !booking) return { result, alertQuestion: question };
+  if (!result.needsHuman && !prior && !continuation) return { result, alertQuestion: question };
+  const contact = rawReplyContact || extractReplyContact([question, ...history.map((item) => item.content)]);
+  if (!contact) return { result: { ...result, answer: CONTACT_PROMPT, needsHuman: false, actions: [] }, alertQuestion: base };
+  return { result: {
+    ...result,
+    intentId: luggage ? "luggage_storage" : result.intentId || "booking_request",
+    category: luggage ? "stay-support" : "booking",
+    handoff: luggage ? "stay_support" : "booking",
+    needsHuman: true,
+    privateReplyContact: contact
+  }, alertQuestion: withoutReplyContact(base) };
 }
 
 function constantTimeEqual(leftValue, rightValue) {
@@ -475,7 +516,7 @@ async function enforceRateLimit(env, sessionId) {
 
 async function interactionRecord({ env, store, interactionId, sessionId, room, question, result }) {
   if (!store) return null;
-  const sanitizedQuestion = sanitizeQuestion(question);
+  const sanitizedQuestion = sanitizeQuestion(withoutReplyContact(question));
   const normalizedQuestion = normalizeText(sanitizedQuestion);
   const clusterKey = learningClusterKey(sanitizedQuestion);
   const sessionHash = await hashSession(sessionId, env.CONCIERGE_HASH_SALT);
@@ -499,7 +540,7 @@ async function interactionRecord({ env, store, interactionId, sessionId, room, q
   return interactionId;
 }
 
-async function recordInteractionAndAlert({ env, store, ctx, sessionId, room, roomVerified, question, result }) {
+async function recordInteractionAndAlert({ env, store, ctx, sessionId, room, roomVerified, question, alertQuestion = question, result }) {
   if (!store) return { interactionId: null, alert: null, delivery: { attempted: 0, accepted: 0 } };
   let interactionId = `int_${crypto.randomUUID()}`;
   const recordedId = await interactionRecord({ env, store, interactionId, sessionId, room, question, result })
@@ -511,7 +552,7 @@ async function recordInteractionAndAlert({ env, store, ctx, sessionId, room, roo
     sessionId,
     room,
     roomVerified,
-    question,
+    question: alertQuestion,
     result
   }).catch(() => null);
   let delivery = { attempted: 0, accepted: 0 };
@@ -530,6 +571,7 @@ export async function handleConciergeRequest(request, env, ctx) {
   }
 
   const sanitizedQuestion = sanitizeQuestion(body.question);
+  const rawReplyContact = extractReplyContact([body.question, ...(Array.isArray(body.history) ? body.history.map((item) => item?.content) : [])]);
   const question = sanitizedQuestion === "[passport information removed]"
     ? "passport registration"
     : sanitizedQuestion;
@@ -674,6 +716,9 @@ export async function handleConciergeRequest(request, env, ctx) {
     };
   }
 
+  const contactPolicy = applyContactRequirement(result, question, history, rawReplyContact);
+  result = contactPolicy.result;
+
   if (language !== "en" && result.source !== "ai") {
     try {
       const [translatedAnswer] = await translateApprovedTexts(env, language, [result.answer]);
@@ -691,6 +736,7 @@ export async function handleConciergeRequest(request, env, ctx) {
     room,
     roomVerified: access.verified,
     question,
+    alertQuestion: contactPolicy.alertQuestion,
     result
   });
 
@@ -711,6 +757,14 @@ export async function handleConciergeRequest(request, env, ctx) {
     language,
     interactionId: recorded.interactionId
   });
+}
+
+export async function handleEmergencyContactRequest(request, env) {
+  if (request.method !== "GET") return json({ error: "method_not_allowed" }, 405, { allow: "GET" });
+  const access = await getGuestAccess(request, env).catch(() => null);
+  if (!access?.verified) return json({ error: "verified_guest_access_required" }, 403);
+  const contact = houseEmergencyContact(env);
+  return contact ? json(contact) : json({ error: "emergency_contact_unavailable" }, 503);
 }
 
 export async function handleFeedbackRequest(request, env) {

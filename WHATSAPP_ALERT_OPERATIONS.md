@@ -2,7 +2,7 @@
 
 ## Purpose
 
-v5.11.8 provides a protected server-side staff-alert channel through the official Meta WhatsApp Business Platform. Guests continue to use the website Concierge. Recipient telephone numbers, access tokens and app secrets stay in encrypted Cloudflare secrets and never appear in public files, Git or release archives.
+v5.11.9 provides a protected server-side staff-alert channel through the official Meta WhatsApp Business Platform. Guests continue to use the website Concierge. Recipient telephone numbers, access tokens and app secrets stay in encrypted Cloudflare secrets and never appear in public files, Git or release archives.
 
 Routing is role based:
 
@@ -21,6 +21,7 @@ A recommendation question alone does not create a booking alert. The guest must 
 - Guest descriptions are sanitized before storage or delivery.
 - Passport data, confirmation codes, stay tokens, payment information and key-box codes are never included.
 - A verified guest reply number may be added only to the transient urgent delivery payload; it is not stored in the alert record.
+- Actionable booking, luggage and ordinary maintenance requests require a usable contact number. It is added only to the transient protected delivery payload and never to interaction, alert or application logs. Genuine urgent incidents are not blocked if no number is available.
 - A displayed room number is guest-selected context unless the alert explicitly says the stay is verified.
 - Automatic spare-key release remains separate and fail closed: a current verified room-bound session, the 19:30–10:30 Bangkok window, two-step 500 THB fee acceptance and at least one accepted protected team notification are all required. The guest does not approve the staff notification.
 - Alert records and delivery metadata are removed after 30 days.
@@ -61,6 +62,27 @@ The House lost-key alert {{1}}. Room: {{2}}. Time: {{3}} Bangkok time. The guest
 ```
 
 Any replacement template or changed parameter list requires separate Meta approval before the code may use it.
+
+### Reviewed replacement templates
+
+The Worker is already compatible with `house_service_alert_v3`, `house_luggage_alert_v2`, `house_booking_alert_v2`, `house_urgent_alert_v2` and `house_lost_key_alert_v3` through the existing purpose-specific template-name variables. Keep the v1 values configured until every replacement reports **Active** in Meta; then change only the corresponding Cloudflare variable.
+
+### Alert status template required before enabling status messages
+
+Create one English (`en_US`) Utility template named `house_alert_status_v1` with five body variables in this exact order:
+
+```text
+{{5}} — {{2}}
+
+{{3}}
+{{4}} updated this request.
+
+Ref: {{1}}
+```
+
+Parameter order is: alert reference, room, human-readable alert type, safe actor label and status (`ACKNOWLEDGED` or `RESOLVED`). Once Meta reports the template **Active**, add `WHATSAPP_STATUS_TEMPLATE_NAME=house_alert_status_v1` as a normal Worker variable and deploy. Until then, leave the variable absent; existing acknowledgement, resolution and escalation behavior continues without status messages.
+
+One-tap acknowledgement requires separately reviewed interactive template versions with quick-reply buttons. Typed `RECEIVED`, `ACK` and `RESOLVE` remain the production fallback and are not changed by this release.
 
 ## Cloudflare secrets
 

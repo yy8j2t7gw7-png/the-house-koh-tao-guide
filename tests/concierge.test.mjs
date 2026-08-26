@@ -5,6 +5,7 @@ import vm from "node:vm";
 import {
   handleAdminRequest,
   handleConciergeRequest,
+  handleEmergencyContactRequest,
   handleFeedbackRequest
 } from "../src/concierge-api.js";
 import { handlePassportGuestRequest } from "../src/passport-api.js";
@@ -22,9 +23,10 @@ import {
 } from "../src/concierge-core.js";
 import { retrieveApprovedProjectKnowledge } from "../src/project-knowledge.js";
 import { handleTranslationRequest } from "../src/i18n-api.js";
-import { classifyConciergeAlert, isAfterHours, safeAlertSummary } from "../src/alert-policy.js";
+import { classifyConciergeAlert, isAfterHours, normalizeBangkokRequestedDate, safeAlertSummary } from "../src/alert-policy.js";
 import {
   handleWhatsAppWebhook,
+  houseEmergencyContact,
   processDueAlertEscalations,
   whatsappAlertConfiguration
 } from "../src/whatsapp-alerts.js";
@@ -295,6 +297,7 @@ function createEnvironment(overrides = {}) {
       const value = objects.get(key);
       return value ? { body: new Response(value).body } : null;
     },
+    async getAlert(id) { return this.alerts.find((alert) => alert.id === id) || null; },
     async delete(key) { objects.delete(key); }
   };
   return {
@@ -450,10 +453,16 @@ test("an actionable luggage request routes to Su and owners with the dedicated p
     return new Response(JSON.stringify({ messages: [{ id: "wamid.luggage" }] }), { status: 200, headers: { "content-type": "application/json" } });
   };
   try {
-    const response = await handleConciergeRequest(
+    const pending = await handleConciergeRequest(
       guestRequest("Please arrange luggage storage after checkout at 3 pm for 2 bags."),
       env
     );
+    const pendingBody = await pending.json();
+    assert.match(pendingBody.answer, /What WhatsApp or phone number/);
+    assert.equal(store.alerts.length, 0);
+    const response = await handleConciergeRequest(guestRequest("+66 81 234 5678", {
+      history: [{ role: "user", content: "Please arrange luggage storage after checkout at 3 pm for 2 bags." }, { role: "assistant", content: pendingBody.answer }]
+    }), env);
     const body = await response.json();
     assert.equal(body.intentId, "luggage_storage");
     assert.equal(body.needsHuman, true);
@@ -787,7 +796,7 @@ test("guest localization supports seven languages and keeps the owner dashboard 
   assert.doesNotMatch(admin, /src="\/i18n\.js"/);
   assert.match(runtime, /exploreContentDeferred/);
   assert.match(runtime, /element\.closest\("\.section,\.footer"\)/);
-  assert.match(runtime, /houseGuideTranslations:v5\.11\.8:/);
+  assert.match(runtime, /houseGuideTranslations:v5\.11\.9:/);
   assert.match(runtime, /MAX_REQUEST_RETRIES = 2/);
   assert.match(runtime, /let flushRunning = false/);
 });
@@ -1423,8 +1432,8 @@ test("guest answers never disclose private commercial arrangements", async () =>
     const body = await response.json();
     assert.equal(body.source, "ai");
     assert.doesNotMatch(body.answer, /commission|referral payment|revenue share/i);
-    assert.match(body.answer, /concierge can help arrange/i);
-    assert.equal(body.actions[0].route, "bookingWhatsapp");
+    assert.match(body.answer, /What WhatsApp or phone number/);
+    assert.deepEqual(body.actions, []);
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -2063,12 +2072,12 @@ test("verified guests can report routine and critical room problems with protect
     headers: { origin: "https://guide.example", cookie },
     body: blockedCritical
   }), env);
-  assert.equal(blocked.status, 400);
-  assert.equal((await blocked.json()).error, "reply_contact_required");
+  assert.equal(blocked.status, 200);
 
   const routineForm = new FormData();
   routineForm.set("issueType", "wifi_problem");
   routineForm.set("details", "Wi-Fi disconnects near the bed.");
+  routineForm.set("replyContact", "+66 81 234 5678");
   const png = new Uint8Array(200);
   png.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
   routineForm.set("photo", new Blob([png], { type: "image/png" }), "room.png");
@@ -2119,7 +2128,7 @@ test("verified guests can report routine and critical room problems with protect
   assert.doesNotMatch(store.alerts.at(-1).summary, /66812345678|81 234 5678/);
   assert.equal("privateReplyContact" in store.alerts.at(-1), false);
   assert.match(whatsappPayload.template.components[0].parameters[4].text, /Guest reply: \+66812345678/);
-  assert.equal(store.maintenanceReports.length, 2);
+  assert.equal(store.maintenanceReports.length, 3);
 });
 
 test("after-hours spare-key release uses the verified session, confirms the fee and never alerts either code", async () => {
@@ -2291,4 +2300,82 @@ test("secure guest access uses the shared header and links discreetly to owner l
   assert.doesNotMatch(html, /This confirms that this permanent link belongs to your booked room/);
   const entry = await readFile(new URL("../public/registration-entry.js", import.meta.url), "utf8");
   assert.match(entry, /\/api\/stay\/in-person-passports/);
+});
+
+test("Bangkok booking dates normalize without inventing a missing time", () => {
+  const now = new Date("2026-08-26T03:00:00.000Z");
+  assert.equal(normalizeBangkokRequestedDate("tomorrow", now), "27 Aug 2026");
+  assert.equal(normalizeBangkokRequestedDate("in 5 days", now), "31 Aug 2026");
+  assert.equal(normalizeBangkokRequestedDate("next Friday at 9", now), "28 Aug 2026, 9:00 AM");
+});
+
+test("House emergency support resolves Owner 2 or West instead of Su", async () => {
+  const env = { WHATSAPP_ALERT_RECIPIENTS: JSON.stringify({
+    support: [{ label: "Su", phone: "+66 64 000 0001" }],
+    emergency: [{ label: "Owner 1", phone: "+66 81 000 0002" }, { label: "West / Owner 2", phone: "+66 82 000 0003" }]
+  }) };
+  const contact = houseEmergencyContact(env);
+  assert.equal(contact.phoneTel, "+66820000003");
+  assert.notEqual(contact.phoneTel, "+66640000001");
+  const script = await readFile(new URL("../public/ai-concierge.js", import.meta.url), "utf8");
+  assert.match(script, /api\/concierge\/emergency-contact/);
+});
+
+test("booking contact is required, kept out of stored records and included only in delivery", async () => {
+  const { env, store } = createEnvironment({
+    WHATSAPP_ACCESS_TOKEN: "token", WHATSAPP_PHONE_NUMBER_ID: "123", WHATSAPP_WEBHOOK_VERIFY_TOKEN: "verify", META_APP_SECRET: "secret",
+    WHATSAPP_ALERT_RECIPIENTS: JSON.stringify({ booking: [{ label: "Fah", phone: "+66 96 000 0001" }] })
+  });
+  const originalFetch = globalThis.fetch;
+  let payload;
+  globalThis.fetch = async (_url, options) => {
+    payload = JSON.parse(options.body);
+    return new Response(JSON.stringify({ messages: [{ id: "wamid.booking.contact" }] }), { status: 200, headers: { "content-type": "application/json" } });
+  };
+  try {
+    const first = await handleConciergeRequest(guestRequest("Please book snorkelling tomorrow for 2 guests"), env);
+    assert.match((await first.json()).answer, /country code/);
+    assert.equal(store.alerts.length, 0);
+    await handleConciergeRequest(guestRequest("+66 81 234 5678", { history: [
+      { role: "user", content: "Please book snorkelling tomorrow for 2 guests" },
+      { role: "assistant", content: "What WhatsApp or phone number can our team use to contact you? Please include the country code." }
+    ] }), env);
+    assert.equal(store.alerts.length, 1);
+    assert.doesNotMatch(JSON.stringify(store.interactions), /66812345678|81 234 5678/);
+    assert.doesNotMatch(JSON.stringify(store.alerts), /66812345678|81 234 5678/);
+    assert.match(payload.template.components[0].parameters[5].text, /Guest reply: \+66812345678/);
+    assert.match(payload.template.components[0].parameters[3].text, /\d{2} \w{3} \d{4}/);
+  } finally { globalThis.fetch = originalFetch; }
+});
+
+test("WhatsApp acknowledgement notifies other assigned recipients once without exposing phones", async () => {
+  const { env, store } = createEnvironment({
+    WHATSAPP_ACCESS_TOKEN: "token", WHATSAPP_PHONE_NUMBER_ID: "123", WHATSAPP_WEBHOOK_VERIFY_TOKEN: "verify", META_APP_SECRET: "status-secret",
+    WHATSAPP_STATUS_TEMPLATE_NAME: "house_alert_status_v1",
+    WHATSAPP_ALERT_RECIPIENTS: JSON.stringify({
+      support: [{ label: "Su", phone: "+66 64 000 0001" }],
+      emergency: [{ label: "Owner 1", phone: "+66 81 000 0002" }, { label: "West / Owner 2", phone: "+66 82 000 0003" }]
+    })
+  });
+  const id = "alert_12345678-1234-1234-1234-123456789099";
+  store.alerts.push({ id, alertType: "stay_support", recipientGroup: "support_with_owners", room: "3", status: "open", summary: "Fresh towels", createdAt: new Date().toISOString() });
+  const raw = JSON.stringify({ entry: [{ changes: [{ value: { messages: [{ from: "66640000001", text: { body: `RECEIVED ${id}` } }] } }] }] });
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(env.META_APP_SECRET), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const signature = `sha256=${Buffer.from(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(raw))).toString("hex")}`;
+  const outbound = [];
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (_url, options) => {
+    outbound.push(JSON.parse(options.body));
+    return new Response(JSON.stringify({ messages: [{ id: `wamid.status.${outbound.length}` }] }), { status: 200, headers: { "content-type": "application/json" } });
+  };
+  try {
+    const request = () => new Request("https://guide.example/api/whatsapp/webhook", { method: "POST", headers: { "x-hub-signature-256": signature }, body: raw });
+    await handleWhatsAppWebhook(request(), env);
+    await handleWhatsAppWebhook(request(), env);
+    assert.equal(store.alerts[0].status, "acknowledged");
+    assert.equal(outbound.length, 2);
+    assert.deepEqual(outbound.map((item) => item.to).sort(), ["66810000002", "66820000003"]);
+    assert.doesNotMatch(JSON.stringify(outbound), /66640000001/);
+    assert.equal(store.alerts.length, 1);
+  } finally { globalThis.fetch = originalFetch; }
 });

@@ -2,6 +2,7 @@ import {
   conciergeStatus,
   handleAdminRequest,
   handleConciergeRequest,
+  handleEmergencyContactRequest,
   handleFeedbackRequest
 } from "./concierge-api.js";
 import { cleanupPassportUploads, handlePassportGuestRequest } from "./passport-api.js";
@@ -107,6 +108,10 @@ export default {
 
     if (url.pathname === "/api/concierge/feedback") {
       return handleFeedbackRequest(request, env);
+    }
+
+    if (url.pathname === "/api/concierge/emergency-contact") {
+      return handleEmergencyContactRequest(request, env);
     }
 
     if (url.pathname === "/api/whatsapp/webhook") {

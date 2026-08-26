@@ -28,6 +28,7 @@ import {
   processDueAlertEscalations,
   whatsappAlertConfiguration
 } from "../src/whatsapp-alerts.js";
+import { servePublicLegalPage } from "../src/public-legal.js";
 import knowledge from "../public/data/concierge-knowledge.json" with { type: "json" };
 import activities from "../public/data/activities.json" with { type: "json" };
 import bars from "../public/data/bars.json" with { type: "json" };
@@ -759,7 +760,7 @@ test("guest localization supports seven languages and keeps the owner dashboard 
   assert.doesNotMatch(admin, /src="\/i18n\.js"/);
   assert.match(runtime, /exploreContentDeferred/);
   assert.match(runtime, /element\.closest\("\.section,\.footer"\)/);
-  assert.match(runtime, /houseGuideTranslations:v5\.11\.5:/);
+  assert.match(runtime, /houseGuideTranslations:v5\.11\.6:/);
   assert.match(runtime, /MAX_REQUEST_RETRIES = 2/);
   assert.match(runtime, /let flushRunning = false/);
 });
@@ -854,10 +855,11 @@ test("Thai-national exemption is bilingual without duplicating fixed Thai copy i
 test("every guest HTML page loads the shared localization runtime", async () => {
   const publicRoot = new URL("../public/", import.meta.url);
   const guestPages = [];
+  const nonGuestPages = new Set(["concierge-admin.html", "privacy.html", "data-deletion.html", "terms.html"]);
   async function collect(directory) {
     for (const entry of await readdir(directory, { withFileTypes: true })) {
       if (entry.isDirectory()) await collect(new URL(`${entry.name}/`, directory));
-      else if (entry.isFile() && entry.name.endsWith(".html") && entry.name !== "concierge-admin.html") {
+      else if (entry.isFile() && entry.name.endsWith(".html") && !nonGuestPages.has(entry.name)) {
         guestPages.push(new URL(entry.name, directory));
       }
     }
@@ -1816,6 +1818,43 @@ test("Worker routing keeps the room guide, photos and private knowledge behind c
   assert.match(source, /PRIVATE_DIRECT_ASSET\.test\(url\.pathname\) \|\| PRIVATE_ROOM_PHOTO\.test\(url\.pathname\)/);
   assert.match(source, /access\.accessGranted \? roomAsset\(request, env, PRIVATE_KNOWLEDGE_PATH\) : notFound\(\)/);
   assert.match(source, /headers\.set\("cache-control", "private, no-store, max-age=0"\)/);
+});
+
+test("public legal routes load without guest or admin authorization and keep security headers", async () => {
+  const requestedAssets = [];
+  const env = {
+    ASSETS: {
+      async fetch(request) {
+        const pathname = new URL(request.url).pathname;
+        requestedAssets.push(pathname);
+        const source = await readFile(new URL(`../public${pathname}`, import.meta.url), "utf8");
+        return new Response(source, { headers: { "content-type": "text/html; charset=utf-8" } });
+      }
+    }
+  };
+  const expectations = [
+    ["/privacy", "/privacy.html", "Privacy Policy"],
+    ["/data-deletion/", "/data-deletion.html", "Data-deletion instructions"],
+    ["/terms.html", "/terms.html", "Terms of Use"]
+  ];
+
+  for (const [route, asset, heading] of expectations) {
+    const response = await servePublicLegalPage(new Request(`https://guide.example${route}`), env);
+    assert.equal(response.status, 200);
+    assert.match(await response.text(), new RegExp(heading));
+    assert.equal(requestedAssets.at(-1), asset);
+    assert.equal(response.headers.get("x-frame-options"), "DENY");
+    assert.match(response.headers.get("content-security-policy"), /frame-ancestors 'none'/);
+    assert.match(response.headers.get("cache-control"), /^public/);
+  }
+});
+
+test("public legal documents expose no operational credentials or protected secret names", async () => {
+  for (const filename of ["privacy.html", "data-deletion.html", "terms.html"]) {
+    const source = await readFile(new URL(`../public/${filename}`, import.meta.url), "utf8");
+    assert.doesNotMatch(source, /SPARE_KEY_CODES|WHATSAPP_ACCESS_TOKEN|CONCIERGE_ADMIN_TOKEN|STAY_TOKEN_PEPPER|AIRBNB_SYNC_TOKEN/);
+    assert.doesNotMatch(source, /(?:EAAG|EAAJ)[A-Za-z0-9_-]{20,}/);
+  }
 });
 
 test("Durable Object SQLite schema initializes every operational table used by admin and scheduled jobs", async () => {

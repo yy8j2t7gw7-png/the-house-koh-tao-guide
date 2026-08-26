@@ -8,6 +8,7 @@ import { cleanupPassportUploads, handlePassportGuestRequest } from "./passport-a
 import { cleanupMaintenanceReports, handleMaintenanceGuestRequest } from "./maintenance-api.js";
 import { handleTranslationRequest } from "./i18n-api.js";
 import { handleWhatsAppWebhook, processDueAlertEscalations } from "./whatsapp-alerts.js";
+import { servePublicLegalPage } from "./public-legal.js";
 import {
   getGuestAccess,
   handleReservationSyncRequest,
@@ -150,6 +151,9 @@ export default {
     if (!exploreEnabled(env) && (EXPLORE_PAGE_PATTERN.test(url.pathname) || EXPLORE_MODULE_PATTERN.test(url.pathname))) {
       return Response.redirect(new URL("/", request.url).toString(), 302);
     }
+
+    const legalPage = await servePublicLegalPage(request, env);
+    if (legalPage) return legalPage;
 
     if (/^\/room\/7\/?$/.test(url.pathname)) {
       return Response.redirect(new URL("/rooms.html", request.url).toString(), 302);

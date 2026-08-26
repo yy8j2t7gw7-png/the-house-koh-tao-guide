@@ -2,6 +2,22 @@
 
 All notable changes to The House – Koh Tao guest guide are recorded here.
 
+## v5.11.6 — Public Legal Pages for Meta Review
+
+### Added
+
+- Added public `/privacy`, `/data-deletion` and `/terms` routes with matching `.html` and trailing-slash aliases.
+- Added clear privacy information covering TM30 registration, the Thai-national exemption, every non-Thai overnight guest, passport storage, AI processing, staff alerts and retention.
+- Added a safe data-deletion request process and public Terms of Use.
+- Added discreet legal links to the public welcome-page footer and cross-links between all legal pages.
+
+### Security and validation
+
+- Legal routes do not require a guest session or admin token and receive restrictive browser security headers.
+- No credentials, recipient numbers, confirmation codes, passport data or key-box codes are included in the pages or release archive.
+- WhatsApp, webhook, Airbnb synchronization, passport upload, protected alerts and spare-key behavior are unchanged.
+- All automated tests pass, including new public-route, authorization and secret-exposure checks.
+
 ## v5.11.5 — Production WhatsApp Routing & Guest Operations
 
 ### Added

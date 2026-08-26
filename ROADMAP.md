@@ -1,6 +1,6 @@
 # Product Roadmap
 
-Baseline: v5.11.5
+Baseline: v5.11.6
 
 ## Completed
 
@@ -26,6 +26,7 @@ Baseline: v5.11.5
 - [x] Actionable luggage requests routed to Su with structured operational details
 - [x] Conservative Airbnb first-name-only synchronization and verified guest greeting
 - [x] Signed `RECEIVED` acknowledgement with backwards-compatible `ACK`
+- [x] Public Privacy Policy, data-deletion instructions and Terms of Use for Meta app review
 - [x] Required passport registration made prominent on main and room-specific welcome pages
 - [x] Private Room welcome link opens the room-bound secure registration form directly without a WhatsApp handoff
 - [x] Registration page presents image-upload and manual-entry choices without activating unverified fields
@@ -130,7 +131,7 @@ Guests may continue using ordinary WhatsApp handoffs. Automated internal alerts 
 
 - [x] Push the v5.5.0 release to the existing hosting workflow
 - [x] Confirm `/api/concierge/status` reports AI and learning enabled
-- [ ] Deploy v5.11.5 and confirm concierge startup, concierge-first contact routing, first-name greeting, office-hours and actionable luggage handling, five-template WhatsApp routing, concise verification, resource guidance, readable maintenance references, full-page language switching, verified group registration, direct stays, stay extensions, maintenance reporting, on-demand lost-key access and alert console
+- [ ] Deploy v5.11.6 and confirm concierge startup, concierge-first contact routing, first-name greeting, office-hours and actionable luggage handling, five-template WhatsApp routing, concise verification, resource guidance, readable maintenance references, full-page language switching, verified group registration, direct stays, stay extensions, maintenance reporting, on-demand lost-key access and alert console
 - [x] Add `STAY_TOKEN_PEPPER` and `RESERVATION_SYNC_TOKEN` Worker secrets
 - [ ] Add protected `SPARE_KEY_CODES` Worker secret before activating automatic spare-key release
 - [x] Install and authorize the included Airbnb Google Apps Script synchronizer

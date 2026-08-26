@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The v5.11.6 concierge combines six layers:
+The v5.11.7 concierge combines six layers:
 
 1. Deterministic safety and operational rules for emergencies, lost keys, fees, booking policy and human routing.
 2. Server-side model reasoning over approved House knowledge plus targeted retrieval from the existing Activities, Restaurants, Cafés, Beaches, Bars and Shopping records.
@@ -21,7 +21,7 @@ Configure secrets on the existing Cloudflare Worker. Never place their values in
 
 ## Guest-language operations
 
-v5.11.6 supports English, Thai, Simplified Chinese, Russian, German, French and Spanish for the operational guest journey. Essential navigation, emergency, passport, lost-key, maintenance-reporting, luggage, resource-conservation and concierge controls have reviewed built-in translations. Longer approved operational text is translated through `/api/i18n/translate` using strict structured output with `store: false` and cached in the existing Durable Object. Approved items use recoverable model sub-batches; incomplete groups are split automatically, browser requests retry temporary failures, and overlapping page flushes are prevented. A release audit verifies every static visible string and accessibility label on each live operational page is accepted by the protected endpoint.
+v5.11.7 supports English, Thai, Simplified Chinese, Russian, German, French and Spanish for the operational guest journey. Essential navigation, emergency, passport, lost-key, maintenance-reporting, luggage, resource-conservation and concierge controls have reviewed built-in translations. Longer approved operational text is translated through `/api/i18n/translate` using strict structured output with `store: false` and cached in the existing Durable Object. Approved items use recoverable model sub-batches; incomplete groups are split automatically, browser requests retry temporary failures, and overlapping page flushes are prevented. A release audit verifies every static visible string and accessibility label on each live operational page is accepted by the protected endpoint.
 
 The visible concierge thinking state is an animated three-dot indicator rather than an operational status sentence. Venue website or social actions must use approved external URLs. Internal Explore detail paths are excluded from model context while Explore is disabled. Bamboo Beach Bar follow-up questions use the approved Facebook and Instagram actions in `public/data/concierge-knowledge.json`.
 
@@ -87,7 +87,7 @@ The core accommodation knowledge is already supplied directly from `public/data/
 10. Verify a future reservation from its correct permanent room page and confirm the same code fails for another room.
 11. Confirm the verified foreign-guest flow offers secure upload and in-person presentation; the in-person route must stay locked until protected owner confirmation. Confirm the all-Thai-overnight-guests option closes the reminder and revokes unused pending upload links.
 12. Open the owner alert console and test a support, booking, urgent and emergency alert with non-sensitive text.
-13. Test spare-key release with a temporary key-box code. Confirm that a missing or incorrect fresh Airbnb confirmation code is rejected, the correct code matches the same active reservation, and the system automatically submits an urgent-team WhatsApp message before display. Confirm that neither code appears in the alert or operational storage.
+13. Test spare-key release with a temporary key-box code. Confirm that an unverified, expired or wrong-room session is rejected, that the guest must deliberately accept the 500 THB fee, and that the system automatically submits a Su-and-owner WhatsApp message before display. Confirm that neither the stay code nor key-box code appears in the alert or operational storage.
 14. Rotate the physical test code, update the encrypted secret, redeploy and confirm rotation in the owner console.
 15. Create a non-sensitive direct test stay, copy its room link and one-time House code, verify it on the correct room and confirm it fails on another room.
 16. Extend an active test stay and confirm the new checkout appears in the Active stays section without requiring the guest to register again.
@@ -132,7 +132,7 @@ Guests are told not to enter passport, payment or key-box information in the con
 - Room selection and a permanent room URL are context, not identity verification. Protected access requires a matching Airbnb HM code or private House stay code for the room and dates.
 - Thai nationals do not require the TM30 passport-registration flow; the owner must confirm a request is for a non-Thai guest.
 - No key-box code or protected token enters the model prompt or learning store.
-- A spare-key request requires a fresh confirmation-code check against the same active reservation; a previous verified browser session is not enough by itself.
+- A spare-key request requires the existing secure session to remain bound to the same active reservation and room. The guest deliberately opens the lost-key flow and accepts the 500 THB fee in two steps, but does not repeat the stay code.
 - Direct/walk-in codes are readable only in the authorized creation response and are persisted only as HMAC hashes. An extension may only move checkout later.
 - Maintenance criticality, recipient group and room are deterministic server decisions, never model output. Critical guest reply contact remains transient.
 - Lost-key handling always includes the 500 THB replacement fee.

@@ -195,7 +195,7 @@ export async function handleMaintenanceGuestRequest(request, env) {
       room: access.room,
       alertType: critical ? "property_emergency" : `maintenance_${issueType}`,
       severity: critical ? "critical" : "attention",
-      recipientGroup: critical ? "emergency" : "support",
+      recipientGroup: critical ? "urgent_response" : "support_with_owners",
       summary: alertSummary,
       replyContact: critical ? replyContact : "",
       escalationRequired: critical

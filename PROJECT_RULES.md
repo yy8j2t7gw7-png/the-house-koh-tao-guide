@@ -49,7 +49,7 @@ Medical or personal emergencies must remain separate from property emergencies a
 - A 500 THB replacement fee is added for a lost key.
 - Never store key-box codes in public files, URLs, structured content, repository history or release archives.
 - Never reveal a code based only on a selected room number.
-- Secure code delivery requires server-side secrets, current-guest verification, a fresh confirmation-code check for the lost-key request, after-hours validation, fee confirmation and event logging.
+- Secure code delivery requires server-side secrets, a current verified room-bound stay session, after-hours validation, two-step fee acceptance, accepted protected team notification, event logging and the rotation lock. The guest does not repeat the stay code for the lost-key request.
 - Current-guest verification and the fresh lost-key check use either the Airbnb HM confirmation code from the guest's trip details or the private House stay code created for a direct/walk-in reservation. The code is checked against the protected room and stay dates; the readable value is never stored or sent to AI, alerts or logs.
 - Each active room may use one permanent public page, but that URL and a selected room are not proof of a reservation.
 - Store confirmation codes only as keyed one-way hashes; never store, log or export readable codes.
@@ -152,7 +152,7 @@ Public interface rules:
 
 ## Current baseline
 
-Current release: v5.11.6.
+Current release: v5.11.7.
 
 Explore is intentionally disabled in the live v5.11.6 release. Do not delete its pages, structured records or media. Restore it only after the planned Explore rebuild and review by changing the protected deployment feature variable. Do not expose internal Explore detail paths in live concierge answers while the feature remains disabled; use approved external actions where supplied.
 

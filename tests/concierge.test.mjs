@@ -432,7 +432,7 @@ test("luggage storage guidance states every available window without promising e
   assert.equal(body.actions[0].href, "/checkout.html");
 });
 
-test("an actionable luggage request routes to Su with the dedicated production template", async () => {
+test("an actionable luggage request routes to Su and owners with the dedicated production template", async () => {
   const { env, store } = createEnvironment({
     OPENAI_API_KEY: "not-used",
     WHATSAPP_ACCESS_TOKEN: "meta-test-token",
@@ -456,7 +456,9 @@ test("an actionable luggage request routes to Su with the dedicated production t
     assert.equal(body.intentId, "luggage_storage");
     assert.equal(body.needsHuman, true);
     assert.equal(body.handoff, "stay_support");
-    assert.equal(store.alerts.at(-1).recipientGroup, "support");
+    assert.equal(store.alerts.at(-1).recipientGroup, "support_with_owners");
+    assert.match(body.answer, /sent to The House team/);
+    assert.deepEqual(body.actions, []);
     assert.equal(payload.template.name, "house_luggage_alert_v1");
     assert.equal(payload.template.components[0].parameters[2].text, "Departure");
     assert.equal(payload.template.components[0].parameters[3].text, "2");
@@ -706,18 +708,18 @@ test("main and room welcome pages make required registration prominent", async (
   assert.match(room, /Stay confirmation code/);
   assert.match(room, /Upload passport securely/);
   assert.match(room, /All overnight guests are Thai nationals/);
-  assert.match(room, /Show my spare-key code/);
+  assert.match(room, /Accept fee &amp; continue/);
+  assert.doesNotMatch(room, /lostKeyConfirmationCode/);
   assert.match(room, /id="openSpareKeyAccess"/);
   assert.match(room, /Secure after-hours help if you cannot enter your room/);
   assert.ok(room.indexOf('id="openSpareKeyAccess"') < room.indexOf('id="spareKeyAccess"'));
   assert.match(room, /id="spareKeyAccess"[^>]*hidden/);
-  assert.match(room, /id="lostKeyConfirmationCode"/);
-  assert.match(room, /Re-enter the Airbnb HM code or private House stay code provided to you/);
+  assert.match(room, /You do not need to enter the Airbnb confirmation code again/);
   assert.match(room, /src="\/registration-entry\.js"/);
   assert.match(registrationEntry, /\/api\/stay\/verify/);
   assert.match(registrationEntry, /\/api\/stay\/passport-link/);
   assert.match(registrationEntry, /\/api\/stay\/spare-key/);
-  assert.match(registrationEntry, /JSON\.stringify\(\{ confirmationCode, feeAccepted: true \}\)/);
+  assert.match(registrationEntry, /JSON\.stringify\(\{ feeAccepted: true \}\)/);
   assert.doesNotMatch(registrationEntry, /spareKeySection\.hidden = false;\s*if \(spareKeyForm\)/);
   assert.match(registrationEntry, /spareKeyTrigger\?\.addEventListener\("click", \(event\) =>/);
   assert.doesNotMatch(registrationEntry, /HOUSE_PRIVATE_REGISTRATION_URL/);
@@ -760,7 +762,7 @@ test("guest localization supports seven languages and keeps the owner dashboard 
   assert.doesNotMatch(admin, /src="\/i18n\.js"/);
   assert.match(runtime, /exploreContentDeferred/);
   assert.match(runtime, /element\.closest\("\.section,\.footer"\)/);
-  assert.match(runtime, /houseGuideTranslations:v5\.11\.6:/);
+  assert.match(runtime, /houseGuideTranslations:v5\.11\.7:/);
   assert.match(runtime, /MAX_REQUEST_RETRIES = 2/);
   assert.match(runtime, /let flushRunning = false/);
 });
@@ -798,9 +800,9 @@ test("critical emergency and registration wording is reviewed in every guest lan
     "Used only for TM30 registration. Your room guide opens after all passports are uploaded or checked in person.",
     "Choice saved. Bring every required original passport to The House. The guide opens after our team completes the check and TM30 registration.",
     "Emergency help remains available without verification.",
-    "Airbnb confirmation code for this lost-key request",
-    "Re-enter the Airbnb confirmation code for your verified active stay before continuing.",
-    "That confirmation code does not match your verified active stay. Check the HM code shown in your Airbnb trip details and try again."
+    "Continue only if you have lost your key or are locked out.",
+    "I accept the 500 THB lost-key replacement fee.",
+    "Accept fee & continue"
   ];
 
   for (const language of ["en", "th", "zh-CN", "ru", "de", "fr", "es"]) {
@@ -1163,10 +1165,13 @@ test("alert policy uses Bangkok after-hours and routes only actionable requests"
     room: "7",
     now: new Date("2027-08-12T13:00:00.000Z")
   });
-  assert.equal(afterHoursKey.severity, "urgent");
-  assert.equal(afterHoursKey.recipientGroup, "urgent");
-  assert.equal(afterHoursKey.escalationRequired, true);
-  assert.equal(afterHoursKey.roomVerified, false);
+  assert.equal(afterHoursKey, null);
+  const daytimeKey = classifyConciergeAlert({
+    result: { needsHuman: true, intentId: "lost_key", category: "room", handoff: "stay_support" },
+    question: "I lost my key", room: "2", now: new Date("2027-08-12T05:00:00.000Z")
+  });
+  assert.equal(daytimeKey.recipientGroup, "lost_key_team");
+  assert.equal(daytimeKey.escalationRequired, false);
 
   const diveRecommendation = classifyConciergeAlert({
     result: { needsHuman: true, intentId: "diving_recommendation", category: "booking", handoff: "booking" },
@@ -1178,7 +1183,7 @@ test("alert policy uses Bangkok after-hours and routes only actionable requests"
   assert.equal(safeAlertSummary("Passport number AB123456, nationality French, date of birth 1 January 1990").includes("AB123456"), false);
 });
 
-test("critical concierge requests send a sanitized WhatsApp template without storing phone numbers", async () => {
+test("critical concierge requests require explicit confirmation before sending WhatsApp", async () => {
   const recipients = JSON.stringify({
     support: [{ label: "Su", phone: "+66 64 000 0001" }],
     emergency: [{ label: "Owner 1", phone: "+66 81 000 0002" }],
@@ -1210,16 +1215,24 @@ test("critical concierge requests send a sanitized WhatsApp template without sto
     );
     assert.equal(response.status, 200);
     await Promise.all(pending);
+    const body = await response.json();
+    assert.equal(store.alerts.length, 0);
+    assert.equal(outbound.length, 0);
+    assert.equal(body.actions[0].action, "confirm_urgent_property");
+    assert.equal(body.actions[0].label, "Send urgent alert");
+    const confirmed = await handleConciergeRequest(
+      guestRequest("There is water leakage in my room", { room: "6", action: "confirm_urgent_property" }),
+      env,
+      {}
+    );
+    const confirmedBody = await confirmed.json();
+    assert.equal(confirmed.status, 200);
+    assert.match(confirmedBody.answer, /Urgent alert sent/);
     assert.equal(store.alerts.length, 1);
-    assert.equal(store.alerts[0].severity, "critical");
-    assert.equal(store.alerts[0].recipientGroup, "emergency");
+    assert.equal(store.alerts[0].recipientGroup, "urgent_response");
     assert.equal(outbound.length, 1);
-    assert.match(outbound[0].url, /graph\.facebook\.com\/v23\.0\/1234567890\/messages$/);
     assert.equal(outbound[0].body.to, "66810000002");
-    assert.equal(outbound[0].body.type, "template");
     assert.equal(outbound[0].body.template.name, "house_urgent_alert_v1");
-    assert.equal(store.alertDeliveries[0].recipientLabel, "Owner 1");
-    assert.notEqual(store.alertDeliveries[0].recipientHash, "66810000002");
     assert.doesNotMatch(JSON.stringify(store.alertDeliveries), /66810000002|66820000003/);
     assert.equal(whatsappAlertConfiguration(env).configured, true);
   } finally {
@@ -1991,6 +2004,7 @@ test("owner operations separates active and upcoming stays and labels manual rec
   assert.match(script, /\/api\/concierge\/admin\/direct-stays/);
   assert.match(script, /\/api\/concierge\/admin\/stay-extension/);
   assert.match(script, /function maintenanceReference\(room, createdAt\)/);
+  assert.match(script, /item\.checkOutDate === today && nowMinutes < 660/);
   assert.doesNotMatch(script, /Reference \$\{item\.id\}/);
 });
 
@@ -2043,7 +2057,7 @@ test("verified guests can report routine and critical room problems with protect
   assert.match(routineBody.reference, /^R2-D\d{8}-T\d{6}$/);
   assert.doesNotMatch(routineBody.reference, /maint_|[a-f0-9]{8}-[a-f0-9-]{27}/i);
   assert.match(store.alerts.at(-1).summary, new RegExp(`^${routineBody.reference} — wifi problem`));
-  assert.equal(store.alerts.at(-1).recipientGroup, "support");
+  assert.equal(store.alerts.at(-1).recipientGroup, "support_with_owners");
   assert.ok([...passportBucket.objects.keys()].some((key) => key.startsWith("maintenance/")));
 
   const criticalForm = new FormData();
@@ -2076,14 +2090,14 @@ test("verified guests can report routine and critical room problems with protect
   } finally {
     globalThis.fetch = originalFetch;
   }
-  assert.equal(store.alerts.at(-1).recipientGroup, "emergency");
+  assert.equal(store.alerts.at(-1).recipientGroup, "urgent_response");
   assert.doesNotMatch(store.alerts.at(-1).summary, /66812345678|81 234 5678/);
   assert.equal("privateReplyContact" in store.alerts.at(-1), false);
   assert.match(whatsappPayload.template.components[0].parameters[4].text, /Guest reply: \+66812345678/);
   assert.equal(store.maintenanceReports.length, 2);
 });
 
-test("after-hours spare-key release freshly verifies the active reservation, confirms the fee and never alerts either code", async () => {
+test("after-hours spare-key release uses the verified session, confirms the fee and never alerts either code", async () => {
   const { env, store } = createEnvironment({
     SPARE_KEY_CODES: JSON.stringify({ "1": "8642" }),
     WHATSAPP_ALERT_RECIPIENTS: JSON.stringify({ urgent: [{ label: "Su", phone: "+66 64 000 0001" }] }),
@@ -2111,28 +2125,13 @@ test("after-hours spare-key release freshly verifies the active reservation, con
     body: JSON.stringify({ nationality: "thai", allGuestsThai: true })
   }), env, "/api/stay/nationality", null, afterHours);
 
-  const missingFreshCode = await handleStayGuestRequest(new Request("https://guide.example/api/stay/spare-key", {
+  const noFee = await handleStayGuestRequest(new Request("https://guide.example/api/stay/spare-key", {
     method: "POST",
     headers: { origin: "https://guide.example", cookie, "content-type": "application/json" },
     body: JSON.stringify({ feeAccepted: false })
   }), env, "/api/stay/spare-key", null, afterHours);
-  assert.equal(missingFreshCode.status, 400);
-  assert.equal((await missingFreshCode.json()).error, "fresh_confirmation_required");
-
-  const wrongFreshCode = await handleStayGuestRequest(new Request("https://guide.example/api/stay/spare-key", {
-    method: "POST",
-    headers: { origin: "https://guide.example", cookie, "content-type": "application/json" },
-    body: JSON.stringify({ confirmationCode: "HMWRONG999", feeAccepted: true })
-  }), env, "/api/stay/spare-key", null, afterHours);
-  assert.equal(wrongFreshCode.status, 403);
-  assert.equal((await wrongFreshCode.json()).error, "confirmation_code_mismatch");
-
-  const noFee = await handleStayGuestRequest(new Request("https://guide.example/api/stay/spare-key", {
-    method: "POST",
-    headers: { origin: "https://guide.example", cookie, "content-type": "application/json" },
-    body: JSON.stringify({ confirmationCode: "HMKEY12345", feeAccepted: false })
-  }), env, "/api/stay/spare-key", null, afterHours);
   assert.equal(noFee.status, 400);
+  assert.equal((await noFee.json()).error, "fee_acceptance_required");
 
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async () => new Response(JSON.stringify({ messages: [{ id: "wamid.key-release" }] }), {
@@ -2143,7 +2142,7 @@ test("after-hours spare-key release freshly verifies the active reservation, con
     const released = await handleStayGuestRequest(new Request("https://guide.example/api/stay/spare-key", {
       method: "POST",
       headers: { origin: "https://guide.example", cookie, "content-type": "application/json" },
-      body: JSON.stringify({ confirmationCode: "HMKEY12345", feeAccepted: true })
+      body: JSON.stringify({ feeAccepted: true })
     }), env, "/api/stay/spare-key", null, afterHours);
     const body = await released.json();
     assert.equal(body.keyBoxCode, "8642");
@@ -2159,7 +2158,7 @@ test("after-hours spare-key release freshly verifies the active reservation, con
     const repeated = await handleStayGuestRequest(new Request("https://guide.example/api/stay/spare-key", {
       method: "POST",
       headers: { origin: "https://guide.example", cookie, "content-type": "application/json" },
-      body: JSON.stringify({ confirmationCode: "HMKEY12345", feeAccepted: true })
+      body: JSON.stringify({ feeAccepted: true })
     }), env, "/api/stay/spare-key", null, afterHours);
     assert.equal(repeated.status, 409);
     assert.equal((await repeated.json()).error, "key_code_rotation_required");

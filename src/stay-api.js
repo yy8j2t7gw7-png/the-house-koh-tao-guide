@@ -553,20 +553,13 @@ export async function handleStayGuestRequest(request, env, path, ctx, now = new 
     if (!registrationComplete(registrationStatus)) return json({ error: "guest_registration_required" }, 403);
     if (!(await rateAllowed(env, request, "spare-key"))) return json({ error: "rate_limited" }, 429);
     const body = await readJson(request, 2_000);
-    const confirmationCode = normalizeConfirmationCode(body?.confirmationCode);
-    if (!confirmationCode) return json({ error: "fresh_confirmation_required" }, 400);
-    const confirmationCodeHash = await hmac(`reservation:${confirmationCode}`, env.STAY_TOKEN_PEPPER);
-    const confirmedReservation = await store.getStayReservationByCodeHash(confirmationCodeHash, session.room);
-    if (!confirmedReservation || confirmedReservation.id !== session.reservationId) {
-      return json({ error: "confirmation_code_mismatch" }, 403);
-    }
     if (body?.feeAccepted !== true) return json({ error: "fee_acceptance_required" }, 400);
     if (!activeStay(session, now)) return json({ error: "active_stay_required" }, 403);
     if (!isAfterHours(now)) return json({ error: "available_after_hours_only" }, 403);
     const keyCode = parseKeyCodes(env)[session.room] || "";
     if (!keyCode) return json({ error: "spare_key_not_configured" }, 503);
     const alertConfiguration = whatsappAlertConfiguration(env);
-    if (!alertConfiguration.configured || Number(alertConfiguration.groupCounts?.urgent) < 1) {
+    if (!alertConfiguration.configured || Number(alertConfiguration.groupCounts?.lost_key_team) < 1) {
       return json({ error: "team_notification_unavailable" }, 503);
     }
     const state = await store.getSpareKeyState(session.reservationId, session.room);
@@ -590,9 +583,9 @@ export async function handleStayGuestRequest(request, env, path, ctx, now = new 
         room: session.room,
         alertType: "verified_spare_key_release",
         severity: "urgent",
-        recipientGroup: "urgent",
+        recipientGroup: "lost_key_team",
         summary: `Verified guest in Room ${session.room} requested the spare key and confirmed the ${LOST_KEY_FEE_THB} THB lost-key fee. Rotate the key-box code before another automatic release.`,
-        escalationRequired: true,
+        escalationRequired: false,
         now
       });
       if (alert) delivery = await dispatchConciergeAlert({ ...alert, duplicate: false }, env);

@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0.0",
-  "release": "5.11.6",
+  "release": "5.11.7",
   "language": "en",
   "updated": "2026-08-14",
   "scope": "Verified accommodation, room, house-rule, support, booking and emergency answers for guests of The House – Koh Tao.",
@@ -367,7 +367,7 @@
         "need a replacement key",
         "key is missing"
       ],
-      "answer": "A lost-key replacement fee of 500 THB applies. During the day, ask the concierge for help. After hours—from 7:30 PM until 10:30 AM Bangkok time—use the protected spare-key section on your permanent Room page. It verifies your Airbnb reservation before showing only your room’s code and immediately notifies the configured team.",
+      "answer": "A lost-key replacement fee of 500 THB applies. During office hours—from 10:30 AM until 7:30 PM Bangkok time—the House team will be notified to help you. After hours—from 7:30 PM until 10:30 AM—use the protected spare-key section on your permanent Room page. Your already verified, room-bound stay session is used; after you explicitly accept the fee, Su and the owners are notified before only your room’s code can be shown.",
       "actions": [
         {
           "label": "Secure spare-key access",

@@ -16,12 +16,13 @@ import { retrieveApprovedProjectKnowledge } from "./project-knowledge.js";
 import { LANGUAGE_NAMES, translateApprovedTexts, validLanguage } from "./i18n-api.js";
 import {
   createConciergeAlert,
+  createProtectedOperationsAlert,
   dispatchConciergeAlert,
   whatsappAlertConfiguration
 } from "./whatsapp-alerts.js";
 import { getGuestAccess, handleStayAdminRequest, stayConfiguration } from "./stay-api.js";
 
-const RELEASE = "5.11.6";
+const RELEASE = "5.11.7";
 const ROOM_OPTIONS = new Set(["1", "2", "3", "4", "5", "6", "8", "9", "10", "11"]);
 const MAX_HISTORY_ITEMS = 10;
 const MAX_QUESTION_LENGTH = 800;
@@ -40,10 +41,13 @@ function publicAccessResult(question, access, room) {
       intentId: medical ? "public_medical_emergency" : "public_property_emergency",
       category: medical ? "emergency" : "property-emergency",
       confidence: 1,
-      needsHuman: true,
+      needsHuman: medical,
       handoff,
       learningGap: false,
-      actions: actionsForHandoff(handoff),
+      actions: medical ? actionsForHandoff(handoff) : [
+        { label: "Send urgent alert", type: "server_action", action: "confirm_urgent_property", style: "danger" },
+        { label: "Cancel", type: "dismiss" }
+      ],
       source: "access-policy"
     };
   }
@@ -496,11 +500,11 @@ async function interactionRecord({ env, store, interactionId, sessionId, room, q
 }
 
 async function recordInteractionAndAlert({ env, store, ctx, sessionId, room, roomVerified, question, result }) {
-  if (!store) return null;
+  if (!store) return { interactionId: null, alert: null, delivery: { attempted: 0, accepted: 0 } };
   let interactionId = `int_${crypto.randomUUID()}`;
   const recordedId = await interactionRecord({ env, store, interactionId, sessionId, room, question, result })
     .catch(() => null);
-  if (!recordedId) return null;
+  if (!recordedId) return { interactionId: null, alert: null, delivery: { attempted: 0, accepted: 0 } };
   const alert = await createConciergeAlert({
     env,
     interactionId,
@@ -510,12 +514,9 @@ async function recordInteractionAndAlert({ env, store, ctx, sessionId, room, roo
     question,
     result
   }).catch(() => null);
-  if (alert && !alert.duplicate) {
-    const delivery = dispatchConciergeAlert(alert, env).catch(() => ({ attempted: 0, accepted: 0 }));
-    if (ctx?.waitUntil) ctx.waitUntil(delivery);
-    else await delivery;
-  }
-  return interactionId;
+  let delivery = { attempted: 0, accepted: 0 };
+  if (alert && !alert.duplicate) delivery = await dispatchConciergeAlert(alert, env).catch(() => delivery);
+  return { interactionId, alert, delivery };
 }
 
 export async function handleConciergeRequest(request, env, ctx) {
@@ -552,6 +553,29 @@ export async function handleConciergeRequest(request, env, ctx) {
     registrationStatus: "not_started"
   })) : { verified: true, accessGranted: true, room: requestedRoom, registrationStatus: "test_bypass" };
   const room = access.verified ? access.room : requestedRoom;
+  if (body.action === "confirm_urgent_property") {
+    if (!access.verified || !room) return json({ error: "verified_guest_access_required" }, 403);
+    const alert = await createProtectedOperationsAlert({
+      env,
+      room,
+      alertType: "property_emergency",
+      severity: "critical",
+      recipientGroup: "urgent_response",
+      summary: question || "Guest confirmed a serious property emergency and requested immediate assistance.",
+      escalationRequired: true
+    }).catch(() => null);
+    const delivery = alert ? await dispatchConciergeAlert(alert, env).catch(() => ({ accepted: 0 })) : { accepted: 0 };
+    if (!delivery.accepted) return json({ error: "urgent_notification_unavailable", message: "The urgent alert could not be delivered. Please call The House Emergency Support now." }, 503);
+    return json({
+      answer: "Urgent alert sent ✓ The House emergency team has been notified. Move to a safe place and call if you need immediate help.",
+      intentId: "property_emergency_confirmed", category: "property-emergency", confidence: 1,
+      needsHuman: false, handoff: "none", learningGap: false,
+      actions: [
+        { label: "Call The House Emergency Support", type: "route", route: "propertyEmergencyCall", style: "danger" },
+        { label: "Call Koh Tao Rescue", type: "route", route: "rescueCall", style: "danger" }
+      ], source: "confirmed-operation", language
+    });
+  }
   let publicResult = access.accessGranted ? null : publicAccessResult(question, access, room);
   if (publicResult) {
     if (language !== "en") {
@@ -562,7 +586,7 @@ export async function handleConciergeRequest(request, env, ctx) {
         // The approved English access message remains available.
       }
     }
-    const interactionId = await recordInteractionAndAlert({
+    const recorded = await recordInteractionAndAlert({
       env,
       store,
       ctx,
@@ -583,7 +607,7 @@ export async function handleConciergeRequest(request, env, ctx) {
       actions: publicResult.actions,
       source: publicResult.source,
       language,
-      interactionId
+      interactionId: recorded.interactionId
     });
   }
 
@@ -638,6 +662,17 @@ export async function handleConciergeRequest(request, env, ctx) {
   result = finalizeResult(result);
   result = applyActionableLuggagePolicy(result, question);
   result = applyLiveFeaturePolicy(result, env);
+  if (result.handoff === "property_emergency" || result.intentId === "property_emergency") {
+    result = {
+      ...result,
+      answer: "This sounds serious. Move away from the danger first. Send an urgent alert to The House emergency team now?",
+      needsHuman: false,
+      actions: [
+        { label: "Send urgent alert", type: "server_action", action: "confirm_urgent_property", style: "danger" },
+        { label: "Cancel", type: "dismiss" }
+      ]
+    };
+  }
 
   if (language !== "en" && result.source !== "ai") {
     try {
@@ -648,7 +683,7 @@ export async function handleConciergeRequest(request, env, ctx) {
     }
   }
 
-  const interactionId = await recordInteractionAndAlert({
+  const recorded = await recordInteractionAndAlert({
     env,
     store,
     ctx,
@@ -659,6 +694,10 @@ export async function handleConciergeRequest(request, env, ctx) {
     result
   });
 
+  if (recorded.alert && recorded.delivery.accepted > 0 && result.needsHuman) {
+    const role = result.intentId === "luggage_storage" ? "luggage request" : result.handoff === "booking" ? "booking request" : "request";
+    result = { ...result, answer: `Your ${role} has been sent to The House team ✓ We will handle it from here.`, actions: [] };
+  }
   return json({
     answer: result.answer,
     intentId: result.intentId,
@@ -670,7 +709,7 @@ export async function handleConciergeRequest(request, env, ctx) {
     actions: result.actions,
     source: result.source,
     language,
-    interactionId
+    interactionId: recorded.interactionId
   });
 }
 

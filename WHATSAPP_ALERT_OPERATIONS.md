@@ -2,15 +2,15 @@
 
 ## Purpose
 
-v5.11.5 provides a protected server-side staff-alert channel through the official Meta WhatsApp Business Platform. Guests continue to use the website Concierge. Recipient telephone numbers, access tokens and app secrets stay in encrypted Cloudflare secrets and never appear in public files, Git or release archives.
+v5.11.7 provides a protected server-side staff-alert channel through the official Meta WhatsApp Business Platform. Guests continue to use the website Concierge. Recipient telephone numbers, access tokens and app secrets stay in encrypted Cloudflare secrets and never appear in public files, Git or release archives.
 
 Routing is role based:
 
-- routine stay requests and actionable luggage requests route to Su through `support`;
-- House-arranged booking requests route to Fah through `booking`;
-- verified spare-key releases notify Su and the configured owners through `urgent`;
-- urgent or critical property incidents notify the configured urgent/emergency recipients;
-- unacknowledged urgent or critical alerts route to `escalation` after 10 minutes.
+- routine stay requests and actionable luggage requests route to Su plus both owners through derived `support_with_owners`;
+- House-arranged booking requests route to Fah plus both owners through derived `booking_with_owners`;
+- verified spare-key releases notify Su plus both owners through derived `lost_key_team` and do not use generic escalation;
+- explicitly confirmed urgent or critical property incidents notify Fah plus both owners, without Su, through derived `urgent_response`;
+- unacknowledged urgent or critical property alerts route to the configured future on-call `escalation` group after 10 minutes, with the owners as the current safe fallback.
 
 A recommendation question alone does not create a booking alert. The guest must ask to book, reserve, arrange or check availability. A luggage-information question remains informational; a request to store or arrange luggage creates an actionable support alert. Identical alerts from the same session are deduplicated for five minutes.
 
@@ -22,13 +22,13 @@ A recommendation question alone does not create a booking alert. The guest must 
 - Passport data, confirmation codes, stay tokens, payment information and key-box codes are never included.
 - A verified guest reply number may be added only to the transient urgent delivery payload; it is not stored in the alert record.
 - A displayed room number is guest-selected context unless the alert explicitly says the stay is verified.
-- Automatic spare-key release remains separate and fail closed: a current verified stay, the 19:30–10:30 Bangkok window, 500 THB fee acceptance and at least one accepted protected team notification are all required. The guest does not approve the staff notification.
+- Automatic spare-key release remains separate and fail closed: a current verified room-bound session, the 19:30–10:30 Bangkok window, two-step 500 THB fee acceptance and at least one accepted protected team notification are all required. The guest does not approve the staff notification.
 - Alert records and delivery metadata are removed after 30 days.
 - The platform does not send automated outbound messages to Koh Tao Rescue, 1669, police, hospitals or clinics. Guest-facing emergency call actions remain direct.
 
 ## Production Meta templates
 
-These English (`en_US`) Utility templates were created in WhatsApp Manager. The latest non-secret handover recorded them as **In review**. Confirm final approval before production activation. Names, body text and parameter order must remain exactly aligned with the code.
+These English (`en_US`) Utility templates are the existing production templates in WhatsApp Manager. Their names, body text, parameter order and parameter counts remain exactly aligned with the code.
 
 ### `house_service_alert_v1`
 
@@ -60,7 +60,7 @@ URGENT — The House alert {{1}}. Room: {{2}}. Type: {{3}}. Time: {{4}} Bangkok 
 The House lost-key alert {{1}}. Room: {{2}}. Time: {{3}} Bangkok time. The guest has requested urgent assistance. Please reply RECEIVED {{1}} to acknowledge this alert.
 ```
 
-Template category and approval remain subject to Meta review. Do not activate production delivery until every template is approved.
+Any replacement template or changed parameter list requires separate Meta approval before the code may use it.
 
 ## Cloudflare secrets
 
@@ -82,24 +82,18 @@ Use this structure for `WHATSAPP_ALERT_RECIPIENTS`, replacing examples directly 
 {
   "support": [{ "label": "Stay support", "phone": "66XXXXXXXXX" }],
   "booking": [{ "label": "Booking", "phone": "66XXXXXXXXX" }],
-  "urgent": [
-    { "label": "Owner 1", "phone": "66XXXXXXXXX" },
-    { "label": "Stay support", "phone": "66XXXXXXXXX" }
-  ],
+  "urgent": [{ "label": "Legacy lost-key recipient", "phone": "66XXXXXXXXX" }],
   "emergency": [
     { "label": "Owner 1", "phone": "66XXXXXXXXX" },
-    { "label": "Owner 2", "phone": "66XXXXXXXXX" },
-    { "label": "Stay support", "phone": "66XXXXXXXXX" }
+    { "label": "Owner 2", "phone": "66XXXXXXXXX" }
   ],
   "escalation": [
-    { "label": "Owner 1", "phone": "66XXXXXXXXX" },
-    { "label": "Owner 2", "phone": "66XXXXXXXXX" },
-    { "label": "Stay support", "phone": "66XXXXXXXXX" }
+    { "label": "Future 24/7 responder", "phone": "66XXXXXXXXX" }
   ]
 }
 ```
 
-The same person may appear in multiple roles. Each group accepts at most 12 unique numbers.
+The same person may appear in multiple roles. Each group accepts at most 12 unique numbers. In production, `support` contains Su, `booking` contains Fah, and `emergency` contains only the two owners. The Worker combines these base groups for the composite routes above and deduplicates recipients. Do not put Su in `emergency`, because that group is also used to derive the serious-property route.
 
 ## Webhook and acknowledgements
 
@@ -142,7 +136,7 @@ Review Meta's supported Graph API versions before changing the version. The Work
 1. Confirm business verification, the WhatsApp display name and all five templates are approved.
 2. Add the secrets and recipient groups, then deploy.
 3. Confirm `/api/concierge/status` reports `whatsappAlertsConfigured: true` and the owner console says **WhatsApp connected**.
-4. Test with non-sensitive requests: room cleaning → support, luggage arrangement → support/Su, snorkelling booking → booking/Fah, serious leak → emergency, and a verified lost-key event → urgent team.
+4. Test with non-sensitive requests: room cleaning and luggage arrangement → Su plus both owners; snorkelling booking → Fah plus both owners; confirmed serious leak → Fah plus both owners without Su; verified lost-key release → Su plus both owners.
 5. Confirm messages use the correct template and contain only the intended sanitized fields.
 6. Reply `RECEIVED` with the exact reference and confirm escalation stops; then test `RESOLVE`.
 7. Test one unacknowledged urgent event and confirm escalation after approximately 10 minutes.

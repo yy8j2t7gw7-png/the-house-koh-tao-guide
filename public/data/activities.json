@@ -1,10 +1,10 @@
 {
   "schemaVersion": "1.3.0",
-  "release": "5.11.6",
+  "release": "5.11.7",
   "property": "The House – Koh Tao",
   "researchDate": "2026-08-07",
   "source": "Fact-checked Ultimate Activities & Experiences Guide",
-  "scope": "The Activities categories were completed in v5.3.3. v5.11.6 keeps the approved structured content available to the model-powered operational concierge while the live Explore interface remains disabled and its later translation and expansion remain deferred.",
+  "scope": "The Activities categories were completed in v5.3.3. v5.11.7 keeps the approved structured content available to the model-powered operational concierge while the live Explore interface remains disabled and its later translation and expansion remain deferred.",
   "editorialPolicy": {
     "rankingsEnabled": false,
     "ratingsEnabled": false,

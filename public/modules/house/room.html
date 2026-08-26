@@ -132,15 +132,18 @@ a{color:inherit}
     <button class="btn secondary" id="closeSpareKeyAccess" type="button">Back to room guide</button>
   </div>
   <p>After hours—from 7:30 PM until 10:30 AM Bangkok time—a verified guest can obtain the spare-key code for this room. The key box is directly next to the room door.</p>
-  <p>Re-enter your stay confirmation code before the key-box code can be released. This fresh check is used only for this lost-key request.</p>
-  <p>A lost-key replacement fee of <strong>500 THB</strong> will be added. The request is recorded and our urgent team is notified immediately. The key-box code is never included in that notification.</p>
+  <p>Your verified, room-bound stay session is used for this request. You do not need to enter the Airbnb confirmation code again.</p>
+  <p>A lost-key replacement fee of <strong>500 THB</strong> will be added. The team is notified only after you explicitly accept the fee. The key-box code is never included in that notification.</p>
   <p class="stay-access-status" id="spareKeyStatus" role="status" aria-live="assertive" hidden></p>
   <form class="spare-key-form" id="spareKeyForm" hidden>
-    <label for="lostKeyConfirmationCode"><strong>Stay confirmation code for this lost-key request</strong></label>
-    <input id="lostKeyConfirmationCode" name="confirmationCode" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="24" required aria-describedby="lostKeyConfirmationHelp">
-    <span class="stay-privacy" id="lostKeyConfirmationHelp">Re-enter the Airbnb HM code or private House stay code provided to you.</span>
-    <label class="fee-confirmation"><input id="lostKeyFeeAccepted" type="checkbox" required> <span>I confirm that I have lost my key or am locked out, and I accept the 500 THB lost-key replacement fee.</span></label>
-    <div class="stay-access-actions"><button class="btn" type="submit">Show my spare-key code</button></div>
+    <div id="lostKeyFeeIntroduction">
+      <p><strong>Continue only if you have lost your key or are locked out.</strong> A 500 THB replacement fee applies.</p>
+      <div class="stay-access-actions"><button class="btn" id="continueLostKeyRequest" type="button">Continue</button><button class="btn secondary" id="cancelLostKeyRequest" type="button">Cancel</button></div>
+    </div>
+    <div id="lostKeyFeeConfirmation" hidden>
+      <label class="fee-confirmation"><input id="lostKeyFeeAccepted" type="checkbox" required> <span>I confirm that I have lost my key or am locked out, and I accept the 500 THB lost-key replacement fee.</span></label>
+      <div class="stay-access-actions"><button class="btn" type="submit">Accept fee &amp; continue</button><button class="btn secondary" id="cancelLostKeyConfirmation" type="button">Cancel</button></div>
+    </div>
   </form>
   <div class="spare-key-result" id="spareKeyResult" hidden>
     <strong>Your Room key-box code</strong>

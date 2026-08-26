@@ -26,7 +26,8 @@
   const spareKeyForm = document.getElementById("spareKeyForm");
   const spareKeyStatus = document.getElementById("spareKeyStatus");
   const feeCheckbox = document.getElementById("lostKeyFeeAccepted");
-  const lostKeyConfirmationCode = document.getElementById("lostKeyConfirmationCode");
+  const lostKeyFeeIntroduction = document.getElementById("lostKeyFeeIntroduction");
+  const lostKeyFeeConfirmation = document.getElementById("lostKeyFeeConfirmation");
   const keyResult = document.getElementById("spareKeyResult");
   const keyCode = document.getElementById("spareKeyCode");
   const keyLocation = document.getElementById("spareKeyLocation");
@@ -55,8 +56,6 @@
     keyRotation: "Automatic release is temporarily paused while the key-box code is changed. The urgent team has been notified; please contact the concierge.",
     keyUnavailable: "Automatic spare-key access is not available right now. Please contact the concierge for urgent help.",
     keyConfirmFee: "Please confirm the 500 THB lost-key replacement fee before continuing.",
-    keyConfirmStay: "Re-enter the stay confirmation code for your verified active stay before continuing.",
-    keyWrongCode: "That confirmation code does not match your verified active stay. Check the Airbnb HM code or private House stay code provided to you, then try again.",
     keyRateLimited: "Too many confirmation attempts. Please wait a minute before trying again.",
     keyReleasing: "Verifying the after-hours request and notifying the team…",
     keyReady: "Spare-key access approved for your verified room.",
@@ -259,29 +258,35 @@
     openSpareKeyAccess();
   });
   spareKeyClose?.addEventListener("click", closeSpareKeyAccess);
+  document.getElementById("continueLostKeyRequest")?.addEventListener("click", () => {
+    if (lostKeyFeeIntroduction) lostKeyFeeIntroduction.hidden = true;
+    if (lostKeyFeeConfirmation) lostKeyFeeConfirmation.hidden = false;
+    feeCheckbox?.focus();
+  });
+  ["cancelLostKeyRequest", "cancelLostKeyConfirmation"].forEach((id) => {
+    document.getElementById(id)?.addEventListener("click", () => {
+      if (lostKeyFeeIntroduction) lostKeyFeeIntroduction.hidden = false;
+      if (lostKeyFeeConfirmation) lostKeyFeeConfirmation.hidden = true;
+      if (feeCheckbox) feeCheckbox.checked = false;
+      closeSpareKeyAccess();
+    });
+  });
 
   spareKeyForm?.addEventListener("submit", async (event) => {
     event.preventDefault();
-    const confirmationCode = String(lostKeyConfirmationCode?.value || "").trim();
-    if (!confirmationCode) {
-      setStatus(spareKeyStatus, messages.keyConfirmStay, "error");
-      lostKeyConfirmationCode?.focus();
-      return;
-    }
     if (!feeCheckbox?.checked) return setStatus(spareKeyStatus, messages.keyConfirmFee, "error");
     const submit = spareKeyForm.querySelector('button[type="submit"]');
     setBusy(submit, true);
     setStatus(spareKeyStatus, messages.keyReleasing, "working");
     try {
-      const data = await api("/api/stay/spare-key", { method: "POST", body: JSON.stringify({ confirmationCode, feeAccepted: true }) });
-      if (lostKeyConfirmationCode) lostKeyConfirmationCode.value = "";
+      const data = await api("/api/stay/spare-key", { method: "POST", body: JSON.stringify({ feeAccepted: true }) });
       spareKeyForm.hidden = true;
       keyCode.textContent = data.keyBoxCode;
       keyLocation.textContent = data.location;
       keyResult.hidden = false;
       setStatus(spareKeyStatus, messages.keyReady, "success");
     } catch (error) {
-      const lookup = { fresh_confirmation_required: messages.keyConfirmStay, confirmation_code_mismatch: messages.keyWrongCode, rate_limited: messages.keyRateLimited, fee_acceptance_required: messages.keyConfirmFee, active_stay_required: messages.keyNotActive, available_after_hours_only: messages.keyDaytime, spare_key_already_released: messages.keyAlreadyReleased, key_code_rotation_required: messages.keyRotation };
+      const lookup = { rate_limited: messages.keyRateLimited, fee_acceptance_required: messages.keyConfirmFee, active_stay_required: messages.keyNotActive, available_after_hours_only: messages.keyDaytime, spare_key_already_released: messages.keyAlreadyReleased, key_code_rotation_required: messages.keyRotation };
       setStatus(spareKeyStatus, lookup[error.code] || messages.keyUnavailable, "error");
       setBusy(submit, false);
     }

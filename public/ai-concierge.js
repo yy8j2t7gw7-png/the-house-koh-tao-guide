@@ -131,6 +131,9 @@
 
   function resolveAction(action, question) {
     const context = contextValues(question);
+    if (action.type === "server_action" || action.type === "dismiss") {
+      return { ...action, label: interpolate(action.label, context), question };
+    }
     if (action.type === "registration") {
       const href = selectedRoom ? `/room/${selectedRoom}#verifiedStayAccess` : "";
       return href ? {
@@ -311,12 +314,21 @@
       const actionRow = document.createElement("div");
       actionRow.className = "ai-concierge-message-actions";
       resolvedActions.forEach((action) => {
-        const link = document.createElement("a");
+        const link = action.type === "server_action" || action.type === "dismiss"
+          ? document.createElement("button") : document.createElement("a");
         link.className = `ai-concierge-message-action${action.style === "danger" ? " is-danger" : ""}`;
-        link.href = action.href;
+        if (link.tagName === "A") link.href = action.href;
+        else link.type = "button";
         link.textContent = action.label;
-        link.dataset.action = "conciergeHandoff";
-        link.dataset.conciergeHumanHandoff = "true";
+        if (action.type === "server_action") {
+          link.dataset.serverAction = action.action;
+          link.dataset.serverQuestion = action.question || question;
+        } else if (action.type === "dismiss") {
+          link.dataset.dismissAction = "true";
+        } else {
+          link.dataset.action = "conciergeHandoff";
+          link.dataset.conciergeHumanHandoff = "true";
+        }
         if (action.external) {
           link.target = "_blank";
           link.rel = "noopener";
@@ -437,6 +449,37 @@
     return result;
   }
 
+  async function runServerAction(button) {
+    const question = button.dataset.serverQuestion || "Confirmed urgent property emergency";
+    const row = button.closest(".ai-concierge-message-actions");
+    row?.querySelectorAll("button").forEach((item) => { item.disabled = true; });
+    const status = appendStatus();
+    try {
+      const response = await fetch(cfg.apiUrl, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          action: button.dataset.serverAction,
+          question,
+          room: selectedRoom || "",
+          sessionId,
+          history: conversationHistory.slice(-historyLimit),
+          language: window.HOUSE_I18N?.language || "en"
+        })
+      });
+      const result = await response.json().catch(() => ({}));
+      status.remove();
+      if (!response.ok) throw new Error(result.message || "The urgent alert could not be sent.");
+      row?.remove();
+      deliverAnswer(result, question);
+    } catch (error) {
+      status.remove();
+      appendMessage("concierge", error.message || "The urgent alert could not be sent. Please call The House Emergency Support now.", [
+        { label: "Call The House Emergency Support", type: "route", route: "propertyEmergencyCall", style: "danger" }
+      ]);
+    }
+  }
+
   async function fallbackAnswer(question) {
     if (isPublicAccess) {
       return {
@@ -533,6 +576,17 @@
   panel.querySelector("[data-close-room-selector]").addEventListener("click", closeRoomSelector);
 
   panel.addEventListener("click", (event) => {
+    const serverAction = event.target.closest("[data-server-action]");
+    if (serverAction) {
+      runServerAction(serverAction);
+      return;
+    }
+    const dismissAction = event.target.closest("[data-dismiss-action]");
+    if (dismissAction) {
+      dismissAction.closest(".ai-concierge-message-actions")?.remove();
+      appendMessage("concierge", "Urgent alert cancelled. No team message was sent.");
+      return;
+    }
     const feedbackButton = event.target.closest("[data-feedback-rating]");
     if (feedbackButton) {
       const feedback = feedbackButton.closest("[data-feedback-for]");

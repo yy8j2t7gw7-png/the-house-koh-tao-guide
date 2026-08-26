@@ -1,6 +1,6 @@
 # Product Roadmap
 
-Baseline: v5.11.6
+Baseline: v5.11.7
 
 ## Completed
 
@@ -81,7 +81,7 @@ Baseline: v5.11.6
 - [x] Keep the private guide locked until all declared non-Thai passport submissions are received
 - [x] Restrict the unverified public concierge to verification, registration reminders and emergency handling
 - [x] Revalidate verified access against updated synchronized checkout dates
-- [x] Require a fresh same-reservation Airbnb confirmation check for every after-hours spare-key release
+- [x] Use the verified active room-bound session for after-hours spare-key release without asking the guest to repeat the stay code
 - [x] Present protected lost-key access as an on-demand room-dashboard option rather than a prominent welcome panel
 - [x] Standardize the secure verification page on the shared single-line desktop header and add a discreet owner-dashboard login entry
 - [x] Offer secure upload or in-person passport presentation for every declared non-Thai overnight guest
@@ -122,8 +122,9 @@ The concierge must be useful to real guests before further Explore expansion.
 - [x] Add protected owner and Su notification recipient configuration
 - [x] Add one-alert-per-recipient delivery and escalation logic
 - [x] Integrate the official WhatsApp Business Platform adapter
-- [ ] Configure the production Meta account, all five approved Utility templates and protected recipients
-- [ ] Verify live outbound delivery, signed acknowledgement and escalation using non-sensitive test events
+- [x] Configure the production Meta account, all five approved Utility templates and protected recipients
+- [x] Verify live outbound delivery using non-sensitive test events
+- [ ] Complete production acknowledgement and ten-minute escalation checks
 
 Guests may continue using ordinary WhatsApp handoffs. Automated internal alerts use the separate official WhatsApp Business Platform adapter only after its protected production configuration is complete. Until then, actionable events remain visible in the protected owner console.
 
@@ -131,7 +132,7 @@ Guests may continue using ordinary WhatsApp handoffs. Automated internal alerts 
 
 - [x] Push the v5.5.0 release to the existing hosting workflow
 - [x] Confirm `/api/concierge/status` reports AI and learning enabled
-- [ ] Deploy v5.11.6 and confirm concierge startup, concierge-first contact routing, first-name greeting, office-hours and actionable luggage handling, five-template WhatsApp routing, concise verification, resource guidance, readable maintenance references, full-page language switching, verified group registration, direct stays, stay extensions, maintenance reporting, on-demand lost-key access and alert console
+- [ ] Deploy v5.11.7 and confirm concierge startup, owner-inclusive actionable routing, confirmed urgent-property alerts, verified-session lost-key release, first-name greeting, office-hours, luggage handling, full-page language switching, registration, maintenance reporting and the alert console
 - [x] Add `STAY_TOKEN_PEPPER` and `RESERVATION_SYNC_TOKEN` Worker secrets
 - [ ] Add protected `SPARE_KEY_CODES` Worker secret before activating automatic spare-key release
 - [x] Install and authorize the included Airbnb Google Apps Script synchronizer

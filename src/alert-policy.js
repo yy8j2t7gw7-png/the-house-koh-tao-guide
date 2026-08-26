@@ -67,18 +67,19 @@ export function classifyConciergeAlert({ result, question, room, now = new Date(
       ...base,
       alertType: "property_emergency",
       severity: "critical",
-      recipientGroup: "emergency",
+      recipientGroup: "urgent_response",
       escalationRequired: true
     };
   }
 
   if (result.intentId === "lost_key") {
+    if (base.afterHours && !result.confirmedLostKeyFee) return null;
     return {
       ...base,
       alertType: "lost_key",
       severity: base.afterHours ? "urgent" : "attention",
-      recipientGroup: base.afterHours ? "urgent" : "support",
-      escalationRequired: base.afterHours
+      recipientGroup: "lost_key_team",
+      escalationRequired: false
     };
   }
 
@@ -87,7 +88,7 @@ export function classifyConciergeAlert({ result, question, room, now = new Date(
       ...base,
       alertType: "luggage_storage",
       severity: "attention",
-      recipientGroup: "support",
+      recipientGroup: "support_with_owners",
       escalationRequired: false
     };
   }
@@ -97,7 +98,7 @@ export function classifyConciergeAlert({ result, question, room, now = new Date(
       ...base,
       alertType: "stay_support",
       severity: "attention",
-      recipientGroup: "support",
+      recipientGroup: "support_with_owners",
       escalationRequired: false
     };
   }
@@ -107,7 +108,7 @@ export function classifyConciergeAlert({ result, question, room, now = new Date(
       ...base,
       alertType: "booking_request",
       severity: "attention",
-      recipientGroup: "booking",
+      recipientGroup: "booking_with_owners",
       escalationRequired: false
     };
   }

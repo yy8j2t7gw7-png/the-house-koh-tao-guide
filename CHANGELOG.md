@@ -2,6 +2,24 @@
 
 All notable changes to The House – Koh Tao guest guide are recorded here.
 
+## v5.11.7 — Operational Alert Routing & Confirmed Emergency Actions
+
+### Changed
+
+- Every actionable routine, luggage and maintenance request now reaches Su and both owners; booking requests reach Fah and both owners; urgent property incidents reach both owners and Fah.
+- Serious property messages now present explicit **Send urgent alert** and **Cancel** actions. No protected alert is created until the guest confirms.
+- Successful automated requests now tell the guest that The House team was notified and do not require a duplicate WhatsApp message.
+- After-hours lost-key access now uses the existing verified room session and a two-step 500 THB fee acceptance instead of asking for the Airbnb code again.
+- Lost-key notification remains fail closed and separate from generic urgent escalation.
+- Generic unacknowledged urgent alerts now use an escalation-specific message and fall back to the owner group when no dedicated future responder is configured.
+- Dashboard headings now distinguish operational alerts from guest maintenance reports, and checkout-day stays stop appearing active at 11:00 AM Bangkok time.
+
+### Compatibility and safety
+
+- Preserved all five approved Meta Utility-template names, language and parameter counts.
+- No passport data, stay codes, key-box codes, phone numbers or credentials are added to public files, logs or staff alert summaries.
+- Added and updated regression coverage for confirmation-before-send, multi-role routing, automated success responses and no-repeat-code spare-key release.
+
 ## v5.11.6 — Public Legal Pages for Meta Review
 
 ### Added

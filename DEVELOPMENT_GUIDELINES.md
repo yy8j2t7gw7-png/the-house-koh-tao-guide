@@ -100,7 +100,7 @@ Future recommendation logic may filter by guest type, budget, time, transport co
 
 ## Sensitive operations
 
-Never put key-box codes, readable Airbnb or direct-stay confirmation codes, private guest tokens or API credentials in public source or structured content. Follow `SECURE_AFTER_HOURS_ACCESS.md` for the protected spare-key flow. Real key-box codes belong only in the encrypted `SPARE_KEY_CODES` Worker secret. Automatic release must fail closed unless a verified active stay, a fresh confirmation-code match for that reservation, the after-hours check, guest fee confirmation, automatic urgent-team notification with confirmed WhatsApp API submission, and rotation state all pass. Direct/walk-in codes must be generated server-side, shown only in the authorized creation response and persisted only as an HMAC hash. Extensions may move checkout later without changing the reservation identity or bypassing the verified-session limit.
+Never put key-box codes, readable Airbnb or direct-stay confirmation codes, private guest tokens or API credentials in public source or structured content. Follow `SECURE_AFTER_HOURS_ACCESS.md` for the protected spare-key flow. Real key-box codes belong only in the encrypted `SPARE_KEY_CODES` Worker secret. Automatic release must fail closed unless a verified active stay session bound to that reservation and room, the after-hours check, two-step guest fee acceptance, automatic Su-and-owner notification with confirmed WhatsApp API submission, and rotation state all pass. The guest does not re-enter the stay code for this operation. Direct/walk-in codes must be generated server-side, shown only in the authorized creation response and persisted only as an HMAC hash. Extensions may move checkout later without changing the reservation identity or bypassing the verified-session limit.
 
 Passport images use the separate private R2 workflow documented in `PASSPORT_DATA_OPERATIONS.md`. It applies only to non-Thai guests; verified guests may self-declare the all-Thai exemption, but the system must never infer nationality. A foreign or mixed group must declare the complete number of non-Thai adults and children, and one separate upload is required for every declared person—not only the booking guest—before private access is granted. Never send passport content to the model, learning store, interaction log, Airbnb message or WhatsApp. Validate the verified reservation, room, expiry, single use, byte limit and file signature before storage. Keep manual TM30 fields disabled until the authoritative schema is supplied.
 
@@ -127,7 +127,7 @@ A coherent release must:
 - validate JSON and JavaScript
 - validate root/module copy parity
 - validate public booking destinations and prohibited direct-booking actions
-- validate that stay-support routes resolve only to Su and House-arranged booking routes resolve only to Fah
+- validate that actionable stay-support and luggage alerts reach Su plus both owners, booking alerts reach Fah plus both owners, and serious property alerts reach Fah plus both owners without Su
 - validate that guest-facing booking answers contain no private commercial terminology
 - validate concierge intent matching, room context and safe fallbacks
 - run `npm test` for protected routing, model-contract, learning and privacy coverage
@@ -135,7 +135,7 @@ A coherent release must:
 - validate that public Contact Us actions open the concierge before human handoff
 - validate that no key-box code or messaging credential is present in the release
 - validate the fixed Airbnb listing-to-room map, cross-room rejection, HMAC-only confirmation storage and verified-session expiration
-- validate spare-key missing/wrong fresh confirmation code, daytime, inactive-stay, missing-fee, missing-notification, duplicate-release and rotation-lock failures
+- validate spare-key unverified-session, daytime, inactive-stay, missing-fee, missing-notification, duplicate-release and rotation-lock failures
 - validate passport token expiry and one-time use, private document retrieval, immediate deletion and retention cleanup
 - validate that passport data cannot enter the model, learning queue, public assets or ordinary WhatsApp messages
 - validate that passport requests require the non-Thai confirmation and Thai guests receive the exemption answer

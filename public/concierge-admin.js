@@ -247,11 +247,12 @@
       timeZone: "Asia/Bangkok",
       year: "numeric",
       month: "2-digit",
-      day: "2-digit"
+      day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23"
     }).formatToParts(new Date()).filter((part) => part.type !== "literal").map((part) => [part.type, part.value]));
     const today = `${dateParts.year}-${dateParts.month}-${dateParts.day}`;
+    const nowMinutes = (Number(dateParts.hour) * 60) + Number(dateParts.minute);
     const active = reservations
-      .filter((item) => item.checkInDate <= today && item.checkOutDate >= today)
+      .filter((item) => item.checkInDate <= today && (item.checkOutDate > today || (item.checkOutDate === today && nowMinutes < 660)))
       .sort((a, b) => a.checkOutDate.localeCompare(b.checkOutDate));
     const upcoming = reservations
       .filter((item) => item.checkInDate > today)

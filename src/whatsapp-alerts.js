@@ -49,6 +49,19 @@ function parseRecipients(env) {
       .filter((recipient) => recipient.phone.length >= 8 && recipient.phone.length <= 15 && !seen.has(recipient.phone) && seen.add(recipient.phone))
       .slice(0, MAX_RECIPIENTS_PER_GROUP);
   }
+  const union = (...groups) => {
+    const seen = new Set();
+    return groups.flatMap((group) => result[group] || [])
+      .filter((recipient) => !seen.has(recipient.phone) && seen.add(recipient.phone))
+      .slice(0, MAX_RECIPIENTS_PER_GROUP);
+  };
+  // Existing production secrets remain valid. Owners are represented by the
+  // emergency group, Su by support, and Fah by booking.
+  result.support_with_owners = union("support", "emergency");
+  result.booking_with_owners = union("booking", "emergency");
+  result.lost_key_team = union("urgent", "support", "emergency");
+  result.urgent_response = union("emergency", "booking");
+  if (!result.escalation.length) result.escalation = union("emergency");
   return result;
 }
 
@@ -308,7 +321,12 @@ export async function processDueAlertEscalations(env, now = new Date()) {
   const due = await store.getDueAlertEscalations(now.toISOString());
   let sent = 0;
   for (const alert of due) {
-    const outcome = await sendToGroup(alert, "escalation", "escalation", env, store);
+    const escalationAlert = {
+      ...alert,
+      alertType: `ESCALATION — ${String(alert.alertType || "urgent alert").replaceAll("_", " ")}`,
+      summary: `ESCALATION: no acknowledgement received within the response window. Respond immediately. Original details: ${alert.summary}`
+    };
+    const outcome = await sendToGroup(escalationAlert, "escalation", "escalation", env, store);
     await store.markAlertEscalated(alert.id, now.toISOString());
     if (outcome.accepted > 0) sent += 1;
   }

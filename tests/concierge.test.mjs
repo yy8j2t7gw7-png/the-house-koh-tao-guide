@@ -375,7 +375,7 @@ test("critical guest requests stay deterministic and room-aware", async () => {
 });
 
 test("medical emergencies offer Koh Tao Rescue first and 1669 second", async () => {
-  const { env } = createEnvironment({ OPENAI_API_KEY: "not-used" });
+  const { env, store } = createEnvironment({ OPENAI_API_KEY: "not-used" });
   const response = await handleConciergeRequest(guestRequest("I had an accident"), env);
   const body = await response.json();
   assert.equal(response.status, 200);
@@ -385,9 +385,12 @@ test("medical emergencies offer Koh Tao Rescue first and 1669 second", async () 
   assert.match(body.answer, /1669/);
   assert.equal(body.actions[0].route, "rescueCall");
   assert.equal(body.actions[1].route, "medicalNationalCall");
+  assert.equal(body.actions[2].action, "confirm_urgent_medical");
+  assert.equal(body.actions[2].label, "Send urgent alert");
+  assert.equal(store.alerts.length, 0);
 });
 
-test("public concierge protects private knowledge, reminds every non-Thai guest and still creates emergency alerts", async () => {
+test("public concierge protects private knowledge and never sends medical alerts without confirmation", async () => {
   const { env, store } = createEnvironment({ GUEST_ACCESS_ENFORCEMENT: "true" });
   const privateQuestion = await handleConciergeRequest(guestRequest("What is the Wi-Fi password?", { room: "2" }), env);
   const privateBody = await privateQuestion.json();
@@ -397,12 +400,11 @@ test("public concierge protects private knowledge, reminds every non-Thai guest 
 
   const emergency = await handleConciergeRequest(guestRequest("I had a serious accident", { room: "2" }), env);
   const emergencyBody = await emergency.json();
-  assert.equal(emergencyBody.intentId, "public_medical_emergency");
+  assert.equal(emergencyBody.intentId, "medical_emergency");
   assert.equal(emergencyBody.handoff, "medical_emergency");
   assert.match(emergencyBody.answer, /Koh Tao Rescue.*1669/s);
-  assert.equal(store.alerts.length, 1);
-  assert.equal(store.alerts[0].alertType, "medical_emergency");
-  assert.equal(store.alerts[0].roomVerified, false);
+  assert.equal(emergencyBody.actions[2].action, "confirm_urgent_medical");
+  assert.equal(store.alerts.length, 0);
 });
 
 test("activity booking uses guest-service wording and the House booking route", async () => {
@@ -533,7 +535,8 @@ test("a local-format luggage contact is rejected until a country code is supplie
   assert.equal(response.status, 200);
   assert.equal(body.workflow.status, "collecting");
   assert.equal(body.workflow.missing.includes("contact"), true);
-  assert.match(body.answer, /country code/i);
+  assert.match(body.answer, /That looks like a local number/i);
+  assert.match(body.answer, /\+66/);
   assert.equal(store.alerts.length, 0);
 });
 
@@ -965,13 +968,14 @@ test("main and room welcome pages make required registration prominent", async (
   assert.match(room, /Stay confirmation code/);
   assert.match(room, /Upload passport securely/);
   assert.match(room, /All overnight guests are Thai nationals/);
-  assert.match(room, /Accept fee &amp; continue/);
+  assert.match(room, /I understand the 500 THB lost-key replacement fee and want to continue/);
+  assert.match(room, />Request spare key<\/button>/);
   assert.doesNotMatch(room, /lostKeyConfirmationCode/);
   assert.match(room, /id="openSpareKeyAccess"/);
   assert.match(room, /Secure after-hours help if you cannot enter your room/);
   assert.ok(room.indexOf('id="openSpareKeyAccess"') < room.indexOf('id="spareKeyAccess"'));
   assert.match(room, /id="spareKeyAccess"[^>]*hidden/);
-  assert.match(room, /You do not need to enter the Airbnb confirmation code again/);
+  assert.match(room, /do not need to enter your Airbnb confirmation code again/);
   assert.match(room, /src="\/registration-entry\.js"/);
   assert.match(registrationEntry, /\/api\/stay\/verify/);
   assert.match(registrationEntry, /\/api\/stay\/passport-link/);
@@ -1008,7 +1012,17 @@ test("browser luggage workflow keeps a supplied contact out of ordinary session 
   assert.doesNotMatch(script, /appendMessage\("guest", question\)/);
   assert.match(script, /privateReplyContact: privateWorkflowContact/);
   assert.match(script, /result\.workflow\?\.type === "luggage"/);
+  assert.match(script, /dataset\.serverQuestion = redactPrivateContact/);
   assert.doesNotMatch(script, /houseConciergeHistory[^\n]{0,200}privateWorkflowContact/);
+});
+
+test("browser concierge permits only one in-flight question and one rendered answer path", async () => {
+  const script = await readFile(new URL("../public/ai-concierge.js", import.meta.url), "utf8");
+  assert.match(script, /let requestInFlight = false/);
+  assert.match(script, /if \(requestInFlight\) return/);
+  assert.match(script, /requestInFlight = true;[\s\S]*const status = appendStatus\(\)/);
+  assert.match(script, /finally \{\s*requestInFlight = false;/);
+  assert.equal((script.match(/deliverAnswer\(result, question\);/g) || []).length, 2);
 });
 
 test("rendered Concierge spare-key CTA opens the protected fee flow", async () => {
@@ -1027,10 +1041,13 @@ test("rendered Concierge spare-key CTA opens the protected fee flow", async () =
   assert.match(registrationEntry, /window\.addEventListener\("house:open-spare-key", openSpareKeyAccess\)/);
   assert.match(registrationEntry, /window\.addEventListener\("hashchange", \(\) =>/);
   assert.match(registrationEntry, /if \(window\.location\.hash === "#spareKeyAccess"\) openSpareKeyAccess\(\)/);
-  assert.match(room, /id="lostKeyFeeIntroduction"/);
-  assert.match(room, /id="lostKeyFeeConfirmation" hidden/);
   assert.match(room, /id="lostKeyFeeAccepted"[^>]*required/);
-  assert.match(room, />Accept fee &amp; continue<\/button>/);
+  assert.match(room, />Request spare key<\/button>/);
+  assert.match(room, /id="spareKeyContactHelp" hidden/);
+  assert.match(room, />Contact The House Concierge<\/a>/);
+  assert.doesNotMatch(room, /id="lostKeyFeeIntroduction"|id="lostKeyFeeConfirmation"/);
+  assert.match(registrationEntry, /spareKeyForm\.hidden = true;[\s\S]*spareKeyContactHelp\.hidden = false/);
+  assert.match(registrationEntry, /\["spare_key_already_released", "key_code_rotation_required"\]/);
   assert.doesNotMatch(room, /lostKeyConfirmationCode/);
 });
 
@@ -1052,7 +1069,7 @@ test("guest localization supports seven languages and keeps the owner dashboard 
   assert.doesNotMatch(admin, /src="\/i18n\.js"/);
   assert.match(runtime, /exploreContentDeferred/);
   assert.match(runtime, /element\.closest\("\.section,\.footer"\)/);
-  assert.match(runtime, /houseGuideTranslations:v5\.11\.12:/);
+  assert.match(runtime, /houseGuideTranslations:v5\.11\.13:/);
   assert.match(runtime, /MAX_REQUEST_RETRIES = 2/);
   assert.match(runtime, /let flushRunning = false/);
 });
@@ -1090,9 +1107,15 @@ test("critical emergency and registration wording is reviewed in every guest lan
     "Used only for TM30 registration. Your room guide opens after all passports are uploaded or checked in person.",
     "Choice saved. Bring every required original passport to The House. The guide opens after our team completes the check and TM30 registration.",
     "Emergency help remains available without verification.",
-    "Continue only if you have lost your key or are locked out.",
-    "I accept the 500 THB lost-key replacement fee.",
-    "Accept fee & continue"
+    "After-hours spare-key help",
+    "If you are locked out after hours, you can request access to the spare key for your room here.",
+    "You are already verified for this room, so you do not need to enter your Airbnb confirmation code again.",
+    "I understand the 500 THB lost-key replacement fee and want to continue.",
+    "Request spare key",
+    "Contact The House Concierge",
+    "Send urgent alert",
+    "Urgent alert cancelled. No team message was sent.",
+    "That looks like a local number. Please send your WhatsApp or phone number including the country code, for example +66 for Thailand."
   ];
 
   for (const language of ["en", "th", "zh-CN", "ru", "de", "fr", "es"]) {
@@ -1498,6 +1521,20 @@ test("alert policy uses Bangkok after-hours and routes only actionable requests"
     now: new Date("2027-08-12T05:00:00.000Z")
   });
   assert.equal(diveRecommendation, null);
+  const mislabeledConversation = classifyConciergeAlert({
+    result: { needsHuman: true, intentId: "booking_request", category: "booking", handoff: "booking" },
+    question: "I am dying for love",
+    room: "1",
+    now: new Date("2027-08-12T05:00:00.000Z")
+  });
+  assert.equal(mislabeledConversation, null);
+  const medicalWithoutConfirmation = classifyConciergeAlert({
+    result: { needsHuman: true, intentId: "medical_emergency", category: "emergency", handoff: "medical_emergency" },
+    question: "I cannot breathe",
+    room: "1",
+    now: new Date("2027-08-12T05:00:00.000Z")
+  });
+  assert.equal(medicalWithoutConfirmation, null);
   assert.equal(safeAlertSummary("Passport number AB123456, nationality French, date of birth 1 January 1990").includes("AB123456"), false);
 });
 
@@ -1821,6 +1858,112 @@ test("low-confidence fallback matches cannot become false emergencies", async ()
   const smokeBody = await smokeResponse.json();
   assert.equal(smokeBody.intentId, "property_emergency");
   assert.equal(smokeBody.handoff, "property_emergency");
+});
+
+test("figurative, slang and ambiguous safety language cannot create operational alerts", async () => {
+  const phrases = [
+    "my ass is burning like hell",
+    "I am burning inside",
+    "I am bloody drunk",
+    "I am dying for love",
+    "bloody hell",
+    "I'm dying laughing"
+  ];
+
+  for (const phrase of phrases) {
+    const { env, store } = createEnvironment({ OPENAI_API_KEY: "not-used" });
+    const response = await handleConciergeRequest(guestRequest(phrase), env);
+    const body = await response.json();
+    assert.equal(response.status, 200, phrase);
+    assert.equal(body.needsHuman, false, phrase);
+    assert.notEqual(body.handoff, "property_emergency", phrase);
+    assert.equal(store.alerts.length, 0, phrase);
+  }
+});
+
+test("medical safety guidance never sends a House alert before explicit confirmation", async () => {
+  const phrases = [
+    "I am unconscious",
+    "Someone is unconscious and won't wake up.",
+    "I can't breathe and need emergency help.",
+    "I am bleeding heavily and need help."
+  ];
+
+  for (const phrase of phrases) {
+    const { env, store } = createEnvironment({ OPENAI_API_KEY: "not-used" });
+    const response = await handleConciergeRequest(guestRequest(phrase), env);
+    const body = await response.json();
+    assert.equal(response.status, 200, phrase);
+    assert.equal(body.needsHuman, false, phrase);
+    assert.equal(body.actions[0].route, "rescueCall", phrase);
+    assert.equal(body.actions[1].route, "medicalNationalCall", phrase);
+    assert.equal(body.actions[2].action, "confirm_urgent_medical", phrase);
+    assert.equal(body.actions[3].type, "dismiss", phrase);
+    assert.equal(store.alerts.length, 0, phrase);
+  }
+});
+
+test("confirmed medical alerts are sent once while cancel remains a no-send client action", async () => {
+  const { env, store } = createEnvironment({
+    OPENAI_API_KEY: "not-used",
+    WHATSAPP_ACCESS_TOKEN: "meta-test-token",
+    WHATSAPP_PHONE_NUMBER_ID: "1234567890",
+    WHATSAPP_ALERT_RECIPIENTS: JSON.stringify({
+      emergency: [
+        { label: "Owner 1", phone: "+66 81 000 0002" },
+        { label: "Owner 2", phone: "+66 82 000 0003" }
+      ]
+    })
+  });
+  const originalFetch = globalThis.fetch;
+  const outbound = [];
+  globalThis.fetch = async (url, options) => {
+    outbound.push({ url: String(url), body: JSON.parse(options.body) });
+    return new Response(JSON.stringify({ messages: [{ id: `wamid.medical-${outbound.length}` }] }), {
+      status: 200,
+      headers: { "content-type": "application/json" }
+    });
+  };
+  try {
+    const medicalMessage = "Someone is unconscious and won't wake up. My number is +66 81 234 5678.";
+    const pending = await handleConciergeRequest(guestRequest(medicalMessage), env);
+    const pendingBody = await pending.json();
+    assert.equal(pendingBody.actions.at(-1).type, "dismiss");
+    assert.equal(store.alerts.length, 0);
+    assert.equal(outbound.length, 0);
+
+    const confirmed = await handleConciergeRequest(guestRequest(medicalMessage, {
+      action: "confirm_urgent_medical"
+    }), env);
+    const confirmedBody = await confirmed.json();
+    assert.equal(confirmed.status, 200);
+    assert.match(confirmedBody.answer, /Urgent alert sent/);
+    assert.equal(store.alerts.length, 1);
+    assert.equal(store.alerts[0].alertType, "medical_emergency");
+    assert.doesNotMatch(JSON.stringify(store.alerts), /66812345678|81 234 5678/);
+    assert.doesNotMatch(JSON.stringify(outbound), /66812345678|81 234 5678/);
+    assert.equal(outbound.length, 2);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("critical property sentences require confirmation while routine towels remain actionable", async () => {
+  for (const phrase of ["There is a fire in my room.", "My room is flooding with water."]) {
+    const { env, store } = createEnvironment({ OPENAI_API_KEY: "not-used" });
+    const response = await handleConciergeRequest(guestRequest(phrase), env);
+    const body = await response.json();
+    assert.equal(body.actions[0].action, "confirm_urgent_property", phrase);
+    assert.equal(body.actions[1].type, "dismiss", phrase);
+    assert.equal(store.alerts.length, 0, phrase);
+  }
+
+  const { env, store } = createEnvironment({ OPENAI_API_KEY: "not-used" });
+  const towels = await handleConciergeRequest(guestRequest("Please send fresh towels to my room."), env);
+  const towelsBody = await towels.json();
+  assert.equal(towelsBody.intentId, "fresh_towels");
+  assert.equal(store.alerts.length, 1);
+  assert.equal(store.alerts[0].alertType, "stay_support");
 });
 
 test("owner-approved knowledge becomes active without a new deployment", async () => {

@@ -92,6 +92,7 @@
   let dragCurrentY = null;
   let enginePromise = null;
   let privateWorkflowContact = "";
+  let requestInFlight = false;
 
   function contextValues(question = "") {
     return {
@@ -145,13 +146,14 @@
 
   function resolveAction(action, question) {
     const context = contextValues(question);
+    const localizedLabel = window.HOUSE_I18N?.t(action.label) || action.label;
     if (action.type === "server_action" || action.type === "dismiss") {
-      return { ...action, label: interpolate(action.label, context), question };
+      return { ...action, label: interpolate(localizedLabel, context), question: redactPrivateContact(question) };
     }
     if (action.type === "registration") {
       const href = selectedRoom ? `/room/${selectedRoom}#verifiedStayAccess` : "";
       return href ? {
-        label: interpolate(action.label, context),
+        label: interpolate(localizedLabel, context),
         href,
         style: action.style || "",
         external: false
@@ -161,7 +163,7 @@
       const href = selectedRoom ? `/room/${selectedRoom}#spareKeyAccess` : "";
       return href ? {
         type: "spare-key",
-        label: interpolate(action.label || "Secure spare-key access", context),
+        label: interpolate(window.HOUSE_I18N?.t(action.label || "Secure spare-key access") || action.label || "Secure spare-key access", context),
         href,
         style: action.style || "",
         external: false
@@ -177,7 +179,7 @@
       href += `${href.includes("?") ? "&" : "?"}text=${message}`;
     }
     return {
-      label: interpolate(action.label, context),
+      label: interpolate(localizedLabel, context),
       href,
       style: action.style || "",
       external: /^https?:/i.test(href)
@@ -337,7 +339,7 @@
         link.textContent = action.label;
         if (action.type === "server_action") {
           link.dataset.serverAction = action.action;
-          link.dataset.serverQuestion = action.question || question;
+          link.dataset.serverQuestion = redactPrivateContact(action.question || question);
         } else if (action.type === "dismiss") {
           link.dataset.dismissAction = "true";
         } else if (action.type === "spare-key") {
@@ -469,6 +471,7 @@
   }
 
   async function runServerAction(button) {
+    if (button.disabled) return;
     const question = button.dataset.serverQuestion || "Confirmed urgent property emergency";
     const row = button.closest(".ai-concierge-message-actions");
     row?.querySelectorAll("button").forEach((item) => { item.disabled = true; });
@@ -539,6 +542,7 @@
   }
 
   async function submitQuestion(rawQuestion) {
+    if (requestInFlight) return;
     const question = String(rawQuestion || input.value).trim();
     if (!question) return;
     if (question.length > 800) {
@@ -550,6 +554,7 @@
     // Send the original value only to the protected request handler. Every
     // visible guest bubble is redacted immediately for every request type.
     appendMessage("guest", redactPrivateContact(question));
+    requestInFlight = true;
     sendButton.disabled = true;
     input.disabled = true;
     const status = appendStatus();
@@ -582,6 +587,7 @@
         question
       );
     } finally {
+      requestInFlight = false;
       sendButton.disabled = false;
       input.disabled = false;
       input.focus();
@@ -633,7 +639,7 @@
     const dismissAction = event.target.closest("[data-dismiss-action]");
     if (dismissAction) {
       dismissAction.closest(".ai-concierge-message-actions")?.remove();
-      appendMessage("concierge", "Urgent alert cancelled. No team message was sent.");
+      appendMessage("concierge", window.HOUSE_I18N?.t("Urgent alert cancelled. No team message was sent.") || "Urgent alert cancelled. No team message was sent.");
       return;
     }
     const feedbackButton = event.target.closest("[data-feedback-rating]");

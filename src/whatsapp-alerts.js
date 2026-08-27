@@ -310,6 +310,7 @@ export async function createConciergeAlert({ env, interactionId, sessionId, room
 export async function createProtectedOperationsAlert({
   env,
   room,
+  roomVerified = true,
   alertType,
   severity,
   recipientGroup,
@@ -336,7 +337,7 @@ export async function createProtectedOperationsAlert({
     alertType: String(alertType || "protected_operation"),
     recipientGroup: String(recipientGroup || "urgent"),
     room: String(room || ""),
-    roomVerified: true,
+    roomVerified: Boolean(roomVerified),
     summary: safeSummary,
     bangkokTime: formatBangkokAlertTime(now),
     createdAt: now.toISOString(),

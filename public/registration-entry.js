@@ -26,8 +26,7 @@
   const spareKeyForm = document.getElementById("spareKeyForm");
   const spareKeyStatus = document.getElementById("spareKeyStatus");
   const feeCheckbox = document.getElementById("lostKeyFeeAccepted");
-  const lostKeyFeeIntroduction = document.getElementById("lostKeyFeeIntroduction");
-  const lostKeyFeeConfirmation = document.getElementById("lostKeyFeeConfirmation");
+  const spareKeyContactHelp = document.getElementById("spareKeyContactHelp");
   const keyResult = document.getElementById("spareKeyResult");
   const keyCode = document.getElementById("spareKeyCode");
   const keyLocation = document.getElementById("spareKeyLocation");
@@ -52,13 +51,13 @@
     allGuestsError: "Confirm that the number includes every non-Thai adult and child staying overnight, not only the Airbnb booking guest.",
     keyDaytime: "Automatic spare-key access is available only after hours, from 7:30 PM until 10:30 AM Bangkok time. During the day, please ask the concierge for help.",
     keyNotActive: "Spare-key access starts at check-in and ends at 11:00 AM on checkout day.",
-    keyAlreadyReleased: "The spare key has already been released for this reservation. Please contact the concierge for assistance.",
-    keyRotation: "Automatic release is temporarily paused while the key-box code is changed. The urgent team has been notified; please contact the concierge.",
+    keyAlreadyReleased: "A spare key has already been provided for this stay. For security, another code cannot be released automatically. Please contact The House Concierge and we will help you.",
+    keyRotation: "Another spare-key code cannot be released until the key box has been reset. Please contact The House Concierge and we will help you.",
     keyUnavailable: "Automatic spare-key access is not available right now. Please contact the concierge for urgent help.",
     keyConfirmFee: "Please confirm the 500 THB lost-key replacement fee before continuing.",
     keyRateLimited: "Too many confirmation attempts. Please wait a minute before trying again.",
-    keyReleasing: "Verifying the after-hours request and notifying the team…",
-    keyReady: "Spare-key access approved for your verified room.",
+    keyReleasing: "Notifying The House team and preparing your spare-key access…",
+    keyReady: "Your spare-key code is ready.",
     copied: "Code copied.",
     copy: "Copy code"
   };
@@ -128,10 +127,17 @@
     if (!spareKeySection) return;
     if (spareKeyTrigger) spareKeyTrigger.hidden = false;
     if (spareKeyForm) spareKeyForm.hidden = true;
+    if (spareKeyContactHelp) spareKeyContactHelp.hidden = true;
+    if (feeCheckbox) feeCheckbox.checked = false;
     if (!data.activeStay) setStatus(spareKeyStatus, messages.keyNotActive, "attention");
     else if (!data.afterHours) setStatus(spareKeyStatus, messages.keyDaytime, "attention");
-    else if (data.keyCodeRotationRequired) setStatus(spareKeyStatus, messages.keyRotation, "error");
-    else if (data.spareKeyReleased) setStatus(spareKeyStatus, messages.keyAlreadyReleased, "attention");
+    else if (data.keyCodeRotationRequired) {
+      setStatus(spareKeyStatus, messages.keyRotation, "error");
+      if (spareKeyContactHelp) spareKeyContactHelp.hidden = false;
+    } else if (data.spareKeyReleased) {
+      setStatus(spareKeyStatus, messages.keyAlreadyReleased, "attention");
+      if (spareKeyContactHelp) spareKeyContactHelp.hidden = false;
+    }
     else {
       if (spareKeyStatus) spareKeyStatus.hidden = true;
       if (spareKeyForm) spareKeyForm.hidden = false;
@@ -262,15 +268,8 @@
     if (window.location.hash === "#spareKeyAccess") openSpareKeyAccess();
   });
   spareKeyClose?.addEventListener("click", closeSpareKeyAccess);
-  document.getElementById("continueLostKeyRequest")?.addEventListener("click", () => {
-    if (lostKeyFeeIntroduction) lostKeyFeeIntroduction.hidden = true;
-    if (lostKeyFeeConfirmation) lostKeyFeeConfirmation.hidden = false;
-    feeCheckbox?.focus();
-  });
-  ["cancelLostKeyRequest", "cancelLostKeyConfirmation"].forEach((id) => {
+  ["cancelLostKeyRequest"].forEach((id) => {
     document.getElementById(id)?.addEventListener("click", () => {
-      if (lostKeyFeeIntroduction) lostKeyFeeIntroduction.hidden = false;
-      if (lostKeyFeeConfirmation) lostKeyFeeConfirmation.hidden = true;
       if (feeCheckbox) feeCheckbox.checked = false;
       closeSpareKeyAccess();
     });
@@ -292,7 +291,12 @@
     } catch (error) {
       const lookup = { rate_limited: messages.keyRateLimited, fee_acceptance_required: messages.keyConfirmFee, active_stay_required: messages.keyNotActive, available_after_hours_only: messages.keyDaytime, spare_key_already_released: messages.keyAlreadyReleased, key_code_rotation_required: messages.keyRotation };
       setStatus(spareKeyStatus, lookup[error.code] || messages.keyUnavailable, "error");
-      setBusy(submit, false);
+      if (["spare_key_already_released", "key_code_rotation_required"].includes(error.code)) {
+        spareKeyForm.hidden = true;
+        if (spareKeyContactHelp) spareKeyContactHelp.hidden = false;
+      } else {
+        setBusy(submit, false);
+      }
     }
   });
 

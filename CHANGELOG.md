@@ -2,6 +2,29 @@
 
 All notable changes to The House – Koh Tao guest guide are recorded here.
 
+## v5.11.13 — Contextual Alert Safety & Lost-Key Guest UX
+
+### Safety and workflow control
+
+- Replaced isolated-keyword alert decisions with contextual, sentence-level classification for medical, personal-safety and critical-property messages.
+- Prevented figurative, slang and ambiguous phrases such as “I am dying for love”, “bloody hell” and “I am burning inside” from creating protected alerts.
+- Kept immediate medical guidance and direct Koh Tao Rescue/1669 actions available while requiring the guest to press **Send urgent alert** before a House alert can be created.
+- Kept serious property incidents behind the existing explicit urgent-confirmation step and blocked model intent labels from directly crossing the alert-creation boundary.
+- Added a browser in-flight guard so one submitted message cannot create overlapping Concierge responses or duplicate state transitions.
+
+### Guest experience
+
+- Replaced internal lost-key terminology with a concise verified-guest flow, one explicit 500 THB fee checkbox and a clear **Request spare key** action.
+- Hides impossible repeat-release controls after a code has already been released or rotation is required, and shows a direct Concierge contact action instead.
+- Clarifies local Thai telephone entry by accepting an international country code such as `+66`.
+- Added reviewed translations for the new urgent-confirmation, contact-number and lost-key interface strings in all seven supported languages.
+
+### Regression protection
+
+- Added tests for figurative-language false positives, confirmation-only medical/property alerts, one-response browser behavior, local-number guidance and model-mislabelling at the final alert boundary.
+- Preserved the complete v5.11.12 luggage required-field gate, universal contact redaction, critical-intent precedence, protected routing and fail-closed lost-key security.
+- Made no Meta template, recipient-secret or production configuration changes.
+
 ## v5.11.12 — Luggage Submission Boundary & Universal Contact Redaction
 
 ### Fixed

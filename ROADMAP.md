@@ -1,6 +1,6 @@
 # Product Roadmap
 
-Baseline: v5.11.12
+Baseline: v5.11.13
 
 ## Completed
 
@@ -31,6 +31,10 @@ Baseline: v5.11.12
 - [x] Public Privacy Policy, data-deletion instructions and Terms of Use for Meta app review
 - [x] Privacy, Data Protection and Terms navigation available from every page
 - [x] Critical property intent overrides stale ordinary Concierge and contact-number workflows
+- [x] Contextual safety classification prevents figurative, slang and ambiguous language from creating alerts
+- [x] Medical and personal-safety guidance remains immediate while House notification requires explicit guest confirmation
+- [x] One in-flight Concierge request produces one coherent response and state transition
+- [x] Guest-friendly lost-key fee flow hides repeat-release controls while key-box rotation is outstanding
 - [x] Required passport registration made prominent on main and room-specific welcome pages
 - [x] Private Room welcome link opens the room-bound secure registration form directly without a WhatsApp handoff
 - [x] Registration page presents image-upload and manual-entry choices without activating unverified fields
@@ -87,7 +91,7 @@ Baseline: v5.11.12
 - [x] Revalidate verified access against updated synchronized checkout dates
 - [x] Use the verified active room-bound session for after-hours spare-key release without asking the guest to repeat the stay code
 - [x] Present protected lost-key access as an on-demand room-dashboard option rather than a prominent welcome panel
-- [x] Wire the rendered AI Concierge spare-key CTA to the protected two-step fee flow on the active room page
+- [x] Wire the rendered AI Concierge spare-key CTA to the protected fee-confirmation flow on the active room page
 - [x] Standardize the secure verification page on the shared single-line desktop header and add a discreet owner-dashboard login entry
 - [x] Offer secure upload or in-person passport presentation for every declared non-Thai overnight guest
 - [x] Keep in-person registrations locked until protected owner confirmation of the manual passport check and TM30 completion
@@ -137,7 +141,7 @@ Guests may continue using ordinary WhatsApp handoffs. Automated internal alerts 
 
 - [x] Push the v5.5.0 release to the existing hosting workflow
 - [x] Confirm `/api/concierge/status` reports AI and learning enabled
-- [ ] Deploy v5.11.12 and confirm a completed luggage request followed by a second vague request creates no new alert or WhatsApp delivery until all new fields are supplied; also confirm critical property messages interrupt stale ordinary workflows, sitewide legal links are present, concierge startup, owner-inclusive actionable routing, confirmed urgent-property alerts, verified-session lost-key release, first-name greeting, office-hours, full-page language switching, registration, maintenance reporting and the alert console
+- [ ] Deploy v5.11.13 and confirm figurative/slang phrases create no alert; medical guidance offers Rescue and 1669 but notifies The House only after **Send urgent alert**; serious property incidents still require confirmation; the Concierge produces one response per message; and the verified lost-key screen uses the simplified fee flow and hides repeat-release controls while rotation is outstanding. Also recheck the v5.11.12 luggage field gate, contact redaction, sitewide legal links and established routing.
 - [x] Add `STAY_TOKEN_PEPPER` and `RESERVATION_SYNC_TOKEN` Worker secrets
 - [ ] Add protected `SPARE_KEY_CODES` Worker secret before activating automatic spare-key release
 - [x] Install and authorize the included Airbnb Google Apps Script synchronizer

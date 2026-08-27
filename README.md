@@ -1,4 +1,4 @@
-# Guest Guide Platform with AI Concierge — The House v5.11.12
+# Guest Guide Platform with AI Concierge — The House v5.11.13
 
 The House – Koh Tao guest guide is a production-oriented, mobile-first digital guest guide and concierge platform. It combines property information, curated island guidance, structured place and activity data, and centralized contact and booking routes.
 
@@ -17,6 +17,16 @@ The House – Koh Tao guest guide is a production-oriented, mobile-first digital
 - Model-powered, room-aware AI Concierge with controlled learning
 
 The Activities module contains 49 structured profiles covering diving, freediving, snorkelling, boat trips, beach experiences, kayaking, paddleboarding, hiking, viewpoints, climbing, yoga, Muay Thai, massage, cooking, wildlife, photography, night activities and rainy-day options.
+
+## v5.11.13 release focus
+
+- Replaces single-word alert triggering with contextual, sentence-level safety classification so slang, figurative language and ambiguous statements cannot silently create House alerts.
+- Keeps medical and personal-safety guidance immediate, including Koh Tao Rescue and 1669 actions, while requiring a deliberate **Send urgent alert** action before notifying The House.
+- Preserves the explicit confirmation requirement for serious property incidents and prevents model labels or stale workflow state from bypassing the protected alert boundary.
+- Prevents overlapping Concierge submissions so one guest message produces one coherent response and one state transition.
+- Clarifies reply-number collection for local Thai numbers by explicitly accepting country-code format such as `+66`.
+- Rewrites the verified lost-key experience in guest-friendly language, uses one clear 500 THB fee confirmation, and replaces unavailable repeat-release controls with a Concierge contact action.
+- Keeps every v5.11.12 luggage-validation, contact-redaction, routing and lost-key security safeguard unchanged. No Meta template or production configuration changes are included.
 
 ## v5.11.12 release focus
 

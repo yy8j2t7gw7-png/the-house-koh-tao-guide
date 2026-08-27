@@ -126,25 +126,26 @@ a{color:inherit}
 <section class="spare-key-card" id="spareKeyAccess" aria-labelledby="spareKeyTitle" hidden>
   <div class="spare-key-card-heading">
     <div>
-      <span class="stay-access-label">Protected after-hours access</span>
+      <span class="stay-access-label">After-hours spare-key help</span>
       <h2 id="spareKeyTitle">Lost key or locked out?</h2>
     </div>
     <button class="btn secondary" id="closeSpareKeyAccess" type="button">Back to room guide</button>
   </div>
-  <p>After hours—from 7:30 PM until 10:30 AM Bangkok time—a verified guest can obtain the spare-key code for this room. The key box is directly next to the room door.</p>
-  <p>Your verified, room-bound stay session is used for this request. You do not need to enter the Airbnb confirmation code again.</p>
-  <p>A lost-key replacement fee of <strong>500 THB</strong> will be added. The team is notified only after you explicitly accept the fee. The key-box code is never included in that notification.</p>
+  <p>If you are locked out after hours, you can request access to the spare key for your room here.</p>
+  <div class="list compact-list">
+    <div class="rule"><strong>🕒 After-hours access</strong>7:30 PM–10:30 AM Bangkok time</div>
+    <div class="rule"><strong>🔑 Key box</strong>Next to your room door</div>
+  </div>
+  <p>You are already verified for this room, so you do not need to enter your Airbnb confirmation code again.</p>
+  <p>If your key has been lost, a <strong>500 THB replacement fee</strong> applies. The House team is notified before spare-key access is released. The key-box code is not sent through WhatsApp.</p>
   <p class="stay-access-status" id="spareKeyStatus" role="status" aria-live="assertive" hidden></p>
   <form class="spare-key-form" id="spareKeyForm" hidden>
-    <div id="lostKeyFeeIntroduction">
-      <p><strong>Continue only if you have lost your key or are locked out.</strong> A 500 THB replacement fee applies.</p>
-      <div class="stay-access-actions"><button class="btn" id="continueLostKeyRequest" type="button">Continue</button><button class="btn secondary" id="cancelLostKeyRequest" type="button">Cancel</button></div>
-    </div>
-    <div id="lostKeyFeeConfirmation" hidden>
-      <label class="fee-confirmation"><input id="lostKeyFeeAccepted" type="checkbox" required> <span>I confirm that I have lost my key or am locked out, and I accept the 500 THB lost-key replacement fee.</span></label>
-      <div class="stay-access-actions"><button class="btn" type="submit">Accept fee &amp; continue</button><button class="btn secondary" id="cancelLostKeyConfirmation" type="button">Cancel</button></div>
-    </div>
+    <label class="fee-confirmation"><input id="lostKeyFeeAccepted" type="checkbox" required> <span>I understand the 500 THB lost-key replacement fee and want to continue.</span></label>
+    <div class="stay-access-actions"><button class="btn" type="submit">Request spare key</button><button class="btn secondary" id="cancelLostKeyRequest" type="button">Cancel</button></div>
   </form>
+  <div id="spareKeyContactHelp" hidden>
+    <a class="btn" href="#concierge" data-action="contact">Contact The House Concierge</a>
+  </div>
   <div class="spare-key-result" id="spareKeyResult" hidden>
     <strong>Your Room key-box code</strong>
     <span class="spare-key-code" id="spareKeyCode"></span>

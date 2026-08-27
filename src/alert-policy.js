@@ -1,7 +1,9 @@
 import { normalizeText, sanitizeQuestion } from "./concierge-core.js";
 
 const BANGKOK_TIME_ZONE = "Asia/Bangkok";
-const BOOKING_REQUEST_WORDS = /\b(?:book|booking|reserve|reservation|arrange|availability|available|schedule)\b/i;
+const BOOKING_REQUEST_WORDS = /(?:^\s*(?:please\s+)?(?:book|reserve|arrange)\s+|\b(?:please\s+(?:book|reserve|arrange)|can\s+you\s+(?:book|reserve|arrange)|could\s+you\s+(?:book|reserve|arrange)|help\s+me\s+(?:book|reserve|arrange)|i\s+(?:want|need|would\s+like)\s+(?:you\s+)?(?:to\s+)?(?:book|reserve|arrange)|book\s+(?:me|us)|make\s+(?:a\s+)?reservation)\b)/i;
+const STAY_SUPPORT_REQUEST_WORDS = /\b(?:please\s+(?:bring|send|clean|replace|change|fix|repair|help)|can\s+you\s+(?:bring|send|clean|replace|change|fix|repair|help)|could\s+you\s+(?:bring|send|clean|replace|change|fix|repair|help)|i\s+(?:need|want|would\s+like)\s+(?:fresh\s+)?(?:towels?|cleaning|housekeeping|help)|(?:bring|send)\s+(?:me\s+)?(?:fresh\s+)?towels?|clean\s+(?:my|our|the)\s+room)\b/i;
+const ACTIONABLE_ROOM_DEFECT = /\b(?:broken|not\s+working|doesn['’]?t\s+work|isn['’]?t\s+working|leaking|overflowing|blocked|clogged|no\s+(?:water|hot\s+water|electricity|power|wifi)|air\s*con(?:ditioning)?\s+(?:problem|broken|not\s+working))\b/i;
 
 function bangkokParts(date = new Date()) {
   const parts = new Intl.DateTimeFormat("en-GB", {
@@ -62,10 +64,14 @@ export function normalizeBangkokRequestedDate(value, now = new Date()) {
   return `${date}, ${formatted}`;
 }
 
-function bookingNeedsAttention(question, intentId) {
-  const normalizedIntent = normalizeText(intentId).replaceAll(" ", "_");
-  if (/booking|reservation|transport_request/.test(normalizedIntent)) return true;
+function bookingNeedsAttention(question, _intentId) {
+  // A model label alone is never enough to create an operational alert.
+  // The guest's current sentence must contain an explicit booking action.
   return BOOKING_REQUEST_WORDS.test(question);
+}
+
+function staySupportNeedsAttention(question) {
+  return STAY_SUPPORT_REQUEST_WORDS.test(question) || ACTIONABLE_ROOM_DEFECT.test(question);
 }
 
 export function classifyConciergeAlert({ result, question, room, now = new Date() }) {
@@ -82,25 +88,14 @@ export function classifyConciergeAlert({ result, question, room, now = new Date(
     afterHours: isAfterHours(now)
   };
 
-  if (result.handoff === "medical_emergency" || result.intentId === "medical_emergency" || result.intentId === "public_medical_emergency") {
-    return {
-      ...base,
-      alertType: "medical_emergency",
-      severity: "critical",
-      recipientGroup: "emergency",
-      escalationRequired: true
-    };
-  }
-
-  if (result.handoff === "property_emergency" || result.intentId === "property_emergency") {
-    return {
-      ...base,
-      alertType: "property_emergency",
-      severity: "critical",
-      recipientGroup: "urgent_response",
-      escalationRequired: true
-    };
-  }
+  // Medical and critical-property alerts are confirmation-only operations.
+  // They are created through createProtectedOperationsAlert after the guest
+  // deliberately presses Send urgent alert, never from classification alone.
+  if (result.handoff === "medical_emergency"
+    || result.intentId === "medical_emergency"
+    || result.intentId === "public_medical_emergency"
+    || result.handoff === "property_emergency"
+    || result.intentId === "property_emergency") return null;
 
   if (result.intentId === "lost_key") {
     if (base.afterHours && !result.confirmedLostKeyFee) return null;
@@ -123,7 +118,7 @@ export function classifyConciergeAlert({ result, question, room, now = new Date(
     };
   }
 
-  if (result.handoff === "stay_support") {
+  if (result.handoff === "stay_support" && staySupportNeedsAttention(question)) {
     return {
       ...base,
       alertType: "stay_support",

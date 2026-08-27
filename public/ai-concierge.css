@@ -155,6 +155,13 @@ body.ai-concierge-ready .float-wa[data-link="houseWhatsapp"]{
   grid-template-columns:repeat(2,minmax(0,1fr));
   gap:10px;
 }
+.ai-concierge-service-hours{
+  margin:0;
+  padding:0 18px 12px;
+  color:#68736f;
+  font-size:12px;
+  line-height:1.45;
+}
 .ai-concierge-action{
   display:flex;
   align-items:center;

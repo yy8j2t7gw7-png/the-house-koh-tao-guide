@@ -1,5 +1,5 @@
 window.AI_CONCIERGE_CONFIG = {
-  "release": "5.11.13",
+  "release": "5.11.14",
   "enabled": true,
   "propertyName": "The House",
   "buttonLabel": "Concierge",
@@ -33,8 +33,8 @@ window.AI_CONCIERGE_CONFIG = {
       "humanHandoffContactKey": "houseSupport"
     },
     "conciergeBookings": {
-      "contactKey": "bookings",
-      "humanHandoffContactKey": "bookings"
+      "contactKey": "structuredConciergeBooking",
+      "humanHandoffContactKey": "houseSupport"
     }
   },
   "quickActions": [

@@ -1,4 +1,4 @@
-# Guest Guide Platform with AI Concierge — The House v5.11.13
+# Guest Guide Platform with AI Concierge — The House v5.11.14
 
 The House – Koh Tao guest guide is a production-oriented, mobile-first digital guest guide and concierge platform. It combines property information, curated island guidance, structured place and activity data, and centralized contact and booking routes.
 
@@ -17,6 +17,18 @@ The House – Koh Tao guest guide is a production-oriented, mobile-first digital
 - Model-powered, room-aware AI Concierge with controlled learning
 
 The Activities module contains 49 structured profiles covering diving, freediving, snorkelling, boat trips, beach experiences, kayaking, paddleboarding, hiking, viewpoints, climbing, yoga, Muay Thai, massage, cooking, wildlife, photography, night activities and rainy-day options.
+
+## v5.11.14 release focus
+
+- Replaces technical classifier/alert wording with natural hospitality language while preserving every explicit emergency-confirmation boundary.
+- Adds fire-specific evacuation, configured Koh Tao Rescue and safe fire-extinguisher guidance without sending a House alert before confirmation.
+- Makes **Find My Room** return the verified room’s location and a direct **Your Room** action.
+- Treats toilet paper, soap, towels and room cleaning as deterministic service requests, with exact 10:30–19:30 Bangkok office-hour behavior and after-hours morning handling.
+- Adds visible housekeeping/service hours to Guest Information and a compact Concierge reminder.
+- Removes personal Fah chat routing from booking controls and starts bookings inside the AI Concierge instead.
+- Adds a structured diving workflow with required date, party size, course/experience, conditional certification/course details and protected international contact before one Fah-and-owner alert can be created.
+- Enforces structured diving fields again at the final server-side alert boundary, keeps recommendation questions informational and states that payment is required before confirmation.
+- Preserves all v5.11.13 safety, luggage, lost-key, contact-redaction and Meta configuration behavior.
 
 ## v5.11.13 release focus
 

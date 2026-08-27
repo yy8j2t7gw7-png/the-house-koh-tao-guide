@@ -31,8 +31,8 @@
   const routes = {
     houseWhatsapp: cfg.houseSupport.whatsapp,
     houseCall: `tel:${cfg.houseSupport.phoneTel}`,
-    bookingWhatsapp: cfg.bookings.whatsapp,
-    bookingCall: `tel:${cfg.bookings.phoneTel}`,
+    bookingWhatsapp: "#concierge-booking",
+    bookingCall: `tel:${cfg.houseSupport.phoneTel}`,
     medicalNationalCall: `tel:${cfg.emergency.medicalNational.phoneTel}`,
     rescueCall: `tel:${cfg.emergency.kohTaoRescue.phoneTel}`,
     policeCall: `tel:${cfg.emergency.kohTaoPolice.phoneTel}`,

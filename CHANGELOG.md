@@ -2,6 +2,35 @@
 
 All notable changes to The House – Koh Tao guest guide are recorded here.
 
+## v5.11.14 — Guest-Natural Safety, Service Hours & Structured Diving
+
+### Guest experience and safety
+
+- Replaced system/classifier-style replies and cancellation wording with natural hospitality language while retaining the underlying no-alert decisions.
+- Added concise fire evacuation guidance, the configured Koh Tao Rescue action and the location/safe-use conditions for the outside fire extinguisher on each floor.
+- Prevented answers from claiming Rescue details are unavailable whenever the configured Rescue action is present.
+- Added a dynamic **Find My Room** answer with the verified room location and direct **Your Room** action.
+
+### Housekeeping and service operations
+
+- Added deterministic requests for toilet paper, soap, fresh/clean towels and room cleaning.
+- During 10:30–19:30 Bangkok service hours, creates the routine alert immediately, confirms naturally and provides a 30-minute **Call Us** fallback.
+- After hours, still creates the alert immediately, explains that housekeeping is off duty and confirms next-morning handling after 10:30 without a 30-minute promise.
+- Added the service-hours policy to Guest Information and a compact reminder in the Concierge.
+
+### Structured bookings and privacy
+
+- Replaced personal Fah WhatsApp booking actions with an in-Concierge booking prompt; any remaining call action uses the general House contact.
+- Added a fresh-state diving workflow for preferred date, diver count, Fun/Open/Advanced/other course, conditional certification/course detail and international reply contact.
+- Keeps recommendation-only diving questions informational and sends exactly one protected booking alert to Fah plus both owners only after every required field is present.
+- Added a final server-side structured-diving validation boundary and keeps raw reply contacts out of normal chat history, interaction records, alerts and logs.
+- Clarifies that availability may be checked first but a booking is not confirmed until payment is received.
+
+### Regression protection
+
+- Expanded the complete suite from 79 to 91 tests, covering Bangkok time boundaries, routine routing, fire/Rescue behavior, natural wording, room links, booking variants, fresh booking state, contact privacy and final submission gates.
+- Kept Meta template names, template parameters, recipient secrets and production configuration unchanged.
+
 ## v5.11.13 — Contextual Alert Safety & Lost-Key Guest UX
 
 ### Safety and workflow control

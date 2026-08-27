@@ -47,6 +47,38 @@ function validatedLuggageSubmission(result) {
   return { context, requestedTime, bagCount: String(bagCount), contact };
 }
 
+function validatedBookingSubmission(result) {
+  const sourceContact = String(result?.privateReplyContact || "").trim();
+  const contact = /^(?:\+|00)/.test(sourceContact) ? privateReplyContact(sourceContact) : "";
+  if (!contact) return null;
+  const request = result?.bookingRequest;
+  if (!request) return { contact, request: null };
+  if (request.kind !== "diving") return null;
+  const preferredDate = String(request.preferredDate || "").trim().slice(0, 120);
+  const guestCount = Number(String(request.guestCount || "").trim());
+  const activity = String(request.activity || "").trim().slice(0, 80);
+  const option = String(request.option || "").trim().slice(0, 120);
+  const courseName = String(request.courseName || "").trim().slice(0, 120);
+  const certificationLevel = String(request.certificationLevel || "").trim().slice(0, 120);
+  const validOption = ["Fun Diving", "Open Water Course", "Advanced Open Water Course", "Other course"].includes(option);
+  if (!preferredDate || !activity || !Number.isInteger(guestCount) || guestCount < 1 || guestCount > 99 || !validOption) return null;
+  if (option === "Fun Diving" && !certificationLevel) return null;
+  if (option === "Other course" && !courseName) return null;
+  return {
+    contact,
+    request: {
+      kind: "diving",
+      preferredDate,
+      guestCount: String(guestCount),
+      activity,
+      option,
+      courseName,
+      certificationLevel,
+      notes: String(request.notes || "").trim().slice(0, 500)
+    }
+  };
+}
+
 function parseRecipients(env) {
   let source;
   try {
@@ -160,6 +192,15 @@ function templateForAlert(alert, env) {
     return { name: names.luggage, parameters: [reference, room, luggage.context, luggage.bagCount, luggage.requestedTime, summary] };
   }
   if (alert.alertType === "booking_request") {
+    if (alert.bookingRequest?.kind === "diving") {
+      const booking = alert.bookingRequest;
+      const detail = booking.option === "Other course" ? booking.courseName : booking.option;
+      const qualification = booking.certificationLevel ? ` · Certification: ${booking.certificationLevel}` : "";
+      return {
+        name: names.booking,
+        parameters: [reference, room, booking.activity, booking.preferredDate, booking.guestCount, `${detail}${qualification} · ${summary}`]
+      };
+    }
     const preferredTime = alert.requestedDateTime || normalizeBangkokRequestedDate(summary, new Date(alert.createdAt));
     const guests = firstMatch(summary, /\b(\d{1,2})\s*(?:guests?|people|persons?|adults?)\b/i, "Not provided");
     return { name: names.booking, parameters: [reference, room, summary, preferredTime, guests, summary] };
@@ -171,6 +212,8 @@ function templateForAlert(alert, env) {
   let requestLabel = labels[alert.alertType] || String(alert.alertType || "guest request").replaceAll("_", " ");
   if (alert.alertType === "stay_support") {
     if (/\b(?:fresh\s+)?towels?\b/i.test(summary)) requestLabel = "Fresh towels";
+    else if (/\btoilet\s+paper\b/i.test(summary)) requestLabel = "Toilet paper";
+    else if (/\bsoap\b/i.test(summary)) requestLabel = "Soap";
     else if (/\b(?:clean|cleaning|housekeeping)\b/i.test(summary)) requestLabel = "Room cleaning";
     else requestLabel = "Guest request";
   }
@@ -272,6 +315,10 @@ export async function createConciergeAlert({ env, interactionId, sessionId, room
     ? validatedLuggageSubmission(result)
     : null;
   if (policy.alertType === "luggage_storage" && !luggageRequest) return null;
+  const bookingSubmission = policy.alertType === "booking_request"
+    ? validatedBookingSubmission(result)
+    : null;
+  if (policy.alertType === "booking_request" && !bookingSubmission) return null;
   const config = whatsappAlertConfiguration(env);
   const dedupeKey = await sha256(`${env.CONCIERGE_HASH_SALT || env.META_APP_SECRET || "the-house-alert"}:${sessionId}:${room}:${policy.alertType}:${normalizeDedupeSummary(policy.summary)}`);
   const escalationDueAt = policy.escalationRequired
@@ -297,8 +344,9 @@ export async function createConciergeAlert({ env, interactionId, sessionId, room
     ...alert,
     duplicate: false,
     configured: config.configured,
-    privateReplyContact: luggageRequest?.contact || privateReplyContact(result.privateReplyContact),
+    privateReplyContact: luggageRequest?.contact || bookingSubmission?.contact || privateReplyContact(result.privateReplyContact),
     requestedDateTime: result.requestedDateTime || "",
+    bookingRequest: bookingSubmission?.request || undefined,
     luggageRequest: luggageRequest ? {
       context: luggageRequest.context,
       requestedTime: luggageRequest.requestedTime,

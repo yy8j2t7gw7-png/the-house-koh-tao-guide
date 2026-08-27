@@ -1,6 +1,6 @@
 # Product Roadmap
 
-Baseline: v5.11.13
+Baseline: v5.11.14
 
 ## Completed
 
@@ -141,7 +141,7 @@ Guests may continue using ordinary WhatsApp handoffs. Automated internal alerts 
 
 - [x] Push the v5.5.0 release to the existing hosting workflow
 - [x] Confirm `/api/concierge/status` reports AI and learning enabled
-- [ ] Deploy v5.11.13 and confirm figurative/slang phrases create no alert; medical guidance offers Rescue and 1669 but notifies The House only after **Send urgent alert**; serious property incidents still require confirmation; the Concierge produces one response per message; and the verified lost-key screen uses the simplified fee flow and hides repeat-release controls while rotation is outstanding. Also recheck the v5.11.12 luggage field gate, contact redaction, sitewide legal links and established routing.
+- [ ] Deploy v5.11.14 and confirm natural figurative/cancellation wording, fire evacuation/Rescue guidance, exact office/after-hours housekeeping behavior, **Your Room** navigation and the complete structured diving workflow. Also recheck v5.11.13 emergency confirmation, one-response behavior, luggage field gates, contact redaction, lost-key rotation lock, sitewide legal links and established routing.
 - [x] Add `STAY_TOKEN_PEPPER` and `RESERVATION_SYNC_TOKEN` Worker secrets
 - [ ] Add protected `SPARE_KEY_CODES` Worker secret before activating automatic spare-key release
 - [x] Install and authorize the included Airbnb Google Apps Script synchronizer

@@ -2,7 +2,7 @@ import { normalizeText, sanitizeQuestion } from "./concierge-core.js";
 
 const BANGKOK_TIME_ZONE = "Asia/Bangkok";
 const BOOKING_REQUEST_WORDS = /(?:^\s*(?:please\s+)?(?:book|reserve|arrange)\s+|\b(?:please\s+(?:book|reserve|arrange)|can\s+you\s+(?:book|reserve|arrange)|could\s+you\s+(?:book|reserve|arrange)|help\s+me\s+(?:book|reserve|arrange)|i\s+(?:want|need|would\s+like)\s+(?:you\s+)?(?:to\s+)?(?:book|reserve|arrange)|book\s+(?:me|us)|make\s+(?:a\s+)?reservation)\b)/i;
-const STAY_SUPPORT_REQUEST_WORDS = /\b(?:please\s+(?:bring|send|clean|replace|change|fix|repair|help)|can\s+you\s+(?:bring|send|clean|replace|change|fix|repair|help)|could\s+you\s+(?:bring|send|clean|replace|change|fix|repair|help)|i\s+(?:need|want|would\s+like)\s+(?:fresh\s+)?(?:towels?|cleaning|housekeeping|help)|(?:bring|send)\s+(?:me\s+)?(?:fresh\s+)?towels?|clean\s+(?:my|our|the)\s+room)\b/i;
+const STAY_SUPPORT_REQUEST_WORDS = /\b(?:please\s+(?:bring|send|provide|clean|replace|change|fix|repair|help)|can\s+(?:i|we)\s+(?:have|get)\s+(?:new\s+|fresh\s+|clean\s+)?(?:toilet\s+paper|soap|towels?)|can\s+you\s+(?:bring|send|provide|clean|replace|change|fix|repair|help)|could\s+you\s+(?:bring|send|provide|clean|replace|change|fix|repair|help)|i\s+(?:need|want|would\s+like)\s+(?:some\s+|new\s+|fresh\s+|clean\s+)?(?:toilet\s+paper|soap|towels?|cleaning|housekeeping|help)|(?:bring|send|provide)\s+(?:me\s+)?(?:some\s+|new\s+|fresh\s+|clean\s+)?(?:toilet\s+paper|soap|towels?)|clean\s+(?:my|our|the)\s+room)\b/i;
 const ACTIONABLE_ROOM_DEFECT = /\b(?:broken|not\s+working|doesn['’]?t\s+work|isn['’]?t\s+working|leaking|overflowing|blocked|clogged|no\s+(?:water|hot\s+water|electricity|power|wifi)|air\s*con(?:ditioning)?\s+(?:problem|broken|not\s+working))\b/i;
 
 function bangkokParts(date = new Date()) {
@@ -40,6 +40,7 @@ export function normalizeBangkokRequestedDate(value, now = new Date()) {
   const today = bangkokParts(now);
   const base = new Date(Date.UTC(Number(today.year), Number(today.month) - 1, Number(today.day), 12));
   let target = null;
+  if (/\btoday\b/.test(lower)) target = new Date(base);
   if (/\btomorrow\b/.test(lower)) target = new Date(base.getTime() + 86_400_000);
   const days = lower.match(/\bin\s+(\d{1,3})\s+days?\b/);
   if (days) target = new Date(base.getTime() + (Number(days[1]) * 86_400_000));
@@ -50,6 +51,26 @@ export function normalizeBangkokRequestedDate(value, now = new Date()) {
     let add = (desired - base.getUTCDay() + 7) % 7;
     if (add === 0) add = 7;
     target = new Date(base.getTime() + (add * 86_400_000));
+  }
+  if (!target) {
+    const numeric = lower.match(/\b(\d{1,2})[\/-](\d{1,2})(?:[\/-](\d{2,4}))?\b/);
+    if (numeric) {
+      const year = numeric[3] ? (numeric[3].length === 2 ? 2000 + Number(numeric[3]) : Number(numeric[3])) : Number(today.year);
+      const candidate = new Date(Date.UTC(year, Number(numeric[2]) - 1, Number(numeric[1]), 12));
+      if (candidate.getUTCFullYear() === year && candidate.getUTCMonth() === Number(numeric[2]) - 1 && candidate.getUTCDate() === Number(numeric[1])) target = candidate;
+    }
+  }
+  if (!target) {
+    const named = lower.match(/\b(?:(\d{1,2})\s+(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)(?:\s+(\d{4}))?|(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+(\d{1,2})(?:,?\s+(\d{4}))?)\b/);
+    if (named) {
+      const monthNames = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
+      const day = Number(named[1] || named[5]);
+      const monthText = String(named[2] || named[4]).slice(0, 3);
+      const year = Number(named[3] || named[6] || today.year);
+      const month = monthNames.indexOf(monthText);
+      const candidate = new Date(Date.UTC(year, month, day, 12));
+      if (month >= 0 && candidate.getUTCFullYear() === year && candidate.getUTCMonth() === month && candidate.getUTCDate() === day) target = candidate;
+    }
   }
   if (!target) return "Not provided";
   const date = new Intl.DateTimeFormat("en-GB", { timeZone: "UTC", day: "2-digit", month: "short", year: "numeric" }).format(target);

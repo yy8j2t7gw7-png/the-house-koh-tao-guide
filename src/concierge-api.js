@@ -12,6 +12,7 @@ import {
 } from "./concierge-core.js";
 import { handlePassportAdminRequest } from "./passport-api.js";
 import { handleMaintenanceAdminRequest } from "./maintenance-api.js";
+import { isAfterHours, normalizeBangkokRequestedDate } from "./alert-policy.js";
 import { retrieveApprovedProjectKnowledge } from "./project-knowledge.js";
 import { LANGUAGE_NAMES, translateApprovedTexts, validLanguage } from "./i18n-api.js";
 import {
@@ -23,7 +24,7 @@ import {
 } from "./whatsapp-alerts.js";
 import { getGuestAccess, handleStayAdminRequest, stayConfiguration } from "./stay-api.js";
 
-const RELEASE = "5.11.13";
+const RELEASE = "5.11.14";
 const ROOM_OPTIONS = new Set(["1", "2", "3", "4", "5", "6", "8", "9", "10", "11"]);
 const MAX_HISTORY_ITEMS = 10;
 const MAX_QUESTION_LENGTH = 800;
@@ -166,6 +167,9 @@ const ACTIONABLE_OPERATIONAL_REQUEST = /\b(?:please\s+(?:book|reserve|arrange|st
 const OPERATIONAL_REQUEST = /\b(?:luggage|baggage|book|booking|reserve|arrange|diving|snorkel|boat|taxi|transfer|transport|scooter)\b/i;
 const ACTIONABLE_LUGGAGE_REQUEST = /\b(?:please\s+(?:store|keep|arrange)|can\s+(?:you|we)\s+(?:store|leave|keep|arrange)|could\s+you\s+(?:store|keep|arrange)|i\s+(?:want|wanna|need|would\s+like)\s+(?:(?:you\s+)?to\s+)?(?:store|leave|arrange|keep)|arrange\s+(?:luggage|baggage|bags?))\b[^.?!]*(?:luggage|baggage|bags?)/i;
 const DIRECT_LUGGAGE_REQUEST = /^\s*(?:please\s+)?(?:store|keep|arrange)\s+(?:my\s+|our\s+)?(?:luggage|baggage|bags?)\b/i;
+const ACTIONABLE_DIVING_BOOKING = /(?:^\s*(?:please\s+)?(?:book|reserve|arrange)\s+.*\b(?:dive|diving|scuba|open\s+water|advanced\s+open\s+water)\b|\b(?:please\s+(?:book|reserve|arrange)|can\s+you\s+(?:book|reserve|arrange)|could\s+you\s+(?:book|reserve|arrange)|help\s+me\s+(?:book|reserve|arrange)|i\s+(?:want|wanna|need|would\s+like)\s+(?:you\s+)?(?:to\s+)?(?:book|reserve|arrange))\b[^.?!]*\b(?:dive|diving|scuba|open\s+water|advanced\s+open\s+water)\b)/i;
+const HOUSEKEEPING_ITEM_REQUEST = /\b(?:toilet\s+paper|soap|(?:new|fresh|clean)\s+towels?|room\s+cleaning|clean\s+(?:my|our|the)\s+room|housekeeping)\b/i;
+const HOUSEKEEPING_REQUEST_ACTION = /\b(?:can\s+(?:i|we)\s+(?:have|get)|please\s+(?:bring|send|provide|clean)|can\s+you\s+(?:bring|send|provide|clean)|could\s+you\s+(?:bring|send|provide|clean)|i\s+(?:need|want|would\s+like)|(?:bring|send|provide)\s+(?:me\s+)?|clean\s+(?:my|our|the)\s+room)\b/i;
 
 function extractReplyContact(values) {
   for (const value of values) {
@@ -221,7 +225,7 @@ function conversationalSafetyResult(question) {
   const normalized = normalizeText(question);
   if (/\b(?:dying for love|dying laughing|dying from laughing|bloody hell)\b/.test(normalized)) {
     return {
-      answer: "I understand that as conversational or figurative language, so I have not sent an alert. What would you like help with?",
+      answer: "I understand 😊 What can I help you with?",
       intentId: "conversational_statement",
       category: "concierge",
       confidence: 1,
@@ -235,7 +239,7 @@ function conversationalSafetyResult(question) {
   }
   if (/\b(?:my (?:ass|butt|skin|stomach) is burning(?: like hell)?|i am burning inside|i m burning inside|im burning inside)\b/.test(normalized)) {
     return {
-      answer: "I’m sorry you’re uncomfortable. Can you tell me whether this is a physical symptom and whether you need medical help, or whether you mean it figuratively? I have not sent an alert.",
+      answer: "I’m sorry you’re uncomfortable. Do you mean this as a physical symptom, and do you need medical help, or are you speaking figuratively?",
       intentId: "medical_clarification",
       category: "concierge",
       confidence: 1,
@@ -264,7 +268,228 @@ function conversationalSafetyResult(question) {
   return null;
 }
 
+function isFireEmergencyMessage(question) {
+  const normalized = normalizeText(question);
+  return /\b(?:fire (?:in|inside|at) (?:my |the |our )?(?:room|bathroom|property|house|building)|(?:my |the |our )?(?:room|bathroom|property|house|building) is on fire|there is (?:a )?fire|flames? (?:in|inside|coming from) (?:my |the |our )?(?:room|property|house|building))\b/.test(normalized);
+}
+
+function housekeepingItem(question) {
+  const source = String(question || "");
+  if (/\btoilet\s+paper\b/i.test(source)) return { id: "toilet_paper", label: "toilet paper", delivery: "bring the toilet paper" };
+  if (/\bsoap\b/i.test(source)) return { id: "soap", label: "soap", delivery: "bring the soap" };
+  if (/\b(?:new|fresh|clean)\s+towels?\b|\btowel\s+(?:change|replacement)\b/i.test(source)) return { id: "fresh_towels", label: "fresh towels", delivery: "bring fresh towels" };
+  if (/\b(?:room\s+cleaning|clean\s+(?:my|our|the)\s+room|housekeeping)\b/i.test(source)) return { id: "room_cleaning", label: "room cleaning", delivery: "arrange the room cleaning" };
+  return null;
+}
+
+export function housekeepingServiceResult(question, now = new Date()) {
+  const item = housekeepingItem(question);
+  if (!item || !HOUSEKEEPING_ITEM_REQUEST.test(question) || !HOUSEKEEPING_REQUEST_ACTION.test(question)) return null;
+  const afterHours = isAfterHours(now);
+  const answer = afterHours
+    ? `Thank you for your request, and sorry for the inconvenience. Our housekeeping team is currently off duty. We’ll ${item.delivery} first thing in the morning after 10:30 AM.`
+    : `Thank you for your request. We’ll ${item.delivery} to your room as soon as possible. If you haven’t received it within 30 minutes, please call us using the button below.`;
+  return {
+    answer,
+    intentId: `housekeeping_${item.id}`,
+    category: "stay-support",
+    confidence: 1,
+    needsHuman: true,
+    handoff: "stay_support",
+    learningGap: false,
+    learningReason: "none",
+    actions: afterHours ? [] : [{ label: "Call Us", type: "route", route: "houseCall" }],
+    suppressDefaultActions: afterHours,
+    housekeepingRequest: { item: item.label, afterHours },
+    source: "service-policy"
+  };
+}
+
+function roomLocationResult(question, room) {
+  if (!room || !/\b(?:find my room|where is my room|room location|which floor is my room|arrival photos)\b/i.test(String(question || ""))) return null;
+  const descriptions = {
+    "1": "upstairs", "2": "upstairs", "3": "upstairs", "4": "upstairs",
+    "5": "upstairs, around the corner", "6": "upstairs, around the corner",
+    "8": "downstairs", "9": "downstairs", "10": "downstairs", "11": "downstairs"
+  };
+  return {
+    answer: `Room ${room} is ${descriptions[room]}. Open Your Room to see the arrival photos and directions to your room.`,
+    intentId: "find_room",
+    category: "arrival",
+    confidence: 1,
+    needsHuman: false,
+    handoff: "none",
+    learningGap: false,
+    learningReason: "none",
+    actions: [{ label: "Your Room", type: "link", href: `/room/${room}` }],
+    source: "room-policy"
+  };
+}
+
+function isActionableDivingBooking(value) {
+  return ACTIONABLE_DIVING_BOOKING.test(String(value || ""));
+}
+
+function isDivingCollectionPrompt(value) {
+  return /\b(?:preferred date|how many (?:people|guests|divers)|fun diving|open water|advanced open water|certification level|which course|whatsapp or phone number|booking is only confirmed)\b/i.test(String(value || ""));
+}
+
+function activeDivingWorkflowMessages(history) {
+  if (!history.length || history.at(-1)?.role !== "assistant") return [];
+  const recent = history.slice(-10);
+  const lastAssistant = recent.at(-1)?.content || "";
+  const hasCollectionPrompt = isDivingCollectionPrompt(lastAssistant)
+    || (/\bWhatsApp or phone number\b/i.test(lastAssistant)
+      && recent.some((item) => (item.role === "assistant" && isDivingCollectionPrompt(item.content))
+        || (item.role === "user" && isActionableDivingBooking(item.content))));
+  if (!hasCollectionPrompt) return [];
+  for (let index = recent.length - 2; index >= 0; index -= 1) {
+    const item = recent[index];
+    if (item.role === "assistant" && /\bdiving request has been sent\b/i.test(item.content)) return [];
+    if (item.role === "user" && isActionableDivingBooking(item.content)) {
+      return recent.slice(index).filter((entry) => entry.role === "user").map((entry) => entry.content);
+    }
+  }
+  return [];
+}
+
+function divingPreferredDate(value) {
+  const source = String(value || "");
+  const match = source.match(/\b(?:today|tomorrow|next\s+(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday))\b/i)
+    || source.match(/\b(?:on\s+)?(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i)
+    || source.match(/\b(?:on\s+)?(?:\d{1,2}[\/-]\d{1,2}(?:[\/-]\d{2,4})?)\b/i)
+    || source.match(/\b(?:on\s+)?(?:\d{1,2}\s+(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)(?:\s+\d{4})?)\b/i)
+    || source.match(/\b(?:on\s+)?(?:(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+\d{1,2}(?:,?\s+\d{4})?)\b/i);
+  if (!match) return "";
+  const raw = match[0].replace(/^on\s+/i, "").trim();
+  const normalized = normalizeBangkokRequestedDate(raw);
+  return normalized === "Not provided" ? raw : normalized;
+}
+
+function divingGuestCount(value) {
+  const source = String(value || "");
+  const numeric = source.match(/\b(\d{1,2})\s*(?:people|persons?|guests?|divers?)\b/i);
+  if (numeric) return String(Number(numeric[1]));
+  const words = { one: "1", two: "2", three: "3", four: "4", five: "5", six: "6", seven: "7", eight: "8", nine: "9", ten: "10" };
+  const written = source.match(/\b(one|two|three|four|five|six|seven|eight|nine|ten)\s+(?:people|persons?|guests?|divers?)\b/i);
+  return written ? words[written[1].toLowerCase()] : "";
+}
+
+function divingChoice(value) {
+  const source = String(value || "");
+  if (/\bfun\s+div(?:e|es|ing)\b/i.test(source)) return { option: "Fun Diving", courseName: "" };
+  if (/\badvanced\s+open\s+water(?:\s+course)?\b/i.test(source)) return { option: "Advanced Open Water Course", courseName: "" };
+  if (/\bopen\s+water(?:\s+course)?\b/i.test(source)) return { option: "Open Water Course", courseName: "" };
+  const namedCourse = source.match(/\b(rescue\s+diver|divemaster|nitrox|deep\s+diver|wreck\s+diver|specialty|speciality)\s*(?:course)?\b/i);
+  if (namedCourse) return { option: "Other course", courseName: namedCourse[1].replace(/\b\w/g, (letter) => letter.toUpperCase()) };
+  if (/\b(?:another|other|higher(?:-level)?)\s+course\b/i.test(source)) return { option: "Other course", courseName: "" };
+  return { option: "", courseName: "" };
+}
+
+function divingCertification(value) {
+  const source = String(value || "");
+  const match = source.match(/\b(divemaster|rescue\s+diver|advanced\s+open\s+water|open\s+water)\b/i);
+  return match ? match[1].replace(/\b\w/g, (letter) => letter.toUpperCase()) : "";
+}
+
+function divingCollectionAnswer(missing, choice, rejectedLocalContact = false) {
+  const prompts = [];
+  if (missing.includes("date")) prompts.push("your preferred date");
+  if (missing.includes("guests")) prompts.push("how many people will be diving");
+  if (missing.includes("option")) prompts.push("whether you want Fun Diving, Open Water, Advanced Open Water, or another course");
+  if (missing.includes("course")) prompts.push("which higher-level or other course you would like");
+  if (missing.includes("certification")) prompts.push("your current certification level for Fun Diving");
+  if (missing.includes("contact")) prompts.push(rejectedLocalContact
+    ? "your WhatsApp or phone number including the international country code, for example +66 for Thailand"
+    : "your WhatsApp or phone number including the international country code");
+  const joined = prompts.length === 1 ? prompts[0] : `${prompts.slice(0, -1).join(", ")}, and ${prompts.at(-1)}`;
+  return `We’d be happy to help arrange your diving. Please tell me ${joined}. Once we have the details, our team will check availability for you. Your booking is only confirmed once availability has been checked and payment has been received.`;
+}
+
+function applyDivingBookingPolicy(result, question, history, currentReplyContact = "") {
+  const priorMessages = activeDivingWorkflowMessages(history);
+  const actionableNow = isActionableDivingBooking(question);
+  if (isCriticalPropertyResult(result) || (!actionableNow && !priorMessages.length)) {
+    return { handled: false, result, alertQuestion: question, workflow: null };
+  }
+  if (/^\s*(?:cancel|never\s*mind|nevermind|forget\s+it)\s*[.!]?\s*$/i.test(question)) {
+    return {
+      handled: true,
+      result: { ...result, answer: "No problem. I have cancelled the diving request.", intentId: "diving_booking_cancelled", category: "booking", needsHuman: false, handoff: "none", actions: [] },
+      alertQuestion: question,
+      workflow: { type: "booking", kind: "diving", status: "cancelled", retainPrivateContact: false, missing: [] }
+    };
+  }
+  const messages = actionableNow ? [question] : [...priorMessages, question];
+  const details = withoutReplyContact(messages.join(" ")).replace(/\[number removed\]|\[contact supplied privately\]/gi, " ").replace(/\s+/g, " ").trim();
+  const preferredDate = divingPreferredDate(details);
+  const guestCount = divingGuestCount(details);
+  const choice = divingChoice(details);
+  const certificationLevel = choice.option === "Fun Diving" ? divingCertification(details) : "";
+  const contact = validInternationalReplyContact(currentReplyContact);
+  const rejectedLocalContact = Boolean(currentReplyContact && !contact);
+  const missing = [];
+  if (!preferredDate) missing.push("date");
+  if (!guestCount) missing.push("guests");
+  if (!choice.option) missing.push("option");
+  if (choice.option === "Other course" && !choice.courseName) missing.push("course");
+  if (choice.option === "Fun Diving" && !certificationLevel) missing.push("certification");
+  if (!contact) missing.push("contact");
+  if (missing.length) {
+    return {
+      handled: true,
+      result: {
+        ...result,
+        answer: divingCollectionAnswer(missing, choice, rejectedLocalContact),
+        intentId: "diving_booking_request",
+        category: "booking",
+        needsHuman: false,
+        handoff: "booking",
+        actions: [],
+        suppressDefaultActions: true
+      },
+      alertQuestion: details || "Diving booking details pending.",
+      workflow: { type: "booking", kind: "diving", status: "collecting", retainPrivateContact: Boolean(contact), missing }
+    };
+  }
+  const optionDetail = choice.option === "Other course" ? choice.courseName : choice.option;
+  const summary = `Diving booking request: ${optionDetail}; preferred date ${preferredDate}; ${guestCount} ${guestCount === "1" ? "person" : "people"}${certificationLevel ? `; certification ${certificationLevel}` : ""}. Guest notes: ${details}`;
+  return {
+    handled: true,
+    result: {
+      ...result,
+      intentId: "diving_booking_request",
+      category: "booking",
+      handoff: "booking",
+      needsHuman: true,
+      actions: [],
+      suppressDefaultActions: true,
+      privateReplyContact: contact,
+      requestedDateTime: preferredDate,
+      bookingRequest: {
+        kind: "diving",
+        activity: "Diving",
+        preferredDate,
+        guestCount,
+        option: choice.option,
+        courseName: choice.courseName,
+        certificationLevel,
+        notes: details
+      }
+    },
+    alertQuestion: summary,
+    workflow: { type: "booking", kind: "diving", status: "ready", retainPrivateContact: false, missing: [] }
+  };
+}
+
 function emergencyConfirmationActions(kind) {
+  if (kind === "fire") {
+    return [
+      { label: "Call Koh Tao Rescue", type: "route", route: "rescueCall", style: "danger" },
+      { label: "Send urgent alert", type: "server_action", action: "confirm_urgent_property", style: "danger" },
+      { label: "Cancel", type: "dismiss" }
+    ];
+  }
   if (kind === "property") {
     return [
       { label: "Send urgent alert", type: "server_action", action: "confirm_urgent_property", style: "danger" },
@@ -279,6 +504,20 @@ function emergencyConfirmationActions(kind) {
 }
 
 function safetyResultForQuestion(question) {
+  if (isFireEmergencyMessage(question)) {
+    return {
+      answer: "If there is a real fire, leave the room or building and move to a safe place immediately. Call Koh Tao Rescue using the button below. There is a fire extinguisher mounted outside on the wall on each floor. Only try to use it if the fire is small, you have a safe escape route and you can do so without putting yourself in danger. Would you also like to send an urgent alert to The House emergency team?",
+      intentId: "fire_emergency",
+      category: "property-emergency",
+      confidence: 1,
+      needsHuman: false,
+      handoff: "property_emergency",
+      learningGap: false,
+      learningReason: "none",
+      actions: emergencyConfirmationActions("fire"),
+      source: "safety-policy"
+    };
+  }
   if (isCriticalPropertyMessage(question)) {
     return {
       answer: "This sounds serious. Move away from the danger first. Send an urgent alert to The House emergency team now?",
@@ -620,11 +859,15 @@ ABSOLUTE SAFETY AND OPERATIONS RULES
 - Selecting a room is never sufficient identity verification for protected access.
 - A lost key has a 500 THB replacement fee. After-hours spare-key access is available only through the protected Room page after Airbnb reservation verification and explicit fee acceptance. The chat must never reveal the code itself.
 - Major leaks, flooding, dangerous electrical problems, fire/smoke or serious property damage require property_emergency guidance and a deliberate House-alert confirmation. Never claim that a House alert was sent merely from the guest's wording.
+- For a real or possible fire, tell the guest to evacuate to safety and offer the configured Koh Tao Rescue call action. State that a fire extinguisher is mounted outside on the wall on each floor and should be used only for a small fire when the guest has a safe escape route and can use it without danger. Evacuation takes priority.
 - Accidents and serious or life-threatening medical situations require immediate safety guidance. Offer Koh Tao Rescue first because they know the island and local access points, and also offer Thailand's national medical emergency number 1669. A separate House notification must always require the guest to press Send urgent alert; never treat medical words alone as permission to notify staff.
+- When a Koh Tao Rescue call action is available, never say its contact information or phone number is unavailable or unconfirmed.
 - Classify the full sentence and intended action, not isolated words. Figurative, joking, slang or ambiguous statements such as dying for love, dying laughing, bloody hell, being drunk, or vague burning language are not operational requests by themselves. Clarify when meaning or requested action is uncertain.
 - A statement such as "I am unconscious" is logically ambiguous when typed by the speaker. Give conditional emergency guidance immediately, but do not claim that any House alert has been sent.
-- Routine stay needs such as towels, cleaning, lost keys and room problems use stay_support.
-- Activities, transport, rentals, tours and services that The House can arrange use booking. Never suggest booking directly with an operator.
+- Routine stay needs such as fresh towels, toilet paper, soap, cleaning, lost keys and room problems use stay_support. Regular service hours are 10:30-19:30 Bangkok time; after-hours routine requests are recorded immediately and handled the following morning after 10:30.
+- Activities, transport, rentals, tours and services that The House can arrange use booking. Never suggest booking directly with an operator and never open a direct personal WhatsApp conversation with a staff member.
+- An information or recommendation question is not a booking request. A clear request to arrange diving must collect the preferred date, number of divers, requested option/course, the exact other course when relevant, certification level for Fun Diving, and an international WhatsApp/phone number before staff is alerted.
+- A booking request is not a confirmed reservation. Availability may be checked first, but a booking is confirmed only after availability has been confirmed and payment has been received.
 - Never discuss internal commercial arrangements, referral terms, revenue or how The House may benefit from a booking. Keep the answer focused on helping the guest arrange what they need.
 - Do not identify internal staff by name in the guest-facing answer unless the guest explicitly asks about a named person.
 - Never claim that temporary House support is confirmed as 24/7 emergency coverage.
@@ -771,14 +1014,35 @@ function finalizeResult(result) {
   const replacesRoctopusTechnicalDetail = /\broctopus\b/i.test(result.answer)
     && /\b(?:padi|raid|certification|training\s+agency)\b/i.test(result.answer);
   if (replacesPrivateCommercialLanguage || replacesRoctopusTechnicalDetail) handoff = "booking";
-  const actions = replacesPrivateCommercialLanguage || replacesRoctopusTechnicalDetail
+  let actions = replacesPrivateCommercialLanguage || replacesRoctopusTechnicalDetail
     ? actionsForHandoff("booking")
-    : (result.actions?.length ? result.actions : actionsForHandoff(handoff));
-  const answer = replacesPrivateCommercialLanguage
+    : (result.suppressDefaultActions ? (result.actions || []) : (result.actions?.length ? result.actions : actionsForHandoff(handoff)));
+  actions = actions.map((action) => {
+    if (action?.route === "bookingWhatsapp") {
+      return {
+        label: action.label || "Book with Us",
+        type: "prompt",
+        prompt: /(?:roctopus|div)/i.test(`${result.intentId} ${result.answer}`)
+          ? "I want to book diving."
+          : "I would like to make a booking."
+      };
+    }
+    if (action?.route === "bookingCall") return { ...action, route: "houseCall" };
+    return action;
+  });
+  let answer = replacesPrivateCommercialLanguage
     ? "Our concierge can help arrange this for you. Use the booking options below and tell us what you need."
     : replacesRoctopusTechnicalDetail
       ? "We recommend Roctopus Dive because their friendly, professional team offers small groups, personal attention and a welcoming experience, especially for first-time or nervous divers. Their dive team in the shop will be happy to explain the available options and help you choose what suits you best."
       : result.answer;
+  if (actions.some((action) => action?.route === "rescueCall")
+    && /(?:do not|don['’]?t|cannot|can['’]?t|unable to)\s+have|not\s+(?:have|confirmed|available)|contact (?:information|number) is unavailable|no confirmed (?:phone|contact|number)/i.test(answer)) {
+    answer = "If you need urgent medical help, call Koh Tao Rescue using the button below. You can also call Thailand’s medical emergency number 1669.";
+  }
+  if (result.intentId === "recommended_dive_school") {
+    handoff = "none";
+    return { ...result, answer, handoff, actions, needsHuman: false };
+  }
   return { ...result, answer, handoff, actions };
 }
 
@@ -793,6 +1057,7 @@ function applyLiveFeaturePolicy(result, env) {
 }
 
 function applyEmergencyConfirmationPolicy(result) {
+  if (result?.intentId === "fire_emergency") return result;
   if (isCriticalPropertyResult(result)) {
     return {
       ...result,
@@ -994,6 +1259,9 @@ export async function handleConciergeRequest(request, env, ctx) {
   }
 
   const effectiveKnowledge = mergeApprovedKnowledge(knowledge, approvedKnowledge);
+  const servicePolicyResult = safetyResult ? null : housekeepingServiceResult(question);
+  const roomPolicyResult = safetyResult || servicePolicyResult ? null : roomLocationResult(question, room);
+  const directPolicyResult = safetyResult || servicePolicyResult || roomPolicyResult;
   const criticalPropertyMatch = safetyResult?.intentId === "property_emergency"
     ? matchKnowledge("major water leak", effectiveKnowledge, 0.44)
     : null;
@@ -1004,8 +1272,8 @@ export async function handleConciergeRequest(request, env, ctx) {
   const contextualMatch = criticalPropertyMatch || luggageWorkflowMatch || bambooSocialFollowUpMatch(question, history, effectiveKnowledge);
   const match = contextualMatch || matchKnowledge(question, effectiveKnowledge, 0.44);
   let result;
-  if (safetyResult) {
-    result = safetyResult;
+  if (directPolicyResult) {
+    result = directPolicyResult;
   } else if (contextualMatch || shouldUseDeterministic(match, history)) {
     result = deterministicResult(match);
   } else if (env.OPENAI_API_KEY) {
@@ -1028,11 +1296,16 @@ export async function handleConciergeRequest(request, env, ctx) {
   result = applyLiveFeaturePolicy(result, env);
   result = applyEmergencyConfirmationPolicy(result);
 
-  const luggagePolicy = applyLuggageRequestPolicy(result, question, history, currentReplyContact);
-  const contactPolicy = luggagePolicy.handled
-    ? luggagePolicy
-    : applyContactRequirement(result, question, history, currentReplyContact);
-  result = contactPolicy.result;
+  const bookingPolicy = applyDivingBookingPolicy(result, question, history, currentReplyContact);
+  const luggagePolicy = bookingPolicy.handled
+    ? { handled: false, result, alertQuestion: question, workflow: null }
+    : applyLuggageRequestPolicy(result, question, history, currentReplyContact);
+  const workflowPolicy = bookingPolicy.handled
+    ? bookingPolicy
+    : (luggagePolicy.handled
+      ? luggagePolicy
+      : { ...applyContactRequirement(result, question, history, currentReplyContact), workflow: null });
+  result = workflowPolicy.result;
 
   if (language !== "en" && result.source !== "ai") {
     try {
@@ -1051,14 +1324,35 @@ export async function handleConciergeRequest(request, env, ctx) {
     room,
     roomVerified: access.verified,
     question,
-    alertQuestion: contactPolicy.alertQuestion,
+    alertQuestion: workflowPolicy.alertQuestion,
     result
   });
 
   if (recorded.alert && recorded.delivery.accepted > 0 && result.needsHuman) {
-    const role = result.intentId === "luggage_storage" ? "luggage request" : result.handoff === "booking" ? "booking request" : "request";
-    result = { ...result, answer: `Your ${role} has been sent to The House team ✓ We will handle it from here.`, actions: [] };
+    if (result.bookingRequest?.kind === "diving") {
+      result = {
+        ...result,
+        answer: "Thank you. We’ve sent your diving request to our booking team. They’ll check availability and get back to you using the contact number you provided. Your booking is not confirmed until availability has been confirmed and payment has been received.",
+        actions: []
+      };
+    } else if (!result.housekeepingRequest) {
+      const role = result.intentId === "luggage_storage" ? "luggage request" : result.handoff === "booking" ? "booking request" : "request";
+      result = { ...result, answer: `Your ${role} has been sent to The House team ✓ We will handle it from here.`, actions: [] };
+    }
     if (luggagePolicy.handled) luggagePolicy.workflow.status = "submitted";
+    if (bookingPolicy.handled) bookingPolicy.workflow.status = "submitted";
+  } else if (result.housekeepingRequest && result.needsHuman) {
+    result = {
+      ...result,
+      answer: "I couldn’t send that request automatically. Please call us so the team can help you.",
+      actions: [{ label: "Call Us", type: "route", route: "houseCall" }]
+    };
+  } else if (result.bookingRequest?.kind === "diving" && result.needsHuman) {
+    result = {
+      ...result,
+      answer: "I couldn’t send your diving request automatically. Please call us so the booking team can help you.",
+      actions: [{ label: "Call Us", type: "route", route: "houseCall" }]
+    };
   }
   return json({
     answer: result.answer,
@@ -1072,7 +1366,7 @@ export async function handleConciergeRequest(request, env, ctx) {
     source: result.source,
     language,
     interactionId: recorded.interactionId,
-    workflow: luggagePolicy.workflow
+    workflow: workflowPolicy.workflow
   });
 }
 

@@ -8,10 +8,10 @@ window.HOUSE_GUIDE = {
     callLabel: "Call"
   },
   bookings: {
-    contactName: "Fah",
-    phoneDisplay: "+66 96 274 1424",
-    phoneTel: "+66962741424",
-    whatsapp: "https://wa.me/66962741424",
+    contactName: "The House booking team",
+    phoneDisplay: "+66 64 097 3491",
+    phoneTel: "+66640973491",
+    whatsapp: "",
     primaryLabel: "Book with Us",
     callLabel: "Call Us"
   },
@@ -28,7 +28,7 @@ window.HOUSE_GUIDE = {
   requestRouting: {
     staySupport: {
       contactKey: "houseSupport",
-      currentHandler: "Su",
+      currentHandler: "House support team",
       targetConversationOwner: "ai-concierge",
       humanHandoffContactKey: "houseSupport",
       afterHours: {
@@ -57,8 +57,8 @@ window.HOUSE_GUIDE = {
       ]
     },
     conciergeBookings: {
-      contactKey: "bookings",
-      currentHandler: "Fah",
+      contactKey: "structuredConciergeBooking",
+      currentHandler: "House booking team",
       intents: [
         "activities",
         "scooter rental",

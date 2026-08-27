@@ -6,7 +6,8 @@ import {
   handleAdminRequest,
   handleConciergeRequest,
   handleEmergencyContactRequest,
-  handleFeedbackRequest
+  handleFeedbackRequest,
+  housekeepingServiceResult
 } from "../src/concierge-api.js";
 import { handlePassportGuestRequest } from "../src/passport-api.js";
 import {
@@ -407,7 +408,7 @@ test("public concierge protects private knowledge and never sends medical alerts
   assert.equal(store.alerts.length, 0);
 });
 
-test("activity booking uses guest-service wording and the House booking route", async () => {
+test("activity booking uses guest-service wording and starts the structured Concierge flow", async () => {
   const { env } = createEnvironment({ OPENAI_API_KEY: "not-used" });
   const response = await handleConciergeRequest(
     guestRequest("Can you help me book snorkelling?"),
@@ -420,8 +421,10 @@ test("activity booking uses guest-service wording and the House booking route", 
   assert.equal(body.handoff, "booking");
   assert.match(body.answer, /help arrange the activity/i);
   assert.doesNotMatch(body.answer, /commission|referral|revenue/i);
-  assert.equal(body.actions[0].route, "bookingWhatsapp");
-  assert.equal(body.actions[1].route, "bookingCall");
+  assert.equal(body.actions[0].type, "prompt");
+  assert.equal(body.actions[0].prompt, "I would like to make a booking.");
+  assert.equal(body.actions[1].route, "houseCall");
+  assert.equal(body.actions.some((action) => action.route === "bookingWhatsapp"), false);
 });
 
 test("luggage storage guidance states every available window without promising early-morning storage", async () => {
@@ -758,7 +761,8 @@ test("The House recommendations answer Roctopus and Bamboo directly", async () =
   assert.match(diving.answer, /dive team in the shop/);
   assert.doesNotMatch(diving.answer, /\b(?:PADI|RAID|certification|training agency)\b/i);
   assert.equal(diving.actions.some((action) => action.href === "/activity.html?id=roctopus-dive"), false);
-  assert.equal(diving.actions[0].route, "bookingWhatsapp");
+  assert.equal(diving.actions[0].type, "prompt");
+  assert.equal(diving.actions[0].prompt, "I want to book diving.");
 
   const barResponse = await handleConciergeRequest(
     guestRequest("Which bar do you recommend?"),
@@ -907,7 +911,8 @@ test("technical Roctopus model wording is replaced with the approved guest answe
     assert.match(body.answer, /friendly, professional team/);
     assert.match(body.answer, /dive team in the shop/);
     assert.doesNotMatch(body.answer, /\b(?:PADI|RAID|certification|training agency)\b/i);
-    assert.equal(body.actions[0].route, "bookingWhatsapp");
+    assert.equal(body.actions[0].type, "prompt");
+    assert.equal(body.actions[0].prompt, "I would like to make a booking.");
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -1069,7 +1074,7 @@ test("guest localization supports seven languages and keeps the owner dashboard 
   assert.doesNotMatch(admin, /src="\/i18n\.js"/);
   assert.match(runtime, /exploreContentDeferred/);
   assert.match(runtime, /element\.closest\("\.section,\.footer"\)/);
-  assert.match(runtime, /houseGuideTranslations:v5\.11\.13:/);
+  assert.match(runtime, /houseGuideTranslations:v5\.11\.14:/);
   assert.match(runtime, /MAX_REQUEST_RETRIES = 2/);
   assert.match(runtime, /let flushRunning = false/);
 });
@@ -1782,7 +1787,8 @@ test("model responses use structured output and deterministic handoff actions", 
     const body = await response.json();
     assert.equal(body.source, "ai");
     assert.equal(body.handoff, "booking");
-    assert.equal(body.actions[0].route, "bookingWhatsapp");
+    assert.equal(body.actions[0].type, "prompt");
+    assert.equal(body.actions[0].prompt, "I would like to make a booking.");
     assert.doesNotMatch(body.answer, /operator\.example|99 123 4567/);
     assert.match(body.answer, /\[link removed\].*\[number removed\]/);
     assert.equal(capturedRequest.store, false);
@@ -1847,7 +1853,8 @@ test("low-confidence fallback matches cannot become false emergencies", async ()
   const taxiBody = await taxiResponse.json();
   assert.equal(taxiBody.category, "booking");
   assert.equal(taxiBody.handoff, "booking");
-  assert.equal(taxiBody.actions[0].route, "bookingWhatsapp");
+  assert.equal(taxiBody.actions[0].type, "prompt");
+  assert.equal(taxiBody.actions[0].prompt, "I would like to make a booking.");
 
   const callResponse = await handleConciergeRequest(guestRequest("Can you call me tomorrow?"), env);
   const callBody = await callResponse.json();
@@ -1953,17 +1960,362 @@ test("critical property sentences require confirmation while routine towels rema
     const { env, store } = createEnvironment({ OPENAI_API_KEY: "not-used" });
     const response = await handleConciergeRequest(guestRequest(phrase), env);
     const body = await response.json();
-    assert.equal(body.actions[0].action, "confirm_urgent_property", phrase);
-    assert.equal(body.actions[1].type, "dismiss", phrase);
+    const confirmation = body.actions.find((action) => action.action === "confirm_urgent_property");
+    assert.ok(confirmation, phrase);
+    assert.equal(body.actions.at(-1).type, "dismiss", phrase);
     assert.equal(store.alerts.length, 0, phrase);
   }
 
   const { env, store } = createEnvironment({ OPENAI_API_KEY: "not-used" });
   const towels = await handleConciergeRequest(guestRequest("Please send fresh towels to my room."), env);
   const towelsBody = await towels.json();
-  assert.equal(towelsBody.intentId, "fresh_towels");
+  assert.equal(towelsBody.intentId, "housekeeping_fresh_towels");
   assert.equal(store.alerts.length, 1);
   assert.equal(store.alerts[0].alertType, "stay_support");
+});
+
+test("Bangkok housekeeping boundaries switch exactly at 10:30 and 19:30", () => {
+  const cases = [
+    { iso: "2026-08-27T03:29:00.000Z", afterHours: true },
+    { iso: "2026-08-27T03:30:00.000Z", afterHours: false },
+    { iso: "2026-08-27T12:29:00.000Z", afterHours: false },
+    { iso: "2026-08-27T12:30:00.000Z", afterHours: true }
+  ];
+  for (const item of cases) {
+    const result = housekeepingServiceResult("Can I have new toilet paper?", new Date(item.iso));
+    assert.ok(result, item.iso);
+    assert.equal(result.housekeepingRequest.afterHours, item.afterHours, item.iso);
+    if (item.afterHours) {
+      assert.match(result.answer, /currently off duty/i, item.iso);
+      assert.match(result.answer, /morning after 10:30 AM/i, item.iso);
+      assert.doesNotMatch(result.answer, /within 30 minutes/i, item.iso);
+      assert.deepEqual(result.actions, [], item.iso);
+    } else {
+      assert.match(result.answer, /within 30 minutes/i, item.iso);
+      assert.equal(result.actions[0].route, "houseCall", item.iso);
+    }
+  }
+});
+
+test("routine housekeeping supplies always create one Su-and-owner service alert", async () => {
+  const requests = [
+    ["Can I have new toilet paper?", /toilet paper/i],
+    ["I need fresh towels.", /fresh towels/i],
+    ["Can I have soap?", /soap/i],
+    ["Please clean my room.", /room cleaning|clean the room/i]
+  ];
+  const originalFetch = globalThis.fetch;
+  try {
+    for (const [question, itemPattern] of requests) {
+      const { env, store } = createEnvironment({
+        OPENAI_API_KEY: "not-used",
+        WHATSAPP_ACCESS_TOKEN: "meta-test-token",
+        WHATSAPP_PHONE_NUMBER_ID: "1234567890",
+        WHATSAPP_ALERT_RECIPIENTS: JSON.stringify({
+          support: [{ label: "Su", phone: "+66 64 000 0001" }],
+          emergency: [
+            { label: "Owner 1", phone: "+66 81 000 0002" },
+            { label: "Owner 2", phone: "+66 82 000 0003" }
+          ]
+        })
+      });
+      const outbound = [];
+      globalThis.fetch = async (_url, options) => {
+        outbound.push(JSON.parse(options.body));
+        return new Response(JSON.stringify({ messages: [{ id: `wamid.housekeeping-${outbound.length}` }] }), {
+          status: 200,
+          headers: { "content-type": "application/json" }
+        });
+      };
+      const response = await handleConciergeRequest(guestRequest(question), env);
+      const body = await response.json();
+      assert.equal(response.status, 200, question);
+      assert.match(body.answer, /Thank you for your request/i, question);
+      assert.match(body.answer, itemPattern, question);
+      assert.doesNotMatch(body.answer, /confirmed information|do not have information|knowledge/i, question);
+      assert.equal(store.alerts.length, 1, question);
+      assert.equal(store.alerts[0].alertType, "stay_support", question);
+      assert.equal(store.alerts[0].recipientGroup, "support_with_owners", question);
+      assert.equal(outbound.length, 3, question);
+      assert.deepEqual(outbound.map((item) => item.to).sort(), ["66640000001", "66810000002", "66820000003"], question);
+    }
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("fire guidance prioritizes evacuation, Rescue and safe extinguisher use before any House alert", async () => {
+  const { env, store } = createEnvironment({ OPENAI_API_KEY: "not-used" });
+  const response = await handleConciergeRequest(guestRequest("There is a fire in my room."), env);
+  const body = await response.json();
+  assert.equal(body.intentId, "fire_emergency");
+  assert.match(body.answer, /leave the room or building|move to a safe place/i);
+  assert.match(body.answer, /Koh Tao Rescue/i);
+  assert.match(body.answer, /fire extinguisher.*outside.*wall.*each floor/is);
+  assert.match(body.answer, /fire is small.*safe escape route/is);
+  assert.equal(body.actions[0].route, "rescueCall");
+  assert.ok(body.actions.find((action) => action.action === "confirm_urgent_property"));
+  assert.equal(body.actions.at(-1).type, "dismiss");
+  assert.doesNotMatch(body.answer, /Rescue.*(?:unknown|unconfirmed|unavailable)/i);
+  assert.equal(store.alerts.length, 0);
+});
+
+test("figurative language and cancelled alerts use natural guest wording", async () => {
+  for (const phrase of ["I am dying for love", "bloody hell", "I'm dying laughing"]) {
+    const { env, store } = createEnvironment({ OPENAI_API_KEY: "not-used" });
+    const response = await handleConciergeRequest(guestRequest(phrase), env);
+    const body = await response.json();
+    assert.match(body.answer, /What can I help you with/i, phrase);
+    assert.doesNotMatch(body.answer, /classifier|conversational or figurative language|alert engine|I have not sent an alert/i, phrase);
+    assert.equal(store.alerts.length, 0, phrase);
+  }
+  const script = await readFile(new URL("../public/ai-concierge.js", import.meta.url), "utf8");
+  assert.match(script, /Okay — I haven’t contacted The House team\./);
+  assert.doesNotMatch(script, /Urgent alert cancelled\. No team message was sent\./);
+});
+
+test("find my room returns the dynamic location and a direct Your Room action", async () => {
+  const { env } = createEnvironment({ OPENAI_API_KEY: "not-used" });
+  const response = await handleConciergeRequest(guestRequest("find my room", { room: "11" }), env);
+  const body = await response.json();
+  assert.equal(body.intentId, "find_room");
+  assert.match(body.answer, /Room 11 is downstairs/i);
+  assert.match(body.answer, /Open Your Room/i);
+  assert.doesNotMatch(body.answer, /room-specific page/i);
+  assert.deepEqual(body.actions[0], { label: "Your Room", type: "link", href: "/room/11" });
+});
+
+test("diving recommendations stay informational while booking starts clean structured collection", async () => {
+  const { env, store } = createEnvironment({ OPENAI_API_KEY: "" });
+  const recommendation = await handleConciergeRequest(guestRequest("Which dive school do you recommend?"), env);
+  const recommendationBody = await recommendation.json();
+  assert.equal(recommendationBody.intentId, "recommended_dive_school");
+  assert.equal(recommendationBody.needsHuman, false);
+  assert.doesNotMatch(recommendationBody.answer, /WhatsApp or phone number/i);
+  assert.equal(store.alerts.length, 0);
+
+  const booking = await handleConciergeRequest(guestRequest("I want to book diving."), env);
+  const bookingBody = await booking.json();
+  assert.equal(bookingBody.intentId, "diving_booking_request");
+  assert.equal(bookingBody.workflow.status, "collecting");
+  assert.deepEqual(bookingBody.workflow.missing.sort(), ["contact", "date", "guests", "option"]);
+  assert.match(bookingBody.answer, /preferred date/i);
+  assert.match(bookingBody.answer, /how many people/i);
+  assert.match(bookingBody.answer, /Fun Diving, Open Water, Advanced Open Water, or another course/i);
+  assert.match(bookingBody.answer, /international country code/i);
+  assert.match(bookingBody.answer, /payment has been received/i);
+  assert.equal(bookingBody.actions.some((action) => action.route === "bookingWhatsapp"), false);
+  assert.equal(store.alerts.length, 0);
+});
+
+test("diving collection enforces conditional course details and international contact", async () => {
+  const cases = [
+    {
+      question: "I want to book Fun Diving tomorrow for 2 divers. My WhatsApp is +66 81 234 5678.",
+      missing: "certification"
+    },
+    {
+      question: "I want to book diving tomorrow for 2 divers on another course. My WhatsApp is +66 81 234 5678.",
+      missing: "course"
+    },
+    {
+      question: "I want to book Fun Diving tomorrow for 2 divers. I am Advanced Open Water certified. My phone is 081 234 5678.",
+      missing: "contact",
+      local: true
+    }
+  ];
+  for (const item of cases) {
+    const { env, store } = createEnvironment({ OPENAI_API_KEY: "" });
+    const response = await handleConciergeRequest(guestRequest(item.question), env);
+    const body = await response.json();
+    assert.equal(body.workflow.status, "collecting", item.missing);
+    assert.equal(body.workflow.missing.includes(item.missing), true, item.missing);
+    if (item.local) assert.match(body.answer, /\+66/);
+    assert.equal(store.alerts.length, 0, item.missing);
+  }
+});
+
+test("a complete diving request creates one protected Fah-and-owner alert and remains unconfirmed pending payment", async () => {
+  const { env, store } = createEnvironment({
+    OPENAI_API_KEY: "",
+    WHATSAPP_ACCESS_TOKEN: "meta-test-token",
+    WHATSAPP_PHONE_NUMBER_ID: "1234567890",
+    WHATSAPP_ALERT_RECIPIENTS: JSON.stringify({
+      booking: [{ label: "Fah", phone: "+66 96 000 0001" }],
+      emergency: [
+        { label: "Owner 1", phone: "+66 81 000 0002" },
+        { label: "Owner 2", phone: "+66 82 000 0003" }
+      ]
+    })
+  });
+  const originalFetch = globalThis.fetch;
+  const outbound = [];
+  globalThis.fetch = async (_url, options) => {
+    outbound.push(JSON.parse(options.body));
+    return new Response(JSON.stringify({ messages: [{ id: `wamid.diving-${outbound.length}` }] }), {
+      status: 200,
+      headers: { "content-type": "application/json" }
+    });
+  };
+  try {
+    const rawContact = "+66 81 234 5678";
+    const response = await handleConciergeRequest(guestRequest(
+      `I want to book Fun Diving tomorrow for 2 divers. I am Advanced Open Water certified. My WhatsApp is ${rawContact}. Please arrange a calm morning trip.`
+    ), env);
+    const body = await response.json();
+    assert.equal(body.workflow.status, "submitted");
+    assert.equal(store.alerts.length, 1);
+    assert.equal(store.alerts[0].alertType, "booking_request");
+    assert.equal(store.alerts[0].recipientGroup, "booking_with_owners");
+    assert.equal(outbound.length, 3);
+    assert.deepEqual(outbound.map((item) => item.to).sort(), ["66810000002", "66820000003", "66960000001"]);
+    assert.equal(outbound.every((item) => item.template.name === "house_booking_alert_v1"), true);
+    const parameters = outbound[0].template.components[0].parameters;
+    assert.equal(parameters[2].text, "Diving");
+    assert.equal(parameters[4].text, "2");
+    assert.match(parameters[5].text, /Fun Diving/);
+    assert.match(parameters[5].text, /Certification: Advanced Open Water/);
+    assert.match(parameters[5].text, /Guest reply: \+66812345678/);
+    assert.match(body.answer, /check availability/i);
+    assert.match(body.answer, /not confirmed.*payment has been received/i);
+    assert.doesNotMatch(JSON.stringify(store.interactions), /66812345678|81 234 5678/);
+    assert.doesNotMatch(JSON.stringify(store.alerts), /66812345678|81 234 5678/);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("Open Water, Advanced Open Water and named higher courses pass the structured diving gate", async () => {
+  const cases = [
+    ["Open Water Course", "I want to book diving tomorrow for 2 divers on the Open Water Course. My WhatsApp is +66 81 234 5678."],
+    ["Advanced Open Water Course", "I want to book diving tomorrow for 2 divers on the Advanced Open Water Course. My WhatsApp is +66 81 234 5678."],
+    ["Other course", "I want to book diving tomorrow for 2 divers on the Rescue Diver course. My WhatsApp is +66 81 234 5678."]
+  ];
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => new Response(JSON.stringify({ messages: [{ id: `wamid.course-${crypto.randomUUID()}` }] }), {
+    status: 200,
+    headers: { "content-type": "application/json" }
+  });
+  try {
+    for (const [expectedOption, question] of cases) {
+      const { env, store } = createEnvironment({
+        OPENAI_API_KEY: "",
+        WHATSAPP_ACCESS_TOKEN: "meta-test-token",
+        WHATSAPP_PHONE_NUMBER_ID: "1234567890",
+        WHATSAPP_ALERT_RECIPIENTS: JSON.stringify({ booking: [{ label: "Fah", phone: "+66 96 000 0001" }] })
+      });
+      const response = await handleConciergeRequest(guestRequest(question), env);
+      const body = await response.json();
+      assert.equal(body.workflow.status, "submitted", expectedOption);
+      assert.equal(store.alerts.length, 1, expectedOption);
+      assert.match(body.answer, /not confirmed.*payment has been received/i, expectedOption);
+      assert.equal(body.workflow.missing.length, 0, expectedOption);
+    }
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("a completed diving request cannot supply stale fields to a new booking", async () => {
+  const { env, store } = createEnvironment({
+    OPENAI_API_KEY: "",
+    WHATSAPP_ACCESS_TOKEN: "meta-test-token",
+    WHATSAPP_PHONE_NUMBER_ID: "1234567890",
+    WHATSAPP_ALERT_RECIPIENTS: JSON.stringify({ booking: [{ label: "Fah", phone: "+66 96 000 0001" }] })
+  });
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => new Response(JSON.stringify({ messages: [{ id: `wamid.fresh-${crypto.randomUUID()}` }] }), {
+    status: 200,
+    headers: { "content-type": "application/json" }
+  });
+  try {
+    const first = await handleConciergeRequest(guestRequest(
+      "I want to book Fun Diving tomorrow for 2 divers. I am Advanced Open Water certified. My WhatsApp is +66 81 234 5678."
+    ), env);
+    const firstBody = await first.json();
+    assert.equal(firstBody.workflow.status, "submitted");
+    assert.equal(store.alerts.length, 1);
+
+    const second = await handleConciergeRequest(guestRequest("I want to book diving.", {
+      history: [
+        { role: "user", content: "I want to book Fun Diving tomorrow for 2 divers. I am Advanced Open Water certified. My WhatsApp is [contact supplied privately]." },
+        { role: "assistant", content: firstBody.answer }
+      ]
+    }), env);
+    const secondBody = await second.json();
+    assert.equal(secondBody.workflow.status, "collecting");
+    assert.deepEqual(secondBody.workflow.missing.sort(), ["contact", "date", "guests", "option"]);
+    assert.equal(store.alerts.length, 1);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("the final alert boundary rejects incomplete structured diving submissions", async () => {
+  const complete = {
+    answer: "Request ready.",
+    intentId: "diving_booking_request",
+    category: "booking",
+    handoff: "booking",
+    needsHuman: true,
+    privateReplyContact: "+66 81 234 5678",
+    bookingRequest: {
+      kind: "diving",
+      activity: "Diving",
+      preferredDate: "28 Aug 2026",
+      guestCount: "2",
+      option: "Fun Diving",
+      courseName: "",
+      certificationLevel: "Advanced Open Water",
+      notes: "Morning preferred"
+    }
+  };
+  const cases = [
+    ["missing date", { ...complete, bookingRequest: { ...complete.bookingRequest, preferredDate: "" } }],
+    ["missing people", { ...complete, bookingRequest: { ...complete.bookingRequest, guestCount: "" } }],
+    ["missing option", { ...complete, bookingRequest: { ...complete.bookingRequest, option: "" } }],
+    ["missing Fun certification", { ...complete, bookingRequest: { ...complete.bookingRequest, certificationLevel: "" } }],
+    ["missing named other course", { ...complete, bookingRequest: { ...complete.bookingRequest, option: "Other course", courseName: "" } }],
+    ["missing contact", { ...complete, privateReplyContact: "" }],
+    ["local contact", { ...complete, privateReplyContact: "081 234 5678" }]
+  ];
+  for (const [label, result] of cases) {
+    const { env, store } = createEnvironment();
+    const alert = await createConciergeAlert({
+      env,
+      interactionId: "int_diving_boundary_test",
+      sessionId: `session_${label.replaceAll(" ", "_")}`,
+      room: "6",
+      roomVerified: true,
+      question: "Diving request",
+      result
+    });
+    assert.equal(alert, null, label);
+    assert.equal(store.alerts.length, 0, label);
+  }
+});
+
+test("booking UI never exposes Fah personal WhatsApp and service hours are guest-visible", async () => {
+  const [contacts, booking, app, concierge, practical, modulePractical] = await Promise.all([
+    readFile(new URL("../public/contacts.js", import.meta.url), "utf8"),
+    readFile(new URL("../public/concierge-booking.js", import.meta.url), "utf8"),
+    readFile(new URL("../public/guide-app.js", import.meta.url), "utf8"),
+    readFile(new URL("../public/ai-concierge.js", import.meta.url), "utf8"),
+    readFile(new URL("../public/practical.html", import.meta.url), "utf8"),
+    readFile(new URL("../public/modules/practical/practical.html", import.meta.url), "utf8")
+  ]);
+  for (const source of [contacts, booking, app, concierge]) {
+    assert.doesNotMatch(source, /wa\.me\/66962741424|\+66962741424|0962741424/);
+  }
+  assert.match(booking, /whatsappHref: "#concierge-booking"/);
+  assert.match(app, /bookingWhatsapp: "#concierge-booking"/);
+  assert.match(concierge, /Housekeeping &amp; service hours: 10:30 AM–7:30 PM/);
+  for (const page of [practical, modulePractical]) {
+    assert.match(page, /Housekeeping &amp; Service Requests/);
+    assert.match(page, /10:30 AM–7:30 PM/);
+    assert.match(page, /following morning after 10:30 AM/);
+    assert.match(page, /Help &amp; Emergency/);
+  }
 });
 
 test("owner-approved knowledge becomes active without a new deployment", async () => {

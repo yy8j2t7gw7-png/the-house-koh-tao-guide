@@ -122,8 +122,8 @@
     return {
       houseWhatsapp: contacts.houseSupport?.whatsapp,
       houseCall: contacts.houseSupport?.phoneTel ? `tel:${contacts.houseSupport.phoneTel}` : "",
-      bookingWhatsapp: contacts.bookings?.whatsapp,
-      bookingCall: contacts.bookings?.phoneTel ? `tel:${contacts.bookings.phoneTel}` : "",
+      bookingWhatsapp: "#concierge-booking",
+      bookingCall: contacts.houseSupport?.phoneTel ? `tel:${contacts.houseSupport.phoneTel}` : "",
       propertyEmergencyWhatsapp: propertyEmergency?.whatsapp,
       propertyEmergencyCall: "#house-emergency-call",
       medicalNationalCall: contacts.emergency?.medicalNational?.phoneTel
@@ -147,8 +147,25 @@
   function resolveAction(action, question) {
     const context = contextValues(question);
     const localizedLabel = window.HOUSE_I18N?.t(action.label) || action.label;
+    if (action.route === "bookingWhatsapp") {
+      return {
+        label: interpolate(localizedLabel || "Book with Us", context),
+        type: "prompt",
+        prompt: /(?:roctopus|div)/i.test(`${question} ${action.message || ""}`)
+          ? "I want to book diving."
+          : "I would like to make a booking."
+      };
+    }
+    if (action.route === "bookingCall") action = { ...action, route: "houseCall" };
     if (action.type === "server_action" || action.type === "dismiss") {
       return { ...action, label: interpolate(localizedLabel, context), question: redactPrivateContact(question) };
+    }
+    if (action.type === "prompt") {
+      return {
+        ...action,
+        label: interpolate(localizedLabel, context),
+        prompt: interpolate(action.prompt || question, context)
+      };
     }
     if (action.type === "registration") {
       const href = selectedRoom ? `/room/${selectedRoom}#verifiedStayAccess` : "";
@@ -262,6 +279,7 @@
          ).join("")}
        </div>`
     : "";
+  const serviceHoursHtml = isPublicAccess ? "" : `<p class="ai-concierge-service-hours">Housekeeping &amp; service hours: 10:30 AM–7:30 PM. After-hours requests will be handled the following morning.</p>`;
 
   const roomButtons = roomOptions.map((room) =>
     `<button type="button" data-select-room="${room}">Room ${room}</button>`
@@ -284,6 +302,7 @@
         <p>${cfg.welcomeText}</p>
       </div>
       <div class="ai-concierge-actions">${quickActionsHtml}</div>
+      ${serviceHoursHtml}
       ${promptHtml}
       <div class="ai-concierge-room-selector" ${selectedRoom ? "hidden" : ""}>
         <div class="ai-concierge-room-selector-head">
@@ -331,7 +350,7 @@
       const actionRow = document.createElement("div");
       actionRow.className = "ai-concierge-message-actions";
       resolvedActions.forEach((action) => {
-        const link = action.type === "server_action" || action.type === "dismiss"
+        const link = action.type === "server_action" || action.type === "dismiss" || action.type === "prompt"
           ? document.createElement("button") : document.createElement("a");
         link.className = `ai-concierge-message-action${action.style === "danger" ? " is-danger" : ""}`;
         if (link.tagName === "A") link.href = action.href;
@@ -342,6 +361,8 @@
           link.dataset.serverQuestion = redactPrivateContact(action.question || question);
         } else if (action.type === "dismiss") {
           link.dataset.dismissAction = "true";
+        } else if (action.type === "prompt") {
+          link.dataset.prompt = action.prompt;
         } else if (action.type === "spare-key") {
           link.dataset.spareKeyAccess = "true";
         } else {
@@ -517,7 +538,11 @@
 
   function deliverAnswer(result, question) {
     const suppliedContact = internationalContact(question);
-    if (result.workflow?.type === "luggage" && result.workflow.status === "collecting" && result.workflow.retainPrivateContact) {
+    const privateContactWorkflow = result.workflow?.type === "luggage"
+      || result.workflow?.type === "booking";
+    if (privateContactWorkflow
+      && result.workflow.status === "collecting"
+      && result.workflow.retainPrivateContact) {
       privateWorkflowContact = suppliedContact || privateWorkflowContact;
     } else {
       privateWorkflowContact = "";
@@ -639,7 +664,7 @@
     const dismissAction = event.target.closest("[data-dismiss-action]");
     if (dismissAction) {
       dismissAction.closest(".ai-concierge-message-actions")?.remove();
-      appendMessage("concierge", window.HOUSE_I18N?.t("Urgent alert cancelled. No team message was sent.") || "Urgent alert cancelled. No team message was sent.");
+      appendMessage("concierge", window.HOUSE_I18N?.t("Okay — I haven’t contacted The House team.") || "Okay — I haven’t contacted The House team.");
       return;
     }
     const feedbackButton = event.target.closest("[data-feedback-rating]");
@@ -704,6 +729,17 @@
       event.preventDefault();
       openPanel({ askRoom: true });
       submitQuestion(promptTrigger.dataset.conciergePrompt);
+      return;
+    }
+    const bookingLink = event.target.closest('[data-action="booking"],[data-link="bookingWhatsapp"],a[href="#concierge-booking"]');
+    if (bookingLink && !panel.contains(bookingLink)) {
+      event.preventDefault();
+      const explicit = bookingLink.dataset.conciergeBookingPrompt;
+      const prompt = explicit || (/diving\.html$/i.test(currentPage) || /(?:roctopus|dive)/i.test(`${location.search} ${bookingLink.textContent || ""}`)
+        ? "I want to book diving."
+        : "I would like to make a booking.");
+      openPanel({ askRoom: true });
+      submitQuestion(prompt);
       return;
     }
     const contactLink = event.target.closest('[data-action="contact"],[data-link="houseWhatsapp"],[data-link="houseCall"]');

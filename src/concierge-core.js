@@ -170,8 +170,8 @@ export function actionsForHandoff(handoff, question = "") {
       { label: "Call Us", type: "route", route: "houseCall" }
     ],
     booking: [
-      { label: "Book with Us", type: "route", route: "bookingWhatsapp", message: "Hello, I am staying at The House and would like help booking: {question}" },
-      { label: "Call Us", type: "route", route: "bookingCall" }
+      { label: "Book with Us", type: "prompt", prompt: "I would like to make a booking." },
+      { label: "Call Us", type: "route", route: "houseCall" }
     ],
     property_emergency: [
       { label: "Call Emergency Support", type: "route", route: "propertyEmergencyCall", style: "danger" },

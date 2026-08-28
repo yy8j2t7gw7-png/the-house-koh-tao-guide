@@ -1,5 +1,5 @@
 window.AI_CONCIERGE_CONFIG = {
-  "release": "5.11.18",
+  "release": "5.11.19",
   "enabled": true,
   "propertyName": "The House",
   "buttonLabel": "Concierge",
@@ -21,11 +21,15 @@ window.AI_CONCIERGE_CONFIG = {
     "Thank you for your request. We’ll bring toilet paper to your room as soon as possible. If you haven’t received it within 30 minutes, please call us using the button below.",
     "Thank you for your request. We’ll bring soap to your room as soon as possible. If you haven’t received it within 30 minutes, please call us using the button below.",
     "Thank you for your request. We’ll bring fresh towels to your room as soon as possible. If you haven’t received it within 30 minutes, please call us using the button below.",
-    "Thank you for your request. We’ll arrange room cleaning as soon as possible. If you haven’t received it within 30 minutes, please call us using the button below.",
     "Thank you for your request. Our housekeeping team is currently off duty, but your request has already been recorded. We’ll bring toilet paper to your room tomorrow morning after 10:30 AM, and you do not need to request it again.",
     "Thank you for your request. Our housekeeping team is currently off duty, but your request has already been recorded. We’ll bring soap to your room tomorrow morning after 10:30 AM, and you do not need to request it again.",
     "Thank you for your request. Our housekeeping team is currently off duty, but your request has already been recorded. We’ll bring fresh towels to your room tomorrow morning after 10:30 AM, and you do not need to request it again.",
-    "Thank you for your request. Our housekeeping team is currently off duty, but your request has already been recorded. We’ll arrange room cleaning tomorrow morning after 10:30 AM, and you do not need to request it again."
+    "We’ll be happy to arrange a room cleaning. What time would be most convenient for you? We’ll do our best to accommodate your preferred time, but the exact cleaning time may vary depending on housekeeping availability.",
+    "I’m sorry, but housekeeping is not available on Mondays. We can arrange your room cleaning from 10:30 AM tomorrow. What time would be most convenient for you? We’ll do our best to accommodate your preferred time, but the exact cleaning time may vary depending on housekeeping availability.",
+    "Housekeeping is currently off duty and is not available on Mondays. We can arrange your room cleaning from 10:30 AM on Tuesday. What time would be most convenient for you? We’ll do our best to accommodate your preferred time, but the exact cleaning time may vary depending on housekeeping availability.",
+    "Thank you. We’ve sent your room-cleaning request to our housekeeping team with your preferred time of 3:00 PM. We’ll do our best to accommodate it, but the exact cleaning time may vary depending on availability.",
+    "Thank you. We’ve sent your room-cleaning request to our housekeeping team with your preferred time of Now. We’ll do our best to accommodate it, but the exact cleaning time may vary depending on availability.",
+    "Thank you. We’ve sent your room-cleaning request to our housekeeping team with your preferred time of As soon as possible. We’ll do our best to accommodate it, but the exact cleaning time may vary depending on availability."
   ],
   "afterHours": {
     "timeZone": "Asia/Bangkok",

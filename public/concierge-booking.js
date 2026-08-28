@@ -1,4 +1,5 @@
 (function () {
+  let currentPagePrompt = "";
   const fallback = {
     contactName: "The House booking team",
     phoneDisplay: "+66 64 097 3491",
@@ -15,7 +16,7 @@
   function createBooking(serviceName) {
     const contact = getContact();
     const safeServiceName = String(serviceName || "this service").trim();
-    return {
+    const booking = {
       contactName: contact.contactName || fallback.contactName,
       phoneDisplay: contact.phoneDisplay || fallback.phoneDisplay,
       phoneHref: `tel:${contact.phoneTel || fallback.phoneTel}`,
@@ -26,9 +27,12 @@
       primaryLabel: contact.primaryLabel || fallback.primaryLabel,
       callLabel: contact.callLabel || fallback.callLabel
     };
+    currentPagePrompt = booking.conciergePrompt;
+    return booking;
   }
 
   window.HOUSE_CONCIERGE_BOOKING = {
-    createBooking
+    createBooking,
+    currentPrompt: () => currentPagePrompt
   };
 })();

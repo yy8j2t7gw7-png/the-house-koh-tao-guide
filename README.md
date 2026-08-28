@@ -1,4 +1,4 @@
-# Guest Guide Platform with AI Concierge — The House v5.11.18
+# Guest Guide Platform with AI Concierge — The House v5.11.19
 
 The House – Koh Tao guest guide is a production-oriented, mobile-first digital guest guide and concierge platform. It combines property information, curated island guidance, structured place and activity data, and centralized contact and booking routes.
 
@@ -17,6 +17,16 @@ The House – Koh Tao guest guide is a production-oriented, mobile-first digital
 - Model-powered, room-aware AI Concierge with controlled learning
 
 The Activities module contains 49 structured profiles covering diving, freediving, snorkelling, boat trips, beach experiences, kayaking, paddleboarding, hiking, viewpoints, climbing, yoga, Muay Thai, massage, cooking, wildlife, photography, night activities and rainy-day options.
+
+## v5.11.19 release focus
+
+- Prevents every luggage, cleaning or booking operation from silently dropping into the device-only answer engine when the protected server request fails; the guest instead sees a truthful **not sent** message and retains the active workflow.
+- Preserves arrival/departure dates, times, bag counts and sanitized notes through local-number correction, then creates exactly one validated luggage alert only after Meta accepts at least one delivery.
+- Makes housekeeping scheduling calendar-aware in Bangkok: Tuesday–Sunday, 10:30–19:30, with Monday closed and Sunday-evening requests correctly carried to Tuesday at 10:30.
+- Collects a preferred cleaning time before sending, accepts clock times, **now** and **ASAP**, and clearly states that the preference is not a confirmed appointment.
+- Adds deterministic information-only and structured booking paths for fishing, snorkeling, taxis, taxi/longtail boats, ferry tickets and motorbike taxis, while preserving the existing diving gates and Fah-plus-owner routing.
+- Makes every **Book with Us** entry category-specific and keeps contacts transient, redacted and excluded from ordinary history, alerts, dashboards and logs.
+- Adds an opt-in, fail-closed path for five new Meta Utility templates with **Received** and **Resolve** quick replies. Existing production templates and typed commands remain unchanged until all new templates are approved and explicitly enabled.
 
 ## v5.11.18 release focus
 

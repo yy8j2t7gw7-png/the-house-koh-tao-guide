@@ -8,6 +8,7 @@ const ACTIONABLE_ROOM_DEFECT = /\b(?:broken|not\s+working|doesn['’]?t\s+work|i
 function bangkokParts(date = new Date()) {
   const parts = new Intl.DateTimeFormat("en-GB", {
     timeZone: BANGKOK_TIME_ZONE,
+    weekday: "long",
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
@@ -17,6 +18,33 @@ function bangkokParts(date = new Date()) {
     hourCycle: "h23"
   }).formatToParts(date);
   return Object.fromEntries(parts.map((part) => [part.type, part.value]));
+}
+
+export function housekeepingAvailability(date = new Date()) {
+  const parts = bangkokParts(date);
+  const minutes = (Number(parts.hour) * 60) + Number(parts.minute);
+  const weekday = String(parts.weekday || "");
+  const openDay = weekday !== "Monday";
+  const open = openDay && minutes >= (10 * 60 + 30) && minutes < (19 * 60 + 30);
+  let daysUntilOpen = 0;
+  if (!open) {
+    if (weekday === "Monday") daysUntilOpen = 1;
+    else if (minutes < (10 * 60 + 30)) daysUntilOpen = 0;
+    else if (weekday === "Sunday") daysUntilOpen = 2;
+    else daysUntilOpen = 1;
+  }
+  const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  const base = new Date(Date.UTC(Number(parts.year), Number(parts.month) - 1, Number(parts.day), 12));
+  const nextDay = dayNames[new Date(base.getTime() + (daysUntilOpen * 86_400_000)).getUTCDay()];
+  return {
+    open,
+    afterHours: !open,
+    weekday,
+    minutes,
+    daysUntilOpen,
+    nextDay,
+    nextOpening: `${nextDay} at 10:30 AM`
+  };
 }
 
 export function isAfterHours(date = new Date()) {
@@ -149,7 +177,7 @@ export function classifyConciergeAlert({ result, question, room, now = new Date(
     };
   }
 
-  if (result.handoff === "booking" && bookingNeedsAttention(question, result.intentId)) {
+  if (result.handoff === "booking" && (result.bookingRequest || bookingNeedsAttention(question, result.intentId))) {
     return {
       ...base,
       alertType: "booking_request",

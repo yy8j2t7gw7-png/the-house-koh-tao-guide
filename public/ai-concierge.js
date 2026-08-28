@@ -37,6 +37,18 @@
     return "";
   }
 
+  function bookingPromptFor(value) {
+    const source = String(value || "");
+    if (/\b(?:motorbike|motorcycle|scooter)\s+taxi\b/i.test(source)) return "I want to book a motorbike taxi.";
+    if (/\b(?:taxi\s+boat|boat\s+taxi|longtail(?:\s+boat)?)\b/i.test(source)) return "I want to book a taxi boat.";
+    if (/\bferr(?:y|ies)(?:\s+tickets?)?\b/i.test(source)) return "I want to book ferry tickets.";
+    if (/\bfish(?:ing)?\b/i.test(source)) return "I want to book a fishing trip.";
+    if (/\bsnorkel(?:ing|ling)?\b/i.test(source)) return "I want to book a snorkeling trip.";
+    if (/\b(?:roctopus|dive|diving|scuba)\b/i.test(source)) return "I want to book diving.";
+    if (/\btaxi\b/i.test(source)) return "Can you arrange a taxi?";
+    return "I would like to make a booking.";
+  }
+
   function roomFromPath() {
     const match = location.pathname.match(/^\/room\/(\d+)\/?$/);
     return match && roomOptions.includes(match[1]) ? match[1] : null;
@@ -152,9 +164,7 @@
       return {
         label: interpolate(localizedLabel || "Book with Us", context),
         type: "prompt",
-        prompt: /(?:roctopus|div)/i.test(`${question} ${action.message || ""}`)
-          ? "I want to book diving."
-          : "I would like to make a booking."
+        prompt: bookingPromptFor(`${question} ${action.message || ""}`)
       };
     }
     if (action.route === "bookingCall") action = { ...action, route: "houseCall" };
@@ -280,7 +290,7 @@
          ).join("")}
        </div>`
     : "";
-  const serviceHoursHtml = isPublicAccess ? "" : `<p class="ai-concierge-service-hours">Housekeeping &amp; service hours: 10:30 AM–7:30 PM. After-hours requests will be handled the following morning.</p>`;
+  const serviceHoursHtml = isPublicAccess ? "" : `<p class="ai-concierge-service-hours">Housekeeping &amp; service hours: Tuesday–Sunday, 10:30 AM–7:30 PM. Housekeeping is unavailable on Mondays.</p>`;
 
   const roomButtons = roomOptions.map((room) =>
     `<button type="button" data-select-room="${room}">Room ${room}</button>`
@@ -538,6 +548,18 @@
     return { ...engine.answer(question), source: "device-fallback", interactionId: null };
   }
 
+  function requiresProtectedServer(question) {
+    if (activeWorkflowState) return true;
+    const source = String(question || "");
+    const impliedLuggageRequest = /\b(?:arrival|arriving|departure|departing)\b/i.test(source)
+      && /\b(?:\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten)\s*(?:bags?|suitcases?|pieces?|luggage\s+items?)\b/i.test(source);
+    return /(?:\+|00)?\d[\d ()-]{6,20}\d/.test(source)
+      || impliedLuggageRequest
+      || /\b(?:luggage|baggage|store\s+(?:my|our)?\s*bags?|room\s+cleaning|clean\s+(?:my|our|the)\s+room)\b/i.test(source)
+      || /(?:^\s*(?:please\s+)?(?:book|reserve|arrange)\b|\b(?:please\s+(?:book|reserve|arrange)|can\s+you\s+(?:book|reserve|arrange)|could\s+you\s+(?:book|reserve|arrange)|help\s+me\s+(?:book|reserve|arrange)|i\s+(?:want|wanna|need|would\s+like)\s+(?:you\s+)?(?:to\s+)?(?:book|reserve|arrange)|book\s+(?:me|us)|make\s+(?:a\s+)?(?:booking|reservation))\b)/i.test(source)
+      || /(?:\b(?:i\s+(?:need|want|would\s+like)|can\s+(?:i|we)\s+(?:get|have)|get\s+me|send\s+me)\s+(?:a\s+)?(?:taxi(?:\s+boat)?|longtail\s+boat|motorbike\s+taxi|ferry\s+tickets?)\b|^\s*(?:taxi(?:\s+boat)?|longtail(?:\s+boat)?|motorbike\s+taxi|ferry(?:\s+tickets?)?)\b(?=[\s\S]*\b(?:today|tomorrow|next\s+(?:mon|tues|wednes|thurs|fri|satur|sun)day|in\s+\d{1,3}\s+days?|from|to|at\s+\d)))/i.test(source);
+  }
+
   function deliverAnswer(result, question) {
     const suppliedContact = internationalContact(question);
     const privateContactWorkflow = result.workflow?.type === "luggage"
@@ -596,6 +618,11 @@
         result = await askServer(question, priorHistory);
       } catch (serverError) {
         if (serverError.status === 429) throw serverError;
+        if (requiresProtectedServer(question)) {
+          const protectedError = new Error("I couldn’t securely process that request, so it has not been sent. Please try again in a moment.");
+          protectedError.protectedWorkflow = true;
+          throw protectedError;
+        }
         result = await fallbackAnswer(question);
       }
       status.remove();
@@ -604,6 +631,10 @@
       status.remove();
       if (error.status === 429) {
         appendMessage("concierge", error.message || "Please wait a moment before sending another question.");
+        return;
+      }
+      if (error.protectedWorkflow) {
+        appendMessage("concierge", error.message);
         return;
       }
       appendMessage(
@@ -740,7 +771,8 @@
     const bookingLink = event.target.closest('[data-action="booking"],[data-link="bookingWhatsapp"],a[href="#concierge-booking"]');
     if (bookingLink && !panel.contains(bookingLink)) {
       event.preventDefault();
-      const explicit = bookingLink.dataset.conciergeBookingPrompt;
+      const explicit = bookingLink.dataset.conciergeBookingPrompt
+        || window.HOUSE_CONCIERGE_BOOKING?.currentPrompt?.();
       const prompt = explicit || (/diving\.html$/i.test(currentPage) || /(?:roctopus|dive)/i.test(`${location.search} ${bookingLink.textContent || ""}`)
         ? "I want to book diving."
         : "I would like to make a booking.");

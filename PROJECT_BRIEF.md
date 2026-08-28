@@ -20,7 +20,7 @@ The product should feel like a competent hotel concierge in a guest’s pocket, 
 
 ### Current state
 
-Current release: v5.11.18.
+Current release: v5.11.19.
 
 The live release prioritizes the operational guest journey and AI Concierge. It supports seven guest languages across the complete live operational pages, with per-item translation isolation so one unsupported sentence cannot block an entire page. The concierge uses an animated-dot thinking state and approved external social actions for Bamboo Beach Bar. Secure guest verification is concise but retains every required privacy and registration instruction. Verified guest guidance includes the confirmed luggage-storage windows and careful use of Koh Tao's limited fresh water and island electricity. Explore is disabled through a reversible deployment feature switch; all Explore source content remains preserved for the final content phase.
 

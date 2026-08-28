@@ -28,6 +28,14 @@ const TEMPLATE_SCHEMAS = Object.freeze({
   house_urgent_alert_v2: Object.freeze({ kind: "urgent", languageCode: "en", bodyParameterCount: 5 }),
   house_lost_key_alert_v3: Object.freeze({ kind: "lostKey", languageCode: "en", bodyParameterCount: 3 }),
   house_alert_status_v1: Object.freeze({ kind: "status", languageCode: "en", bodyParameterCount: 5 }),
+  // Optional interactive successors. They are selected only after the
+  // explicit feature flag and exact per-kind template mapping are enabled.
+  // Until Meta approves them, every existing production mapping remains live.
+  house_service_alert_actions_v1: Object.freeze({ kind: "service", languageCode: "en", bodyParameterCount: 5, quickActions: true }),
+  house_luggage_alert_actions_v1: Object.freeze({ kind: "luggage", languageCode: "en", bodyParameterCount: 6, quickActions: true }),
+  house_booking_alert_actions_v1: Object.freeze({ kind: "booking", languageCode: "en", bodyParameterCount: 6, quickActions: true }),
+  house_urgent_alert_actions_v1: Object.freeze({ kind: "urgent", languageCode: "en", bodyParameterCount: 5, quickActions: true }),
+  house_lost_key_alert_actions_v1: Object.freeze({ kind: "lostKey", languageCode: "en", bodyParameterCount: 3, quickActions: true }),
   // Kept only as a deliberate rollback path. These are the legacy payload
   // layouts shipped before the replacement templates became active.
   house_service_alert_v1: Object.freeze({ kind: "service", languageCode: "en_US", bodyParameterCount: 5 }),
@@ -57,6 +65,7 @@ function validatedLuggageSubmission(result) {
   const context = request?.context === "Arrival" || request?.context === "Departure"
     ? request.context
     : "";
+  const requestedDate = String(request?.requestedDate || "").trim().slice(0, 120);
   const requestedTime = String(request?.requestedTime || "").trim().slice(0, 80);
   const bagCount = Number(String(request?.bagCount || "").trim());
   const sourceContact = String(result?.privateReplyContact || "").trim();
@@ -64,7 +73,7 @@ function validatedLuggageSubmission(result) {
   if (!context || !requestedTime || !Number.isInteger(bagCount) || bagCount < 1 || bagCount > 99 || !contact) {
     return null;
   }
-  return { context, requestedTime, bagCount: String(bagCount), contact };
+  return { context, requestedDate, requestedTime, bagCount: String(bagCount), contact };
 }
 
 function validatedBookingSubmission(result) {
@@ -72,28 +81,44 @@ function validatedBookingSubmission(result) {
   const contact = /^(?:\+|00)/.test(sourceContact) ? privateReplyContact(sourceContact) : "";
   if (!contact) return null;
   const request = result?.bookingRequest;
-  if (!request) return { contact, request: null };
-  if (request.kind !== "diving") return null;
+  if (!request) return null;
+  const supportedKinds = ["diving", "fishing", "snorkeling", "taxi", "taxi_boat", "ferry", "motorbike_taxi"];
+  if (!supportedKinds.includes(request.kind)) return null;
   const preferredDate = String(request.preferredDate || "").trim().slice(0, 120);
   const guestCount = Number(String(request.guestCount || "").trim());
   const activity = String(request.activity || "").trim().slice(0, 80);
   const option = String(request.option || "").trim().slice(0, 120);
   const courseName = String(request.courseName || "").trim().slice(0, 120);
   const certificationLevel = String(request.certificationLevel || "").trim().slice(0, 120);
-  const validOption = ["Fun Diving", "Open Water Course", "Advanced Open Water Course", "Other course"].includes(option);
-  if (!preferredDate || !activity || !Number.isInteger(guestCount) || guestCount < 1 || guestCount > 99 || !validOption) return null;
-  if (option === "Fun Diving" && !certificationLevel) return null;
-  if (option === "Other course" && !courseName) return null;
+  const pickupTime = String(request.pickupTime || "").trim().slice(0, 60);
+  const pickupLocation = String(request.pickupLocation || "").trim().slice(0, 160);
+  const destination = String(request.destination || "").trim().slice(0, 160);
+  const tripType = String(request.tripType || "").trim().slice(0, 60);
+  if (!preferredDate || !activity || !Number.isInteger(guestCount) || guestCount < 1 || guestCount > 99) return null;
+  if (request.kind === "diving") {
+    const validOption = ["Fun Diving", "Open Water Course", "Advanced Open Water Course", "Other course"].includes(option);
+    if (!validOption) return null;
+    if (option === "Fun Diving" && !certificationLevel) return null;
+    if (option === "Other course" && !courseName) return null;
+  }
+  if (["fishing", "snorkeling"].includes(request.kind) && !option) return null;
+  if (["taxi", "taxi_boat", "motorbike_taxi"].includes(request.kind) && !pickupTime) return null;
+  if (["taxi", "taxi_boat", "ferry", "motorbike_taxi"].includes(request.kind) && (!pickupLocation || !destination)) return null;
+  if (request.kind === "taxi_boat" && !["One-way", "Return"].includes(tripType)) return null;
   return {
     contact,
     request: {
-      kind: "diving",
+      kind: request.kind,
       preferredDate,
       guestCount: String(guestCount),
       activity,
       option,
       courseName,
       certificationLevel,
+      pickupTime,
+      pickupLocation,
+      destination,
+      tripType,
       notes: String(request.notes || "").trim().slice(0, 500)
     }
   };
@@ -143,6 +168,7 @@ export function whatsappAlertConfiguration(env) {
   const recipients = parseRecipients(env);
   const groupCounts = Object.fromEntries(Object.entries(recipients).map(([group, values]) => [group, values.length]));
   const names = templateNames(env);
+  const staffQuickActionTemplates = actionTemplateNames(env);
   return {
     configured: Boolean(
       env.WHATSAPP_ACCESS_TOKEN &&
@@ -155,7 +181,28 @@ export function whatsappAlertConfiguration(env) {
     templateLanguages: Object.fromEntries(Object.entries(names).map(([kind, name]) => [kind, TEMPLATE_SCHEMAS[name]?.languageCode || DEFAULT_TEMPLATE_LANGUAGE])),
     templateLanguage: String(env.WHATSAPP_ALERT_TEMPLATE_LANGUAGE || DEFAULT_TEMPLATE_LANGUAGE),
     groupCounts,
+    staffQuickActionsEnabled: staffQuickActionsEnabled(env),
+    staffQuickActionTemplates,
     escalationMinutes: Math.min(60, Math.max(2, Number(env.WHATSAPP_ALERT_ESCALATION_MINUTES) || DEFAULT_ESCALATION_MINUTES))
+  };
+}
+
+function staffQuickActionsEnabled(env) {
+  if (String(env.WHATSAPP_STAFF_ACTIONS_ENABLED || "false").toLowerCase() !== "true") return false;
+  const mappings = actionTemplateNames(env);
+  return Object.entries(mappings).every(([kind, name]) => {
+    const schema = TEMPLATE_SCHEMAS[name];
+    return Boolean(name && schema?.kind === kind && schema.quickActions);
+  });
+}
+
+function actionTemplateNames(env) {
+  return {
+    service: String(env.WHATSAPP_SERVICE_ACTION_TEMPLATE_NAME || "").trim(),
+    booking: String(env.WHATSAPP_BOOKING_ACTION_TEMPLATE_NAME || "").trim(),
+    luggage: String(env.WHATSAPP_LUGGAGE_ACTION_TEMPLATE_NAME || "").trim(),
+    urgent: String(env.WHATSAPP_URGENT_ACTION_TEMPLATE_NAME || "").trim(),
+    lostKey: String(env.WHATSAPP_LOST_KEY_ACTION_TEMPLATE_NAME || "").trim()
   };
 }
 
@@ -256,7 +303,8 @@ function templateValues(alert, kind) {
   if (kind === "lostKey") return [reference, room, time];
   if (kind === "luggage") {
     const luggage = alert.luggageRequest || {};
-    return [reference, room, luggage.context, luggage.bagCount, luggage.requestedTime, appendProtectedContact(summary, alert.privateReplyContact)];
+    const requested = [luggage.requestedDate, luggage.requestedTime].filter(Boolean).join(", ");
+    return [reference, room, luggage.context, luggage.bagCount, requested, appendProtectedContact(summary, alert.privateReplyContact)];
   }
   if (kind === "booking") {
     if (alert.bookingRequest?.kind === "diving") {
@@ -265,6 +313,15 @@ function templateValues(alert, kind) {
       const qualification = booking.certificationLevel ? `Certification: ${booking.certificationLevel}` : "";
       const notes = [detail, qualification, booking.notes, summary].filter(Boolean).join(" · ");
       return [reference, room, booking.activity, booking.preferredDate, booking.guestCount, appendProtectedContact(notes, alert.privateReplyContact)];
+    }
+    if (alert.bookingRequest) {
+      const booking = alert.bookingRequest;
+      const route = booking.pickupLocation || booking.destination
+        ? `Route: ${booking.pickupLocation || "Not provided"} → ${booking.destination || "Not provided"}`
+        : "";
+      const detail = [booking.option, booking.tripType, route, booking.notes, summary].filter(Boolean).join(" · ");
+      const requested = [booking.preferredDate, booking.pickupTime].filter(Boolean).join(", ");
+      return [reference, room, booking.activity, requested, booking.guestCount, appendProtectedContact(detail, alert.privateReplyContact)];
     }
     const preferredTime = alert.requestedDateTime || normalizeBangkokRequestedDate(summary, new Date(alert.createdAt));
     const guests = firstMatch(summary, /\b(\d{1,2})\s*(?:guests?|people|persons?|adults?)\b/i, "Not provided");
@@ -280,20 +337,43 @@ export function validateWhatsAppTemplateParameters(name, kind, parameters) {
   if (!Array.isArray(parameters) || parameters.length !== schema.bodyParameterCount) {
     return { ok: false, name, errorCode: "parameter_count_mismatch" };
   }
-  return { ok: true, name: String(name).trim(), kind, languageCode: schema.languageCode, parameters };
+  return { ok: true, name: String(name).trim(), kind, languageCode: schema.languageCode, parameters, quickActions: Boolean(schema.quickActions) };
 }
 
 function selectedTemplateForAlert(alert, env) {
   const names = templateNames(env);
   const kind = alertTemplateKind(alert);
-  const name = names[kind];
+  const mappedActionName = actionTemplateNames(env)[kind];
+  const actionSchema = TEMPLATE_SCHEMAS[mappedActionName];
+  const name = staffQuickActionsEnabled(env)
+    && mappedActionName
+    && actionSchema?.kind === kind
+    && actionSchema.quickActions
+    ? mappedActionName
+    : names[kind];
   const parameters = templateValues(alert, kind);
   return validateWhatsAppTemplateParameters(name, kind, parameters);
+}
+
+function staffActionPayload(command, alertId) {
+  const id = String(alertId || "");
+  if (!/^alert_[A-Za-z0-9-]{20,}$/.test(id) || !["RECEIVED", "RESOLVE"].includes(command)) return "";
+  return `HOUSE_ALERT|${command}|${id}`;
 }
 
 export function buildWhatsAppTemplatePayload(alert, recipient, env) {
   const selected = selectedTemplateForAlert(alert, env);
   if (!selected.ok) return selected;
+  const components = [{
+    type: "body",
+    parameters: textParameters(selected.parameters)
+  }];
+  if (selected.quickActions) {
+    components.push(
+      { type: "button", sub_type: "quick_reply", index: "0", parameters: [{ type: "payload", payload: staffActionPayload("RECEIVED", alert.id) }] },
+      { type: "button", sub_type: "quick_reply", index: "1", parameters: [{ type: "payload", payload: staffActionPayload("RESOLVE", alert.id) }] }
+    );
+  }
   return { ok: true, name: selected.name, bodyParameterCount: selected.parameters.length, payload: {
     messaging_product: "whatsapp",
     recipient_type: "individual",
@@ -302,10 +382,7 @@ export function buildWhatsAppTemplatePayload(alert, recipient, env) {
     template: {
       name: selected.name,
       language: { code: selected.languageCode },
-      components: [{
-        type: "body",
-        parameters: textParameters(selected.parameters)
-      }]
+      components
     }
   } };
 }
@@ -548,6 +625,7 @@ export async function createConciergeAlert({ env, interactionId, sessionId, room
     bookingRequest: bookingSubmission?.request || undefined,
     luggageRequest: luggageRequest ? {
       context: luggageRequest.context,
+      requestedDate: luggageRequest.requestedDate,
       requestedTime: luggageRequest.requestedTime,
       bagCount: luggageRequest.bagCount
     } : undefined
@@ -659,6 +737,15 @@ function recipientIsAuthorized(phone, env) {
   return Object.values(parseRecipients(env)).flat().some((recipient) => recipient.phone === target);
 }
 
+function statusCommandFromMessage(message) {
+  const buttonPayload = String(message?.button?.payload || message?.interactive?.button_reply?.id || "").trim();
+  const quickAction = buttonPayload.match(/^HOUSE_ALERT\|(RECEIVED|RESOLVE)\|(alert_[A-Za-z0-9-]{20,})$/i);
+  if (quickAction) return { command: quickAction[1].toUpperCase(), alertId: quickAction[2] };
+  const text = String(message?.text?.body || message?.button?.text || "").trim();
+  const typed = text.match(/^(RECEIVED|ACK|RESOLVE)\s+(alert_[A-Za-z0-9-]{20,})$/i);
+  return typed ? { command: typed[1].toUpperCase(), alertId: typed[2] } : null;
+}
+
 export function buildWhatsAppStatusPayload(alert, recipient, status, actorLabel, env) {
   const name = String(env.WHATSAPP_STATUS_TEMPLATE_NAME || "").trim();
   if (!name) return { ok: false, name: "", errorCode: "status_template_not_configured" };
@@ -760,19 +847,18 @@ export async function handleWhatsAppWebhook(request, env) {
       continue;
     }
     const from = digits(item.message?.from);
-    const text = String(item.message?.text?.body || "").trim();
-    const match = text.match(/^(RECEIVED|ACK|RESOLVE)\s+(alert_[A-Za-z0-9-]{20,})$/i);
-    if (!match || !recipientIsAuthorized(from, env)) continue;
-    const command = match[1].toUpperCase();
-    const before = store.getAlert ? await store.getAlert(match[2]) : store.alerts?.find((alert) => alert.id === match[2]);
+    const parsed = statusCommandFromMessage(item.message);
+    if (!parsed || !recipientIsAuthorized(from, env)) continue;
+    const command = parsed.command;
+    const before = store.getAlert ? await store.getAlert(parsed.alertId) : store.alerts?.find((alert) => alert.id === parsed.alertId);
     if (!before) continue;
     const assignedActor = (parseRecipients(env)[before.recipientGroup] || []).find((recipient) => recipient.phone === from);
     if (!assignedActor) continue;
     const eligible = ["RECEIVED", "ACK"].includes(command) ? before.status === "open" : ["open", "acknowledged"].includes(before.status);
     if (!eligible) continue;
     const actor = await recipientHash(from, env);
-    if (["RECEIVED", "ACK"].includes(command)) await store.acknowledgeAlert(match[2], actor, new Date().toISOString());
-    else await store.resolveAlert(match[2], actor, new Date().toISOString());
+    if (["RECEIVED", "ACK"].includes(command)) await store.acknowledgeAlert(parsed.alertId, actor, new Date().toISOString());
+    else await store.resolveAlert(parsed.alertId, actor, new Date().toISOString());
     await notifyStatusChange(before, from, ["RECEIVED", "ACK"].includes(command) ? "ACKNOWLEDGED" : "RESOLVED", env, store);
   }
   return new Response("OK", { status: 200 });

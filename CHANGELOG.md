@@ -2,6 +2,30 @@
 
 All notable changes to The House – Koh Tao guest guide are recorded here.
 
+## v5.11.19 — Protected Operations, Scheduling & Structured Bookings
+
+### Production fixes
+
+- Stops luggage, room-cleaning and booking requests from silently falling back to the device-only answer engine after a protected API failure. The guest now receives explicit no-send wording and the browser retains the pending workflow for retry.
+- Preserves arrival/departure date, requested time, bag count and sanitized luggage notes through local-contact rejection, then independently validates the corrected request at the final alert boundary.
+- Makes routine housekeeping availability weekday-aware in Bangkok: Tuesday–Sunday from 10:30 through 19:29, Monday closed, with the correct next opening for Sunday evening and all Monday requests.
+- Collects a preferred cleaning time before submission, accepts clock times, `now` and `ASAP`, and never represents that preference as a confirmed schedule.
+- Keeps the routine **Call Us** fallback available only during open housekeeping hours; urgent and emergency actions remain independent.
+
+### Booking workflows
+
+- Adds separate information-only and actionable flows for fishing, snorkeling, taxi, taxi/longtail boat, ferry and motorbike taxi requests.
+- Collects each category’s required date, party, route, time, trip-style and international-contact fields, preserving valid state across turns and rejecting local-format contacts without losing prior details.
+- Routes complete non-diving bookings to Fah plus both owners, creates no alert for recommendation-only questions and repeats the availability-and-payment confirmation boundary in guest-facing wording.
+- Makes **Book with Us** actions category-specific and continues to keep raw reply contacts transient and visibly redacted.
+
+### Staff quick actions and regression protection
+
+- Adds code-ready, opt-in schemas for five new generic-English Utility templates with **Received** and **Resolve** quick replies. The feature defaults off and requires every exact action-template mapping before it can activate.
+- Accepts signed Meta quick-reply payloads through the same authorization, actor-exclusion, idempotency, status-fanout and escalation-stop rules as typed `RECEIVED`, `ACK` and `RESOLVE` commands.
+- Leaves all current production template mappings, languages, BODY shapes, recipient groups and secrets unchanged until the new templates are approved and explicitly enabled.
+- Expands the complete regression suite from 111 to 122 tests, including the reported luggage scenario, exact housekeeping boundaries, every added booking category, protected browser failure behavior and quick-action lifecycle.
+
 ## v5.11.18 — Workflow State, Routine Service & Urgent Clarification
 
 ### Production fixes

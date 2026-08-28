@@ -12,7 +12,7 @@ import {
 } from "./concierge-core.js";
 import { handlePassportAdminRequest } from "./passport-api.js";
 import { handleMaintenanceAdminRequest } from "./maintenance-api.js";
-import { isAfterHours, normalizeBangkokRequestedDate } from "./alert-policy.js";
+import { housekeepingAvailability, normalizeBangkokRequestedDate } from "./alert-policy.js";
 import { retrieveApprovedProjectKnowledge } from "./project-knowledge.js";
 import { LANGUAGE_NAMES, translateApprovedTexts, validLanguage } from "./i18n-api.js";
 import {
@@ -24,7 +24,7 @@ import {
 } from "./whatsapp-alerts.js";
 import { getGuestAccess, handleStayAdminRequest, stayConfiguration } from "./stay-api.js";
 
-const RELEASE = "5.11.18";
+const RELEASE = "5.11.19";
 const ROOM_OPTIONS = new Set(["1", "2", "3", "4", "5", "6", "8", "9", "10", "11"]);
 const MAX_HISTORY_ITEMS = 10;
 const MAX_QUESTION_LENGTH = 800;
@@ -168,6 +168,9 @@ const OPERATIONAL_REQUEST = /\b(?:luggage|baggage|book|booking|reserve|arrange|d
 const ACTIONABLE_LUGGAGE_REQUEST = /\b(?:please\s+(?:store|keep|arrange)|can\s+(?:you|we)\s+(?:store|leave|keep|arrange)|could\s+you\s+(?:store|keep|arrange)|i\s+(?:want|wanna|need|would\s+like)\s+(?:(?:you\s+)?to\s+)?(?:store|leave|arrange|keep)|arrange\s+(?:luggage|baggage|bags?))\b[^.?!]*(?:luggage|baggage|bags?)/i;
 const DIRECT_LUGGAGE_REQUEST = /^\s*(?:please\s+)?(?:store|keep|arrange)\s+(?:my\s+|our\s+)?(?:luggage|baggage|bags?)\b/i;
 const ACTIONABLE_DIVING_BOOKING = /(?:^\s*(?:please\s+)?(?:book|reserve|arrange)\s+.*\b(?:dive|diving|scuba|open\s+water|advanced\s+open\s+water)\b|\b(?:please\s+(?:book|reserve|arrange)|can\s+you\s+(?:book|reserve|arrange)|could\s+you\s+(?:book|reserve|arrange)|help\s+me\s+(?:book|reserve|arrange)|i\s+(?:want|wanna|need|would\s+like)\s+(?:you\s+)?(?:to\s+)?(?:book|reserve|arrange))\b[^.?!]*\b(?:dive|diving|scuba|open\s+water|advanced\s+open\s+water)\b)/i;
+const ACTIONABLE_STRUCTURED_BOOKING = /(?:^\s*(?:please\s+)?(?:book|reserve|arrange)\b|\b(?:please\s+(?:book|reserve|arrange)|can\s+you\s+(?:book|reserve|arrange)|could\s+you\s+(?:book|reserve|arrange)|help\s+me\s+(?:book|reserve|arrange)|i\s+(?:want|wanna|need|would\s+like)\s+(?:you\s+)?(?:to\s+)?(?:book|reserve|arrange)|book\s+(?:me|us)|make\s+(?:a\s+)?(?:booking|reservation))\b)/i;
+const DIRECT_TRANSPORT_BOOKING = /(?:\b(?:i\s+(?:need|want|would\s+like)|can\s+(?:i|we)\s+(?:get|have)|get\s+me|send\s+me)\s+(?:a\s+)?(?:taxi(?:\s+boat)?|longtail\s+boat|motorbike\s+taxi|ferry\s+tickets?)\b|^\s*(?:taxi(?:\s+boat)?|longtail(?:\s+boat)?|motorbike\s+taxi|ferry(?:\s+tickets?)?)\b(?=[\s\S]*\b(?:today|tomorrow|next\s+(?:mon|tues|wednes|thurs|fri|satur|sun)day|in\s+\d{1,3}\s+days?|from|to|at\s+\d)))/i;
+const SUPPORTED_BOOKING_KINDS = new Set(["diving", "fishing", "snorkeling", "taxi", "taxi_boat", "ferry", "motorbike_taxi"]);
 const HOUSEKEEPING_ITEM_REQUEST = /\b(?:toilet\s+paper|soap|(?:(?:new|fresh|clean)\s+)?towels?|room\s+cleaning|clean\s+(?:my|our|the)\s+room|housekeeping)\b/i;
 const HOUSEKEEPING_REQUEST_ACTION = /\b(?:can\s+(?:i|we)\s+(?:have|get)|please\s+(?:bring|send|provide|clean)|can\s+you\s+(?:bring|send|provide|clean)|could\s+you\s+(?:bring|send|provide|clean)|i\s+(?:need|want|would\s+like)|(?:bring|send|provide)\s+(?:me\s+)?|clean\s+(?:my|our|the)\s+room)\b|\b(?:toilet\s+paper|soap|towels?)\s+please\b/i;
 const GENERIC_URGENT_WORDS = new Set([
@@ -204,29 +207,78 @@ function cleanWorkflowNotes(value) {
     .slice(0, 500);
 }
 
+function cleanWorkflowValue(value, maximum = 120) {
+  return cleanWorkflowNotes(value).slice(0, maximum);
+}
+
 function cleanWorkflowState(value) {
   if (!value || value.status !== "collecting") return null;
   if (value.type === "urgent_clarification") {
     return { type: "urgent_clarification", status: "collecting" };
   }
-  if (value.type !== "luggage") return null;
-  const request = value.luggageRequest || {};
-  const context = ["Arrival", "Departure"].includes(request.context) ? request.context : "";
-  const requestedTime = String(request.requestedTime || "").trim().slice(0, 40);
-  const bagNumber = Number(String(request.bagCount || "").trim());
-  const bagCount = Number.isInteger(bagNumber) && bagNumber >= 1 && bagNumber <= 99 ? String(bagNumber) : "";
-  return {
-    type: "luggage",
-    status: "collecting",
-    retainPrivateContact: Boolean(value.retainPrivateContact),
-    missing: Array.isArray(value.missing) ? value.missing.filter((item) => ["context", "time", "bags", "contact"].includes(item)) : [],
-    luggageRequest: {
-      context,
-      requestedTime,
-      bagCount,
-      notes: cleanWorkflowNotes(request.notes)
-    }
-  };
+  if (value.type === "cleaning") {
+    const request = value.cleaningRequest || {};
+    return {
+      type: "cleaning",
+      status: "collecting",
+      retainPrivateContact: false,
+      missing: ["preferredTime"],
+      cleaningRequest: {
+        preferredTime: cleanWorkflowValue(request.preferredTime, 60),
+        notes: cleanWorkflowNotes(request.notes)
+      }
+    };
+  }
+  if (value.type === "booking") {
+    const request = value.bookingRequest || {};
+    const kind = SUPPORTED_BOOKING_KINDS.has(request.kind || value.kind) ? (request.kind || value.kind) : "";
+    const countNumber = Number(String(request.guestCount || "").trim());
+    const guestCount = Number.isInteger(countNumber) && countNumber >= 1 && countNumber <= 99 ? String(countNumber) : "";
+    const allowedMissing = ["kind", "date", "guests", "option", "course", "certification", "time", "pickup", "destination", "tripType", "contact"];
+    return {
+      type: "booking",
+      kind,
+      status: "collecting",
+      retainPrivateContact: Boolean(value.retainPrivateContact),
+      missing: Array.isArray(value.missing) ? value.missing.filter((item) => allowedMissing.includes(item)) : [],
+      bookingRequest: {
+        kind,
+        activity: cleanWorkflowValue(request.activity, 80),
+        preferredDate: cleanWorkflowValue(request.preferredDate, 120),
+        guestCount,
+        option: cleanWorkflowValue(request.option, 120),
+        courseName: cleanWorkflowValue(request.courseName, 120),
+        certificationLevel: cleanWorkflowValue(request.certificationLevel, 120),
+        pickupTime: cleanWorkflowValue(request.pickupTime, 60),
+        pickupLocation: cleanWorkflowValue(request.pickupLocation, 160),
+        destination: cleanWorkflowValue(request.destination, 160),
+        tripType: cleanWorkflowValue(request.tripType, 60),
+        notes: cleanWorkflowNotes(request.notes)
+      }
+    };
+  }
+  if (value.type === "luggage") {
+    const request = value.luggageRequest || {};
+    const context = ["Arrival", "Departure"].includes(request.context) ? request.context : "";
+    const requestedDate = cleanWorkflowValue(request.requestedDate, 120);
+    const requestedTime = String(request.requestedTime || "").trim().slice(0, 40);
+    const bagNumber = Number(String(request.bagCount || "").trim());
+    const bagCount = Number.isInteger(bagNumber) && bagNumber >= 1 && bagNumber <= 99 ? String(bagNumber) : "";
+    return {
+      type: "luggage",
+      status: "collecting",
+      retainPrivateContact: Boolean(value.retainPrivateContact),
+      missing: Array.isArray(value.missing) ? value.missing.filter((item) => ["context", "time", "bags", "contact"].includes(item)) : [],
+      luggageRequest: {
+        context,
+        requestedDate,
+        requestedTime,
+        bagCount,
+        notes: cleanWorkflowNotes(request.notes)
+      }
+    };
+  }
+  return null;
 }
 
 function isCriticalPropertyResult(result) {
@@ -375,12 +427,146 @@ function housekeepingItem(question) {
   return null;
 }
 
+function applyHousekeepingCallAvailability(result, question, now = new Date()) {
+  const routineHousekeeping = Boolean(result?.housekeepingRequest)
+    || /\b(?:housekeeping|room\s+cleaning|clean\s+(?:my|our|the)\s+room|towels?|toilet\s+paper|soap|bed\s*linen|bedsheets?|pillows?|blankets?|room\s+supplies|amenities|rubbish|trash|bins?)\b/i
+      .test(`${question} ${result?.intentId || ""}`);
+  if (!routineHousekeeping || housekeepingAvailability(now).open) return result;
+  return {
+    ...result,
+    actions: (result.actions || []).filter((action) => action?.route !== "houseCall")
+  };
+}
+
+function displayPreferredTime(value) {
+  const source = String(value || "");
+  if (/\b(?:asap|as soon as possible|soonest possible)\b/i.test(source)) return "As soon as possible";
+  if (/\b(?:now|right now|immediately|right away)\b/i.test(source)) return "Now";
+  if (/\bnoon\b/i.test(source)) return "12:00 PM";
+  const match = source.match(/\b(?:(?:at|around|by|from|prefer(?:red)?(?:\s+time)?(?:\s+is)?)\s*)?((?:[01]?\d|2[0-3])(?::[0-5]\d)?\s*(?:am|pm))\b/i)
+    || source.match(/\b(?:at|around|by|from)\s*((?:[01]?\d|2[0-3]):[0-5]\d)\b/i);
+  if (!match) return "";
+  const clock = match[1].trim().toLowerCase();
+  const parts = clock.match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)?$/i);
+  if (!parts) return clock.toUpperCase();
+  let hour = Number(parts[1]);
+  const minute = Number(parts[2] || 0);
+  const meridiem = parts[3]?.toLowerCase();
+  if (meridiem === "pm" && hour < 12) hour += 12;
+  if (meridiem === "am" && hour === 12) hour = 0;
+  if (!meridiem && hour > 23) return "";
+  return new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", hour12: true, timeZone: "UTC" })
+    .format(new Date(Date.UTC(2020, 0, 1, hour, minute)));
+}
+
+function nextHousekeepingPhrase(availability) {
+  if (availability.open) return "during current housekeeping hours";
+  if (availability.daysUntilOpen === 0) return "from 10:30 AM today";
+  if (availability.daysUntilOpen === 1) return "from 10:30 AM tomorrow";
+  return `from 10:30 AM on ${availability.nextDay}`;
+}
+
+function cleaningCollectionAnswer(availability) {
+  const disclaimer = "We’ll do our best to accommodate your preferred time, but the exact cleaning time may vary depending on housekeeping availability.";
+  if (availability.weekday === "Monday") {
+    return `I’m sorry, but housekeeping is not available on Mondays. We can arrange your room cleaning from 10:30 AM tomorrow. What time would be most convenient for you? ${disclaimer}`;
+  }
+  if (availability.weekday === "Sunday" && availability.minutes >= (19 * 60 + 30)) {
+    return `Housekeeping is currently off duty and is not available on Mondays. We can arrange your room cleaning from 10:30 AM on Tuesday. What time would be most convenient for you? ${disclaimer}`;
+  }
+  if (!availability.open) {
+    return `Housekeeping is currently off duty. We can arrange your room cleaning ${nextHousekeepingPhrase(availability)}. What time would be most convenient for you? ${disclaimer}`;
+  }
+  return `We’ll be happy to arrange a room cleaning. What time would be most convenient for you? ${disclaimer}`;
+}
+
+function cleaningCompletionAnswer(preferredTime, availability) {
+  const timing = availability.open
+    ? ""
+    : availability.weekday === "Monday"
+      ? " Housekeeping is not available on Mondays, so the earliest normal availability is Tuesday from 10:30 AM."
+      : availability.weekday === "Sunday" && availability.minutes >= (19 * 60 + 30)
+        ? " Housekeeping is currently off duty and is not available on Mondays, so the earliest normal availability is Tuesday from 10:30 AM."
+        : ` The earliest normal housekeeping availability is ${nextHousekeepingPhrase(availability)}.`;
+  return `Thank you. We’ve sent your room-cleaning request to our housekeeping team with your preferred time of ${preferredTime}.${timing} We’ll do our best to accommodate it, but the exact cleaning time may vary depending on availability.`;
+}
+
+function applyCleaningRequestPolicy(question, workflowState = null, now = new Date()) {
+  const pendingState = workflowState?.type === "cleaning" && workflowState.status === "collecting"
+    ? workflowState
+    : null;
+  const item = housekeepingItem(question);
+  const actionableNow = item?.id === "room_cleaning"
+    && HOUSEKEEPING_ITEM_REQUEST.test(question)
+    && HOUSEKEEPING_REQUEST_ACTION.test(question);
+  if (!actionableNow && !pendingState) return { handled: false, result: null, alertQuestion: question, workflow: null };
+  if (/^\s*(?:cancel|never\s*mind|nevermind|forget\s+it)\s*[.!]?\s*$/i.test(question)) {
+    return {
+      handled: true,
+      result: {
+        answer: "No problem. I have cancelled the room-cleaning request.",
+        intentId: "housekeeping_room_cleaning_cancelled",
+        category: "stay-support", confidence: 1, needsHuman: false, handoff: "none",
+        learningGap: false, learningReason: "none", actions: [], suppressDefaultActions: true, source: "service-policy"
+      },
+      alertQuestion: question,
+      workflow: { type: "cleaning", status: "cancelled", retainPrivateContact: false, missing: [] }
+    };
+  }
+  const currentNotes = cleanWorkflowNotes(question);
+  const notes = pendingState
+    ? [pendingState.cleaningRequest?.notes, currentNotes].filter(Boolean).join(" ").replace(/\s+/g, " ").trim().slice(0, 500)
+    : currentNotes;
+  const preferredTime = displayPreferredTime(question) || pendingState?.cleaningRequest?.preferredTime || "";
+  const availability = housekeepingAvailability(now);
+  if (!preferredTime) {
+    return {
+      handled: true,
+      result: {
+        answer: cleaningCollectionAnswer(availability),
+        intentId: "housekeeping_room_cleaning",
+        category: "stay-support", confidence: 1, needsHuman: false, handoff: "stay_support",
+        learningGap: false, learningReason: "none", actions: [], suppressDefaultActions: true, source: "service-policy"
+      },
+      alertQuestion: notes || "Room-cleaning preference pending.",
+      workflow: {
+        type: "cleaning", status: "collecting", retainPrivateContact: false, missing: ["preferredTime"],
+        cleaningRequest: { preferredTime: "", notes }
+      }
+    };
+  }
+  const alertQuestion = `Room cleaning request. Preferred time: ${preferredTime}. Earliest normal housekeeping: ${availability.open ? "currently available" : availability.nextOpening}. Guest notes: ${notes}`;
+  return {
+    handled: true,
+    result: {
+      answer: cleaningCompletionAnswer(preferredTime, availability),
+      intentId: "housekeeping_room_cleaning",
+      category: "stay-support", confidence: 1, needsHuman: true, handoff: "stay_support",
+      learningGap: false, learningReason: "none",
+      actions: availability.open ? [{ label: "Call Us", type: "route", route: "houseCall" }] : [],
+      suppressDefaultActions: true,
+      housekeepingRequest: {
+        item: "room cleaning", afterHours: availability.afterHours, preferredTime,
+        earliestService: availability.open ? "Current housekeeping hours" : availability.nextOpening
+      },
+      source: "service-policy"
+    },
+    alertQuestion,
+    workflow: {
+      type: "cleaning", status: "ready", retainPrivateContact: false, missing: [],
+      cleaningRequest: { preferredTime, notes }
+    }
+  };
+}
+
 export function housekeepingServiceResult(question, now = new Date()) {
   const item = housekeepingItem(question);
   if (!item || !HOUSEKEEPING_ITEM_REQUEST.test(question) || !HOUSEKEEPING_REQUEST_ACTION.test(question)) return null;
-  const afterHours = isAfterHours(now);
+  if (item.id === "room_cleaning") return applyCleaningRequestPolicy(question, null, now).result;
+  const availability = housekeepingAvailability(now);
+  const afterHours = availability.afterHours;
   const answer = afterHours
-    ? `Thank you for your request. Our housekeeping team is currently off duty, but your request has already been recorded. We’ll ${item.delivery} tomorrow morning after 10:30 AM, and you do not need to request it again.`
+    ? `Thank you for your request. Our housekeeping team is currently off duty, but your request has already been recorded. We’ll ${item.delivery} ${nextHousekeepingPhrase(availability)}, and you do not need to request it again.`
     : `Thank you for your request. We’ll ${item.delivery} as soon as possible. If you haven’t received it within 30 minutes, please call us using the button below.`;
   return {
     answer,
@@ -393,7 +579,7 @@ export function housekeepingServiceResult(question, now = new Date()) {
     learningReason: "none",
     actions: afterHours ? [] : [{ label: "Call Us", type: "route", route: "houseCall" }],
     suppressDefaultActions: afterHours,
-    housekeepingRequest: { item: item.label, afterHours },
+    housekeepingRequest: { item: item.label, afterHours, earliestService: availability.open ? "Current housekeeping hours" : availability.nextOpening },
     source: "service-policy"
   };
 }
@@ -416,6 +602,69 @@ function roomLocationResult(question, room) {
     learningReason: "none",
     actions: [{ label: "Your Room", type: "link", href: `/room/${room}` }],
     source: "room-policy"
+  };
+}
+
+function bookingKindFromText(value) {
+  const source = String(value || "");
+  if (/\b(?:motorbike|motorcycle|scooter)\s+taxi\b/i.test(source)) return "motorbike_taxi";
+  if (/\b(?:taxi\s+boat|boat\s+taxi|longtail(?:\s+boat)?)\b/i.test(source)) return "taxi_boat";
+  if (/\bferr(?:y|ies)(?:\s+tickets?)?\b/i.test(source)) return "ferry";
+  if (/\b(?:fish(?:ing)?\s+trip|sport\s+fishing|food\s+fishing|go\s+fishing|fishing)\b/i.test(source)) return "fishing";
+  if (/\b(?:snorkel|snorkeling|snorkelling)\b/i.test(source)) return "snorkeling";
+  if (/\b(?:dive|diving|scuba|open\s+water|advanced\s+open\s+water)\b/i.test(source)) return "diving";
+  if (/\btaxi\b/i.test(source)) return "taxi";
+  return "";
+}
+
+function bookingActivity(kind) {
+  return {
+    diving: "Diving",
+    fishing: "Fishing trip",
+    snorkeling: "Snorkeling trip",
+    taxi: "Taxi",
+    taxi_boat: "Taxi boat",
+    ferry: "Ferry tickets",
+    motorbike_taxi: "Motorbike taxi"
+  }[kind] || "Booking request";
+}
+
+function bookingStartPrompt(kind) {
+  return {
+    diving: "I want to book diving.",
+    fishing: "I want to book a fishing trip.",
+    snorkeling: "I want to book a snorkeling trip.",
+    taxi: "Can you arrange a taxi?",
+    taxi_boat: "I want to book a taxi boat.",
+    ferry: "I want to book ferry tickets.",
+    motorbike_taxi: "I want to book a motorbike taxi."
+  }[kind] || "I would like to make a booking.";
+}
+
+function isActionableStructuredBooking(value) {
+  const source = String(value || "");
+  return ACTIONABLE_STRUCTURED_BOOKING.test(source) || DIRECT_TRANSPORT_BOOKING.test(source);
+}
+
+function supportedBookingInformationResult(question) {
+  const kind = bookingKindFromText(question);
+  if (!kind || kind === "diving" || isActionableStructuredBooking(question)) return null;
+  const descriptions = {
+    fishing: "The House can help arrange fishing trips, including sport, food-fishing and relaxed or family-style options where available. The booking team will confirm the current options, availability and price.",
+    snorkeling: "The House can help arrange snorkeling trips. Private, group, boat and shore-based options depend on current operators, sea conditions and availability, so the booking team will confirm the current choices and price.",
+    taxi: "The House can help arrange a taxi. The booking team will confirm the pickup, availability and current price before anything is confirmed.",
+    taxi_boat: "The House can help arrange a taxi boat or longtail boat. Routes, sea conditions, availability and current prices must be checked for the requested date.",
+    ferry: "The House can help arrange ferry tickets. Schedules, seat availability and current prices must be checked for the requested route and date.",
+    motorbike_taxi: "The House can help arrange a motorbike taxi. Availability and the current price must be checked for the requested pickup and destination."
+  };
+  return {
+    answer: descriptions[kind],
+    intentId: `${kind}_information`,
+    category: "booking", confidence: 1, needsHuman: false, handoff: "none",
+    learningGap: false, learningReason: "none",
+    actions: [{ label: "Book with Us", type: "prompt", prompt: bookingStartPrompt(kind) }],
+    suppressDefaultActions: true,
+    source: "booking-policy"
   };
 }
 
@@ -446,16 +695,17 @@ function activeDivingWorkflowMessages(history) {
   return [];
 }
 
-function divingPreferredDate(value) {
+function divingPreferredDate(value, now = new Date()) {
   const source = String(value || "");
   const match = source.match(/\b(?:today|tomorrow|next\s+(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday))\b/i)
+    || source.match(/\bin\s+\d{1,3}\s+days?\b/i)
     || source.match(/\b(?:on\s+)?(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i)
     || source.match(/\b(?:on\s+)?(?:\d{1,2}[\/-]\d{1,2}(?:[\/-]\d{2,4})?)\b/i)
     || source.match(/\b(?:on\s+)?(?:\d{1,2}\s+(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)(?:\s+\d{4})?)\b/i)
     || source.match(/\b(?:on\s+)?(?:(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+\d{1,2}(?:,?\s+\d{4})?)\b/i);
   if (!match) return "";
   const raw = match[0].replace(/^on\s+/i, "").trim();
-  const normalized = normalizeBangkokRequestedDate(raw);
+  const normalized = normalizeBangkokRequestedDate(raw, now);
   return normalized === "Not provided" ? raw : normalized;
 }
 
@@ -499,10 +749,15 @@ function divingCollectionAnswer(missing, choice, rejectedLocalContact = false) {
   return `We’d be happy to help arrange your diving. Please tell me ${joined}. Once we have the details, our team will check availability for you. Your booking is only confirmed once availability has been checked and payment has been received.`;
 }
 
-function applyDivingBookingPolicy(result, question, history, currentReplyContact = "") {
-  const priorMessages = activeDivingWorkflowMessages(history);
+function applyDivingBookingPolicy(result, question, history, currentReplyContact = "", workflowState = null, now = new Date()) {
+  const pendingState = workflowState?.type === "booking"
+    && workflowState.status === "collecting"
+    && workflowState.kind === "diving"
+    ? workflowState
+    : null;
+  const priorMessages = pendingState ? [] : activeDivingWorkflowMessages(history);
   const actionableNow = isActionableDivingBooking(question);
-  if (isCriticalPropertyResult(result) || (!actionableNow && !priorMessages.length)) {
+  if (isCriticalPropertyResult(result) || (!actionableNow && !priorMessages.length && !pendingState)) {
     return { handled: false, result, alertQuestion: question, workflow: null };
   }
   if (/^\s*(?:cancel|never\s*mind|nevermind|forget\s+it)\s*[.!]?\s*$/i.test(question)) {
@@ -513,12 +768,21 @@ function applyDivingBookingPolicy(result, question, history, currentReplyContact
       workflow: { type: "booking", kind: "diving", status: "cancelled", retainPrivateContact: false, missing: [] }
     };
   }
-  const messages = actionableNow ? [question] : [...priorMessages, question];
-  const details = withoutReplyContact(messages.join(" ")).replace(/\[number removed\]|\[contact supplied privately\]/gi, " ").replace(/\s+/g, " ").trim();
-  const preferredDate = divingPreferredDate(details);
-  const guestCount = divingGuestCount(details);
-  const choice = divingChoice(details);
-  const certificationLevel = choice.option === "Fun Diving" ? divingCertification(details) : "";
+  const messages = actionableNow && !pendingState ? [question] : [...priorMessages, question];
+  const currentDetails = cleanWorkflowNotes(question);
+  const details = pendingState
+    ? [pendingState.bookingRequest?.notes, currentDetails].filter(Boolean).join(" ").replace(/\s+/g, " ").trim().slice(0, 500)
+    : cleanWorkflowNotes(messages.join(" "));
+  const previous = pendingState?.bookingRequest || {};
+  const currentChoice = divingChoice(currentDetails);
+  const choice = currentChoice.option
+    ? currentChoice
+    : { option: previous.option || "", courseName: previous.courseName || "" };
+  const preferredDate = divingPreferredDate(currentDetails, now) || previous.preferredDate || divingPreferredDate(details, now);
+  const guestCount = divingGuestCount(currentDetails) || previous.guestCount || divingGuestCount(details);
+  const certificationLevel = choice.option === "Fun Diving"
+    ? (divingCertification(currentDetails) || previous.certificationLevel || divingCertification(details))
+    : "";
   const contact = validInternationalReplyContact(currentReplyContact);
   const rejectedLocalContact = Boolean(currentReplyContact && !contact);
   const missing = [];
@@ -542,7 +806,14 @@ function applyDivingBookingPolicy(result, question, history, currentReplyContact
         suppressDefaultActions: true
       },
       alertQuestion: details || "Diving booking details pending.",
-      workflow: { type: "booking", kind: "diving", status: "collecting", retainPrivateContact: Boolean(contact), missing }
+      workflow: {
+        type: "booking", kind: "diving", status: "collecting", retainPrivateContact: Boolean(contact), missing,
+        bookingRequest: {
+          kind: "diving", activity: "Diving", preferredDate, guestCount,
+          option: choice.option, courseName: choice.courseName, certificationLevel,
+          pickupTime: "", pickupLocation: "", destination: "", tripType: "", notes: details
+        }
+      }
     };
   }
   const optionDetail = choice.option === "Other course" ? choice.courseName : choice.option;
@@ -571,8 +842,210 @@ function applyDivingBookingPolicy(result, question, history, currentReplyContact
       }
     },
     alertQuestion: summary,
-    workflow: { type: "booking", kind: "diving", status: "ready", retainPrivateContact: false, missing: [] }
+    workflow: {
+      type: "booking", kind: "diving", status: "ready", retainPrivateContact: false, missing: [],
+      bookingRequest: {
+        kind: "diving", activity: "Diving", preferredDate, guestCount,
+        option: choice.option, courseName: choice.courseName, certificationLevel,
+        pickupTime: "", pickupLocation: "", destination: "", tripType: "", notes: details
+      }
+    }
   };
+}
+
+function bookingGuestCount(value, allowBare = false) {
+  const source = String(value || "");
+  const numeric = source.match(/\b(\d{1,2})\s*(?:people|persons?|guests?|travell?ers?|passengers?|adults?|tickets?)\b/i);
+  if (numeric) return String(Number(numeric[1]));
+  const words = { one: "1", two: "2", three: "3", four: "4", five: "5", six: "6", seven: "7", eight: "8", nine: "9", ten: "10" };
+  const written = source.match(/\b(one|two|three|four|five|six|seven|eight|nine|ten)\s+(?:people|persons?|guests?|travell?ers?|passengers?|adults?|tickets?)\b/i);
+  if (written) return words[written[1].toLowerCase()];
+  if (allowBare) {
+    const bare = source.trim().match(/^(\d{1,2})$/);
+    if (bare && Number(bare[1]) >= 1) return String(Number(bare[1]));
+  }
+  return "";
+}
+
+function bookingOption(kind, value, allowFreeText = false) {
+  const source = String(value || "").trim();
+  if (kind === "fishing") {
+    if (/\bsport\s+fishing\b/i.test(source)) return "Sport fishing";
+    if (/\b(?:food|catch(?:ing)?\s+food)\s+fishing\b/i.test(source)) return "Food fishing";
+    if (/\b(?:relaxed|relaxing|family|family-friendly|casual)\b/i.test(source)) return "Relaxed / family fishing";
+    if (/\b(?:no preference|any style|anything available)\b/i.test(source)) return "No preference";
+  }
+  if (kind === "snorkeling") {
+    if (/\bprivate\b/i.test(source)) return "Private snorkeling trip";
+    if (/\bgroup\b/i.test(source)) return "Group snorkeling trip";
+    if (/\bboat\s+trip\b/i.test(source)) return "Boat snorkeling trip";
+    if (/\bshore(?:-based)?\b/i.test(source)) return "Shore-based snorkeling";
+    if (/\b(?:half[- ]day|full[- ]day)\b/i.test(source)) return source.match(/\b(?:half[- ]day|full[- ]day)\b/i)[0].replace(/\b\w/g, (letter) => letter.toUpperCase());
+    if (/\b(?:no preference|any trip|anything available)\b/i.test(source)) return "No preference";
+  }
+  return allowFreeText && source.length >= 2 && source.length <= 120 ? cleanWorkflowValue(source, 120) : "";
+}
+
+function bookingTripType(value) {
+  const source = String(value || "").trim();
+  if (/\b(?:round\s*trip|return)\b/i.test(source)) return "Return";
+  if (/\bone[- ]way\b/i.test(source)) return "One-way";
+  return "";
+}
+
+function bookingRoute(value) {
+  const source = String(value || "").replace(/\s+/g, " ").trim();
+  const route = source.match(/\bfrom\s+(.{2,120}?)\s+to\s+(.{2,120}?)(?=\s+(?:for\s+(?:\d|one|two|three|four|five|six|seven|eight|nine|ten)|with\s+|at\s+\d|on\s+|today\b|tomorrow\b|in\s+\d)|[.,;!?]|$)/i);
+  const pickup = route?.[1]
+    || source.match(/\bpickup(?:\s+(?:location|point))?\s*(?:is|:|at|from)?\s+(.{2,120}?)(?=\s+(?:destination|to)\b|[.,;!?]|$)/i)?.[1]
+    || "";
+  const destination = route?.[2]
+    || source.match(/\bdestination\s*(?:is|:|to)?\s+(.{2,120}?)(?=[.,;!?]|$)/i)?.[1]
+    || "";
+  return {
+    pickupLocation: cleanWorkflowValue(pickup, 160),
+    destination: cleanWorkflowValue(destination, 160)
+  };
+}
+
+function shortBookingReply(pendingState, question, field) {
+  if (!pendingState || pendingState.missing?.[0] !== field) return "";
+  const value = cleanWorkflowValue(question, field === "pickup" || field === "destination" ? 160 : 120);
+  return value && value.length <= 160 ? value : "";
+}
+
+function bookingMissingFields(kind, request, contact) {
+  if (!kind) return ["kind"];
+  const missing = [];
+  if (!request.preferredDate) missing.push("date");
+  if (["taxi", "taxi_boat", "motorbike_taxi"].includes(kind) && !request.pickupTime) missing.push("time");
+  if (["taxi", "taxi_boat", "ferry", "motorbike_taxi"].includes(kind) && !request.pickupLocation) missing.push("pickup");
+  if (["taxi", "taxi_boat", "ferry", "motorbike_taxi"].includes(kind) && !request.destination) missing.push("destination");
+  if (!request.guestCount) missing.push("guests");
+  if (["fishing", "snorkeling"].includes(kind) && !request.option) missing.push("option");
+  if (kind === "taxi_boat" && !request.tripType) missing.push("tripType");
+  if (!contact) missing.push("contact");
+  return missing;
+}
+
+function bookingCollectionAnswer(kind, missing, rejectedLocalContact = false) {
+  if (missing.includes("kind")) {
+    return "What would you like to book? I can help with fishing, snorkeling, a taxi, taxi boat or longtail boat, ferry tickets, motorbike taxi, or diving. Your booking will not be confirmed until availability has been confirmed and payment has been received.";
+  }
+  const labels = {
+    date: "your preferred date",
+    time: "the pickup or preferred time",
+    pickup: kind === "ferry" ? "the departure point or origin" : "the pickup location",
+    destination: kind === "ferry" ? "the destination or full route" : "the destination",
+    guests: ["taxi", "taxi_boat", "motorbike_taxi"].includes(kind) ? "the number of passengers" : kind === "ferry" ? "the number of travelers" : "the number of guests",
+    option: kind === "fishing" ? "the fishing style you prefer, such as sport, food, or a relaxed/family trip" : "the snorkeling trip type you prefer, such as private, group, boat, or shore-based",
+    tripType: "whether the boat trip is one-way or return",
+    contact: "your WhatsApp or phone number including the international country code"
+  };
+  const ordinary = missing.filter((field) => field !== "contact").map((field) => labels[field]);
+  if (missing.includes("contact") && !rejectedLocalContact) ordinary.push(labels.contact);
+  const joined = ordinary.length === 1 ? ordinary[0] : ordinary.length > 1 ? `${ordinary.slice(0, -1).join(", ")}, and ${ordinary.at(-1)}` : "";
+  const intro = joined ? `Please tell me ${joined}.` : "";
+  const contactCorrection = missing.includes("contact") && rejectedLocalContact ? LOCAL_CONTACT_PROMPT : "";
+  return [`We’d be happy to help arrange your ${bookingActivity(kind).toLowerCase()}.`, intro, contactCorrection, "The team will check availability and the current price. Your booking is not confirmed until availability has been confirmed and payment has been received."].filter(Boolean).join(" ");
+}
+
+function generalBookingPolicy(result, question, currentReplyContact = "", workflowState = null, now = new Date()) {
+  const pendingState = workflowState?.type === "booking" && workflowState.status === "collecting"
+    ? workflowState
+    : null;
+  const kindNow = bookingKindFromText(question);
+  const actionableNow = isActionableStructuredBooking(question);
+  if (!pendingState && actionableNow && !kindNow && /\b(?:luggage|baggage|bags?)\b/i.test(question)) {
+    return { handled: false, result, alertQuestion: question, workflow: null };
+  }
+  if (!pendingState && !actionableNow) return { handled: false, result, alertQuestion: question, workflow: null };
+  if (/^\s*(?:cancel|never\s*mind|nevermind|forget\s+it)\s*[.!]?\s*$/i.test(question)) {
+    return {
+      handled: true,
+      result: { ...result, answer: "No problem. I have cancelled the booking request.", intentId: "booking_request_cancelled", category: "booking", needsHuman: false, handoff: "none", actions: [], suppressDefaultActions: true },
+      alertQuestion: question,
+      workflow: { type: "booking", kind: pendingState?.kind || "", status: "cancelled", retainPrivateContact: false, missing: [] }
+    };
+  }
+  const startingNewKind = Boolean(pendingState && actionableNow && kindNow && kindNow !== pendingState.kind);
+  const previous = startingNewKind ? {} : (pendingState?.bookingRequest || {});
+  const kind = startingNewKind ? kindNow : (pendingState?.kind || kindNow || "");
+  if (kind === "diving") return { handled: false, result, alertQuestion: question, workflow: null };
+  const currentDetails = cleanWorkflowNotes(question);
+  const notes = previous.notes
+    ? [previous.notes, currentDetails].filter(Boolean).join(" ").replace(/\s+/g, " ").trim().slice(0, 500)
+    : currentDetails;
+  const route = bookingRoute(question);
+  const allowGuestsReply = pendingState?.missing?.[0] === "guests";
+  const allowOptionReply = pendingState?.missing?.[0] === "option";
+  const allowTripReply = pendingState?.missing?.[0] === "tripType";
+  const preferredDate = divingPreferredDate(question, now) || previous.preferredDate || "";
+  const guestCount = bookingGuestCount(question, allowGuestsReply) || previous.guestCount || "";
+  const option = bookingOption(kind, question, allowOptionReply) || previous.option || "";
+  const pickupTime = displayPreferredTime(question) || previous.pickupTime || "";
+  const pickupLocation = route.pickupLocation || shortBookingReply(pendingState, question, "pickup") || previous.pickupLocation || "";
+  const destination = route.destination || shortBookingReply(pendingState, question, "destination") || previous.destination || "";
+  const tripType = bookingTripType(question) || previous.tripType || "";
+  const contact = validInternationalReplyContact(currentReplyContact);
+  const rejectedLocalContact = Boolean(currentReplyContact && !contact);
+  const request = {
+    kind,
+    activity: bookingActivity(kind),
+    preferredDate,
+    guestCount,
+    option,
+    courseName: "",
+    certificationLevel: "",
+    pickupTime,
+    pickupLocation,
+    destination,
+    tripType,
+    notes
+  };
+  const missing = bookingMissingFields(kind, request, contact);
+  if (missing.length) {
+    return {
+      handled: true,
+      result: {
+        ...result,
+        answer: bookingCollectionAnswer(kind, missing, rejectedLocalContact),
+        intentId: kind ? `${kind}_booking_request` : "booking_request",
+        category: "booking", needsHuman: false, handoff: "booking", actions: [], suppressDefaultActions: true,
+        source: "booking-policy"
+      },
+      alertQuestion: notes || "Booking details pending.",
+      workflow: { type: "booking", kind, status: "collecting", retainPrivateContact: Boolean(contact), missing, bookingRequest: request }
+    };
+  }
+  const routeSummary = pickupLocation || destination
+    ? `; route ${pickupLocation || "Not provided"} to ${destination || "Not provided"}`
+    : "";
+  const detailSummary = [option, tripType, pickupTime ? `time ${pickupTime}` : "", notes].filter(Boolean).join("; ");
+  const summary = `${bookingActivity(kind)} booking request; preferred date ${preferredDate}; ${guestCount} ${["taxi", "taxi_boat", "motorbike_taxi"].includes(kind) ? "passenger(s)" : kind === "ferry" ? "traveler(s)" : "guest(s)"}${routeSummary}. Details: ${detailSummary}`;
+  return {
+    handled: true,
+    result: {
+      ...result,
+      intentId: `${kind}_booking_request`,
+      category: "booking", handoff: "booking", needsHuman: true, actions: [], suppressDefaultActions: true,
+      privateReplyContact: contact,
+      requestedDateTime: [preferredDate, pickupTime].filter(Boolean).join(", "),
+      bookingRequest: request,
+      source: "booking-policy"
+    },
+    alertQuestion: summary,
+    workflow: { type: "booking", kind, status: "ready", retainPrivateContact: false, missing: [], bookingRequest: request }
+  };
+}
+
+function applyStructuredBookingPolicy(result, question, history, currentReplyContact = "", workflowState = null, now = new Date()) {
+  const pendingKind = workflowState?.type === "booking" && workflowState.status === "collecting" ? workflowState.kind : "";
+  const kindNow = bookingKindFromText(question);
+  if (pendingKind === "diving" || kindNow === "diving" || isActionableDivingBooking(question)) {
+    return applyDivingBookingPolicy(result, question, history, currentReplyContact, workflowState, now);
+  }
+  return generalBookingPolicy(result, question, currentReplyContact, workflowState, now);
 }
 
 function emergencyConfirmationActions(kind) {
@@ -667,7 +1140,9 @@ function immediatePendingContactWorkflow(history) {
 
 function isActionableLuggageMessage(value) {
   const text = String(value || "");
-  return ACTIONABLE_LUGGAGE_REQUEST.test(text) || DIRECT_LUGGAGE_REQUEST.test(text);
+  return ACTIONABLE_LUGGAGE_REQUEST.test(text)
+    || DIRECT_LUGGAGE_REQUEST.test(text)
+    || Boolean(luggageContext(text) && luggageBagCount(text));
 }
 
 function isLuggageCollectionPrompt(value) {
@@ -732,7 +1207,7 @@ function luggageCollectionAnswer(missing, rejectedLocalContact = false) {
   return [detailPrompt, contactPrompt, operational.length ? "You may also include any useful notes." : ""].filter(Boolean).join(" ");
 }
 
-function applyLuggageRequestPolicy(result, question, history, currentReplyContact = "", workflowState = null) {
+function applyLuggageRequestPolicy(result, question, history, currentReplyContact = "", workflowState = null, now = new Date()) {
   const pendingState = workflowState?.type === "luggage" && workflowState.status === "collecting"
     ? workflowState
     : null;
@@ -755,6 +1230,7 @@ function applyLuggageRequestPolicy(result, question, history, currentReplyContac
     ? [pendingState.luggageRequest?.notes, currentDetails].filter(Boolean).join(" ").replace(/\s+/g, " ").trim().slice(0, 500)
     : cleanWorkflowNotes(messages.join(" "));
   const context = luggageContext(currentDetails) || pendingState?.luggageRequest?.context || luggageContext(details);
+  const requestedDate = divingPreferredDate(currentDetails, now) || pendingState?.luggageRequest?.requestedDate || divingPreferredDate(details, now);
   const requestedTime = luggageRequestedTime(currentDetails) || pendingState?.luggageRequest?.requestedTime || luggageRequestedTime(details);
   const bags = luggageBagCount(currentDetails) || pendingState?.luggageRequest?.bagCount || luggageBagCount(details);
   const contact = validInternationalReplyContact(currentReplyContact);
@@ -782,11 +1258,11 @@ function applyLuggageRequestPolicy(result, question, history, currentReplyContac
         status: "collecting",
         retainPrivateContact: Boolean(contact),
         missing,
-        luggageRequest: { context, requestedTime, bagCount: bags, notes: details }
+        luggageRequest: { context, requestedDate, requestedTime, bagCount: bags, notes: details }
       }
     };
   }
-  const summary = `Luggage storage request for ${context} at ${requestedTime}, ${bags} ${bags === "1" ? "bag" : "bags"}. Guest details: ${details}`;
+  const summary = `Luggage storage request for ${context}${requestedDate ? ` on ${requestedDate}` : ""} at ${requestedTime}, ${bags} ${bags === "1" ? "bag" : "bags"}. Guest details: ${details}`;
   return {
     handled: true,
     result: {
@@ -799,12 +1275,16 @@ function applyLuggageRequestPolicy(result, question, history, currentReplyContac
       privateReplyContact: contact,
       luggageRequest: {
         context,
+        requestedDate,
         requestedTime,
         bagCount: bags
       }
     },
     alertQuestion: summary,
-    workflow: { type: "luggage", status: "ready", retainPrivateContact: false, missing: [] }
+    workflow: {
+      type: "luggage", status: "ready", retainPrivateContact: false, missing: [],
+      luggageRequest: { context, requestedDate, requestedTime, bagCount: bags, notes: details }
+    }
   };
 }
 
@@ -969,7 +1449,7 @@ ABSOLUTE SAFETY AND OPERATIONS RULES
 - When a Koh Tao Rescue call action is available, never say its contact information or phone number is unavailable or unconfirmed.
 - Classify the full sentence and intended action, not isolated words. Figurative, joking, slang or ambiguous statements such as dying for love, dying laughing, bloody hell, being drunk, or vague burning language are not operational requests by themselves. Clarify when meaning or requested action is uncertain.
 - A statement such as "I am unconscious" is logically ambiguous when typed by the speaker. Give conditional emergency guidance immediately, but do not claim that any House alert has been sent.
-- Routine stay needs such as fresh towels, toilet paper, soap, cleaning, lost keys and room problems use stay_support. Regular service hours are 10:30-19:30 Bangkok time; after-hours routine requests are recorded immediately and handled the following morning after 10:30.
+- Routine stay needs such as fresh towels, toilet paper, soap, cleaning, lost keys and room problems use stay_support. Housekeeping operates Tuesday-Sunday from 10:30-19:30 Bangkok time and is unavailable all day Monday. Cleaning requests collect a preferred time and never imply that the time is confirmed; after-hours wording must use the actual next available housekeeping day.
 - Activities, transport, rentals, tours and services that The House can arrange use booking. Never suggest booking directly with an operator and never open a direct personal WhatsApp conversation with a staff member.
 - An information or recommendation question is not a booking request. A clear request to arrange diving must collect the preferred date, number of divers, requested option/course, the exact other course when relevant, certification level for Fun Diving, and an international WhatsApp/phone number before staff is alerted.
 - A booking request is not a confirmed reservation. Availability may be checked first, but a booking is confirmed only after availability has been confirmed and payment has been received.
@@ -1111,7 +1591,7 @@ function bambooSocialFollowUpMatch(question, history, knowledge) {
   };
 }
 
-function finalizeResult(result) {
+function finalizeResult(result, question = "") {
   let handoff = result.handoff;
   if (result.needsHuman && handoff === "none") handoff = "stay_support";
   const privateCommercialLanguage = /\b(?:commission(?:able|ed|s)?|referral\s+(?:fee|payment)|revenue\s+share|(?:we|the\s+house)\s+(?:earn|receive|make|take)\s+(?:money|income|a\s+payment|a\s+fee|a\s+percentage)|(?:paid|payment)\s+(?:to|for)\s+(?:us|the\s+house))\b/i;
@@ -1124,12 +1604,11 @@ function finalizeResult(result) {
     : (result.suppressDefaultActions ? (result.actions || []) : (result.actions?.length ? result.actions : actionsForHandoff(handoff)));
   actions = actions.map((action) => {
     if (action?.route === "bookingWhatsapp") {
+      const kind = bookingKindFromText(`${question} ${result.intentId} ${result.answer}`);
       return {
         label: action.label || "Book with Us",
         type: "prompt",
-        prompt: /(?:roctopus|div)/i.test(`${result.intentId} ${result.answer}`)
-          ? "I want to book diving."
-          : "I would like to make a booking."
+        prompt: bookingStartPrompt(kind)
       };
     }
     if (action?.route === "bookingCall") return { ...action, route: "houseCall" };
@@ -1216,7 +1695,7 @@ async function interactionRecord({ env, store, interactionId, sessionId, room, q
   return interactionId;
 }
 
-async function recordInteractionAndAlert({ env, store, ctx, sessionId, room, roomVerified, question, alertQuestion = question, result }) {
+async function recordInteractionAndAlert({ env, store, ctx, sessionId, room, roomVerified, question, alertQuestion = question, result, now = new Date() }) {
   if (!store) return { interactionId: null, alert: null, delivery: { attempted: 0, accepted: 0 } };
   let interactionId = `int_${crypto.randomUUID()}`;
   const recordedId = await interactionRecord({ env, store, interactionId, sessionId, room, question, result })
@@ -1229,14 +1708,15 @@ async function recordInteractionAndAlert({ env, store, ctx, sessionId, room, roo
     room,
     roomVerified,
     question: alertQuestion,
-    result
+    result,
+    now
   }).catch(() => null);
   let delivery = { attempted: 0, accepted: 0 };
   if (alert && !alert.duplicate) delivery = await dispatchConciergeAlert(alert, env).catch(() => delivery);
   return { interactionId, alert, delivery };
 }
 
-export async function handleConciergeRequest(request, env, ctx) {
+export async function handleConciergeRequest(request, env, ctx, now = new Date()) {
   if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405, { allow: "POST" });
   let body;
   try {
@@ -1389,9 +1869,15 @@ export async function handleConciergeRequest(request, env, ctx) {
   }
 
   const effectiveKnowledge = mergeApprovedKnowledge(knowledge, approvedKnowledge);
-  const servicePolicyResult = safetyResult ? null : housekeepingServiceResult(question);
-  const roomPolicyResult = safetyResult || servicePolicyResult ? null : roomLocationResult(question, room);
-  const directPolicyResult = safetyResult || servicePolicyResult || roomPolicyResult;
+  const cleaningPolicy = safetyResult
+    ? { handled: false, result: null, alertQuestion: question, workflow: null }
+    : applyCleaningRequestPolicy(question, workflowState, now);
+  const servicePolicyResult = safetyResult || cleaningPolicy.handled ? null : housekeepingServiceResult(question, now);
+  const roomPolicyResult = safetyResult || cleaningPolicy.handled || servicePolicyResult ? null : roomLocationResult(question, room);
+  const bookingInformationResult = safetyResult || cleaningPolicy.handled || servicePolicyResult || roomPolicyResult
+    ? null
+    : supportedBookingInformationResult(question);
+  const directPolicyResult = safetyResult || cleaningPolicy.result || servicePolicyResult || roomPolicyResult || bookingInformationResult;
   const criticalPropertyMatch = safetyResult?.intentId === "property_emergency"
     ? matchKnowledge("major water leak", effectiveKnowledge, 0.44)
     : null;
@@ -1424,22 +1910,27 @@ export async function handleConciergeRequest(request, env, ctx) {
     const fallbackMatch = safeFallbackMatch(match, question, effectiveKnowledge);
     result = deterministicResult(fallbackMatch, fallbackMatch.matched ? "approved-fallback" : "fallback");
   }
-  result = finalizeResult(result);
+  result = finalizeResult(result, question);
   result = applyLiveFeaturePolicy(result, env);
   result = applyEmergencyConfirmationPolicy(result);
+  result = applyHousekeepingCallAvailability(result, question, now);
 
   const directWorkflow = result.intentId === "urgent_clarification"
     ? { type: "urgent_clarification", status: "collecting" }
-    : null;
-  const bypassOrdinaryWorkflows = Boolean(directWorkflow || servicePolicyResult || isEmergencyResult(result));
+    : cleaningPolicy.handled
+      ? cleaningPolicy.workflow
+      : null;
+  const bypassOrdinaryWorkflows = Boolean(directWorkflow || servicePolicyResult || bookingInformationResult || isEmergencyResult(result));
   const bookingPolicy = bypassOrdinaryWorkflows
     ? { handled: false, result, alertQuestion: question, workflow: null }
-    : applyDivingBookingPolicy(result, question, history, currentReplyContact);
+    : applyStructuredBookingPolicy(result, question, history, currentReplyContact, workflowState, now);
   const luggagePolicy = bypassOrdinaryWorkflows || bookingPolicy.handled
     ? { handled: false, result, alertQuestion: question, workflow: null }
-    : applyLuggageRequestPolicy(result, question, history, currentReplyContact, workflowState);
-  const workflowPolicy = directWorkflow
-    ? { result, alertQuestion: question, workflow: directWorkflow }
+    : applyLuggageRequestPolicy(result, question, history, currentReplyContact, workflowState, now);
+  const workflowPolicy = cleaningPolicy.handled
+    ? { result, alertQuestion: cleaningPolicy.alertQuestion, workflow: directWorkflow }
+    : directWorkflow
+      ? { result, alertQuestion: question, workflow: directWorkflow }
     : servicePolicyResult
       ? { result, alertQuestion: question, workflow: null }
       : bookingPolicy.handled
@@ -1448,15 +1939,6 @@ export async function handleConciergeRequest(request, env, ctx) {
           ? luggagePolicy
           : { ...applyContactRequirement(result, question, history, currentReplyContact), workflow: null });
   result = workflowPolicy.result;
-
-  if (language !== "en" && result.source !== "ai") {
-    try {
-      const [translatedAnswer] = await translateApprovedTexts(env, language, [result.answer]);
-      result = { ...result, answer: translatedAnswer };
-    } catch (_error) {
-      // The approved English answer remains available if translation is temporarily unavailable.
-    }
-  }
 
   const recorded = await recordInteractionAndAlert({
     env,
@@ -1467,14 +1949,15 @@ export async function handleConciergeRequest(request, env, ctx) {
     roomVerified: access.verified,
     question,
     alertQuestion: workflowPolicy.alertQuestion,
-    result
+    result,
+    now
   });
 
   if (recorded.alert && recorded.delivery.accepted > 0 && result.needsHuman) {
-    if (result.bookingRequest?.kind === "diving") {
+    if (result.bookingRequest) {
       result = {
         ...result,
-        answer: "Thank you. We’ve sent your diving request to our booking team. They’ll check availability and get back to you using the contact number you provided. Your booking is not confirmed until availability has been confirmed and payment has been received.",
+        answer: "Thank you. We’ve sent your request to our booking team. They’ll check availability and the current price and get back to you using the contact details you provided. Your booking is not confirmed until availability has been confirmed and payment has been received.",
         actions: []
       };
     } else if (!result.housekeepingRequest) {
@@ -1483,18 +1966,45 @@ export async function handleConciergeRequest(request, env, ctx) {
     }
     if (luggagePolicy.handled) luggagePolicy.workflow.status = "submitted";
     if (bookingPolicy.handled) bookingPolicy.workflow.status = "submitted";
+    if (cleaningPolicy.handled) cleaningPolicy.workflow.status = "submitted";
   } else if (result.housekeepingRequest && result.needsHuman) {
+    const callAvailable = !result.housekeepingRequest.afterHours;
     result = {
       ...result,
-      answer: "I couldn’t send that request automatically. Please call us so the team can help you.",
-      actions: [{ label: "Call Us", type: "route", route: "houseCall" }]
+      answer: callAvailable
+        ? "I couldn’t send that request automatically. Please call us so the team can help you."
+        : "I couldn’t send that request to the housekeeping team, so please don’t rely on it as received. Please try again during housekeeping hours, Tuesday–Sunday from 10:30 AM to 7:30 PM.",
+      actions: callAvailable ? [{ label: "Call Us", type: "route", route: "houseCall" }] : []
     };
-  } else if (result.bookingRequest?.kind === "diving" && result.needsHuman) {
+    if (cleaningPolicy.handled && cleaningPolicy.workflow) cleaningPolicy.workflow.status = "collecting";
+  } else if (result.bookingRequest && result.needsHuman) {
     result = {
       ...result,
-      answer: "I couldn’t send your diving request automatically. Please call us so the booking team can help you.",
+      answer: "I couldn’t send your booking request automatically, so it has not been sent. Please try again in a moment or call The House for help.",
       actions: [{ label: "Call Us", type: "route", route: "houseCall" }]
     };
+    if (bookingPolicy.handled && bookingPolicy.workflow) {
+      bookingPolicy.workflow.status = "collecting";
+      bookingPolicy.workflow.retainPrivateContact = true;
+    }
+  } else if (result.intentId === "luggage_storage" && result.needsHuman) {
+    result = {
+      ...result,
+      answer: "I couldn’t send your luggage request automatically, so it has not been sent. Please try again in a moment.",
+      actions: []
+    };
+    if (luggagePolicy.handled && luggagePolicy.workflow) {
+      luggagePolicy.workflow.status = "collecting";
+      luggagePolicy.workflow.retainPrivateContact = true;
+    }
+  }
+  if (language !== "en" && result.source !== "ai") {
+    try {
+      const [translatedAnswer] = await translateApprovedTexts(env, language, [result.answer]);
+      result = { ...result, answer: translatedAnswer };
+    } catch (_error) {
+      // The approved English answer remains available if translation is temporarily unavailable.
+    }
   }
   return json({
     answer: result.answer,

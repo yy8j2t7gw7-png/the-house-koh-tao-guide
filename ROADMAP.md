@@ -1,6 +1,6 @@
 # Product Roadmap
 
-Baseline: v5.11.18
+Baseline: v5.11.19
 
 ## Completed
 
@@ -145,7 +145,8 @@ Guests may continue using ordinary WhatsApp handoffs. Automated internal alerts 
 - [x] Push the v5.5.0 release to the existing hosting workflow
 - [x] Confirm `/api/concierge/status` reports AI and learning enabled
 - [x] Capture the exact v5.11.16 Meta failure (HTTP 404 / `132001`) and implement template-aware language resolution: current templates use `en`; deliberate v1 rollback templates retain `en_US`.
-- [ ] Deploy v5.11.18 and live-test all six current templates, workflow corrections, actor exclusion, duplicate-webhook idempotency, truthful guest fallbacks and every established privacy/security gate.
+- [ ] Deploy v5.11.19 and live-test protected luggage submission, housekeeping scheduling, every structured booking category, all six current templates, actor exclusion, duplicate-webhook idempotency, truthful guest fallbacks and every established privacy/security gate.
+- [ ] Submit and obtain Meta approval for the five optional quick-action templates documented in `META_STAFF_QUICK_ACTIONS_v5.11.19.md`; enable them only after every template is Active.
 - [x] Add `STAY_TOKEN_PEPPER` and `RESERVATION_SYNC_TOKEN` Worker secrets
 - [ ] Add protected `SPARE_KEY_CODES` Worker secret before activating automatic spare-key release
 - [x] Install and authorize the included Airbnb Google Apps Script synchronizer

@@ -576,12 +576,14 @@
     const suppliedContact = internationalContact(question);
     const privateContactWorkflow = result.workflow?.type === "luggage"
       || result.workflow?.type === "booking";
-    activeWorkflowState = result.workflow?.status === "collecting"
+    const activePrivateWorkflow = result.workflow?.status === "collecting"
+      || (result.workflow?.type === "booking" && result.workflow?.status === "delivery_failed");
+    activeWorkflowState = activePrivateWorkflow
       || (result.workflow?.type === "property_issue" && result.workflow?.status === "monitoring")
       ? result.workflow
       : null;
     if (privateContactWorkflow
-      && result.workflow.status === "collecting"
+      && activePrivateWorkflow
       && result.workflow.retainPrivateContact) {
       privateWorkflowContact = suppliedContact || privateWorkflowContact;
     } else {

@@ -850,8 +850,13 @@ export async function handleStayAdminRequest(request, env, path, store) {
     if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405, { allow: "POST" });
     const body = await readJson(request, 2_000);
     const room = String(body?.room || "");
-    if (!ACTIVE_ROOMS.has(room) || body?.confirmed !== true) return json({ error: "invalid_request" }, 400);
-    return json(await store.confirmSpareKeyRotation(room, new Date().toISOString()));
+    const resetMode = ["controlled_test", "physical_rotation"].includes(body?.resetMode) ? body.resetMode : "";
+    const requiredConfirmation = resetMode === "controlled_test" ? "KEEP EXISTING CODE" : "CODE ROTATED";
+    if (!ACTIVE_ROOMS.has(room) || !resetMode || body?.confirmed !== true || body?.confirmation !== requiredConfirmation) {
+      return json({ error: "invalid_request" }, 400);
+    }
+    const result = await store.confirmSpareKeyRotation(room, new Date().toISOString(), resetMode);
+    return json(result, result.ok ? 200 : 409);
   }
 
   return null;

@@ -601,7 +601,7 @@ export async function createConciergeAlert({ env, interactionId, sessionId, room
   if (policy.alertType === "booking_request" && !bookingSubmission) return null;
   const config = whatsappAlertConfiguration(env);
   const dedupeSummary = result.propertyIssueRequest?.category
-    ? `property issue ${String(result.propertyIssueRequest.category).slice(0, 40)}`
+    ? `property issue ${String(result.propertyIssueRequest.category).slice(0, 40)} ${String(result.propertyIssueRequest.instanceKey || "").slice(0, 180)}`
     : policy.summary;
   const dedupeKey = await sha256(`${env.CONCIERGE_HASH_SALT || env.META_APP_SECRET || "the-house-alert"}:${sessionId}:${room}:${policy.alertType}:${normalizeDedupeSummary(dedupeSummary)}`);
   const escalationDueAt = policy.escalationRequired
@@ -622,10 +622,7 @@ export async function createConciergeAlert({ env, interactionId, sessionId, room
     escalationDueAt
   };
   const created = await store.createAlert(alert);
-  if (!created?.created) return { ...created?.alert, duplicate: true };
-  return {
-    ...alert,
-    duplicate: false,
+  const protectedSubmission = {
     configured: config.configured,
     privateReplyContact: luggageRequest?.contact || bookingSubmission?.contact || privateReplyContact(result.privateReplyContact),
     requestedDateTime: result.requestedDateTime || "",
@@ -637,6 +634,21 @@ export async function createConciergeAlert({ env, interactionId, sessionId, room
       bagCount: luggageRequest.bagCount
     } : undefined
   };
+  if (!created?.created) {
+    const acceptedDeliveries = Number(created?.alert?.acceptedDeliveries) || 0;
+    const deliveryAttempts = Number(created?.alert?.deliveryAttempts) || 0;
+    const retryableDelivery = policy.alertType === "booking_request"
+      && acceptedDeliveries === 0
+      && deliveryAttempts > 0;
+    return {
+      ...created?.alert,
+      ...protectedSubmission,
+      duplicate: true,
+      previouslyAccepted: policy.alertType === "booking_request" && acceptedDeliveries > 0,
+      retryableDelivery
+    };
+  }
+  return { ...alert, ...protectedSubmission, duplicate: false, previouslyAccepted: false, retryableDelivery: false };
 }
 
 export async function createProtectedOperationsAlert({
@@ -686,10 +698,10 @@ function normalizeDedupeSummary(value) {
 }
 
 export async function dispatchConciergeAlert(alert, env) {
-  if (!alert || alert.duplicate) return { attempted: 0, accepted: 0 };
+  if (!alert || (alert.duplicate && !alert.retryableDelivery)) return { attempted: 0, accepted: 0 };
   const store = getStore(env);
   if (!store) return { attempted: 0, accepted: 0 };
-  return sendToGroup(alert, alert.recipientGroup, "initial", env, store);
+  return sendToGroup(alert, alert.recipientGroup, alert.duplicate ? "retry" : "initial", env, store);
 }
 
 export async function processDueAlertEscalations(env, now = new Date()) {

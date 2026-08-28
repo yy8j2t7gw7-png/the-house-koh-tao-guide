@@ -62,35 +62,55 @@ export function formatBangkokAlertTime(date = new Date()) {
   }).format(date);
 }
 
-export function normalizeBangkokRequestedDate(value, now = new Date()) {
+export function parseBangkokRequestedDate(value, now = new Date()) {
   const text = String(value || "");
   const lower = text.toLowerCase();
   const today = bangkokParts(now);
   const base = new Date(Date.UTC(Number(today.year), Number(today.month) - 1, Number(today.day), 12));
   let target = null;
-  if (/\btoday\b/.test(lower)) target = new Date(base);
-  if (/\btomorrow\b/.test(lower)) target = new Date(base.getTime() + 86_400_000);
+  let recognized = false;
+  if (/\bday\s+after\s+tomorrow\b/.test(lower)) {
+    target = new Date(base.getTime() + (2 * 86_400_000));
+    recognized = true;
+  } else if (/\btomorrow\b/.test(lower)) {
+    target = new Date(base.getTime() + 86_400_000);
+    recognized = true;
+  } else if (/\btoday\b/.test(lower)) {
+    target = new Date(base);
+    recognized = true;
+  }
   const days = lower.match(/\bin\s+(\d{1,3})\s+days?\b/);
-  if (days) target = new Date(base.getTime() + (Number(days[1]) * 86_400_000));
+  if (days) {
+    target = new Date(base.getTime() + (Number(days[1]) * 86_400_000));
+    recognized = true;
+  }
   const weekdays = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
-  const weekday = lower.match(/\bnext\s+(sunday|monday|tuesday|wednesday|thursday|friday|saturday)\b/);
+  const weekday = lower.match(/\b(next\s+)?(sunday|monday|tuesday|wednesday|thursday|friday|saturday)\b/);
   if (weekday) {
-    const desired = weekdays.indexOf(weekday[1]);
+    const desired = weekdays.indexOf(weekday[2]);
     let add = (desired - base.getUTCDay() + 7) % 7;
-    if (add === 0) add = 7;
+    if (weekday[1] && add === 0) add = 7;
     target = new Date(base.getTime() + (add * 86_400_000));
+    recognized = true;
   }
   if (!target) {
-    const numeric = lower.match(/\b(\d{1,2})[\/-](\d{1,2})(?:[\/-](\d{2,4}))?\b/);
+    const numeric = lower.match(/\b(\d{1,2})[.\/-](\d{1,2})(?:[.\/-](\d{2,4}))?\b/);
     if (numeric) {
+      recognized = true;
       const year = numeric[3] ? (numeric[3].length === 2 ? 2000 + Number(numeric[3]) : Number(numeric[3])) : Number(today.year);
-      const candidate = new Date(Date.UTC(year, Number(numeric[2]) - 1, Number(numeric[1]), 12));
-      if (candidate.getUTCFullYear() === year && candidate.getUTCMonth() === Number(numeric[2]) - 1 && candidate.getUTCDate() === Number(numeric[1])) target = candidate;
+      const first = Number(numeric[1]);
+      const second = Number(numeric[2]);
+      const monthFirst = first <= 12 && second > 12;
+      const day = monthFirst ? second : first;
+      const month = monthFirst ? first : second;
+      const candidate = new Date(Date.UTC(year, month - 1, day, 12));
+      if (candidate.getUTCFullYear() === year && candidate.getUTCMonth() === month - 1 && candidate.getUTCDate() === day) target = candidate;
     }
   }
   if (!target) {
     const named = lower.match(/\b(?:(\d{1,2})\s+(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)(?:\s+(\d{4}))?|(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+(\d{1,2})(?:,?\s+(\d{4}))?)\b/);
     if (named) {
+      recognized = true;
       const monthNames = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
       const day = Number(named[1] || named[5]);
       const monthText = String(named[2] || named[4]).slice(0, 3);
@@ -100,17 +120,33 @@ export function normalizeBangkokRequestedDate(value, now = new Date()) {
       if (month >= 0 && candidate.getUTCFullYear() === year && candidate.getUTCMonth() === month && candidate.getUTCDate() === day) target = candidate;
     }
   }
-  if (!target) return "Not provided";
+  if (!target) return { status: recognized ? "invalid" : "missing", normalized: "", displayDate: "", dateKey: "" };
   const date = new Intl.DateTimeFormat("en-GB", { timeZone: "UTC", day: "2-digit", month: "short", year: "numeric" }).format(target);
+  const dateKey = `${target.getUTCFullYear()}-${String(target.getUTCMonth() + 1).padStart(2, "0")}-${String(target.getUTCDate()).padStart(2, "0")}`;
   const time = lower.match(/\b(?:at|around|by)\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\b/);
-  if (!time) return date;
-  let hour = Number(time[1]);
-  const minute = Number(time[2] || 0);
-  if (time[3] === "pm" && hour < 12) hour += 12;
-  if (time[3] === "am" && hour === 12) hour = 0;
-  const formatted = new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", hour12: true, timeZone: "UTC" })
-    .format(new Date(Date.UTC(2020, 0, 1, hour, minute)));
-  return `${date}, ${formatted}`;
+  let normalized = date;
+  if (time) {
+    let hour = Number(time[1]);
+    const minute = Number(time[2] || 0);
+    if (time[3] === "pm" && hour < 12) hour += 12;
+    if (time[3] === "am" && hour === 12) hour = 0;
+    if (hour <= 23 && minute <= 59) {
+      const formatted = new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", hour12: true, timeZone: "UTC" })
+        .format(new Date(Date.UTC(2020, 0, 1, hour, minute)));
+      normalized = `${date}, ${formatted}`;
+    }
+  }
+  return {
+    status: target.getTime() < base.getTime() ? "past" : "valid",
+    normalized,
+    displayDate: date,
+    dateKey
+  };
+}
+
+export function normalizeBangkokRequestedDate(value, now = new Date()) {
+  const parsed = parseBangkokRequestedDate(value, now);
+  return ["valid", "past"].includes(parsed.status) ? parsed.normalized : "Not provided";
 }
 
 function bookingNeedsAttention(question, _intentId) {

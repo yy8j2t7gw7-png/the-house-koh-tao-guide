@@ -37,6 +37,7 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-vis
 .concierge-admin-stat span{color:var(--admin-muted);font-size:13px}
 .concierge-admin-section{margin-top:18px;padding:22px}
 .concierge-admin-section-head{display:flex;justify-content:space-between;align-items:center;gap:16px;min-height:52px;cursor:pointer;list-style:none;user-select:none}
+.concierge-admin-section-head[aria-disabled="true"]{cursor:not-allowed}
 .concierge-admin-section-head::-webkit-details-marker{display:none}
 .concierge-admin-section-head>div{min-width:0}
 .concierge-admin-section-summary{display:flex;align-items:center;justify-content:flex-end;gap:9px;flex-wrap:wrap;color:var(--admin-muted);font-size:12px;font-weight:900}

@@ -155,7 +155,7 @@ Public interface rules:
 
 ## Current baseline
 
-Current release: v5.11.22 (progressive category booking, property intelligence, protected 24/7 request-bound lost-key release and collapsible owner operations).
+Current release: v5.11.23 (conversational booking-state corrections, shared date/certification validation, explicit Open Water contact/delivery retry that yields to unrelated intents, isolated property issue state, forced-open urgent owner operations and two truthful protected lost-key reset modes).
 
 Explore is intentionally disabled in the live v5.11.6 release. Do not delete its pages, structured records or media. Restore it only after the planned Explore rebuild and review by changing the protected deployment feature variable. Do not expose internal Explore detail paths in live concierge answers while the feature remains disabled; use approved external actions where supplied.
 

@@ -12,7 +12,7 @@ import {
 } from "./concierge-core.js";
 import { handlePassportAdminRequest } from "./passport-api.js";
 import { handleMaintenanceAdminRequest } from "./maintenance-api.js";
-import { housekeepingAvailability, isAfterHours, normalizeBangkokRequestedDate } from "./alert-policy.js";
+import { housekeepingAvailability, isAfterHours, parseBangkokRequestedDate } from "./alert-policy.js";
 import { retrieveApprovedProjectKnowledge } from "./project-knowledge.js";
 import { LANGUAGE_NAMES, translateApprovedTexts, validLanguage } from "./i18n-api.js";
 import {
@@ -24,7 +24,7 @@ import {
 } from "./whatsapp-alerts.js";
 import { getGuestAccess, handleStayAdminRequest, stayConfiguration } from "./stay-api.js";
 
-const RELEASE = "5.11.22";
+const RELEASE = "5.11.23";
 const ROOM_OPTIONS = new Set(["1", "2", "3", "4", "5", "6", "8", "9", "10", "11"]);
 const MAX_HISTORY_ITEMS = 10;
 const MAX_QUESTION_LENGTH = 800;
@@ -227,7 +227,8 @@ function cleanWorkflowState(value) {
       notes: cleanWorkflowNotes(value.notes)
     };
   }
-  if (value.status !== "collecting") return null;
+  const retryableBooking = value.type === "booking" && value.status === "delivery_failed";
+  if (value.status !== "collecting" && !retryableBooking) return null;
   if (value.type === "urgent_clarification") {
     return { type: "urgent_clarification", status: "collecting" };
   }
@@ -254,7 +255,7 @@ function cleanWorkflowState(value) {
     return {
       type: "booking",
       kind,
-      status: "collecting",
+      status: retryableBooking ? "delivery_failed" : "collecting",
       retainPrivateContact: Boolean(value.retainPrivateContact),
       missing: Array.isArray(value.missing) ? value.missing.filter((item) => allowedMissing.includes(item)) : [],
       bookingRequest: {
@@ -265,6 +266,7 @@ function cleanWorkflowState(value) {
         option: cleanWorkflowValue(request.option, 120),
         courseName: cleanWorkflowValue(request.courseName, 120),
         certificationLevel: cleanWorkflowValue(request.certificationLevel, 120),
+        preferredProvider: cleanWorkflowValue(request.preferredProvider, 120),
         pickupTime: cleanWorkflowValue(request.pickupTime, 60),
         pickupLocation: cleanWorkflowValue(request.pickupLocation, 160),
         destination: cleanWorkflowValue(request.destination, 160),
@@ -533,7 +535,8 @@ function nextCleaningOperatingDay(day) {
 }
 
 function cleaningRequestedDay(value, now = new Date()) {
-  const normalized = divingPreferredDate(value, now);
+  const parsed = parseBangkokRequestedDate(value, now);
+  const normalized = ["valid", "past"].includes(parsed.status) ? parsed.normalized : "";
   const dateMatch = normalized.match(/\b(\d{1,2})\s+([A-Za-z]{3})\s+(\d{4})\b/);
   if (dateMatch) {
     const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -787,6 +790,8 @@ function propertyIssueClassification(question, workflowState = null) {
     && workflowState.issueCategory === "odor_clarification";
   if (pendingOdor) {
     if (/^(?:cancel|never mind|nevermind|forget it|no thanks)$/.test(normalized)) return { cancelled: true };
+    const independentIssue = propertyIssueClassification(question, null);
+    if (independentIssue && independentIssue.category !== "odor_clarification") return independentIssue;
     return { category: "odor", label: "unexplained room odor" };
   }
 
@@ -834,6 +839,27 @@ function propertyIssueClassification(question, workflowState = null) {
     || /\bwater\b.{0,35}\b(?:drip|drips|dripping|small leak|leaking slowly)\b.{0,35}\b(?:from|through|down)\b.{0,30}\b(?:ceiling|wall)\b/.test(normalized)) {
     return { category: "condition", label: "room condition or dampness issue" };
   }
+  if (workflowState?.status === "monitoring") {
+    const followUpPatterns = {
+      pest: /\b(?:also|still|scratching|scraping|droppings|nest|noise|noises|movement)\b/,
+      odor: /\b(?:also|still|stronger|worse|smell|odor|stink|coming from)\b/,
+      plumbing: /\b(?:also|still|dripping|leaking|blocked|slow|noise|noises|pressure)\b/,
+      equipment: /\b(?:also|still|clicking|rattling|beeping|buzzing|noise|noisy|warm|hot|turning off)\b/,
+      fixture: /\b(?:also|still|loose|stuck|jammed|fallen|noise|noisy)\b/,
+      condition: /\b(?:also|still|spreading|larger|worse|wet|damp|dripping)\b/
+    };
+    const labels = {
+      pest: "pest or animal issue",
+      odor: "bad smell or room odor",
+      plumbing: "plumbing or water issue",
+      equipment: "room equipment or appliance issue",
+      fixture: "broken room fixture or furniture",
+      condition: "room condition or dampness issue"
+    };
+    if (followUpPatterns[workflowState.issueCategory]?.test(normalized)) {
+      return { category: workflowState.issueCategory, label: labels[workflowState.issueCategory] };
+    }
+  }
   return null;
 }
 
@@ -854,7 +880,10 @@ function propertyIssuePolicy(question, workflowState = null) {
     };
   }
   if (!issue) return { handled: false, result: null, alertQuestion: question, workflow: null };
-  const notes = [pending?.notes, cleanWorkflowNotes(question)].filter(Boolean).join(" ").replace(/\s+/g, " ").trim().slice(0, 500);
+  const sameIssue = Boolean(pending && (pending.issueCategory === issue.category
+    || (pending.issueCategory === "odor_clarification" && issue.category === "odor")));
+  const notes = [sameIssue ? pending?.notes : "", cleanWorkflowNotes(question)]
+    .filter(Boolean).join(" ").replace(/\s+/g, " ").trim().slice(0, 500);
   if (issue.clarification) {
     return {
       handled: true,
@@ -891,7 +920,7 @@ function propertyIssuePolicy(question, workflowState = null) {
       intentId: `property_issue_${issue.category}`, category: "stay-support", confidence: 1,
       needsHuman: true, handoff: "stay_support", learningGap: false, learningReason: "none",
       actions: [], suppressDefaultActions: true,
-      propertyIssueRequest: { category: issue.category, label: issue.label },
+      propertyIssueRequest: { category: issue.category, label: issue.label, instanceKey: notes },
       source: "service-policy"
     },
     alertQuestion: `Property issue — ${issue.label}. Guest report: ${notes || cleanWorkflowNotes(question)}`,
@@ -991,6 +1020,11 @@ function isActionableStructuredBooking(value) {
     || DIRECT_ACTIVITY_BOOKING.test(source);
 }
 
+function isExplicitBookingRetry(value) {
+  const source = String(value || "").trim();
+  return /^(?:please\s+)?(?:retry|try\s+(?:it|again)|try\s+(?:my|the)\s+(?:(?:diving|fishing|snorkeling|taxi|ferry|motorbike)\s+)?(?:booking|request)\s+again|retry\s+(?:my|the)?\s*(?:(?:diving|fishing|snorkeling|taxi|ferry|motorbike)\s+)?(?:booking|request)|(?:can|could|would)\s+you\s+(?:please\s+)?(?:send|try)\s+(?:my|the)\s+(?:(?:diving|fishing|snorkeling|taxi|ferry|motorbike)\s+)?(?:booking|request)\s+again|send\s+(?:my|the)\s+(?:(?:diving|fishing|snorkeling|taxi|ferry|motorbike)\s+)?(?:booking|request)\s+again)[.!?]*$/i.test(source);
+}
+
 function supportedBookingInformationResult(question) {
   const kind = bookingKindFromText(question);
   if (!kind || kind === "diving" || isActionableStructuredBooking(question)) return null;
@@ -1043,17 +1077,8 @@ function activeDivingWorkflowMessages(history) {
 }
 
 function divingPreferredDate(value, now = new Date()) {
-  const source = String(value || "");
-  const match = source.match(/\b(?:today|tomorrow|next\s+(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday))\b/i)
-    || source.match(/\bin\s+\d{1,3}\s+days?\b/i)
-    || source.match(/\b(?:on\s+)?(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i)
-    || source.match(/\b(?:on\s+)?(?:\d{1,2}[\/-]\d{1,2}(?:[\/-]\d{2,4})?)\b/i)
-    || source.match(/\b(?:on\s+)?(?:\d{1,2}\s+(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)(?:\s+\d{4})?)\b/i)
-    || source.match(/\b(?:on\s+)?(?:(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+\d{1,2}(?:,?\s+\d{4})?)\b/i);
-  if (!match) return "";
-  const raw = match[0].replace(/^on\s+/i, "").trim();
-  const normalized = normalizeBangkokRequestedDate(raw, now);
-  return normalized === "Not provided" ? raw : normalized;
+  const parsed = parseBangkokRequestedDate(value, now);
+  return parsed.status === "valid" ? parsed.displayDate : "";
 }
 
 function divingGuestCount(value, allowBare = false) {
@@ -1082,9 +1107,104 @@ function divingChoice(value) {
 }
 
 function divingCertification(value) {
-  const source = String(value || "");
-  const match = source.match(/\b(divemaster|rescue\s+diver|advanced\s+open\s+water|open\s+water)\b/i);
-  return match ? match[1].replace(/\b\w/g, (letter) => letter.toUpperCase()) : "";
+  const source = cleanWorkflowValue(value, 120)
+    .replace(/^\s*(?:i\s*(?:am|'m)|my\s+certification\s+(?:is|level\s+is)|certification\s*(?:is|:))\s+/i, "")
+    .replace(/[.!]+$/g, "")
+    .trim();
+  if (!source || source.length > 120 || /^(?:none|no|not\s+sure|i\s+don['’]?t\s+know|beginner)$/i.test(source)) return "";
+  const agencyMatch = source.match(/\b(PADI|SSI|RAID|NAUI|CMAS|BSAC|SDI|TDI)\b/i);
+  const agency = agencyMatch ? agencyMatch[1].toUpperCase() : "";
+  let level = "";
+  if (/\bcourse\s+director\b/i.test(source)) level = "Course Director";
+  else if (/\bmsdt\b/i.test(source)) level = "MSDT";
+  else if (/\bowsi\b/i.test(source)) level = "OWSI";
+  else if (/\bmaster\s+scuba\s+diver\b/i.test(source)) level = "Master Scuba Diver";
+  else if (/\b(?:dive\s+)?instructor\b/i.test(source)) level = "Instructor";
+  else if (/\b(?:dive\s*master|divemaster|dm)\b/i.test(source)) level = "Divemaster";
+  else if (/\brescue(?:\s+diver)?\b/i.test(source)) level = "Rescue Diver";
+  else if (/\b(?:advanced(?:\s+open\s+water)?|aowd?)\b/i.test(source)) level = "Advanced Open Water";
+  else if (/\b(?:open\s+water(?:\s+diver)?|owd?)\b/i.test(source)) level = "Open Water";
+  if (level) return agency ? `${agency} ${level}` : level;
+  const usefulFreeText = /\b(?:diver|instructor|master|level|star)\b/i.test(source)
+    && source.split(/\s+/).length <= 10
+    && !/[?]/.test(source);
+  return usefulFreeText ? source : "";
+}
+
+function preferredBookingProvider(kind, value) {
+  if (kind !== "diving") return "";
+  const source = cleanWorkflowValue(value, 180);
+  const candidates = [...source.matchAll(/\b([A-Za-z&'’.-]+(?:\s+[A-Za-z&'’.-]+){0,4}\s+(?:Divers?|Dive(?:\s+(?:Center|Centre|School))?))\b/gi)]
+    .map((match) => match[1].replace(/^(?:(?:can|could|would|we|i|to|go|with|the|use|choose|prefer)\s+)+/i, "").trim())
+    .filter(Boolean);
+  const provider = candidates.at(-1) || "";
+  if (!provider || provider.split(/\s+/).length > 5) return "";
+  return provider.toLowerCase() === "french kiss divers"
+    ? "French Kiss Divers"
+    : provider.toLowerCase() === "roctopus dive"
+      ? "Roctopus Dive"
+      : provider.replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function bookingSideContext(kind, value) {
+  const source = cleanWorkflowValue(value, 240);
+  const preferredProvider = preferredBookingProvider(kind, source);
+  if (preferredProvider) {
+    return {
+      preferredProvider,
+      acknowledgement: preferredProvider === "Roctopus Dive"
+        ? "I’ve included Roctopus Dive as your preferred dive school."
+        : `We normally recommend Roctopus Dive, but I can include ${preferredProvider} as your preferred dive school and our booking team can check whether that can be arranged.`
+    };
+  }
+  if (/\b(?:suitcases?|luggage|bags?)\b/i.test(source)
+    && /\b(?:can|could|bring|have|taking|travelling|traveling)\b/i.test(source)) {
+    return { preferredProvider: "", acknowledgement: "I’ve added the luggage details to your request. The booking team will check that the available transport can accommodate them." };
+  }
+  if (/\b(?:bicycles?|bikes?)\b/i.test(source)) {
+    return { preferredProvider: "", acknowledgement: "I’ve added that you would like to bring bicycles. The booking team will check the operator’s current rules and availability." };
+  }
+  if (/\b(?:child|children|kid|kids)\b/i.test(source)) {
+    return { preferredProvider: "", acknowledgement: "I’ve added that children may be joining. The booking team will check the suitable option and availability." };
+  }
+  const sideQuestion = /[?]/.test(source)
+    || /\b(?:is\s+(?:that|this|it)\s+possible|can\s+(?:we|i|they)|could\s+(?:we|i|they)|would\s+(?:it|that)|please\s+note|instead|prefer)\b/i.test(source);
+  return sideQuestion
+    ? { preferredProvider: "", acknowledgement: "I’ve added that to your request. Our booking team will check whether it can be arranged." }
+    : { preferredProvider: "", acknowledgement: "" };
+}
+
+function bookingDatePurpose(kind) {
+  return {
+    diving: "diving",
+    fishing: "fishing trip",
+    snorkeling: "snorkeling trip",
+    taxi: "taxi",
+    taxi_boat: "taxi-boat trip",
+    ferry: "ferry journey",
+    motorbike_taxi: "motorbike taxi"
+  }[kind] || "booking";
+}
+
+function bookingValidationAnswer(kind, field, parsedDate = null) {
+  if (field === "date" && parsedDate?.status === "past") {
+    return `${parsedDate.displayDate} has already passed. Please choose another date for your ${bookingDatePurpose(kind)}.`;
+  }
+  if (field === "date") {
+    return "I couldn’t understand that date. You can enter something like ‘tomorrow’, ‘30 August’, or ‘30.08.2026’.";
+  }
+  if (field === "guests") return "Please enter the number of guests, for example 2.";
+  if (field === "time") return "I couldn’t understand that pickup time. You can enter something like ‘9:30 AM’ or ‘14:00’.";
+  if (field === "pickup") return "I couldn’t identify the pickup location. Please enter the place or pier where the journey should start.";
+  if (field === "destination") return "I couldn’t identify the destination. Please enter where you would like to go.";
+  if (field === "option") return kind === "diving"
+    ? "I didn’t recognize that diving option. Please choose Fun Diving, Open Water, Advanced Open Water, or Other course."
+    : `I didn’t recognize that ${kind === "fishing" ? "fishing" : "snorkeling"} preference. Please choose one of the options below.`;
+  if (field === "course") return "Please enter the diving course you would like us to check.";
+  if (field === "certification") return "I didn’t recognize a certification level there. You can enter something like Open Water, Advanced, Rescue, Divemaster or Instructor.";
+  if (field === "tripType") return "Please choose whether you need a one-way or return boat trip.";
+  if (field === "contact") return `I couldn’t find a usable contact number. ${CONTACT_PROMPT}`;
+  return "I couldn’t use that answer. Please try again.";
 }
 
 function bookingChoiceActions(kind, field) {
@@ -1133,7 +1253,7 @@ function divingCollectionStep(missing, rejectedLocalContact = false, isNewReques
   };
 }
 
-function applyDivingBookingPolicy(result, question, history, currentReplyContact = "", workflowState = null, now = new Date()) {
+function applyDivingBookingPolicy(result, question, history, currentReplyContact = "", workflowState = null, now = new Date(), retryingDelivery = false) {
   const pendingState = workflowState?.type === "booking"
     && workflowState.status === "collecting"
     && workflowState.kind === "diving"
@@ -1153,22 +1273,29 @@ function applyDivingBookingPolicy(result, question, history, currentReplyContact
     };
   }
   const messages = actionableNow && !pendingState ? [question] : [...priorMessages, question];
-  const currentDetails = cleanWorkflowNotes(question);
+  const currentDetails = retryingDelivery ? "" : cleanWorkflowNotes(question);
   const details = pendingState
     ? [pendingState.bookingRequest?.notes, currentDetails].filter(Boolean).join(" ").replace(/\s+/g, " ").trim().slice(0, 500)
     : cleanWorkflowNotes(messages.join(" "));
   const previous = pendingState?.bookingRequest || {};
-  const currentChoice = pendingState?.missing?.[0] === "certification"
+  const expectedField = pendingState?.missing?.[0] || "";
+  const sideContext = bookingSideContext("diving", currentDetails);
+  const parsedDate = parseBangkokRequestedDate(question, now);
+  const currentDate = parsedDate.status === "valid" ? parsedDate.displayDate : "";
+  const currentChoice = expectedField === "certification"
     ? { option: "", courseName: "" }
     : divingChoice(currentDetails);
   const choice = currentChoice.option
     ? currentChoice
     : { option: previous.option || "", courseName: previous.courseName || "" };
-  const preferredDate = divingPreferredDate(currentDetails, now) || previous.preferredDate || divingPreferredDate(details, now);
-  const guestCount = divingGuestCount(currentDetails, pendingState?.missing?.[0] === "guests") || previous.guestCount || divingGuestCount(details);
+  const preferredDate = currentDate || previous.preferredDate || (!pendingState ? divingPreferredDate(details, now) : "");
+  const currentGuestCount = divingGuestCount(currentDetails, expectedField === "guests");
+  const guestCount = currentGuestCount || previous.guestCount || (!pendingState ? divingGuestCount(details) : "");
+  const currentCertification = divingCertification(currentDetails);
   const certificationLevel = choice.option === "Fun Diving"
-    ? (divingCertification(currentDetails) || previous.certificationLevel || divingCertification(details))
+    ? (currentCertification || previous.certificationLevel || (!pendingState ? divingCertification(details) : ""))
     : "";
+  const preferredProvider = sideContext.preferredProvider || previous.preferredProvider || "";
   const contact = validInternationalReplyContact(currentReplyContact);
   const rejectedLocalContact = Boolean(currentReplyContact && !contact);
   const missing = [];
@@ -1180,11 +1307,25 @@ function applyDivingBookingPolicy(result, question, history, currentReplyContact
   if (!contact) missing.push("contact");
   if (missing.length) {
     const step = divingCollectionStep(missing, rejectedLocalContact, actionableNow && !pendingState);
+    const acceptedExpectedField = {
+      date: parsedDate.status === "valid",
+      guests: Boolean(currentGuestCount),
+      option: Boolean(currentChoice.option),
+      course: Boolean(currentChoice.courseName),
+      certification: Boolean(currentCertification),
+      contact: Boolean(contact)
+    }[expectedField];
+    let prefix = sideContext.acknowledgement;
+    if (pendingState && missing[0] === expectedField && !acceptedExpectedField && !prefix && !(expectedField === "contact" && rejectedLocalContact)) {
+      prefix = bookingValidationAnswer("diving", expectedField, parsedDate);
+    } else if (!pendingState && missing[0] === "date" && ["past", "invalid"].includes(parsedDate.status)) {
+      prefix = bookingValidationAnswer("diving", "date", parsedDate);
+    }
     return {
       handled: true,
       result: {
         ...result,
-        answer: step.answer,
+        answer: [prefix, step.answer].filter(Boolean).join(" "),
         intentId: "diving_booking_request",
         category: "booking",
         needsHuman: false,
@@ -1198,14 +1339,14 @@ function applyDivingBookingPolicy(result, question, history, currentReplyContact
         type: "booking", kind: "diving", status: "collecting", retainPrivateContact: Boolean(contact), missing,
         bookingRequest: {
           kind: "diving", activity: "Diving", preferredDate, guestCount,
-          option: choice.option, courseName: choice.courseName, certificationLevel,
+          option: choice.option, courseName: choice.courseName, certificationLevel, preferredProvider,
           pickupTime: "", pickupLocation: "", destination: "", tripType: "", notes: details
         }
       }
     };
   }
   const optionDetail = choice.option === "Other course" ? choice.courseName : choice.option;
-  const summary = `Diving booking request: ${optionDetail}; preferred date ${preferredDate}; ${guestCount} ${guestCount === "1" ? "person" : "people"}${certificationLevel ? `; certification ${certificationLevel}` : ""}. Guest notes: ${details}`;
+  const summary = `Diving booking request: ${optionDetail}; preferred date ${preferredDate}; ${guestCount} ${guestCount === "1" ? "person" : "people"}${certificationLevel ? `; certification ${certificationLevel}` : ""}${preferredProvider ? `; preferred dive school ${preferredProvider}` : ""}. Guest notes: ${details}`;
   return {
     handled: true,
     result: {
@@ -1227,6 +1368,7 @@ function applyDivingBookingPolicy(result, question, history, currentReplyContact
         option: choice.option,
         courseName: choice.courseName,
         certificationLevel,
+        preferredProvider,
         notes: details
       }
     },
@@ -1235,7 +1377,7 @@ function applyDivingBookingPolicy(result, question, history, currentReplyContact
       type: "booking", kind: "diving", status: "ready", retainPrivateContact: false, missing: [],
       bookingRequest: {
         kind: "diving", activity: "Diving", preferredDate, guestCount,
-        option: choice.option, courseName: choice.courseName, certificationLevel,
+        option: choice.option, courseName: choice.courseName, certificationLevel, preferredProvider,
         pickupTime: "", pickupLocation: "", destination: "", tripType: "", notes: details
       }
     }
@@ -1352,7 +1494,7 @@ function bookingCollectionStep(kind, missing, rejectedLocalContact = false, isNe
   };
 }
 
-function generalBookingPolicy(result, question, currentReplyContact = "", workflowState = null, now = new Date()) {
+function generalBookingPolicy(result, question, currentReplyContact = "", workflowState = null, now = new Date(), retryingDelivery = false) {
   const pendingState = workflowState?.type === "booking" && workflowState.status === "collecting"
     ? workflowState
     : null;
@@ -1374,21 +1516,32 @@ function generalBookingPolicy(result, question, currentReplyContact = "", workfl
   const previous = startingNewKind ? {} : (pendingState?.bookingRequest || {});
   const kind = startingNewKind ? kindNow : (pendingState?.kind || kindNow || "");
   if (kind === "diving") return { handled: false, result, alertQuestion: question, workflow: null };
-  const currentDetails = cleanWorkflowNotes(question);
+  const currentDetails = retryingDelivery ? "" : cleanWorkflowNotes(question);
+  const expectedField = startingNewKind ? "" : (pendingState?.missing?.[0] || "");
+  const sideContext = bookingSideContext(kind, currentDetails);
   const notes = previous.notes
     ? [previous.notes, currentDetails].filter(Boolean).join(" ").replace(/\s+/g, " ").trim().slice(0, 500)
     : currentDetails;
   const route = bookingRoute(question);
-  const allowGuestsReply = pendingState?.missing?.[0] === "guests";
-  const allowOptionReply = pendingState?.missing?.[0] === "option";
-  const allowTripReply = pendingState?.missing?.[0] === "tripType";
-  const preferredDate = divingPreferredDate(question, now) || previous.preferredDate || "";
-  const guestCount = bookingGuestCount(question, allowGuestsReply) || previous.guestCount || "";
-  const option = bookingOption(kind, question, allowOptionReply) || previous.option || "";
-  const pickupTime = displayPreferredTime(question) || previous.pickupTime || "";
-  const pickupLocation = route.pickupLocation || shortBookingReply(pendingState, question, "pickup") || previous.pickupLocation || "";
-  const destination = route.destination || shortBookingReply(pendingState, question, "destination") || previous.destination || "";
-  const tripType = bookingTripType(question) || previous.tripType || "";
+  const allowGuestsReply = expectedField === "guests";
+  const allowOptionReply = expectedField === "option";
+  const parsedDate = parseBangkokRequestedDate(question, now);
+  const currentDate = parsedDate.status === "valid" ? parsedDate.displayDate : "";
+  const currentGuestCount = bookingGuestCount(question, allowGuestsReply);
+  const currentOption = bookingOption(kind, question, sideContext.acknowledgement ? false : allowOptionReply);
+  const currentPickupTime = displayPreferredTime(question);
+  const shortPickup = sideContext.acknowledgement ? "" : shortBookingReply(pendingState, question, "pickup");
+  const shortDestination = sideContext.acknowledgement ? "" : shortBookingReply(pendingState, question, "destination");
+  const currentPickupLocation = route.pickupLocation || shortPickup;
+  const currentDestination = route.destination || shortDestination;
+  const currentTripType = bookingTripType(question);
+  const preferredDate = currentDate || previous.preferredDate || "";
+  const guestCount = currentGuestCount || previous.guestCount || "";
+  const option = currentOption || previous.option || "";
+  const pickupTime = currentPickupTime || previous.pickupTime || "";
+  const pickupLocation = currentPickupLocation || previous.pickupLocation || "";
+  const destination = currentDestination || previous.destination || "";
+  const tripType = currentTripType || previous.tripType || "";
   const contact = validInternationalReplyContact(currentReplyContact);
   const rejectedLocalContact = Boolean(currentReplyContact && !contact);
   const request = {
@@ -1399,6 +1552,7 @@ function generalBookingPolicy(result, question, currentReplyContact = "", workfl
     option,
     courseName: "",
     certificationLevel: "",
+    preferredProvider: previous.preferredProvider || "",
     pickupTime,
     pickupLocation,
     destination,
@@ -1408,11 +1562,27 @@ function generalBookingPolicy(result, question, currentReplyContact = "", workfl
   const missing = bookingMissingFields(kind, request, contact);
   if (missing.length) {
     const step = bookingCollectionStep(kind, missing, rejectedLocalContact, !pendingState || startingNewKind);
+    const acceptedExpectedField = {
+      date: parsedDate.status === "valid",
+      guests: Boolean(currentGuestCount),
+      option: Boolean(currentOption),
+      time: Boolean(currentPickupTime),
+      pickup: Boolean(currentPickupLocation),
+      destination: Boolean(currentDestination),
+      tripType: Boolean(currentTripType),
+      contact: Boolean(contact)
+    }[expectedField];
+    let prefix = sideContext.acknowledgement;
+    if (pendingState && missing[0] === expectedField && !acceptedExpectedField && !prefix && !(expectedField === "contact" && rejectedLocalContact)) {
+      prefix = bookingValidationAnswer(kind, expectedField, parsedDate);
+    } else if (!pendingState && missing[0] === "date" && ["past", "invalid"].includes(parsedDate.status)) {
+      prefix = bookingValidationAnswer(kind, "date", parsedDate);
+    }
     return {
       handled: true,
       result: {
         ...result,
-        answer: step.answer,
+        answer: [prefix, step.answer].filter(Boolean).join(" "),
         intentId: kind ? `${kind}_booking_request` : "booking_request",
         category: "booking", needsHuman: false, handoff: "booking", actions: step.actions, suppressDefaultActions: true,
         source: "booking-policy"
@@ -1442,13 +1612,13 @@ function generalBookingPolicy(result, question, currentReplyContact = "", workfl
   };
 }
 
-function applyStructuredBookingPolicy(result, question, history, currentReplyContact = "", workflowState = null, now = new Date()) {
+function applyStructuredBookingPolicy(result, question, history, currentReplyContact = "", workflowState = null, now = new Date(), retryingDelivery = false) {
   const pendingKind = workflowState?.type === "booking" && workflowState.status === "collecting" ? workflowState.kind : "";
   const kindNow = bookingKindFromText(question);
   if (pendingKind === "diving" || kindNow === "diving" || isActionableDivingBooking(question)) {
-    return applyDivingBookingPolicy(result, question, history, currentReplyContact, workflowState, now);
+    return applyDivingBookingPolicy(result, question, history, currentReplyContact, workflowState, now, retryingDelivery);
   }
-  return generalBookingPolicy(result, question, currentReplyContact, workflowState, now);
+  return generalBookingPolicy(result, question, currentReplyContact, workflowState, now, retryingDelivery);
 }
 
 function emergencyConfirmationActions(kind) {
@@ -2115,7 +2285,11 @@ async function recordInteractionAndAlert({ env, store, ctx, sessionId, room, roo
     now
   }).catch(() => null);
   let delivery = { attempted: 0, accepted: 0 };
-  if (alert && !alert.duplicate) delivery = await dispatchConciergeAlert(alert, env).catch(() => delivery);
+  if (alert?.previouslyAccepted) {
+    delivery = { attempted: 0, accepted: 1 };
+  } else if (alert && (!alert.duplicate || alert.retryableDelivery)) {
+    delivery = await dispatchConciergeAlert(alert, env).catch(() => delivery);
+  }
   return { interactionId, alert, delivery };
 }
 
@@ -2130,7 +2304,8 @@ export async function handleConciergeRequest(request, env, ctx, now = new Date()
   }
 
   const sanitizedQuestion = sanitizeQuestion(body.question);
-  const currentReplyContact = extractReplyContact([body.question, body.privateReplyContact]);
+  const questionReplyContact = extractReplyContact([body.question]);
+  const currentReplyContact = questionReplyContact || extractReplyContact([body.privateReplyContact]);
   const question = sanitizedQuestion === "[passport information removed]"
     ? "passport registration"
     : sanitizedQuestion;
@@ -2335,14 +2510,44 @@ export async function handleConciergeRequest(request, env, ctx, now = new Date()
       : propertyPolicy.handled
         ? propertyPolicy.workflow
         : null;
+  const failedBookingState = workflowState?.type === "booking" && workflowState.status === "delivery_failed"
+    ? workflowState
+    : null;
+  const explicitBookingRetry = Boolean(failedBookingState && isExplicitBookingRetry(question));
+  const failedBookingCancel = Boolean(failedBookingState
+    && /^\s*(?:cancel|never\s*mind|nevermind|forget\s+it)\s*[.!]?\s*$/i.test(question));
+  const startsNewBooking = Boolean(failedBookingState && !explicitBookingRetry && isActionableStructuredBooking(question));
+  const bookingStateForTurn = explicitBookingRetry
+    ? { ...failedBookingState, status: "collecting" }
+    : startsNewBooking ? null : workflowState;
+  const replyContactForTurn = failedBookingState && !explicitBookingRetry
+    ? questionReplyContact
+    : currentReplyContact;
   const bypassOrdinaryWorkflows = Boolean(lostKeyResult || directWorkflow || servicePolicyResult || bookingInformationResult || isEmergencyResult(result));
-  const bookingPolicy = bypassOrdinaryWorkflows
+  const bookingPolicy = failedBookingCancel
+    ? {
+        handled: true,
+        result: {
+          ...result,
+          answer: "No problem. I have cancelled the failed booking request.",
+          intentId: "booking_request_cancelled",
+          category: "booking",
+          needsHuman: false,
+          handoff: "none",
+          actions: [],
+          suppressDefaultActions: true,
+          source: "booking-policy"
+        },
+        alertQuestion: question,
+        workflow: { type: "booking", kind: failedBookingState.kind, status: "cancelled", retainPrivateContact: false, missing: [] }
+      }
+    : bypassOrdinaryWorkflows || (failedBookingState && !explicitBookingRetry && !startsNewBooking)
     ? { handled: false, result, alertQuestion: question, workflow: null }
-    : applyStructuredBookingPolicy(result, question, history, currentReplyContact, workflowState, now);
+    : applyStructuredBookingPolicy(result, question, history, replyContactForTurn, bookingStateForTurn, now, explicitBookingRetry);
   const luggagePolicy = bypassOrdinaryWorkflows || bookingPolicy.handled
     ? { handled: false, result, alertQuestion: question, workflow: null }
-    : applyLuggageRequestPolicy(result, question, history, currentReplyContact, workflowState, now);
-  const workflowPolicy = lostKeyResult
+    : applyLuggageRequestPolicy(result, question, history, replyContactForTurn, workflowState, now);
+  let workflowPolicy = lostKeyResult
     ? { result, alertQuestion: question, workflow: null }
     : cleaningPolicy.handled
     ? { result, alertQuestion: cleaningPolicy.alertQuestion, workflow: directWorkflow }
@@ -2356,7 +2561,15 @@ export async function handleConciergeRequest(request, env, ctx, now = new Date()
         ? bookingPolicy
         : (luggagePolicy.handled
           ? luggagePolicy
-          : { ...applyContactRequirement(result, question, history, currentReplyContact), workflow: null });
+          : { ...applyContactRequirement(result, question, history, replyContactForTurn), workflow: null });
+  if (failedBookingState
+    && !explicitBookingRetry
+    && !startsNewBooking
+    && !failedBookingCancel
+    && !bypassOrdinaryWorkflows
+    && !workflowPolicy.workflow) {
+    workflowPolicy = { ...workflowPolicy, workflow: failedBookingState };
+  }
   result = workflowPolicy.result;
 
   const recorded = await recordInteractionAndAlert({
@@ -2439,7 +2652,7 @@ export async function handleConciergeRequest(request, env, ctx, now = new Date()
       actions: [{ label: "Call Us", type: "route", route: "houseCall" }]
     };
     if (bookingPolicy.handled && bookingPolicy.workflow) {
-      bookingPolicy.workflow.status = "collecting";
+      bookingPolicy.workflow.status = "delivery_failed";
       bookingPolicy.workflow.retainPrivateContact = true;
     }
   } else if (result.intentId === "luggage_storage" && result.needsHuman) {

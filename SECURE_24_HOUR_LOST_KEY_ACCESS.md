@@ -22,7 +22,7 @@ This policy supersedes every earlier office-hours/after-hours split for lost-key
 7. At least one protected Meta submission must be accepted before release can continue. If none succeeds, no code or view action is returned.
 8. The protected guest page may then show **View spare key**. The code is returned only to that page and is never inserted into Concierge conversation history.
 9. Display records the release and immediately marks the room as requiring physical code rotation. The request authorization becomes unusable.
-10. Another release remains blocked until authorized staff change the physical key-box code, update the encrypted `SPARE_KEY_CODES` secret, deploy it and complete the rotation reset in `/concierge-admin`.
+10. Another release remains blocked until an authorized owner clears only the rotation lock through one of the two deliberate reset modes in `/concierge-admin`: controlled administrative test when no guest or unauthorized person saw the code, or physical rotation after the box code and encrypted secret have actually been changed.
 
 ## Request-bound authorization
 
@@ -51,14 +51,22 @@ The release fails closed when protected recipients are missing, Meta configurati
 
 ## Rotation lock
 
-After the code is displayed, `/concierge-admin` must clearly show that the room's physical key-box code requires rotation. Reset is authorized only after all of these steps are complete:
+After the code is displayed, `/concierge-admin` must clearly show that the room's key-box state requires an authorized decision. The protected owner/admin boundary offers exactly two reset modes.
+
+### Controlled administrative test
+
+Use **Controlled admin test — keep existing code** only when an owner deliberately tested the complete flow and no guest or unauthorized person saw the code. The owner must type the exact confirmation phrase. This clears only the rotation lock, retains the current physical code and writes a distinct code-free activity record stating that the existing code was retained. It must not claim physical rotation.
+
+### Physical key-box rotation
+
+Use **Physical key-box code rotated** only after all of these steps are complete:
 
 1. Change the physical code on the relevant room's key box.
 2. Replace that room's value in the encrypted `SPARE_KEY_CODES` secret.
 3. Deploy the updated secret/configuration.
-4. Use the protected owner-console confirmation to clear the rotation lock.
+4. Type the exact physical-rotation confirmation in the protected owner console to clear the lock and write the distinct physical-rotation activity record.
 
-The lock is per room. Clearing it does not make a historical request reusable; a guest must start a new request and explicitly accept the fee again.
+Both modes require the existing protected owner/admin authentication and deliberate typed confirmation. The lock is per room. Either mode clears only that lock; it preserves historical release and used-request records, so no request becomes reusable. A guest must start a new request, begin with `feeAccepted=false`, explicitly accept the fee and pass a new protected notification before another release. Audit/activity records include the room, Bangkok timestamp and reset mode but never the key-box code.
 
 ## Required verification matrix
 
@@ -70,18 +78,21 @@ The lock is per room. Clearing it does not make a historical request reusable; a
 - Expired or replayed request: no code.
 - Notification failure: no code.
 - Rotation outstanding: second release blocked.
-- Authorized rotation reset: only a new request with new acceptance may release again.
+- Controlled-test reset: deliberate confirmation clears the lock, truthfully records that the existing code was retained and leaves the used request unusable.
+- Physical-rotation reset: deliberate confirmation truthfully records completed physical rotation and leaves the used request unusable.
+- Cancelled or invalid confirmation: lock remains active.
 - Leak scan: no real code in Concierge history, WhatsApp/Meta payloads, alerts, logs, diagnostics, Git, release files or screenshots.
 
 ## Activation checklist
 
-1. Deploy the verified v5.11.22 release without changing recipients or Meta template mappings.
+1. Deploy the verified v5.11.23 release without changing recipients or Meta template mappings.
 2. Keep `STAY_TOKEN_PEPPER`, `RESERVATION_SYNC_TOKEN` and real current `SPARE_KEY_CODES` values as separate encrypted secrets.
 3. Confirm `lost_key_team` resolves to Su and both owners through the existing protected recipient configuration.
 4. Test daytime and nighttime flows using a non-sensitive active test stay and temporary physical code.
 5. Verify notification acceptance precedes display, then verify the rotation-required state and second-release block.
-6. Change the temporary physical code, update the secret, deploy and complete the authorized reset.
-7. Confirm the used request still cannot be replayed and a new request asks for fee acceptance again.
+6. For a controlled owner-only test, use the controlled-test reset and verify its truthful activity record without changing the temporary physical code.
+7. Separately verify the normal physical-rotation path only when the box code and encrypted secret have actually been changed.
+8. After either reset, confirm the used request still cannot be replayed and a new request asks for fee acceptance again.
 
 ## Separate property-emergency route
 

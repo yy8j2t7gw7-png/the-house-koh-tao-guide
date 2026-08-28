@@ -2,6 +2,33 @@
 
 All notable changes to The House – Koh Tao guest guide are recorded here.
 
+## v5.11.23 — Production Conversation & State Corrections
+
+### Booking conversation and validation
+
+- Stops the active collector from treating every guest message as the currently missing field. Side questions, alternative providers, luggage, bicycle and child notes are acknowledged, retained in the same authoritative request and followed by the next missing question without a third-party availability promise.
+- Adds one shared Bangkok-aware date parser for dotted, slashed, dashed, named and relative dates. Past and unparseable values now produce concise reasons and remain pending instead of silently repeating the question.
+- Keeps common European `DD.MM.YYYY` input out of contact redaction while retaining the existing raw-contact protections.
+- Replaces the four-value diving certification regex with sanitized free text and common alias normalization for Open Water, Advanced, Rescue, Divemaster, instructor and agency-qualified equivalents.
+- Adds concise invalid-field explanations for dates, party counts, pickup time, route fields, finite options, course, certification, trip direction and contact.
+- Proves that Open Water is complete with date, divers, course selection and an international contact; it never inherits the Fun Diving certification requirement. A rejected local contact leaves the same request intact and a corrected international contact replaces it.
+- Corrects the protected-delivery retry state: an alert with failed attempts and zero accepted notifications is retried under the same alert ID, while an already accepted duplicate returns success without another send. Guest success still requires at least one provider message ID.
+- Separates `delivery_failed` from active booking collection. Unrelated bar, checkout, Wi-Fi, property and other new intents route normally and never trigger a silent resend; only an explicit retry phrase may reuse the safe completed snapshot and transient contact.
+
+### Property, owner safety and lost-key reset
+
+- Corrects the property accumulator so prior notes are carried only for the same issue category or an odor clarification. Category changes start a clean detail buffer.
+- Includes clean issue content in property deduplication, so an exact reload repeat stays deduplicated while a later distinct same-category issue can create its own clean alert.
+- Keeps unresolved urgent/critical owner-console sections open after manual mouse or keyboard toggles as well as **Collapse all**, with synchronized `aria-expanded`, `aria-disabled` and a prominent stays-open badge.
+- Adds two protected lost-key rotation-lock reset modes: **Controlled admin test — keep existing code** and **Physical key-box code rotated**. Each requires an exact typed confirmation and creates a truthful code-free activity event.
+- Leaves every historical request marker intact after either reset, so the next release still requires a new request, fresh fee acceptance and new protected notification.
+
+### Scope and validation
+
+- Preserves the production-passed cleaning sequence, seven-category progressive structure, property classifiers, urgent confirmation boundary and 24/7 guest lost-key release.
+- Changes no Meta template mapping, recipient, secret, webhook, emergency route, passport/Airbnb rule or public visual design. `WHATSAPP_STAFF_ACTIONS_ENABLED=false` remains required.
+- Expands the complete regression suite from 140 to 148 tests. The next planned milestone is v5.11.24 full visual polish.
+
 ## v5.11.22 — Progressive Booking, Property Intelligence & 24/7 Lost-Key Recovery
 
 ### Progressive booking

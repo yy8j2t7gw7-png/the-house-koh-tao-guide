@@ -555,7 +555,12 @@ export class ConciergeStore extends DurableObject {
       `SELECT id, interaction_id AS interactionId, severity, alert_type AS alertType,
               recipient_group AS recipientGroup, room, room_verified AS roomVerified,
               summary, bangkok_time AS bangkokTime, status, created_at AS createdAt,
-              escalation_due_at AS escalationDueAt, escalated_at AS escalatedAt
+              escalation_due_at AS escalationDueAt, escalated_at AS escalatedAt,
+              (SELECT COUNT(*) FROM concierge_alert_deliveries d
+               WHERE d.alert_id = concierge_alerts.id) AS deliveryAttempts,
+              (SELECT COUNT(*) FROM concierge_alert_deliveries d
+               WHERE d.alert_id = concierge_alerts.id
+                 AND d.status IN ('accepted', 'sent', 'delivered', 'read')) AS acceptedDeliveries
        FROM concierge_alerts
        WHERE dedupe_key = ? AND status IN ('open', 'acknowledged')
          AND julianday(created_at) >= julianday(?, '-5 minutes')
@@ -563,7 +568,17 @@ export class ConciergeStore extends DurableObject {
       dedupeKey,
       createdAt
     ))[0];
-    if (existing) return { created: false, alert: { ...existing, roomVerified: Boolean(existing.roomVerified) } };
+    if (existing) {
+      return {
+        created: false,
+        alert: {
+          ...existing,
+          roomVerified: Boolean(existing.roomVerified),
+          deliveryAttempts: Number(existing.deliveryAttempts) || 0,
+          acceptedDeliveries: Number(existing.acceptedDeliveries) || 0
+        }
+      };
+    }
 
     this.ctx.storage.sql.exec(
       `INSERT INTO concierge_alerts
@@ -1320,22 +1335,38 @@ export class ConciergeStore extends DurableObject {
     return { ok: true };
   }
 
-  async confirmSpareKeyRotation(room, nowValue) {
+  async confirmSpareKeyRotation(room, nowValue, resetMode) {
     const now = cleanText(nowValue, 40) || new Date().toISOString();
+    const mode = ["controlled_test", "physical_rotation"].includes(resetMode) ? resetMode : "";
+    if (!mode) return { ok: false, error: "invalid_reset_mode" };
+    const current = rows(this.ctx.storage.sql.exec(
+      `SELECT rotation_required AS rotationRequired, last_reservation_id AS lastReservationId
+       FROM spare_key_room_state WHERE room = ? LIMIT 1`,
+      cleanText(room, 4)
+    ))[0] || null;
+    if (!Boolean(current?.rotationRequired)) return { ok: false, error: "rotation_not_required" };
+    const eventType = mode === "controlled_test"
+      ? "rotation_cleared_controlled_test"
+      : "rotation_cleared_physical";
     this.ctx.storage.sql.exec(
-      `INSERT INTO spare_key_room_state
-       (room, rotation_required, last_released_at, last_reservation_id,
-        rotation_confirmed_at, updated_at)
-       VALUES (?, 0, '', '', ?, ?)
-       ON CONFLICT(room) DO UPDATE SET
-         rotation_required = 0,
-         rotation_confirmed_at = excluded.rotation_confirmed_at,
-         updated_at = excluded.updated_at`,
+      `INSERT INTO spare_key_events
+       (id, reservation_id, room, event_type, fee_accepted, code_released, request_hash, alert_id, created_at)
+       VALUES (?, ?, ?, ?, 0, 0, '', '', ?)`,
+      `key_reset_${crypto.randomUUID()}`,
+      cleanText(current.lastReservationId, 100),
       cleanText(room, 4),
-      now,
+      eventType,
       now
     );
-    return { ok: true, room, rotationConfirmedAt: now };
+    this.ctx.storage.sql.exec(
+      `UPDATE spare_key_room_state
+       SET rotation_required = 0, rotation_confirmed_at = ?, updated_at = ?
+      WHERE room = ?`,
+      now,
+      now,
+      cleanText(room, 4)
+    );
+    return { ok: true, room, resetMode: mode, rotationConfirmedAt: now };
   }
 
   async extendStayReservation(reservationId, checkOutDate, nowValue) {
@@ -1406,7 +1437,13 @@ export class ConciergeStore extends DurableObject {
        WHERE rotation_required = 1
        ORDER BY updated_at DESC`
     )).map((item) => ({ ...item, rotationRequired: Boolean(item.rotationRequired) }));
-    return { reservations, rotations };
+    const rotationActivity = rows(this.ctx.storage.sql.exec(
+      `SELECT room, event_type AS eventType, created_at AS createdAt
+       FROM spare_key_events
+       WHERE event_type IN ('rotation_cleared_controlled_test', 'rotation_cleared_physical')
+       ORDER BY created_at DESC LIMIT 20`
+    ));
+    return { reservations, rotations, rotationActivity };
   }
 
   async getTranslations(cacheKeys) {

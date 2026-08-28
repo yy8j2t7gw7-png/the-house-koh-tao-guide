@@ -196,7 +196,7 @@ export function sanitizeQuestion(value, maximum = 800) {
   return source
     .replace(/https?:\/\/\S+/gi, "[link removed]")
     .replace(/[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}/g, "[email removed]")
-    .replace(/(?:\+?\d[\d\s()-]{7,}\d)/g, "[number removed]")
+    .replace(/(?:\+?\d[\d\s()-]{7,}\d)/g, (match) => /^\d{1,2}-\d{1,2}-\d{2,4}$/.test(match.trim()) ? match : "[number removed]")
     .replace(/\b(?:(?:key[\s-]?box|lock[\s-]?box|door|access|room)\s*)?(?:code|pin)\s*(?:(?:is|:|=|#|-)\s*)?(?=[A-Z0-9-]{3,16}\b)(?=[A-Z0-9-]*\d)[A-Z0-9-]{3,16}\b/gi, "[protected code removed]")
     .replace(/\b(?:stay|access|guest|private)\s+(?:token|nonce|reference)\s*(?:(?:is|:|=|#|-)\s*)?[A-Z0-9_-]{5,80}\b/gi, "[private token removed]")
     .replace(/\b(passport|booking|reservation)\s*(?:(?:number|no\.?|id)\s*[:#-]?\s*|[:#-]\s*)[A-Z0-9-]{5,}\b/gi, "$1 [identifier removed]")

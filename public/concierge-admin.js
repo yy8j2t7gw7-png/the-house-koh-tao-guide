@@ -20,6 +20,7 @@
   const activeStayReservations = document.getElementById("activeStayReservations");
   const upcomingStayReservations = document.getElementById("upcomingStayReservations");
   const keyRotations = document.getElementById("keyRotations");
+  const keyRotationActivity = document.getElementById("keyRotationActivity");
   const manualStayForm = document.getElementById("manualStayForm");
   const directStayForm = document.getElementById("directStayForm");
   const directStayResult = document.getElementById("directStayResult");
@@ -28,7 +29,7 @@
   const expandAdminSections = document.getElementById("expandAdminSections");
   const collapseAdminSections = document.getElementById("collapseAdminSections");
   const adminSections = [...document.querySelectorAll("details[data-admin-section]")];
-  const sectionStateKey = "houseConciergeAdminSections:v5.11.22";
+  const sectionStateKey = "houseConciergeAdminSections:v5.11.23";
   let token = "";
 
   function savedAdminSectionState() {
@@ -58,7 +59,7 @@
   }
 
   function setAdminSectionOpen(section, open, persist = true) {
-    section.open = Boolean(open);
+    section.open = section.classList.contains("has-urgent") ? true : Boolean(open);
     syncAdminSectionState(section);
     if (persist) persistAdminSectionState();
   }
@@ -70,6 +71,10 @@
       if (typeof saved[id] === "boolean") section.open = saved[id];
       syncAdminSectionState(section);
       section.addEventListener("toggle", () => {
+        if (section.classList.contains("has-urgent") && !section.open) {
+          setAdminSectionOpen(section, true, false);
+          return;
+        }
         syncAdminSectionState(section);
         persistAdminSectionState();
       });
@@ -89,10 +94,18 @@
     const section = adminSections.find((item) => item.dataset.adminSection === id);
     if (!section) return;
     section.classList.toggle("has-urgent", urgent);
+    const summary = section.querySelector(":scope > summary");
+    if (urgent) {
+      summary?.setAttribute("aria-disabled", "true");
+      summary?.setAttribute("title", "This section stays open while urgent work is unresolved.");
+    } else {
+      summary?.removeAttribute("aria-disabled");
+      summary?.removeAttribute("title");
+    }
     const summaryGroup = section.querySelector(".concierge-admin-section-summary");
     let badge = summaryGroup?.querySelector("[data-section-urgent]");
     if (urgent && !badge) {
-      badge = element("span", "concierge-admin-section-urgent", "Urgent");
+      badge = element("span", "concierge-admin-section-urgent", "Urgent · stays open");
       badge.dataset.sectionUrgent = "";
       summaryGroup?.prepend(badge);
     } else if (!urgent) {
@@ -455,13 +468,34 @@
         element("span", "", item.lastReleasedAt
           ? `Spare-key code released: ${bangkokDate(item.lastReleasedAt)}`
           : `Lost-key release is being processed: ${bangkokDate(item.updatedAt)}`),
-        element("span", "", "Change the physical key-box code, update the SPARE_KEY_CODES secret, deploy, then confirm below.")
+        element("span", "", "Choose the truthful reset path below. Normal guest exposure requires physical rotation; only a controlled owner test may retain the current code.")
       );
-      const button = element("button", "danger", "I changed and deployed the code");
-      button.type = "button";
-      button.dataset.rotationAction = "confirm";
-      card.appendChild(button);
+      const actions = element("div", "concierge-admin-card-actions");
+      const rotated = element("button", "danger", "Physical key-box code rotated");
+      rotated.type = "button";
+      rotated.dataset.rotationAction = "physical_rotation";
+      const controlled = element("button", "secondary", "Controlled admin test — keep existing code");
+      controlled.type = "button";
+      controlled.dataset.rotationAction = "controlled_test";
+      actions.append(rotated, controlled);
+      card.appendChild(actions);
       keyRotations.appendChild(card);
+    });
+
+    keyRotationActivity.replaceChildren();
+    const rotationActivity = data.rotationActivity || [];
+    if (!rotationActivity.length) keyRotationActivity.appendChild(element("div", "concierge-admin-empty", "No key-box reset activity recorded yet."));
+    rotationActivity.forEach((item) => {
+      const card = element("article", "concierge-admin-registration-item");
+      const description = item.eventType === "rotation_cleared_controlled_test"
+        ? "Rotation lock cleared — controlled owner test; existing physical code retained."
+        : "Rotation lock cleared — physical key-box code rotated.";
+      card.append(
+        element("strong", "", `Room ${item.room}`),
+        element("span", "", description),
+        element("span", "", bangkokDate(item.createdAt))
+      );
+      keyRotationActivity.appendChild(card);
     });
   }
 
@@ -749,17 +783,28 @@
     const button = event.target.closest("[data-rotation-action]");
     if (!button) return;
     const card = button.closest("[data-rotation-room]");
-    if (!window.confirm(`Confirm that the physical Room ${card.dataset.rotationRoom} key-box code and the Cloudflare SPARE_KEY_CODES secret were both changed and deployed.`)) return;
-    button.disabled = true;
+    const controlledTest = button.dataset.rotationAction === "controlled_test";
+    const confirmationPhrase = controlledTest ? "KEEP EXISTING CODE" : "CODE ROTATED";
+    const prompt = controlledTest
+      ? `Room ${card.dataset.rotationRoom}: confirm this was a controlled administrative test, no guest or unauthorized person saw the key-box code, and you intentionally choose to retain the current physical code. Type ${confirmationPhrase} to clear the lock.`
+      : `Room ${card.dataset.rotationRoom}: first change the physical key-box code, update SPARE_KEY_CODES and deploy it. Type ${confirmationPhrase} only after all three steps are complete.`;
+    if (window.prompt(prompt) !== confirmationPhrase) return;
+    const buttons = [...card.querySelectorAll("[data-rotation-action]")];
+    buttons.forEach((item) => { item.disabled = true; });
     try {
       await api("/api/concierge/admin/spare-key-rotation", {
         method: "POST",
-        body: JSON.stringify({ room: card.dataset.rotationRoom, confirmed: true })
+        body: JSON.stringify({
+          room: card.dataset.rotationRoom,
+          resetMode: button.dataset.rotationAction,
+          confirmed: true,
+          confirmation: confirmationPhrase
+        })
       });
       await loadOverview();
     } catch (_error) {
-      button.disabled = false;
-      window.alert("The rotation confirmation could not be saved.");
+      buttons.forEach((item) => { item.disabled = false; });
+      window.alert("The key-box reset confirmation could not be saved. The rotation lock remains active.");
     }
   });
 

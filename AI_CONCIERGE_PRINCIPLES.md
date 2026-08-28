@@ -70,6 +70,8 @@ Avoid:
 
 The public interface does not need to display Fah’s name, but the underlying booking actions must use Fah’s number.
 
+An active structured booking remains conversational. A side question, provider preference or operational note is acknowledged without promising unconfirmed availability, retained only as sanitized booking context and followed by the same next missing field. It must not reset state, start a parallel workflow or create an incomplete alert. Shared Bangkok date validation distinguishes valid, past and unparseable input across all seven categories and explains why a value was rejected. Fun Diving certification is useful human-readable booking information, so accept reasonable sanitized agency/level free text rather than a brittle fixed enum. Open Water is a course selection, not evidence of an existing certification requirement. A corrected international contact replaces a rejected local attempt while all operational fields remain intact. Failed protected delivery is a retryable terminal snapshot, not active collection: unrelated new intents take priority and may never trigger a resend. Only explicit retry may reuse the snapshot/contact. Retries reuse the same alert record and may show success only after one provider acceptance; an already accepted duplicate must not send again.
+
 ## Stay-support behavior
 
 Fresh towels, room cleaning, lost keys or lockouts, room supplies, air conditioning, water, Wi-Fi, check-in, checkout and similar requests are stay-support conversations, not bookings.
@@ -99,6 +101,8 @@ The verified-stay layer uses either the Airbnb HM confirmation code from the gue
 
 Verified guests may submit structured room-problem reports. Routine reports route to House support; active leaks, toilet overflows, electrical danger and rooms that cannot be secured route to the urgent team. The server determines room and criticality without model judgment. Critical reports require a reply number, but it is used only in the transient protected delivery payload and is not stored. Optional maintenance photos remain private, outside AI and public assets, and expire within 30 days or sooner after deletion.
 
+Natural routine property reports keep detail state isolated by room, protected session, category and active issue instance. A same-issue follow-up may extend that issue, and an exact repeated submission may be deduplicated, but neither suppressed text nor a prior category may contaminate the next alert. A later distinct issue in the same category may create its own clean alert.
+
 ## Property-emergency behavior
 
 Treat a major water leak, flooding, burst pipe, dangerous electrical problem or serious property damage as an urgent property emergency. Offer an immediate call and include the room and guest's description in the urgent message.
@@ -113,7 +117,7 @@ For an accident or urgent medical situation, offer two immediate call actions in
 
 State that a 500 THB replacement fee will be added for a lost key and require explicit acceptance for every current request. Office and housekeeping schedules do not limit the protected self-service flow; during normal service hours a personal-assistance fallback may be offered in addition.
 
-Automated spare-key code delivery must validate the current guest, room, active stay, protected session, single-use request authorization and current-request fee confirmation on the server. The system—not the guest—automatically notifies Su and both owners and must receive confirmation of at least one WhatsApp API submission before protected-page display, then require physical code rotation before another release. Historical acceptance must never carry between requests, days, sessions, stays, rooms or guests. Key-box codes must never enter public client files, Concierge history, alerts, Meta payloads, operational storage, logs, diagnostics, screenshots or conversation fallbacks.
+Automated spare-key code delivery must validate the current guest, room, active stay, protected session, single-use request authorization and current-request fee confirmation on the server. The system—not the guest—automatically notifies Su and both owners and must receive confirmation of at least one WhatsApp API submission before protected-page display, then engage the room rotation lock before another release. Historical acceptance must never carry between requests, days, sessions, stays, rooms or guests. The protected owner console may clear only the lock through either a deliberately confirmed controlled administrative test that truthfully retains an unexposed code, or a deliberately confirmed real physical rotation after the box and encrypted secret are updated. The two audit events must remain distinguishable and code-free, and neither may revive a historical request. Key-box codes must never enter public client files, Concierge history, alerts, Meta payloads, operational storage, logs, diagnostics, screenshots or conversation fallbacks.
 
 ## Factual discipline
 

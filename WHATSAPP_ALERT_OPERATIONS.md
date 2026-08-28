@@ -2,7 +2,7 @@
 
 ## Purpose
 
-v5.11.22 provides a protected server-side staff-alert channel through the official Meta WhatsApp Business Platform. Guests continue to use the website Concierge. Recipient telephone numbers, access tokens and app secrets stay in encrypted Cloudflare secrets and never appear in public files, Git or release archives.
+v5.11.23 provides a protected server-side staff-alert channel through the official Meta WhatsApp Business Platform. Guests continue to use the website Concierge. Recipient telephone numbers, access tokens and app secrets stay in encrypted Cloudflare secrets and never appear in public files, Git or release archives.
 
 Routing is role based:
 
@@ -14,9 +14,11 @@ Routing is role based:
 
 Every luggage alert is independently validated at the final server-side creation boundary. That boundary refuses storage and WhatsApp delivery unless the individual request contains arrival/departure context, requested time, bag count and a usable international contact. Template fields come from this validated structure, so a newly created luggage alert must never contain `Not provided` for a required field.
 
-Every structured booking alert is also validated at the final server-side creation boundary. Diving retains its preferred date, diver count, recognised experience/course choice, conditional certification or named-course detail and usable international contact. Fishing and snorkeling require date, guest count and trip style; taxi and motorbike taxi require date, time, pickup, destination and passenger count; taxi/longtail boat additionally requires one-way or return; ferry requires date, origin, destination and traveler count, with time accepted when supplied. Every category requires a usable international contact. Complete requests route through `booking_with_owners`; recommendation-only questions create no alert. The guest never receives a personal Fah WhatsApp action.
+Every structured booking alert is also validated at the final server-side creation boundary. Diving retains its preferred date, diver count, recognised experience/course choice, useful sanitized certification or named-course detail, optional preferred provider and usable international contact. Open Water and Advanced Open Water require no Fun Diving certification. A local contact is rejected without changing the other fields; the corrected international contact replaces it. Fishing and snorkeling require date, guest count and trip style; taxi and motorbike taxi require date, time, pickup, destination and passenger count; taxi/longtail boat additionally requires one-way or return; ferry requires date, origin, destination and traveler count, with time accepted when supplied. Side questions and preferences stay in the same protected booking state and cannot create an incomplete alert. Every category requires a usable international contact. Complete requests route through `booking_with_owners`; recommendation-only questions create no alert. The guest never receives a personal Fah WhatsApp action.
 
-Routine property reports for pests/animals, odors, plumbing, equipment, fixtures, mold/damp and room condition route through `support_with_owners`. The report is deduplicated by protected session, verified room, alert type and normalized property category, so a detail follow-up updates the conversation without sending a second alert. Dirty-room, bathroom, sheet or disinfection requests use the cleaning workflow instead. Potential fire, dangerous electrical, major leak/flooding or other critical property incidents remain behind the guest's explicit **Send urgent alert** boundary and route through `urgent_response` only after confirmation.
+Booking alert storage and provider delivery are separate fail-closed boundaries. If an existing deduplicated booking alert has delivery attempts but no accepted provider message ID, the browser retains a safe `delivery_failed` snapshot in memory. It does not submit on an unrelated guest message; only an explicit retry reuses that alert ID and sends a `retry` delivery with the current transient payload. If any earlier delivery was accepted, the duplicate is treated as already sent and no second message is produced. No contact or template value is added to the stored alert or delivery-count metadata.
+
+Routine property reports for pests/animals, odors, plumbing, equipment, fixtures, mold/damp and room condition route through `support_with_owners`. Detail state is isolated by protected session, verified room, normalized property category and active issue instance. A recognizable follow-up may extend that one issue without another alert; an exact reload repeat is deduplicated by its clean content fingerprint, while a later distinct issue in the same category may create its own alert. Category transitions always begin with an empty detail buffer. Dirty-room, bathroom, sheet or disinfection requests use the cleaning workflow instead. Potential fire, dangerous electrical, major leak/flooding or other critical property incidents remain behind the guest's explicit **Send urgent alert** boundary and route through `urgent_response` only after confirmation.
 
 A recommendation question alone does not create a booking alert. The guest must ask to book, reserve, arrange or check availability. A luggage-information question remains informational. An actionable luggage request enters a deterministic collection workflow and creates an alert only after arrival/departure context, requested time, bag count and a usable international reply contact are all available. Identical alerts from the same session are deduplicated for five minutes.
 
@@ -140,7 +142,7 @@ WHATSAPP_ALERT_ESCALATION_MINUTES=10
 
 `WHATSAPP_ALERT_TEMPLATE_LANGUAGE` remains present for compatibility and does not need a Cloudflare change for v5.11.17. Every mapped production or rollback template now uses the language attached to its immutable schema entry.
 
-The optional action templates are intentionally absent from `wrangler.jsonc`, so deploying v5.11.22 cannot activate unapproved Meta definitions. After all five intended templates are Active, configure these exact non-secret variables and then enable the gate in a separate authorized activation release:
+The optional action templates are intentionally absent from `wrangler.jsonc`, so deploying v5.11.23 cannot activate unapproved Meta definitions. After all five intended templates are Active, configure these exact non-secret variables and then enable the gate in a separate authorized activation release:
 
 ```text
 WHATSAPP_SERVICE_ACTION_TEMPLATE_NAME=house_service_alert_actions_v2
@@ -155,18 +157,16 @@ If the flag is false, missing or any required action-template mapping is absent,
 
 Review Meta's supported Graph API versions before changing the version. The Worker checks once per minute for overdue escalations.
 
-## v5.11.22 deployment and changed-function verification
+## v5.11.23 deployment and changed-function verification
 
-Deploy the verified v5.11.22 bundle to the existing Worker without changing the six production template mappings, secrets, recipients, webhook settings, `SPARE_KEY_CODES` or `WHATSAPP_STAFF_ACTIONS_ENABLED=false` state.
+Deploy the verified v5.11.23 bundle to the existing Worker without changing the six production template mappings, secrets, recipients, webhook settings, `SPARE_KEY_CODES` or `WHATSAPP_STAFF_ACTIONS_ENABLED=false` state.
 
 Smoke-test the changed functions with non-sensitive data:
 
-1. Start each of the seven supported booking categories directly and through **Book with Us**. Confirm only one missing question appears at a time, supplied fields persist, contact is last and one completed request creates one Fah-plus-owner alert.
-2. Submit one routine pest or plumbing report and a same-category detail follow-up. Confirm one Su-plus-owner alert only. Confirm a dirty-room request uses cleaning, an ambiguous odor asks one clarification and a serious electrical/fire/water phrase exposes the urgent confirmation action without sending automatically.
-3. At 16:00 Bangkok time from a verified active stay, send **I lost my key**. Confirm the guest is asked to accept 500 THB, no code is available and no staff payload claims acceptance. Accept once; confirm at least one Su-or-owner delivery is accepted before **View spare key** becomes available, then confirm display engages the rotation lock.
-4. Repeat the same test at 23:00 and confirm identical self-service behavior. A normal-hours **Call Us** fallback may also appear but must not block self-service.
-5. Confirm cancellation, missing acceptance and simulated notification failure expose no code. Confirm a new request/session, another stay or another room starts with no accepted fee, an expired request fails and an already used request cannot be replayed after rotation.
-6. In the owner console, verify each operational section collapses independently, the state persists in the authorized browser and unresolved urgent/critical work remains open and visibly counted.
+1. In an active diving booking, enter `30.08.2026`, separately try a past date, ask **Can we go with French Kiss Divers instead?**, and enter **Dive Instructor** for Fun Diving. Confirm useful acknowledgements, no availability promise, preserved state and no premature alert. Separately choose Open Water, enter a local contact and then a corrected international contact; confirm one Fah-plus-owner alert and normal pending-booking success. A simulated/no-send provider failure must remain fail closed; **is there a good bar around** must route normally with no retry, and only **try my diving booking again** may retry the same alert.
+2. In one verified session, report a rat, sewage odor and an AC that is not cold. Confirm three alerts with clean category-specific details and no earlier issue text.
+3. With non-sensitive unresolved urgent work, confirm the alerts section cannot be hidden through Collapse all, pointer activation or keyboard activation; resolve the test item and confirm ordinary collapse returns.
+4. In an authorized lost-key test state, use **Controlled admin test — keep existing code**. Confirm deliberate typed confirmation, a truthful code-free activity entry, lock clearing and continued replay rejection. Do not claim or perform physical rotation for this controlled test.
 
 Quick-action activation is a separate post-approval change. Follow `META_STAFF_QUICK_ACTIONS_v5.11.20.md` only after every intended template is Active; never map service v1.
 

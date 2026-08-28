@@ -71,6 +71,7 @@ Supported route keys include:
 
 - Routine stay requests are handled by the concierge first and handed to Su only when a person must act.
 - House-arranged bookings hand off to the booking contact.
+- During an active structured booking, side questions and provider preferences remain sanitized operational notes in the same workflow; approved facts may answer them, otherwise state that the booking team will check without promising availability.
 - Urgent property problems use the separate property-emergency role.
 - Accidents and urgent medical situations offer Koh Tao Rescue first and medical emergency number 1669 second.
 - Explore recommendations may use preserved approved records for concierge reasoning, but live Explore navigation and page links remain disabled while `EXPLORE_ENABLED=false`.
@@ -87,7 +88,7 @@ Protected passport entry and spare-key access use the separate deterministic ver
 
 Never store key-box codes, guest identity data, private access tokens, passwords, API credentials or messaging credentials in the knowledge JSON, public files, Git history or release ZIP.
 
-Follow `SECURE_24_HOUR_LOST_KEY_ACCESS.md` for spare-key access. Each new request requires its own explicit 500 THB acceptance; no historical workflow state may authorize release.
+Follow `SECURE_24_HOUR_LOST_KEY_ACCESS.md` for spare-key access. Each new request requires its own explicit 500 THB acceptance; no historical workflow state may authorize release. Controlled-test and physical-rotation admin resets clear only the room lock, create distinct code-free activity and never make an old request reusable.
 
 Do not place telephone numbers or WhatsApp destinations inside learned answers. Contact actions are generated from protected, deterministic routing configuration.
 

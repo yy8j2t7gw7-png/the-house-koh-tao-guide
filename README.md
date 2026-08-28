@@ -1,4 +1,4 @@
-# Guest Guide Platform with AI Concierge — The House v5.11.22
+# Guest Guide Platform with AI Concierge — The House v5.11.23
 
 The House – Koh Tao guest guide is a production-oriented, mobile-first digital guest guide and concierge platform. It combines property information, curated island guidance, structured place and activity data, and centralized contact and booking routes.
 
@@ -18,6 +18,17 @@ The House – Koh Tao guest guide is a production-oriented, mobile-first digital
 
 The Activities module contains 49 structured profiles covering diving, freediving, snorkelling, boat trips, beach experiences, kayaking, paddleboarding, hiking, viewpoints, climbing, yoga, Muay Thai, massage, cooking, wildlife, photography, night activities and rainy-day options.
 
+## v5.11.23 release focus
+
+- Keeps active structured bookings conversational: side questions and preferences are acknowledged, stored as protected notes and returned to the same next missing field without promising third-party availability or creating an early alert.
+- Extends the shared Bangkok booking-date parser to `DD.MM.YYYY`, `DD/MM/YYYY`, `DD-MM-YYYY`, named dates and relative dates, with concise past/invalid feedback instead of a silent repeated question.
+- Replaces the brittle Fun Diving certification whitelist with sanitized useful free text plus normalization for common diver, Divemaster and instructor aliases.
+- Makes the exact Open Water contact-correction path complete: a local number is visibly redacted and rejected without poisoning date/diver/course state, then a valid international replacement creates exactly one Fah-plus-owner alert. Failed delivery becomes a non-monopolizing retry snapshot: unrelated questions route normally, only an explicit retry can reuse it, the same alert record is retained and no success is shown until Meta returns a message ID.
+- Isolates routine property detail buffers and deduplication by category and issue content, preventing rat, sewage, AC and later pest reports from contaminating one another while retaining genuine same-issue follow-ups.
+- Prevents unresolved urgent owner-console sections from being hidden by manual, keyboard or **Collapse all** actions.
+- Adds truthful protected reset modes for a controlled owner-only test that retains the current code and a real physical-code rotation. Both create distinguishable code-free audit entries and never revive a historical lost-key request.
+- Preserves the passed v5.11.22 cleaning, property classification, 24/7 lost-key release and Meta routing behavior. Staff quick actions remain disabled; public visual polish is deferred to v5.11.24.
+
 ## v5.11.22 release focus
 
 - Replaces multi-field booking forms with one-question-at-a-time, category-specific Concierge collection for diving, fishing, snorkeling, taxi, taxi boat, ferry and motorbike taxi requests. Supplied details are preserved, finite choices use buttons and the international reply contact is collected last.
@@ -26,7 +37,7 @@ The Activities module contains 49 structured profiles covering diving, freedivin
 - Makes the owner console sections independently collapsible, remembers authorized-browser preferences, keeps unresolved urgent work open and visible, and adds clear counts and rotation-required status without changing protected data APIs.
 - Preserves all production Meta mappings, secrets, recipients, webhook behavior, emergency routing, passport retention and Airbnb synchronization. Staff quick actions remain disabled and the only valid future service-action template remains `house_service_alert_actions_v2`.
 
-The v5.11.22 24/7 lost-key rule supersedes time-window behavior described in the historical release summaries below.
+The v5.11.22-and-later 24/7 lost-key rule supersedes time-window behavior described in the historical release summaries below.
 
 ## v5.11.21 release focus
 

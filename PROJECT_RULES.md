@@ -155,7 +155,7 @@ Public interface rules:
 
 ## Current baseline
 
-Current release: v5.11.24 (server-bound exact-alert booking retry before general/model routing, contact-free durable retry snapshots, contact-only recovery after reload, alert-bound owner delivery diagnostics and clean Master Divers provider normalization, while preserving all v5.11.23 property, urgent and lost-key safeguards).
+Current release: v5.11.25 (centralized outbound Meta BODY whitespace normalization for confirmed error `132018`, preserving every v5.11.24 exact-alert retry, privacy, diagnostic and provider-normalization safeguard without changing template schemas, routes or configuration).
 
 Explore is intentionally disabled in the live v5.11.6 release. Do not delete its pages, structured records or media. Restore it only after the planned Explore rebuild and review by changing the protected deployment feature variable. Do not expose internal Explore detail paths in live concierge answers while the feature remains disabled; use approved external actions where supplied.
 

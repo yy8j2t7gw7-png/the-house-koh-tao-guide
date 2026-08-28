@@ -1,6 +1,6 @@
 # Product Roadmap
 
-Baseline: v5.11.24
+Baseline: v5.11.25
 
 ## Completed
 
@@ -163,8 +163,10 @@ Guests may continue using ordinary WhatsApp handoffs. Automated internal alerts 
 - [x] Capture the exact v5.11.16 Meta failure (HTTP 404 / `132001`) and implement template-aware language resolution: current templates use `en`; deliberate v1 rollback templates retain `en_US`.
 - [x] Deploy v5.11.22 without changing production configuration and run its production smoke matrix; use the observed conversation/state defects as the authoritative v5.11.23 correction scope.
 - [x] Deploy v5.11.23 without changing production configuration and use its observed explicit-retry/history-contamination failure as the authoritative narrow v5.11.24 correction scope.
-- [ ] Deploy v5.11.24 without changing production configuration, then run only the failed-booking retry, owner-diagnostic, unrelated-intent and Master Divers checks in `DEVELOPMENT_HANDOFF_v5.11.24.md`.
-- [ ] After v5.11.24 passes production smoke testing, begin v5.11.25 as the full public visual-polish milestone under a separate explicit scope.
+- [x] Deploy v5.11.24 without changing production configuration and capture the real booking-delivery rejection: Meta HTTP 400 / `132018`, caused by invalid whitespace inside a textual template parameter.
+- [x] Implement v5.11.25 as a narrow common-boundary Meta BODY whitespace sanitizer without changing template schemas, routes, recipients or configuration.
+- [ ] Deploy v5.11.25, run one fresh non-sensitive diving booking and confirm at least one of three booking notifications is accepted; if Meta still rejects it, retain the new sanitized provider diagnostic and stop.
+- [ ] After v5.11.25 passes production smoke testing, begin v5.11.26 as the full public visual-polish milestone under a separate explicit scope.
 - [ ] Submit and obtain Meta approval for the five optional quick-action templates documented in `META_STAFF_QUICK_ACTIONS_v5.11.20.md`; never map the buttonless service v1 template and enable only after every intended template is Active.
 - [x] Add `STAY_TOKEN_PEPPER` and `RESERVATION_SYNC_TOKEN` Worker secrets
 - [x] Add protected `SPARE_KEY_CODES` Worker secret before activating automatic spare-key release

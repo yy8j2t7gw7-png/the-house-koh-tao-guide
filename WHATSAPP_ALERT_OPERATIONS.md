@@ -2,7 +2,7 @@
 
 ## Purpose
 
-v5.11.24 provides a protected server-side staff-alert channel through the official Meta WhatsApp Business Platform. Guests continue to use the website Concierge. Recipient telephone numbers, access tokens and app secrets stay in encrypted Cloudflare secrets and never appear in public files, Git or release archives.
+v5.11.25 provides a protected server-side staff-alert channel through the official Meta WhatsApp Business Platform. Guests continue to use the website Concierge. Recipient telephone numbers, access tokens and app secrets stay in encrypted Cloudflare secrets and never appear in public files, Git or release archives.
 
 Routing is role based:
 
@@ -18,7 +18,9 @@ Every structured booking alert is also validated at the final server-side creati
 
 Booking alert storage and provider delivery are separate fail-closed boundaries. If an alert has delivery attempts but no accepted provider message ID, the Worker stores a contact-free safe retry snapshot bound by a one-way hash to the verified reservation, room and protected browser session. The browser may retain the transient contact in memory, but a reload intentionally removes it. Explicit retry is recognized before knowledge or model routing and reuses that exact alert ID; it never creates a second booking record. If the contact is gone, only the international contact is recollected. If any earlier delivery was accepted, no second notification is produced. Unrelated messages never retry. No raw contact is added to the snapshot, interaction, alert, delivery metadata, diagnostics or dashboard.
 
-The protected owner alert card binds failed-delivery evidence to the relevant booking alert. It shows channel/provider, route, template, language, actual attempted and accepted counts, HTTP status when present, actual sanitized provider error code/category/message and Bangkok time. It does not show recipient numbers, guest contact, parameter values, access tokens, request authorization, stay credentials or raw payloads. The active booking mapping remains `house_booking_alert_v2`, generic English (`en`), six ordered BODY parameters and `booking_with_owners`; v5.11.24 does not change production configuration or infer an error Meta did not return.
+The protected owner alert card binds failed-delivery evidence to the relevant booking alert. It shows channel/provider, route, template, language, actual attempted and accepted counts, HTTP status when present, actual sanitized provider error code/category/message and Bangkok time. It does not show recipient numbers, guest contact, parameter values, access tokens, request authorization, stay credentials or raw payloads. Production v5.11.24 diagnostics captured Meta HTTP `400`, error `132018`, with the provider rule that textual parameters cannot contain newline/tab characters or excessive consecutive spaces. The active booking mapping remains `house_booking_alert_v2`, generic English (`en`), six ordered BODY parameters and `booking_with_owners`; those values were correct and remain unchanged.
+
+`textParameters()` in `src/whatsapp-alerts.js` is the final common textual BODY serialization boundary. Before JSON submission, it converts every Unicode whitespace run—including CR, LF and tabs—to one ordinary space, trims the result and applies the existing 900-character maximum. Service, luggage, booking, urgent, lost-key, status and future enabled action-template BODY values all use this function. It never records parameter values and does not change schema order/count, button payloads, protected contact rules or diagnostic redaction.
 
 Routine property reports for pests/animals, odors, plumbing, equipment, fixtures, mold/damp and room condition route through `support_with_owners`. Detail state is isolated by protected session, verified room, normalized property category and active issue instance. A recognizable follow-up may extend that one issue without another alert; an exact reload repeat is deduplicated by its clean content fingerprint, while a later distinct issue in the same category may create its own alert. Category transitions always begin with an empty detail buffer. Dirty-room, bathroom, sheet or disinfection requests use the cleaning workflow instead. Potential fire, dangerous electrical, major leak/flooding or other critical property incidents remain behind the guest's explicit **Send urgent alert** boundary and route through `urgent_response` only after confirmation.
 
@@ -144,7 +146,7 @@ WHATSAPP_ALERT_ESCALATION_MINUTES=10
 
 `WHATSAPP_ALERT_TEMPLATE_LANGUAGE` remains present for compatibility and does not need a Cloudflare change for v5.11.17. Every mapped production or rollback template now uses the language attached to its immutable schema entry.
 
-The optional action templates are intentionally absent from `wrangler.jsonc`, so deploying v5.11.24 cannot activate unapproved Meta definitions. After all five intended templates are Active, configure these exact non-secret variables and then enable the gate in a separate authorized activation release:
+The optional action templates are intentionally absent from `wrangler.jsonc`, so deploying v5.11.25 cannot activate unapproved Meta definitions. After all five intended templates are Active, configure these exact non-secret variables and then enable the gate in a separate authorized activation release:
 
 ```text
 WHATSAPP_SERVICE_ACTION_TEMPLATE_NAME=house_service_alert_actions_v2
@@ -159,16 +161,15 @@ If the flag is false, missing or any required action-template mapping is absent,
 
 Review Meta's supported Graph API versions before changing the version. The Worker checks once per minute for overdue escalations.
 
-## v5.11.24 deployment and changed-function verification
+## v5.11.25 deployment and changed-function verification
 
-Deploy the verified v5.11.24 bundle to the existing Worker without changing the six production template mappings, secrets, recipients, webhook settings, `SPARE_KEY_CODES` or `WHATSAPP_STAFF_ACTIONS_ENABLED=false` state.
+Deploy the verified v5.11.25 bundle to the existing Worker without changing the six production template mappings, languages, BODY counts/order, routes, secrets, recipients, webhook settings, `SPARE_KEY_CODES` or `WHATSAPP_STAFF_ACTIONS_ENABLED=false` state.
 
-Smoke-test the changed functions with non-sensitive data:
+Run one non-sensitive production booking smoke test:
 
-1. Create one non-sensitive completed booking whose protected delivery is rejected. Confirm the owner alert has one alert ID, route `booking_with_owners`, zero accepted messages and a sanitized alert-bound real provider reason.
-2. Say **try my diving booking again**. Confirm there is no checklist or stale medical text, the same alert ID receives a `retry` delivery and success appears only if a provider message ID is accepted. Refresh before a separate retry and confirm only the international contact is requested.
-3. After a failed delivery ask **is there a good bar around**, **What time is check-out?** and a non-sensitive property question. Confirm normal routing and no automatic booking resend.
-4. During an active diving request say **or with Master Divers would be even better**. Confirm the preference is stored as **Master Divers**, the current field remains pending and no availability is promised.
+1. Create one fresh diving request and complete it normally using non-sensitive test details.
+2. Confirm exactly one booking alert record, three attempted recipients, at least one accepted delivery, a received booking message and the normal pending-booking guest confirmation.
+3. If Meta rejects the request, capture only the new sanitized owner diagnostic and stop; do not guess or change configuration.
 
 Quick-action activation is a separate post-approval change. Follow `META_STAFF_QUICK_ACTIONS_v5.11.20.md` only after every intended template is Active; never map service v1.
 

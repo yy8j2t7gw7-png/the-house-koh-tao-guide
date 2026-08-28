@@ -29,7 +29,7 @@
   const expandAdminSections = document.getElementById("expandAdminSections");
   const collapseAdminSections = document.getElementById("collapseAdminSections");
   const adminSections = [...document.querySelectorAll("details[data-admin-section]")];
-  const sectionStateKey = "houseConciergeAdminSections:v5.11.24";
+  const sectionStateKey = "houseConciergeAdminSections:v5.11.25";
   let token = "";
 
   function savedAdminSectionState() {

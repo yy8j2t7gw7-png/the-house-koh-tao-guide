@@ -85,7 +85,7 @@ Both modes require the existing protected owner/admin authentication and deliber
 
 ## Activation checklist
 
-1. Deploy the verified v5.11.24 release without changing recipients or Meta template mappings.
+1. Deploy the verified v5.11.25 release without changing recipients or Meta template mappings.
 2. Keep `STAY_TOKEN_PEPPER`, `RESERVATION_SYNC_TOKEN` and real current `SPARE_KEY_CODES` values as separate encrypted secrets.
 3. Confirm `lost_key_team` resolves to Su and both owners through the existing protected recipient configuration.
 4. Test daytime and nighttime flows using a non-sensitive active test stay and temporary physical code.

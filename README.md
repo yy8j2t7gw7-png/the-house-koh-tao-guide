@@ -1,4 +1,4 @@
-# Guest Guide Platform with AI Concierge — The House v5.11.24
+# Guest Guide Platform with AI Concierge — The House v5.11.25
 
 The House – Koh Tao guest guide is a production-oriented, mobile-first digital guest guide and concierge platform. It combines property information, curated island guidance, structured place and activity data, and centralized contact and booking routes.
 
@@ -18,6 +18,15 @@ The House – Koh Tao guest guide is a production-oriented, mobile-first digital
 
 The Activities module contains 49 structured profiles covering diving, freediving, snorkelling, boat trips, beach experiences, kayaking, paddleboarding, hiking, viewpoints, climbing, yoga, Muay Thai, massage, cooking, wildlife, photography, night activities and rainy-day options.
 
+## v5.11.25 release focus
+
+- Fixes the confirmed Meta `132018` booking-delivery rejection at the shared outbound template BODY serialization boundary.
+- Converts every CR, LF, tab and Unicode whitespace run in every textual template parameter to one ordinary space, trims the result and retains the existing 900-character limit.
+- Applies centrally to service, luggage, booking, urgent, lost-key, status and future enabled action-template BODY values without changing any template name, language, parameter count/order, route, recipient or Meta configuration.
+- Keeps protected contacts only in the intended transient outbound parameter and preserves all value-free diagnostic, secret, key-code and retry-state boundaries.
+- Classifies a real Meta `132018` response as a sanitized template-parameter failure without logging or storing parameter values.
+- Expands the complete suite from 155 to 157 tests. Staff quick actions remain disabled; public visual polish is deferred to v5.11.26.
+
 ## v5.11.24 release focus
 
 - Moves explicit booking retry ahead of approved-knowledge retrieval, broad history and model routing, so retry commands cannot become a new checklist or inherit stale medical, property, lost-key, cleaning or luggage context.
@@ -26,7 +35,7 @@ The Activities module contains 49 structured profiles covering diving, freedivin
 - Keeps unrelated bar, check-out and property questions in ordinary Concierge routing after a delivery failure. A retry happens only after an explicit retry command.
 - Adds owner-visible alert-bound WhatsApp diagnostics with the real sanitized template, language, route, attempted/accepted totals, HTTP/provider classification and Bangkok time. The established `house_booking_alert_v2`, `en`, six-BODY-parameter mapping remains unchanged because source inspection found no deterministic payload mismatch; the next production rejection will expose the actual Meta response safely.
 - Normalizes conversational provider wording such as **or with Master Divers would be even better** to **Master Divers** without promising availability.
-- Preserves every passed v5.11.23 booking, property, cleaning, urgent-console and 24/7 lost-key safeguard. Staff quick actions remain disabled; public visual polish is deferred to v5.11.25.
+- Preserves every passed v5.11.23 booking, property, cleaning, urgent-console and 24/7 lost-key safeguard. Staff quick actions remain disabled; public visual polish was subsequently deferred to v5.11.26 after the narrow v5.11.25 Meta parameter hotfix.
 
 ## v5.11.23 release focus
 
@@ -37,7 +46,7 @@ The Activities module contains 49 structured profiles covering diving, freedivin
 - Isolates routine property detail buffers and deduplication by category and issue content, preventing rat, sewage, AC and later pest reports from contaminating one another while retaining genuine same-issue follow-ups.
 - Prevents unresolved urgent owner-console sections from being hidden by manual, keyboard or **Collapse all** actions.
 - Adds truthful protected reset modes for a controlled owner-only test that retains the current code and a real physical-code rotation. Both create distinguishable code-free audit entries and never revive a historical lost-key request.
-- Preserves the passed v5.11.22 cleaning, property classification, 24/7 lost-key release and Meta routing behavior. Staff quick actions remain disabled. The planned visual milestone was subsequently moved to v5.11.25 after the narrow v5.11.24 production correction.
+- Preserves the passed v5.11.22 cleaning, property classification, 24/7 lost-key release and Meta routing behavior. Staff quick actions remain disabled. The planned visual milestone was subsequently moved to v5.11.26 after the narrow v5.11.24 and v5.11.25 production corrections.
 
 ## v5.11.22 release focus
 

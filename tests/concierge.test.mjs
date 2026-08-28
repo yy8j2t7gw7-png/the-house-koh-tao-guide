@@ -2112,7 +2112,7 @@ test("owner dashboard major sections are independently collapsible, persistent a
   assert.match(html, /id="collapseAdminSections"[^>]*>Collapse all<\/button>/);
   assert.match(html, /id="keyRotationActivity"/);
 
-  assert.match(script, /houseConciergeAdminSections:v5\.11\.24/);
+  assert.match(script, /houseConciergeAdminSections:v5\.11\.25/);
   assert.match(script, /adminSections\.map\(\(section\) => \[section\.dataset\.adminSection, section\.open\]\)/);
   assert.match(script, /typeof saved\[id\] === "boolean"/);
   assert.match(script, /section\.addEventListener\("toggle"/);
@@ -2165,7 +2165,7 @@ test("guest localization supports seven languages and keeps the owner dashboard 
   assert.doesNotMatch(admin, /src="\/i18n\.js"/);
   assert.match(runtime, /exploreContentDeferred/);
   assert.match(runtime, /element\.closest\("\.section,\.footer"\)/);
-  assert.match(runtime, /houseGuideTranslations:v5\.11\.24:/);
+  assert.match(runtime, /houseGuideTranslations:v5\.11\.25:/);
   assert.match(runtime, /MAX_REQUEST_RETRIES = 2/);
   assert.match(runtime, /let flushRunning = false/);
 });
@@ -6851,6 +6851,117 @@ test("all active Meta templates use their exact approved body schemas", () => {
   const status = buildWhatsAppStatusPayload({ ...base, alertType: "stay_support", summary: "Fresh towels" }, recipient, "ACKNOWLEDGED", "Su", env);
   assertBodyOnly(status, "house_alert_status_v1", 5);
   assert.deepEqual(values(status), [base.id, "Room 3", "Fresh towels", "Su", "ACKNOWLEDGED"]);
+});
+
+test("Meta BODY serialization removes invalid whitespace without changing booking parameter order or privacy", () => {
+  const recipient = { label: "Team", phone: "66810000002" };
+  const rawContact = "+66 81 234 5678";
+  const alert = {
+    id: "alert_whitespace_booking_reference",
+    room: "11",
+    alertType: "booking_request",
+    recipientGroup: "booking_with_owners",
+    severity: "attention",
+    summary: "I wanna go diving\r\n30.08.2026\tOpen Water     please",
+    bangkokTime: "28 Aug 2026, 18:00",
+    createdAt: "2026-08-28T11:00:00.000Z",
+    bookingRequest: {
+      kind: "diving",
+      activity: "Diving\tCourse",
+      preferredDate: "30.08.2026\r\n09:00",
+      guestCount: "4",
+      option: "Open Water",
+      certificationLevel: "",
+      notes: "I wanna go diving\n30.08.2026\tOpen Water      with a calm group"
+    },
+    privateReplyContact: rawContact
+  };
+  const built = buildWhatsAppTemplatePayload(alert, recipient, {
+    WHATSAPP_BOOKING_TEMPLATE_NAME: "house_booking_alert_v2"
+  });
+  const parameters = built.payload.template.components[0].parameters;
+  const values = parameters.map((parameter) => parameter.text);
+
+  assert.equal(built.ok, true);
+  assert.equal(built.payload.template.name, "house_booking_alert_v2");
+  assert.equal(built.payload.template.language.code, "en");
+  assert.equal(built.payload.template.components.length, 1);
+  assert.equal(parameters.length, 6);
+  assert.deepEqual(parameters.map((parameter) => parameter.type), ["text", "text", "text", "text", "text", "text"]);
+  assert.deepEqual(values.slice(0, 5), [
+    alert.id,
+    "Room 11",
+    "Diving Course",
+    "30.08.2026 09:00",
+    "4"
+  ]);
+  assert.match(values[5], /Open Water · I wanna go diving 30\.08\.2026 Open Water with a calm group/);
+  assert.match(values[5], /I wanna go diving 30\.08\.2026 Open Water please/);
+  assert.match(values[5], /Guest reply: \+66812345678$/);
+  values.forEach((value) => {
+    assert.doesNotMatch(value, /[\r\n\t]/);
+    assert.doesNotMatch(value, /\s{2,}/u);
+  });
+  assert.equal(values.slice(0, 5).some((value) => /66812345678|81 234 5678/.test(value)), false);
+});
+
+test("the centralized Meta text sanitizer protects service, status and future action-template BODY values", () => {
+  const recipient = { label: "Team", phone: "66810000002" };
+  const base = {
+    id: "alert_whitespace_shared_boundary",
+    room: "3",
+    alertType: "stay_support",
+    severity: "attention",
+    summary: "Please bring\r\nnew\t towels       to the room.",
+    privateReplyContact: "+66 81 234 5678",
+    bangkokTime: "28 Aug 2026,\t18:00",
+    createdAt: "2026-08-28T11:00:00.000Z"
+  };
+  const actionMappings = {
+    WHATSAPP_STAFF_ACTIONS_ENABLED: "true",
+    WHATSAPP_SERVICE_ACTION_TEMPLATE_NAME: "house_service_alert_actions_v2",
+    WHATSAPP_LUGGAGE_ACTION_TEMPLATE_NAME: "house_luggage_alert_actions_v1",
+    WHATSAPP_BOOKING_ACTION_TEMPLATE_NAME: "house_booking_alert_actions_v1",
+    WHATSAPP_URGENT_ACTION_TEMPLATE_NAME: "house_urgent_alert_actions_v1",
+    WHATSAPP_LOST_KEY_ACTION_TEMPLATE_NAME: "house_lost_key_alert_actions_v1"
+  };
+  const cases = [
+    buildWhatsAppTemplatePayload(base, recipient, {}),
+    buildWhatsAppTemplatePayload(base, recipient, actionMappings),
+    buildWhatsAppStatusPayload(base, recipient, "ACKNOWLEDGED", "Su\r\n\t     Team", {
+      WHATSAPP_STATUS_TEMPLATE_NAME: "house_alert_status_v1"
+    })
+  ];
+
+  for (const built of cases) {
+    assert.equal(built.ok, true);
+    const body = built.payload.template.components.find((component) => component.type === "body");
+    assert.ok(body);
+    body.parameters.forEach((parameter) => {
+      assert.equal(parameter.type, "text");
+      assert.doesNotMatch(parameter.text, /[\r\n\t]/);
+      assert.doesNotMatch(parameter.text, /\s{2,}/u);
+    });
+  }
+  assert.equal(cases[0].payload.template.components[0].parameters.length, 5);
+  assert.equal(cases[0].payload.template.components[0].parameters[4].text, "Please bring new towels to the room. Guest reply: +66812345678");
+  assert.equal(cases[1].payload.template.name, "house_service_alert_actions_v2");
+  assert.equal(cases[1].payload.template.components[0].parameters.length, 5);
+  assert.equal(cases[2].payload.template.components[0].parameters.length, 5);
+  assert.equal(cases[2].payload.template.components[0].parameters[3].text, "Su Team");
+
+  const diagnostic = buildWhatsAppFailureDiagnostic({
+    built: cases[0],
+    response: new Response(JSON.stringify({}), { status: 400 }),
+    responseBody: { error: {
+      code: 132018,
+      message: "There’s an issue with the parameters in your template",
+      error_data: { details: "Param text cannot have new-line/tab characters or more than 4 consecutive spaces" }
+    } }
+  });
+  assert.equal(diagnostic.errorCode, "132018");
+  assert.equal(diagnostic.failureKind, "template_parameters");
+  assert.doesNotMatch(JSON.stringify(diagnostic), /66812345678|81 234 5678|Please bring new towels/);
 });
 
 test("staff quick-action templates remain opt-in and bind both actions to the exact alert", () => {

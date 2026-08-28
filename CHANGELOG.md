@@ -2,6 +2,22 @@
 
 All notable changes to The House – Koh Tao guest guide are recorded here.
 
+## v5.11.25 — Meta Template Parameter Sanitization Hotfix
+
+### Confirmed production cause and centralized correction
+
+- Records the confirmed production provider failure as Meta HTTP `400`, error `132018`: textual template parameters contained forbidden newline/tab characters or excessive consecutive spaces.
+- Normalizes every textual outbound BODY parameter in the shared `textParameters()` serialization boundary in `src/whatsapp-alerts.js` by converting every Unicode whitespace run to one ordinary space, trimming and then applying the existing 900-character limit.
+- Covers service, luggage, booking, urgent, lost-key, status and any future enabled action-template BODY values through the same path. Template names, languages, BODY counts/order, routes, recipients and Meta configuration remain unchanged.
+- Classifies `132018` as a sanitized `template_parameters` diagnostic without retaining or logging parameter values.
+
+### Regression and scope
+
+- Adds the production-style multiline Open Water booking fixture and proves the six ordered BODY parameters remain semantically intact and Meta-safe.
+- Proves the same sanitizer protects service, status and future action-template BODY values, including tabs and long whitespace runs, while keeping contact and diagnostic privacy boundaries intact.
+- Expands the complete suite from 155 to 157 tests with zero failures.
+- Defers the full public visual-polish milestone to v5.11.26.
+
 ## v5.11.24 — Booking Retry & Delivery-State Correction
 
 ### Bound deterministic retry
@@ -23,7 +39,7 @@ All notable changes to The House – Koh Tao guest guide are recorded here.
 
 - Preserves every passed v5.11.23 date, side-question, certification, Open Water, property, cleaning, urgent-console and 24/7 lost-key behavior.
 - Changes no Meta mapping, recipient, secret, webhook, emergency route, passport/Airbnb rule or quick-action state. `WHATSAPP_STAFF_ACTIONS_ENABLED=false` remains required.
-- Expands the complete suite from 148 to 155 tests. The next planned milestone is v5.11.25 full visual polish.
+- Expands the complete suite from 148 to 155 tests. The visual milestone was subsequently moved to v5.11.26 after the narrow v5.11.25 Meta parameter hotfix.
 
 ## v5.11.23 — Production Conversation & State Corrections
 

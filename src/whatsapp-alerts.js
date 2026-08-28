@@ -247,8 +247,18 @@ function firstMatch(value, pattern, fallback) {
   return String(match?.[1] || fallback).trim().slice(0, 120);
 }
 
+function normalizeTemplateTextParameter(value) {
+  const source = value === null || value === undefined || value === ""
+    ? "Not provided"
+    : String(value);
+  const normalized = source.replace(/\s+/gu, " ").trim();
+  return (normalized || "Not provided").slice(0, 900).trim() || "Not provided";
+}
+
 function textParameters(values) {
-  return values.map((value) => ({ type: "text", text: String(value || "Not provided").slice(0, 900) }));
+  // Final Meta BODY serialization boundary. Every current alert template and
+  // any enabled action-template BODY passes through this value-free sanitizer.
+  return values.map((value) => ({ type: "text", text: normalizeTemplateTextParameter(value) }));
 }
 
 function appendProtectedContact(value, contact) {
@@ -432,7 +442,7 @@ function failureKind(httpStatus, errorCode, localCode = "") {
   if (["unmapped_template", "parameter_count_mismatch", "status_template_not_configured", "invalid_status"].includes(localCode)) return "local_template_schema";
   if (code === "190" || httpStatus === 401 || httpStatus === 403) return "authentication_or_permission";
   if (code === "132001") return "template_or_language";
-  if (["131008", "132000", "132012"].includes(code)) return "template_parameters";
+  if (["131008", "132000", "132012", "132018"].includes(code)) return "template_parameters";
   if (code === "131026") return "recipient_delivery";
   if (["4", "80007", "130429", "131048"].includes(code) || httpStatus === 429) return "rate_limit";
   if (httpStatus >= 500) return "meta_service";

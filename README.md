@@ -1,4 +1,4 @@
-# Guest Guide Platform with AI Concierge — The House v5.11.27
+# Guest Guide Platform with AI Concierge — The House v5.11.28
 
 The House – Koh Tao guest guide is a production-oriented, mobile-first digital guest guide and concierge platform. It combines property information, curated island guidance, structured place and activity data, and centralized contact and booking routes.
 
@@ -17,6 +17,15 @@ The House – Koh Tao guest guide is a production-oriented, mobile-first digital
 - Model-powered, room-aware AI Concierge with controlled learning
 
 The Activities module contains 49 structured profiles covering diving, freediving, snorkelling, boat trips, beach experiences, kayaking, paddleboarding, hiking, viewpoints, climbing, yoga, Muay Thai, massage, cooking, wildlife, photography, night activities and rainy-day options.
+
+## v5.11.28 release focus
+
+- Refines the public landing page into a warmer boutique-hospitality hierarchy without enlarging the compact v5.11.27 hero or exposing protected room/arrival photography; no approved public-safe property image exists, so the House-green hero uses restrained tonal depth.
+- Reframes the required step as **Complete your guest registration**, keeps the foreign-guest and Thai-exemption rules, flattens the three facts and presents one clear four-step path to the private room guide.
+- Removes the ambiguous suggestion that access arrives after a stay is complete, and makes Room, Concierge and Google Maps actions describe their actual destinations.
+- Removes the repeated Room 11 identity from the photo overlay, tightens the approved toilet/resource guidance, reduces nested box treatment and removes “budget-friendly” from public footers.
+- Routes clear lost-key and lockout synonyms—including bare **lost key**—through the same protected 24/7 fee-consent flow before generic service/model routing, while preserving every notification, protected-display and rotation gate.
+- Adds three regressions (two lost-key routing tests and one landing/room contract); the complete 169-test suite is required to pass with zero failures. Explore and optional staff quick actions remain disabled.
 
 ## v5.11.27 release focus
 

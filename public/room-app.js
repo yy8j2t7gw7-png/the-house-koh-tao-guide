@@ -22,7 +22,7 @@
     document.title = `Room ${room} | The House – Koh Tao`;
     document.getElementById("roomBadge").textContent = `Room ${room} · ${data.floor}`;
     titleElement.textContent = title;
-    document.getElementById("heroRoom").textContent = `Room ${room}`;
+    document.getElementById("heroRoom").textContent = data.floor;
     noteElement.textContent = data.note;
 
     const roomPhoto = document.getElementById("roomPhoto");

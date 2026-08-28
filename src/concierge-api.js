@@ -40,7 +40,7 @@ import {
   specialtyChoiceLabels
 } from "./diving-catalog.js";
 
-const RELEASE = "5.11.27";
+const RELEASE = "5.11.28";
 const ROOM_OPTIONS = new Set(["1", "2", "3", "4", "5", "6", "8", "9", "10", "11"]);
 const MAX_HISTORY_ITEMS = 10;
 const MAX_QUESTION_LENGTH = 800;
@@ -193,7 +193,7 @@ const PROPERTY_ISSUE_CATEGORIES = new Set(["pest", "odor", "plumbing", "equipmen
 const HOUSEKEEPING_ITEM_REQUEST = /\b(?:toilet\s+paper|soap|(?:(?:new|fresh|clean)\s+)?towels?|room\s+cleaning|clean\s+(?:my|our|the)\s+room|housekeeping)\b/i;
 const HOUSEKEEPING_REQUEST_ACTION = /\b(?:can\s+(?:i|we)\s+(?:have|get)|please\s+(?:bring|send|provide|clean)|can\s+you\s+(?:bring|send|provide|clean)|could\s+you\s+(?:bring|send|provide|clean)|i\s+(?:need|want|would\s+like)|(?:bring|send|provide)\s+(?:me\s+)?|clean\s+(?:my|our|the)\s+room)\b|\b(?:toilet\s+paper|soap|towels?)\s+please\b/i;
 const DIRTY_ROOM_CLEANING_REQUEST = /\b(?:(?:my|our|the)\s+(?:room|bathroom)\s+(?:(?:is|feels|looks|seems)\s+(?:(?:really|very|quite|so)\s+)?(?:dirty|messy|unclean)|needs?\s+(?:a\s+)?clean(?:ing)?)|(?:my|our|the)\s+(?:sheets?|bedding|bed\s*linen)\s+(?:(?:are|is|look|looks|seem|seems)\s+)?(?:dirty|stained|unclean)|(?:dirty|stained|unclean)\s+(?:sheets?|bedding|bed\s*linen)|(?:my|our|the)\s+(?:room|bathroom)\s+needs?\s+(?:cleaning|disinfect(?:ing|ion)))\b/i;
-const LOST_KEY_REQUEST = /\b(?:i\s+(?:have\s+)?lost\s+(?:my|the)\s+(?:room\s+)?key|(?:my|the)\s+(?:room\s+)?key\s+(?:is\s+)?(?:lost|missing)|cannot\s+find\s+(?:my|the)\s+(?:room\s+)?key|can['’]?t\s+find\s+(?:my|the)\s+(?:room\s+)?key|locked\s+out|need\s+(?:a\s+)?replacement\s+key)\b/i;
+const LOST_KEY_REQUEST = /\b(?:(?:(?:i|we)\s+(?:have\s+)?)?lost\s+(?:(?:my|our|the|a)\s+)?(?:room\s+)?key|(?:(?:my|our|the)\s+)?(?:room\s+)?key\s+(?:is\s+)?(?:lost|missing)|(?:cannot|can['’]?t|unable\s+to)\s+find\s+(?:(?:my|our|the)\s+)?(?:room\s+)?key|(?:(?:i(?:['’]?m|\s+am)?|we(?:['’]?re|\s+are)?)\s+)?locked\s+out|(?:cannot|can['’]?t|unable\s+to)\s+(?:get|go)\s+(?:back\s+)?into\s+(?:my|our|the)\s+room|(?:(?:i|we)\s+)?forgot\s+(?:(?:my|our|the)\s+)?(?:room\s+)?key|(?:(?:i|we)\s+)?need\s+(?:a\s+)?(?:spare|replacement)\s+key|where\s+is\s+(?:(?:my|our|the)\s+)?spare\s+key)\b/i;
 const GENERIC_URGENT_WORDS = new Set([
   "a", "am", "an", "and", "bad", "emergency", "happened", "has", "have", "help", "i", "in", "is", "it",
   "my", "need", "please", "problem", "really", "room", "serious", "something", "the", "there", "urgent", "very",

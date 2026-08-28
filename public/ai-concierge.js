@@ -13,6 +13,7 @@
   const roomOptions = (cfg.roomOptions || ["1", "2", "3", "4", "5", "6", "8", "9", "10", "11"]).map(String);
   const pagePrompts = cfg.pagePrompts?.[currentPage] || cfg.defaultPrompts || [];
   const availableQuickActions = isPublicAccess ? (cfg.publicQuickActions || []) : (cfg.quickActions || []);
+  const lostKeyRequest = /\b(?:(?:(?:i|we)\s+(?:have\s+)?)?lost\s+(?:(?:my|our|the|a)\s+)?(?:room\s+)?key|(?:(?:my|our|the)\s+)?(?:room\s+)?key\s+(?:is\s+)?(?:lost|missing)|(?:cannot|can['’]?t|unable\s+to)\s+find\s+(?:(?:my|our|the)\s+)?(?:room\s+)?key|(?:(?:i(?:['’]?m|\s+am)?|we(?:['’]?re|\s+are)?)\s+)?locked\s+out|(?:cannot|can['’]?t|unable\s+to)\s+(?:get|go)\s+(?:back\s+)?into\s+(?:my|our|the)\s+room|(?:(?:i|we)\s+)?forgot\s+(?:(?:my|our|the)\s+)?(?:room\s+)?key|(?:(?:i|we)\s+)?need\s+(?:a\s+)?(?:spare|replacement)\s+key|where\s+is\s+(?:(?:my|our|the)\s+)?spare\s+key)\b/i;
 
   function safeStorage(storage, operation, key, value) {
     try {
@@ -575,7 +576,7 @@
       || impliedLuggageRequest
       || /\b(?:luggage|baggage|store\s+(?:my|our)?\s*bags?|room\s+cleaning|clean\s+(?:my|our|the)\s+room)\b/i.test(source)
       || /\b(?:my|our|the)\s+room\s+(?:(?:is|feels|looks|seems)\s+(?:(?:really|very|quite|so)\s+)?(?:dirty|messy|unclean)|needs?\s+(?:a\s+)?clean(?:ing)?)\b/i.test(source)
-      || /\b(?:i\s+(?:have\s+)?lost\s+(?:my|the)\s+(?:room\s+)?key|(?:my|the)\s+(?:room\s+)?key\s+(?:is\s+)?(?:lost|missing)|cannot\s+find\s+(?:my|the)\s+(?:room\s+)?key|can['’]?t\s+find\s+(?:my|the)\s+(?:room\s+)?key|locked\s+out|need\s+(?:a\s+)?replacement\s+key)\b/i.test(source)
+      || lostKeyRequest.test(source)
       || /(?:^\s*(?:please\s+)?(?:book|reserve|arrange)\b|\b(?:please\s+(?:book|reserve|arrange)|can\s+you\s+(?:book|reserve|arrange)|could\s+you\s+(?:book|reserve|arrange)|help\s+me\s+(?:book|reserve|arrange)|i\s+(?:want|wanna|need|would\s+like)\s+(?:you\s+)?(?:to\s+)?(?:book|reserve|arrange)|book\s+(?:me|us)|make\s+(?:a\s+)?(?:booking|reservation))\b)/i.test(source)
       || /(?:\b(?:i\s+(?:need|want|would\s+like)|can\s+(?:i|we)\s+(?:get|have)|get\s+me|send\s+me)\s+(?:a\s+)?(?:taxi(?:\s+boat)?|longtail\s+boat|motorbike\s+taxi|ferry\s+tickets?)\b|^\s*(?:taxi(?:\s+boat)?|longtail(?:\s+boat)?|motorbike\s+taxi|ferry(?:\s+tickets?)?)\b(?=[\s\S]*\b(?:today|tomorrow|next\s+(?:mon|tues|wednes|thurs|fri|satur|sun)day|in\s+\d{1,3}\s+days?|from|to|at\s+\d)))/i.test(source)
       || /(?:\b(?:i|we)\s+(?:(?:want|need|plan)\s+to|would\s+like\s+to|wanna)\s+(?:(?:go|book|arrange)\s+)?(?:(?:scuba\s+)?div(?:e|ing)|fishing|snorkel(?:ing|ling)?)\b|\b(?:i|we)['’]d\s+like\s+to\s+(?:(?:go|book|arrange)\s+)?(?:(?:scuba\s+)?div(?:e|ing)|fishing|snorkel(?:ing|ling)?)\b|\b(?:i|we)\s+(?:want|need|would\s+like)\s+(?:a\s+)?(?:diving|fishing|snorkel(?:ing|ling)?)\s+(?:trip|tour)\b|\b(?:take\s+(?:me|us)|can\s+you\s+take\s+(?:me|us)|help\s+(?:me|us)\s+(?:go\s+)?)\s*(?:(?:scuba\s+)?div(?:e|ing)|fishing|snorkel(?:ing|ling)?)\b)/i.test(source)

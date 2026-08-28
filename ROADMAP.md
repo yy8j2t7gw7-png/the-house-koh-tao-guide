@@ -1,6 +1,6 @@
 # Product Roadmap
 
-Baseline: v5.11.27
+Baseline: v5.11.28
 
 ## Completed
 
@@ -176,7 +176,9 @@ Guests may continue using ordinary WhatsApp handoffs. Automated internal alerts 
 - [x] Implement v5.11.26 as the diving course/mixed-party and owner-cleanup functional release without beginning public visual redesign.
 - [x] Deploy v5.11.26 and pass its mixed-diving and owner-cleanup production smoke checks.
 - [x] Implement and package v5.11.27 full public visual polish without changing business logic.
-- [ ] Deploy v5.11.27 and run the six-step visual smoke check in `DEVELOPMENT_HANDOFF_v5.11.27.md`.
+- [x] Deploy v5.11.27 and use production visual review to define the focused v5.11.28 refinement.
+- [x] Implement and package v5.11.28 public hierarchy/wording refinement plus the authorized deterministic lost-key synonym correction.
+- [ ] Deploy v5.11.28 and run the concise smoke check in `DEVELOPMENT_HANDOFF_v5.11.28.md`.
 - [ ] Submit and obtain Meta approval for the five optional quick-action templates documented in `META_STAFF_QUICK_ACTIONS_v5.11.20.md`; never map the buttonless service v1 template and enable only after every intended template is Active.
 - [x] Add `STAY_TOKEN_PEPPER` and `RESERVATION_SYNC_TOKEN` Worker secrets
 - [x] Add protected `SPARE_KEY_CODES` Worker secret before activating automatic spare-key release

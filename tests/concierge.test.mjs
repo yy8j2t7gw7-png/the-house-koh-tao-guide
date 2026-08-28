@@ -685,6 +685,66 @@ test("critical guest requests stay deterministic and room-aware", async () => {
   assert.equal(store.interactions[0].learningGap, false);
 });
 
+test("every clear lost-key and lockout phrase enters the same protected path before generic routing", async () => {
+  const now = new Date("2026-08-28T09:00:00.000Z");
+  const { env, store } = createEnvironment({ GUEST_ACCESS_ENFORCEMENT: "true" });
+  const cookie = await syncAndVerifyStay(env, { now });
+  const phrases = [
+    "lost key",
+    "I lost my key",
+    "lost my key",
+    "key lost",
+    "locked out",
+    "I’m locked out",
+    "I am locked out",
+    "can’t get into my room",
+    "cannot get into my room",
+    "forgot my key",
+    "I forgot my room key",
+    "need spare key",
+    "where is my spare key"
+  ];
+
+  for (const phrase of phrases) {
+    const response = await handleConciergeRequest(verifiedConciergeRequest(phrase, cookie), env, undefined, now);
+    const body = await response.json();
+    assert.equal(response.status, 200, phrase);
+    assert.equal(body.intentId, "lost_key", phrase);
+    assert.equal(body.source, "lost-key-policy", phrase);
+    assert.equal(body.needsHuman, false, phrase);
+    assert.match(body.answer, /500 THB replacement fee/i, phrase);
+    assert.equal(body.actions.some((action) => action.type === "spare-key"), true, phrase);
+    assert.doesNotMatch(body.answer, /couldn’t reach The House team/i, phrase);
+  }
+
+  assert.equal(store.alerts.length, 0);
+  assert.equal(store.alertDeliveries.length, 0);
+});
+
+test("a repeated lost-key synonym while fee acceptance is pending preserves the protected path without an alert", async () => {
+  const now = new Date("2026-08-28T09:00:00.000Z");
+  const { env, store } = createEnvironment({ GUEST_ACCESS_ENFORCEMENT: "true" });
+  const cookie = await syncAndVerifyStay(env, { now });
+  const first = await handleConciergeRequest(verifiedConciergeRequest("I lost my key", cookie), env, undefined, now);
+  const firstBody = await first.json();
+  const repeated = await handleConciergeRequest(verifiedConciergeRequest("lost key", cookie, {
+    history: [
+      { role: "user", content: "I lost my key" },
+      { role: "assistant", content: firstBody.answer }
+    ]
+  }), env, undefined, now);
+  const repeatedBody = await repeated.json();
+
+  assert.equal(firstBody.intentId, "lost_key");
+  assert.equal(repeatedBody.intentId, "lost_key");
+  assert.equal(repeatedBody.source, "lost-key-policy");
+  assert.equal(repeatedBody.needsHuman, false);
+  assert.match(repeatedBody.answer, /500 THB replacement fee/i);
+  assert.equal(repeatedBody.actions.some((action) => action.type === "spare-key"), true);
+  assert.equal(store.alerts.length, 0);
+  assert.equal(store.alertDeliveries.length, 0);
+});
+
 test("an unverified lost-key request sends no alert and exposes no spare-key path", async () => {
   const { env, store } = createEnvironment({
     GUEST_ACCESS_ENFORCEMENT: "true",
@@ -2004,7 +2064,9 @@ test("main and room welcome pages make required registration prominent", async (
     readFile(new URL("../public/registration-entry.js", import.meta.url), "utf8"),
     readFile(new URL("../public/passport-upload.html", import.meta.url), "utf8")
   ]);
-  assert.match(home, /Required registration for non-Thai guests/);
+  assert.match(home, /Required guest registration/);
+  assert.match(home, /Complete your guest registration/);
+  assert.match(home, /Passport information is required for non-Thai overnight guests\. Thai guests are exempt\./);
   [home, room].forEach((html) => {
     assert.match(html, /TM30 Immigration/);
     assert.match(html, /automatically deleted 14 days after upload/);
@@ -2042,8 +2104,8 @@ test("main and room welcome pages make required registration prominent", async (
   assert.match(registrationForm, /Option 2 — Enter the required details/);
   assert.match(registrationForm, /exact required TM30 fields/);
   assert.match(room, /Please conserve water and electricity/);
-  assert.match(room, /undersea grid connection developed to reduce reliance on local diesel generators/);
-  assert.match(room, /switch off the air conditioning and lights whenever you leave the room/);
+  assert.match(room, /undersea grid connection, reducing reliance on local diesel generators/);
+  assert.match(room, /switch off the air conditioning and lights when you leave the room/);
   assert.match(house, /<b>1,000 THB clearance fee<\/b>/);
   assert.doesNotMatch(house, /<strong>1,000 THB clearance fee<\/strong>/);
   assert.equal(room, canonicalRoom);
@@ -2095,7 +2157,8 @@ test("protected workflows never fall back to the device-only answer engine", asy
   assert.match(script, /i\\s\+\(\?:need\|want\|would\\s\+like\)/);
   assert.match(script, /make\\s\+\(\?:a\\s\+\)\?\(\?:booking\|reservation\)/);
   assert.match(script, /dirty\|messy\|unclean/);
-  assert.match(script, /lost\\s\+\(\?:my\|the\)\\s\+\(\?:room\\s\+\)\?key/);
+  assert.match(script, /const lostKeyRequest = \/\\b/);
+  assert.match(script, /\|\| lostKeyRequest\.test\(source\)/);
   assert.match(script, /fishing\|snorkel/);
   assert.match(script, /would\\s\+like\\s\+to\|wanna/);
   assert.match(script, /take\\s\+\(\?:me\|us\)/);
@@ -2229,7 +2292,7 @@ test("guest localization supports seven languages and keeps the owner dashboard 
   assert.doesNotMatch(admin, /src="\/i18n\.js"/);
   assert.match(runtime, /exploreContentDeferred/);
   assert.match(runtime, /element\.closest\("\.section,\.footer"\)/);
-  assert.match(runtime, /houseGuideTranslations:v5\.11\.27:/);
+  assert.match(runtime, /houseGuideTranslations:v5\.11\.28:/);
   assert.match(runtime, /MAX_REQUEST_RETRIES = 2/);
   assert.match(runtime, /let flushRunning = false/);
 });
@@ -2251,7 +2314,16 @@ test("critical emergency and registration wording is reviewed in every guest lan
     "Tuesday–Sunday during office working hours, or at Bamboo Beach Bar from 11:00 AM. No storage is currently available before 11:00 AM.",
     "Luggage storage is available Tuesday–Sunday during office working hours. If the office is unavailable, luggage can be stored at Bamboo Beach Bar from 11:00 AM. We do not currently have luggage storage for early-morning arrivals before 11:00 AM.",
     "💧 Please conserve water and electricity",
-    "Fresh water is limited on Koh Tao. Electricity reaches the island through an undersea grid connection developed to reduce reliance on local diesel generators. Please use water and power thoughtfully, and switch off the air conditioning and lights whenever you leave the room.",
+    "Fresh water is limited on Koh Tao. Electricity reaches the island through an undersea grid connection, reducing reliance on local diesel generators. Please use water and power thoughtfully, and switch off the air conditioning and lights when you leave the room.",
+    "Complete your guest registration",
+    "Passport information is required for non-Thai overnight guests. Thai guests are exempt.",
+    "Access your room guide",
+    "Open Concierge",
+    "Open Google Maps",
+    "Your private room guide",
+    "Room location, arrival pictures, Wi-Fi and your full guest guide become available after your stay has been verified and the required guest registration is complete.",
+    "Only human waste may be flushed. Put toilet paper, tissues, wipes, sanitary products and all other items in the bin provided. If a blockage is caused by a prohibited item, a 1,000 THB clearance fee applies.",
+    "The House – Koh Tao · Simple, comfortable accommodation in Mae Haad.",
     "Enter your stay code to unlock your private room guide.",
     "Use the HM code in your Airbnb trip details, or your private House stay code.",
     "Your code is checked securely.",
@@ -4352,8 +4424,8 @@ test("agency-specific beginner and continuing courses pass the structured diving
   }
 });
 
-test("the bundled v5.11.27 catalog preserves current PADI, SSI and RAID pathways", () => {
-  assert.equal(divingCourses.updatedForRelease, "5.11.27");
+test("the bundled v5.11.28 catalog preserves current PADI, SSI and RAID pathways", () => {
+  assert.equal(divingCourses.updatedForRelease, "5.11.28");
   assert.deepEqual(divingCourses.houseRecommendation, {
     agency: "RAID",
     reason: "focus on dive safety and buoyancy control",
@@ -8184,7 +8256,7 @@ test("desktop Concierge expands the conversation while mobile keeps its polished
   assert.match(styles, /\.ai-concierge-panel\.has-conversation \.ai-concierge-chat[\s\S]*flex:1/);
 });
 
-test("v5.11.27 shared visual system constrains width, hero height, motion and overflow", async () => {
+test("v5.11.28 shared visual system constrains width, hero height, motion and overflow", async () => {
   const [styles, room, guideApp] = await Promise.all([
     readFile(new URL("../public/design-system.css", import.meta.url), "utf8"),
     readFile(new URL("../public/room.html", import.meta.url), "utf8"),
@@ -8205,7 +8277,7 @@ test("v5.11.27 shared visual system constrains width, hero height, motion and ov
   assert.match(guideApp, /setAttribute\("aria-current", "page"\)/);
 });
 
-test("v5.11.27 guest visual contracts keep registration and lost-key consent scan-friendly", async () => {
+test("v5.11.28 guest visual contracts keep registration and lost-key consent scan-friendly", async () => {
   const [home, passport, room, roomAccess, stayStyles, passportStyles] = await Promise.all([
     readFile(new URL("../public/index.html", import.meta.url), "utf8"),
     readFile(new URL("../public/passport-upload.html", import.meta.url), "utf8"),
@@ -8233,7 +8305,48 @@ test("v5.11.27 guest visual contracts keep registration and lost-key consent sca
   assert.match(passportStyles, /@media\(max-width:650px\)[\s\S]*\.passport-facts,\.passport-privacy ul,\.passport-session,\.registration-methods\{grid-template-columns:1fr\}/);
 });
 
-test("v5.11.27 owner operations styles distinguish lifecycle, diagnostics and narrow tables", async () => {
+test("v5.11.28 landing and room hierarchy use safe imagery, exact guidance and accurate actions", async () => {
+  const [home, room, canonicalRoom, roomApp, styles] = await Promise.all([
+    readFile(new URL("../public/index.html", import.meta.url), "utf8"),
+    readFile(new URL("../public/room.html", import.meta.url), "utf8"),
+    readFile(new URL("../public/modules/house/room.html", import.meta.url), "utf8"),
+    readFile(new URL("../public/room-app.js", import.meta.url), "utf8"),
+    readFile(new URL("../public/design-system.css", import.meta.url), "utf8")
+  ]);
+  assert.equal(room, canonicalRoom);
+  assert.match(home, /<section class="hero landing-hero">/);
+  assert.doesNotMatch(home, /\/assets\/photo-|\/api\/stay\/|arrivalRoomPhoto|roomPhoto/);
+  assert.match(styles, /\.landing-hero\{[\s\S]*linear-gradient\(145deg,#214f45/);
+  assert.match(home, /<h2 id="registrationTitle">Complete your guest registration<\/h2>/);
+  assert.match(home, /Passport information is required for non-Thai overnight guests\. Thai guests are exempt\./);
+  assert.equal((home.match(/<li><span>[1-4]<\/span>/g) || []).length, 4);
+  assert.match(home, /Access your room guide/);
+  assert.match(home, /Room location, arrival pictures, Wi-Fi and your full guest guide become available after your stay has been verified and the required guest registration is complete\./);
+  assert.doesNotMatch(home, /after the stay and required guest registration are complete/);
+  assert.match(room, /<span class="badge">ROOM LOCATION<\/span>\s*<h2 id="heroRoom">Location<\/h2>/);
+  assert.match(roomApp, /getElementById\("heroRoom"\)\.textContent = data\.floor/);
+  assert.match(room, /Put toilet paper, tissues, wipes, sanitary products and all other items in the bin provided/);
+  assert.match(room, /undersea grid connection, reducing reliance on local diesel generators/);
+  assert.ok((home.match(/Open Concierge/g) || []).length >= 3);
+  assert.ok((room.match(/Open Concierge/g) || []).length >= 2);
+  assert.equal((room.match(/500 THB/g) || []).length, 1);
+
+  const publicRoot = new URL("../public/", import.meta.url);
+  const pages = [];
+  async function collect(directory) {
+    for (const entry of await readdir(directory, { withFileTypes: true })) {
+      if (entry.isDirectory()) await collect(new URL(`${entry.name}/`, directory));
+      else if (entry.isFile() && entry.name.endsWith(".html")) pages.push(new URL(entry.name, directory));
+    }
+  }
+  await collect(publicRoot);
+  for (const page of pages) {
+    const html = await readFile(page, "utf8");
+    assert.doesNotMatch(html, /budget-friendly/i, `${page.pathname} retains the obsolete footer wording`);
+  }
+});
+
+test("v5.11.28 owner operations styles distinguish lifecycle, diagnostics and narrow tables", async () => {
   const [styles, script] = await Promise.all([
     readFile(new URL("../public/concierge-admin.css", import.meta.url), "utf8"),
     readFile(new URL("../public/concierge-admin.js", import.meta.url), "utf8")

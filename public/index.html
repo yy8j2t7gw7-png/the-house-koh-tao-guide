@@ -74,14 +74,14 @@ a{color:inherit}
 <link rel="stylesheet" href="/design-system.css">
 <link rel="stylesheet" href="/ai-concierge.css">
 </head>
-<body data-guest-access="public">
+<body class="landing-page" data-guest-access="public">
 <div class="shell">
 <header class="topbar">
   <a class="brand" href="/"><img src="/logo.svg" alt="The House Koh Tao"></a>
   <nav class="nav"><a href="/rooms.html">Your Room</a><a href="/house.html">The House</a><a href="/practical.html">Guest Information</a><a href="/explore.html">Explore</a><a href="/emergency.html">Help & Emergency</a><a href="/checkout.html">Departure</a></nav>
 </header>
 
-<section class="hero">
+<section class="hero landing-hero">
   <div class="hero-copy">
     <span class="badge">Welcome to Koh Tao</span>
     <h1>Welcome to The House.</h1>
@@ -90,40 +90,46 @@ a{color:inherit}
 </section>
 
 <section class="registration-required" id="guest-registration" aria-labelledby="registrationTitle">
-  <span class="required-label">Required registration for non-Thai guests</span>
-  <h2 id="registrationTitle">Non-Thai guests: complete your passport information</h2>
-  <p>Thailand's TM30 Immigration accommodation registration requires passport information for non-Thai overnight guests.</p>
+  <span class="required-label">Required guest registration</span>
+  <h2 id="registrationTitle">Complete your guest registration</h2>
+  <p>Passport information is required for non-Thai overnight guests. Thai guests are exempt.</p>
   <div class="registration-facts" aria-label="Guest registration requirements">
     <div class="registration-fact"><strong>Every foreign guest</strong><span>Include every non-Thai adult and child staying overnight, not only the person who made the booking.</span></div>
     <div class="registration-fact"><strong>Thai nationals are exempt</strong><span>Thai overnight guests do not need to upload passport information for this registration.</span></div>
     <div class="registration-fact"><strong>Private and secure</strong><span>Passport images are not sent through AI chat or WhatsApp and are automatically deleted 14 days after upload, or sooner after processing.</span></div>
   </div>
-  <p class="privacy-line">Open your permanent Room welcome page and verify the Airbnb confirmation code shown in your trip details or the private House stay code provided for a direct booking. You can then upload each required passport securely or choose the supported in-person verification option.</p>
+  <ol class="registration-steps" aria-label="How to access your private room guide">
+    <li><span>1</span>Open your personal Room page</li>
+    <li><span>2</span>Verify your stay</li>
+    <li><span>3</span>Complete required registration</li>
+    <li><span>4</span>Access your private guest information</li>
+  </ol>
+  <p class="privacy-line">Start with the permanent Room link in your Airbnb arrival message, or select your room if The House provided a private direct-stay code.</p>
+  <p class="privacy-line">Thailand's TM30 Immigration accommodation registration requires passport information for every non-Thai adult and child staying overnight, not only the booking guest. Upload each required passport securely or choose the supported in-person verification option. Never send passport details in the Concierge or WhatsApp.</p>
   <div class="btns">
     <a class="btn" href="/rooms.html">Open my Room page</a>
   </div>
-  <p class="privacy-line"><strong>Your Airbnb arrival message contains the correct permanent Room link.</strong> Do not send passport details in the concierge chat.</p>
 </section>
 
-<section class="grid">
- <a class="card" href="/rooms.html"><h3>🔐 Guest verification</h3><p>Open the permanent Room link from your Airbnb arrival message and complete secure access.</p></a>
+<section class="grid landing-actions">
+ <a class="card" href="/rooms.html"><h3>🔐 Access your room guide</h3><p>Open your personal Room link from Airbnb to verify your stay and access your private guest information.</p></a>
  <a class="card emergency-card" href="/emergency.html"><h3>🚨 Help & Emergency</h3><p>Emergency contacts, medical care and urgent help are always available.</p></a>
- <a class="card" href="https://maps.app.goo.gl/5MV4j4B1YzyR1SR69" target="_blank" rel="noopener"><h3>📍 Location</h3><p>Open the public Google Maps location for The House.</p></a>
- <a class="card" data-link="houseWhatsapp" target="_blank" rel="noopener" data-action="contact"><h3>💬 Contact Us</h3><p>Open the concierge first; human help is available when needed.</p></a>
+ <a class="card" href="https://maps.app.goo.gl/5MV4j4B1YzyR1SR69" target="_blank" rel="noopener"><h3>📍 Open Google Maps</h3><p>Open the public Google Maps location for The House.</p></a>
+ <a class="card" data-link="houseWhatsapp" target="_blank" rel="noopener" data-action="contact"><h3>💬 Open Concierge</h3><p>Open the Concierge for help with your stay and contact the team when needed.</p></a>
 </section>
 
-<section class="section info">
- <h2>Private information stays private</h2>
- <p>Room location, arrival pictures, Wi-Fi, stay instructions and the full guest guide become available only after the stay and required guest registration are complete.</p>
- <div class="btns"><a class="btn" href="https://maps.app.goo.gl/5MV4j4B1YzyR1SR69" target="_blank" rel="noopener">Find The House</a><a class="btn secondary" data-link="houseWhatsapp" target="_blank" rel="noopener" data-action="contact">Contact Us</a></div>
+<section class="section info landing-private-guide">
+ <h2>Your private room guide</h2>
+ <p>Room location, arrival pictures, Wi-Fi and your full guest guide become available after your stay has been verified and the required guest registration is complete.</p>
+ <div class="btns"><a class="btn" href="https://maps.app.goo.gl/5MV4j4B1YzyR1SR69" target="_blank" rel="noopener">Open Google Maps</a><a class="btn secondary" data-link="houseWhatsapp" target="_blank" rel="noopener" data-action="contact">Open Concierge</a></div>
 </section>
 
 <footer class="footer">
-  <div>The House – Koh Tao · Simple, comfortable, budget-friendly accommodation in Mae Haad.</div>
+  <div>The House – Koh Tao · Simple, comfortable accommodation in Mae Haad.</div>
   <nav class="legal-footer-links" aria-label="Legal information"><a href="/privacy">Privacy</a><a href="/data-deletion">Data Protection</a><a href="/terms">Terms</a></nav>
 </footer>
 </div>
-<a class="float-wa" data-link="houseWhatsapp" target="_blank" rel="noopener" data-action="contact">Contact Us</a>
+<a class="float-wa" data-link="houseWhatsapp" target="_blank" rel="noopener" data-action="contact">Open Concierge</a>
 <script src="/contacts.js"></script>
 <script src="/guide-app.js"></script>
 <script src="/module-registry.js"></script>

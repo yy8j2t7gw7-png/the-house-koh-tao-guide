@@ -20,9 +20,9 @@ The product should feel like a competent hotel concierge in a guest’s pocket, 
 
 ### Current state
 
-Current release: v5.11.27.
+Current release: v5.11.28.
 
-The live release prioritizes the operational guest journey and AI Concierge. v5.11.27 applies a complete restrained visual polish to guest pages, registration/passport guidance, the room-aware Concierge, protected lost-key consent and the owner operations dashboard. It introduces one responsive House design system, reduces oversized heroes, improves scanability and touch targets, and gives operational states a clearer non-color-only hierarchy. The v5.11.26 data-driven PADI/SSI/RAID catalog, mixed-party collector, RAID safety/buoyancy-control recommendation and preferred Roctopus guidance remain authoritative. Every Meta sanitizer, exact-alert retry, transient-contact boundary, six-parameter booking schema, recipient route, property, cleaning, urgent-console and secure 24/7 lost-key safeguard remains intact. Explore is disabled through a reversible deployment feature switch; all Explore source content remains preserved.
+The live release prioritizes the operational guest journey and AI Concierge. v5.11.28 refines the v5.11.27 visual system rather than redesigning it: the public landing page has a warmer but image-safe hierarchy, registration uses a clear four-step path, CTAs describe their real destinations, ambiguous access wording is corrected, the room-location overlay no longer repeats the room identity and operational wording/cards are quieter. It also applies one authorized production correction so every clear lost-key/lockout synonym reaches the same protected 24/7 flow before generic routing. The v5.11.26 data-driven PADI/SSI/RAID catalog, mixed-party collector, RAID safety/buoyancy-control recommendation and preferred Roctopus guidance remain authoritative. Every Meta sanitizer, exact-alert retry, transient-contact boundary, six-parameter booking schema, recipient route, property, cleaning, urgent-console and secure lost-key authorization/display/rotation safeguard remains intact. Explore is disabled through a reversible deployment feature switch; all Explore source content remains preserved.
 
 Existing content areas:
 

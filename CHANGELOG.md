@@ -2,6 +2,27 @@
 
 All notable changes to The House – Koh Tao guest guide are recorded here.
 
+## v5.11.28 — Visual Hierarchy, Wording & Lost-Key Intent Consistency
+
+### Public guest refinement
+
+- Keeps the compact landing hero and adds restrained House-green tonal depth because no existing image is both property-relevant and public-safe.
+- Changes the registration hierarchy to **Complete your guest registration**, retains all legal/privacy detail, flattens its three facts and adds a concise four-step access sequence.
+- Replaces the misleading “after the stay … complete” sentence with wording tied to verified stay status and completed required registration.
+- Makes Room, Concierge and Google Maps actions describe their destinations, removes the repeated room number from the room-photo overlay and reduces nested card treatment around operational guidance.
+- Tightens the approved toilet and island resource wording and replaces every public “budget-friendly” footer with **The House – Koh Tao · Simple, comfortable accommodation in Mae Haad.**
+
+### Narrow production correction
+
+- Recognizes bare **lost key** and the approved lost-key, forgotten-key and lockout variants before generic Concierge/service/model routing in both the protected client boundary and the server policy router.
+- A repeated synonym while fee consent is pending remains in the same protected flow and creates no alert. Unverified guests still require verification; explicit current-request fee acceptance, accepted team notification, protected-page-only display and rotation lock are unchanged.
+
+### Regression and scope
+
+- Adds two lost-key intent regressions and one lightweight landing/room hierarchy contract, expanding the complete suite from 166 to 169 tests.
+- Changes no booking, diving, Meta template, recipient, cleaning, maintenance, emergency, passport, Airbnb, admin lifecycle or spare-key authorization behavior beyond the explicitly authorized intent-precedence correction.
+- Keeps `EXPLORE_ENABLED=false` and `WHATSAPP_STAFF_ACTIONS_ENABLED=false`.
+
 ## v5.11.27 — Full Visual Polish
 
 ### Shared guest visual system

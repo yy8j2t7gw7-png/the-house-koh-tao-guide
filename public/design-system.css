@@ -187,6 +187,20 @@ html:not(.explore-enabled) a.card[href="/explore.html"]{display:none!important}
 .hero .badge{margin-bottom:10px;background:rgba(255,255,255,.93);color:var(--ink)}
 .hero h1,.hero h2{max-width:18ch;margin:0 0 9px;color:#fff;font-size:clamp(32px,4.2vw,48px);line-height:1.04;letter-spacing:-.025em;text-wrap:balance}
 .hero p{max-width:58ch;margin:0;color:rgba(255,255,255,.94);font-size:clamp(16px,1.7vw,18px);line-height:1.5}
+.landing-hero{
+  background:
+    radial-gradient(circle at 82% 22%,rgba(255,255,255,.13) 0 8%,transparent 8.5%),
+    radial-gradient(circle at 88% 31%,rgba(255,255,255,.075) 0 17%,transparent 17.5%),
+    linear-gradient(145deg,#214f45 0%,#2f6f5f 70%,#3d796a 100%);
+}
+.landing-hero::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  z-index:0;
+  background:linear-gradient(105deg,rgba(13,43,36,.18),transparent 62%);
+  pointer-events:none;
+}
 
 .badge{
   display:inline-flex;
@@ -257,17 +271,29 @@ html:not(.explore-enabled) a.card[href="/explore.html"]{display:none!important}
   border:1px solid #b7d2c7;
   border-radius:var(--radius);
   background:#f2f8f5;
-  box-shadow:var(--shadow);
+  box-shadow:0 3px 14px rgba(24,59,52,.045);
 }
 .registration-required h2{max-width:24ch;margin:7px 0 9px;color:var(--ink);font-size:clamp(25px,3.2vw,36px);line-height:1.13;text-wrap:balance}
 .registration-required>p{max-width:var(--readable);margin:7px 0;color:var(--text)}
 .registration-required .required-label{display:inline-flex;padding:6px 10px;border-radius:999px;background:var(--ink);color:#fff;font-size:11px;font-weight:850;letter-spacing:.05em;line-height:1.3;text-transform:uppercase}
 .registration-required .privacy-line{color:var(--muted);font-size:14px}
-.registration-facts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:18px 0}
-.registration-fact{padding:14px;border:1px solid #cbded6;border-radius:13px;background:#fff}
+.registration-facts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0;margin:18px 0;border-block:1px solid #cbded6}
+.registration-fact{padding:14px 16px;border:0;border-left:1px solid #cbded6;border-radius:0;background:transparent}
+.registration-fact:first-child{padding-left:0;border-left:0}
+.registration-fact:last-child{padding-right:0}
 .registration-fact strong{display:block;margin-bottom:4px;color:var(--ink);font-size:15px}
 .registration-fact span{display:block;color:var(--muted);font-size:13px;line-height:1.45}
+.registration-steps{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));margin:18px 0;padding:0;border-block:1px solid #cbded6;list-style:none;counter-reset:none}
+.registration-steps li{display:flex;align-items:flex-start;gap:9px;min-width:0;padding:13px 14px;border-left:1px solid #cbded6;color:var(--ink);font-size:14px;font-weight:760;line-height:1.38}
+.registration-steps li:first-child{padding-left:0;border-left:0}
+.registration-steps li:last-child{padding-right:0}
+.registration-steps span{flex:0 0 24px;display:grid;place-items:center;width:24px;height:24px;border-radius:50%;background:var(--green);color:#fff;font-size:12px;font-weight:900}
 .registration-required .registration-link-missing{padding:12px 14px;border:1px solid #d8b574;border-radius:12px;background:var(--amber-soft);color:#6c4c15}
+
+.landing-private-guide{border-left:4px solid var(--green);background:var(--green-soft);box-shadow:none}
+.room-guidance,.room-facts-section{padding:0;border:0;border-radius:0;background:transparent;box-shadow:none}
+.room-guidance{display:grid;gap:10px}
+.room-guidance .notice{margin:0}
 
 .room-guide-intro{padding-block:18px}
 .room-guide-intro h1{font-size:clamp(29px,4vw,44px)}
@@ -371,7 +397,11 @@ html:not(.explore-enabled) a.card[href="/explore.html"]{display:none!important}
   .grid,.explore-grid{grid-template-columns:1fr;gap:11px}
   .card{padding:16px}
   .registration-facts{grid-template-columns:1fr}
-  .registration-fact{padding:13px}
+  .registration-fact,.registration-fact:first-child,.registration-fact:last-child{padding:13px 0;border-left:0;border-top:1px solid #cbded6}
+  .registration-fact:first-child{border-top:0}
+  .registration-steps{grid-template-columns:1fr}
+  .registration-steps li,.registration-steps li:first-child,.registration-steps li:last-child{padding:12px 0;border-top:1px solid #cbded6;border-left:0}
+  .registration-steps li:first-child{border-top:0}
   .explore-card-v2{min-height:370px}
   .partner-header{grid-template-columns:1fr}
   .partner-logo-box{width:124px;height:124px}

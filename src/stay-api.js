@@ -550,7 +550,9 @@ export async function handleStayGuestRequest(request, env, path, ctx, now = new 
 
   if (path === "/api/stay/spare-key") {
     if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405, { allow: "POST" });
-    if (!registrationComplete(registrationStatus)) return json({ error: "guest_registration_required" }, 403);
+    // Stay verification, not passport-registration completion, is the
+    // authorization boundary for lost-key help. The verified session and
+    // active-stay checks below still bind access to the current stay/room.
     if (!(await rateAllowed(env, request, "spare-key"))) return json({ error: "rate_limited" }, 429);
     const body = await readJson(request, 2_000);
     if (body?.feeAccepted !== true) return json({ error: "fee_acceptance_required" }, 400);

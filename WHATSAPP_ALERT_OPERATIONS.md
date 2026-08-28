@@ -2,13 +2,13 @@
 
 ## Purpose
 
-v5.11.19 provides a protected server-side staff-alert channel through the official Meta WhatsApp Business Platform. Guests continue to use the website Concierge. Recipient telephone numbers, access tokens and app secrets stay in encrypted Cloudflare secrets and never appear in public files, Git or release archives.
+v5.11.20 provides a protected server-side staff-alert channel through the official Meta WhatsApp Business Platform. Guests continue to use the website Concierge. Recipient telephone numbers, access tokens and app secrets stay in encrypted Cloudflare secrets and never appear in public files, Git or release archives.
 
 Routing is role based:
 
 - routine stay requests and actionable luggage requests route to Su plus both owners through derived `support_with_owners`;
 - House-arranged booking requests route to Fah plus both owners through derived `booking_with_owners`;
-- verified spare-key releases notify Su plus both owners through derived `lost_key_team` and do not use generic escalation;
+- verified office-hours lost-key alerts and after-hours spare-key releases notify Su plus both owners through derived `lost_key_team` and do not use generic service or escalation routing;
 - explicitly confirmed urgent or critical property incidents notify Fah plus both owners, without Su, through derived `urgent_response`;
 - unacknowledged urgent or critical property alerts route to the configured future on-call `escalation` group after 10 minutes, with the owners as the current safe fallback.
 
@@ -66,7 +66,7 @@ The protected owner console displays these records under **WhatsApp delivery dia
 
 `house_alert_status_v1` is non-recursive. An authorized `RECEIVED`, `ACK` or `RESOLVE` reply updates the original alert and sends one status message only to the other recipients assigned to that alert. The actor and unrelated roles are excluded; duplicate webhook delivery is suppressed by the original alert state. Status messages create no alert and no escalation.
 
-v5.11.19 contains a code-ready but default-off path for five separately reviewed Utility templates with **Received** and **Resolve** quick replies. Their exact Meta setup, payload strategy, activation gate and one-variable rollback are documented in `META_STAFF_QUICK_ACTIONS_v5.11.19.md`. Typed `RECEIVED`, `ACK` and `RESOLVE` remain available before and after activation.
+v5.11.20 contains a code-ready but default-off path for five separately reviewed Utility templates with **Received** and **Resolve** quick replies. Their exact Meta setup, payload strategy, activation gate and one-variable rollback are documented in `META_STAFF_QUICK_ACTIONS_v5.11.20.md`. The intended service template is `house_service_alert_actions_v2`; the accidentally created `house_service_alert_actions_v1` has no buttons and must never be mapped. Typed `RECEIVED`, `ACK` and `RESOLVE` remain available before and after activation.
 
 ## Cloudflare secrets
 
@@ -138,10 +138,10 @@ WHATSAPP_ALERT_ESCALATION_MINUTES=10
 
 `WHATSAPP_ALERT_TEMPLATE_LANGUAGE` remains present for compatibility and does not need a Cloudflare change for v5.11.17. Every mapped production or rollback template now uses the language attached to its immutable schema entry.
 
-The optional v5.11.19 action templates are intentionally absent from `wrangler.jsonc`, so deploying application code cannot activate unapproved Meta definitions. After all five templates are Active, configure these exact non-secret variables and then enable the gate:
+The optional v5.11.20 action templates are intentionally absent from `wrangler.jsonc`, so deploying application code cannot activate unapproved Meta definitions. After all five intended templates are Active, configure these exact non-secret variables and then enable the gate in a separate authorized activation release:
 
 ```text
-WHATSAPP_SERVICE_ACTION_TEMPLATE_NAME=house_service_alert_actions_v1
+WHATSAPP_SERVICE_ACTION_TEMPLATE_NAME=house_service_alert_actions_v2
 WHATSAPP_LUGGAGE_ACTION_TEMPLATE_NAME=house_luggage_alert_actions_v1
 WHATSAPP_BOOKING_ACTION_TEMPLATE_NAME=house_booking_alert_actions_v1
 WHATSAPP_URGENT_ACTION_TEMPLATE_NAME=house_urgent_alert_actions_v1
@@ -153,17 +153,16 @@ If the flag is false, missing or any required action-template mapping is absent,
 
 Review Meta's supported Graph API versions before changing the version. The Worker checks once per minute for overdue escalations.
 
-## Production verification
+## v5.11.20 deployment and changed-function verification
 
-1. Deploy v5.11.19 with `WHATSAPP_STAFF_ACTIONS_ENABLED=false` and confirm all six current template names above remain mapped in production.
-2. Confirm the existing protected secrets and recipient groups remain present, then deploy.
-3. Confirm `/api/concierge/status` reports `whatsappAlertsConfigured: true` and the owner console says **WhatsApp connected**.
-4. Test with non-sensitive requests: room cleaning and luggage arrangement → Su plus both owners; diving booking → Fah plus both owners; confirmed serious leak → Fah plus both owners without Su; verified lost-key release → Su plus both owners.
-5. Confirm every current delivery uses language `en`, the expected active template and the exact safe fields listed in the table. Meta `132001` must not recur.
-6. Reply `RECEIVED` or `ACK` with an exact reference and confirm the other assigned recipients—but not the actor—receive one ACKNOWLEDGED status. Confirm escalation stops. Then test `RESOLVE` and one RESOLVED update per other assigned recipient.
-7. Test one unacknowledged urgent event and confirm escalation after approximately 10 minutes.
-8. Only after the protected channel passes should a temporary `SPARE_KEY_CODES` value be tested. Rotate it immediately afterward.
+Deploy the verified v5.11.20 bundle to the existing Worker without changing the six production template mappings, secrets, recipients, webhook settings, `SPARE_KEY_CODES` or `WHATSAPP_STAFF_ACTIONS_ENABLED=false` state.
 
-Quick-action activation is a separate post-approval change. Follow `META_STAFF_QUICK_ACTIONS_v5.11.19.md`, verify both buttons from every alert kind, confirm actor exclusion and duplicate-event idempotency, then repeat one unacknowledged urgent escalation test.
+Smoke-test only the functions changed in this release:
+
+1. From a verified room, send **my room is dirty**, then **3:30pm**. Confirm exactly one service alert reaches Su plus both owners, includes the preferred time and gives the guest no second manual-contact instruction. Repeat after hours or on Monday and confirm no routine **Call Us** action appears.
+2. Send **I want to go fishing** and separately press a category **Book with Us** action. Confirm each starts structured collection, asks only for missing fields and produces one Fah-plus-owner booking alert only after all fields and an international contact are supplied. Confirm the contact is redacted in visible history and ferry never requests passport data.
+3. Send **I lost my key** once without a verified stay and confirm no alert or code. With a verified active stay and passport pending, confirm an office-hours request creates one dedicated lost-key alert with no code path. After hours, confirm the 500 THB acceptance and accepted-team-notification gates precede protected-page code display, then confirm the rotation lock prevents a second release.
+
+Quick-action activation is a separate post-approval change. Follow `META_STAFF_QUICK_ACTIONS_v5.11.20.md` only after every intended template is Active; never map service v1.
 
 If configuration is incomplete, alerts remain visible in the protected owner console and ordinary Concierge use continues. Automatic spare-key release remains unavailable by design.

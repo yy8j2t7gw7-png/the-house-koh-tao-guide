@@ -2,6 +2,23 @@
 
 All notable changes to The House – Koh Tao guest guide are recorded here.
 
+## v5.11.20 — Cleaning, Booking Entry & Lost-Key Verification Fixes
+
+### Production fixes
+
+- Recognizes natural room-condition wording as an actionable cleaning request, asks only for a missing preferred time and creates one protected service alert with that time once complete. The guest is no longer instructed to submit the same request manually.
+- Starts structured fishing and snorkeling collection from direct first-person intent as well as the category-specific **Book with Us** action. Existing supplied fields remain in the active workflow; recommendation-only questions still create no alert.
+- Decouples active-stay verification from passport completion for lost-key assistance. An unverified request cannot alert or expose a code; a verified office-hours request creates only a dedicated lost-key alert; a verified after-hours request enters the protected fee-and-code flow.
+- Lets a verified guest reach the protected lost-key controls from the access page even while passport registration is pending, without revealing the private room guide.
+- Removes the passport-completion gate from the spare-key endpoint while retaining the verified room-bound session, active-stay, after-hours, fee, accepted-team-notification and rotation-lock gates.
+
+### Security and regression protection
+
+- Adds an independent room-verification check at the final lost-key WhatsApp boundary and prevents browser-only fallback for cleaning, direct booking and lost-key operations.
+- Rejects `house_service_alert_actions_v1`, which exists in Meta without the required buttons, and permits only the intended `house_service_alert_actions_v2` schema when the all-template quick-action gate is eventually enabled.
+- Leaves `WHATSAPP_STAFF_ACTIONS_ENABLED` off by default and changes no production template mapping, secret, recipient, webhook, emergency route, passport-retention rule or Airbnb synchronization behavior.
+- Expands the complete regression suite from 122 to 126 tests, including real verified-stay sessions, passport-pending stays, office/after-hours lost-key paths, cross-session/stay/room isolation, exact natural-language cleaning and booking paths, delivery payloads and leak checks.
+
 ## v5.11.19 — Protected Operations, Scheduling & Structured Bookings
 
 ### Production fixes

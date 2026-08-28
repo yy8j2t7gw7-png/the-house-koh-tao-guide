@@ -13,7 +13,7 @@
 <link rel="stylesheet" href="/ai-concierge.css">
 <style>
 body{margin:0;font-family:Arial,Helvetica,sans-serif;color:#26322f;background:#fbfcfb;line-height:1.55}
-.intro{margin:38px 0 22px}.intro h1{font-size:clamp(34px,7vw,56px);line-height:1.05;color:#173d35;margin:0 0 12px}.intro p{max-width:720px;color:#68736f;font-size:18px}.choice-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:18px}.choice{border:1px solid #dbe5e0;border-radius:16px;padding:18px;background:#fff}.choice h3{margin:0 0 8px;color:#173d35}.choice p{margin:0 0 14px}.choice label{display:block;font-weight:700;margin-bottom:6px}.choice input[type=number]{width:100%;padding:13px;border:1px solid #a8beb6;border-radius:10px;font:inherit;margin-bottom:12px}.thai-exemption-th{margin:-4px 0 10px!important;color:#1f5b4f;font-weight:700}.thai-button-label{display:block;margin-top:2px;font-size:.86em;font-weight:600}html[lang="th"] .thai-exemption-th,html[lang="th"] .thai-button-label{display:none}.important{padding:13px 15px;border-left:5px solid #1f5b4f;background:#eaf4f0;border-radius:10px}.public-help{margin-top:24px;padding:20px;border:1px solid #dbe5e0;border-radius:18px;background:#fff}.public-help h2{margin:0 0 8px;color:#173d35}.footer{display:flex;flex-direction:column;align-items:center;gap:10px;margin-top:42px;padding-top:18px;border-top:1px solid #dbe5e0;color:#68736f;font-size:13px}.admin-login-link{display:inline-flex;align-items:center;justify-content:center;min-height:34px;padding:6px 12px;border:1px solid #cbdad4;border-radius:999px;background:#fff;color:#51645d;text-decoration:none;font-size:12px;font-weight:700}.admin-login-link:hover{border-color:#9db8b0;color:#173d35;background:#f4f8f6}.admin-login-link:focus-visible{outline:3px solid rgba(31,91,79,.2);outline-offset:2px}@media(max-width:650px){.choice-grid{grid-template-columns:1fr}}
+.intro{margin:38px 0 22px}.intro h1{font-size:clamp(34px,7vw,56px);line-height:1.05;color:#173d35;margin:0 0 12px}.intro p{max-width:720px;color:#68736f;font-size:18px}.choice-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:18px}.choice{border:1px solid #dbe5e0;border-radius:16px;padding:18px;background:#fff}.choice h3{margin:0 0 8px;color:#173d35}.choice p{margin:0 0 14px}.choice label{display:block;font-weight:700;margin-bottom:6px}.choice input[type=number]{width:100%;padding:13px;border:1px solid #a8beb6;border-radius:10px;font:inherit;margin-bottom:12px}.thai-exemption-th{margin:-4px 0 10px!important;color:#1f5b4f;font-weight:700}.thai-button-label{display:block;margin-top:2px;font-size:.86em;font-weight:600}html[lang="th"] .thai-exemption-th,html[lang="th"] .thai-button-label{display:none}.important{padding:13px 15px;border-left:5px solid #1f5b4f;background:#eaf4f0;border-radius:10px}.public-help{margin-top:24px;padding:20px;border:1px solid #dbe5e0;border-radius:18px;background:#fff}.public-help h2{margin:0 0 8px;color:#173d35}.verified-lost-key-trigger{display:block;text-decoration:none;color:inherit}.footer{display:flex;flex-direction:column;align-items:center;gap:10px;margin-top:42px;padding-top:18px;border-top:1px solid #dbe5e0;color:#68736f;font-size:13px}.admin-login-link{display:inline-flex;align-items:center;justify-content:center;min-height:34px;padding:6px 12px;border:1px solid #cbdad4;border-radius:999px;background:#fff;color:#51645d;text-decoration:none;font-size:12px;font-weight:700}.admin-login-link:hover{border-color:#9db8b0;color:#173d35;background:#f4f8f6}.admin-login-link:focus-visible{outline:3px solid rgba(31,91,79,.2);outline-offset:2px}@media(max-width:650px){.choice-grid{grid-template-columns:1fr}}
 </style>
 </head>
 <body data-guest-access="pending">
@@ -84,6 +84,46 @@ body{margin:0;font-family:Arial,Helvetica,sans-serif;color:#26322f;background:#f
     <p class="stay-privacy">Used only for TM30 registration. Your room guide opens after all passports are uploaded or checked in person.</p>
   </div>
   <p class="stay-access-status" id="registrationStatus" role="status" aria-live="polite" hidden></p>
+</section>
+
+<a class="public-help spare-key-trigger verified-lost-key-trigger" id="openSpareKeyAccess" href="#spareKeyAccess" aria-controls="spareKeyAccess" aria-expanded="false" hidden>
+  <h2>Lost key or locked out?</h2>
+  <p>Secure after-hours help if you cannot enter your room.</p>
+</a>
+
+<section class="spare-key-card" id="spareKeyAccess" aria-labelledby="spareKeyTitle" hidden>
+  <div class="spare-key-card-heading">
+    <div>
+      <span class="stay-access-label">After-hours spare-key help</span>
+      <h2 id="spareKeyTitle">Lost key or locked out?</h2>
+    </div>
+    <button class="btn secondary" id="closeSpareKeyAccess" type="button">Back to room guide</button>
+  </div>
+  <p>You can access the spare key for your room between 7:30 PM and 10:30 AM.</p>
+  <div class="list compact-list">
+    <div class="rule"><strong>🔑 Key box</strong>Next to your room door</div>
+  </div>
+  <p>You're already verified for this room — no Airbnb confirmation code is needed.</p>
+  <p>If your key has been lost, a 500 THB replacement fee applies. The House team will be notified before the spare-key code is released.</p>
+  <p>Your key-box code is never sent through WhatsApp.</p>
+  <p class="stay-access-status" id="spareKeyStatus" role="status" aria-live="assertive" hidden></p>
+  <form class="spare-key-form" id="spareKeyForm" hidden>
+    <label class="fee-confirmation"><input id="lostKeyFeeAccepted" type="checkbox" required> <span>I understand the 500 THB lost-key replacement fee and want to continue.</span></label>
+    <div class="stay-access-actions"><button class="btn" type="submit">Request spare key</button><button class="btn secondary" id="cancelLostKeyRequest" type="button">Cancel</button></div>
+  </form>
+  <div id="spareKeyContactHelp" hidden>
+    <a class="btn" href="#concierge" data-action="contact">Contact The House Concierge</a>
+  </div>
+  <div class="spare-key-result" id="spareKeyResult" hidden>
+    <h3>Your spare key is ready.</h3>
+    <p>Use the code below to open the key box next to your room door.</p>
+    <strong>Key-box code</strong>
+    <span class="spare-key-code" id="spareKeyCode"></span>
+    <p id="spareKeyLocation"></p>
+    <button class="btn secondary" id="copySpareKeyCode" type="button">Copy code</button>
+    <p class="stay-privacy">Please take the spare key and close the key box again.</p>
+    <p class="stay-privacy">If you need any further help, contact The House Concierge.</p>
+  </div>
 </section>
 
 <section class="public-help">

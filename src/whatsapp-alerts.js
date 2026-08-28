@@ -31,7 +31,10 @@ const TEMPLATE_SCHEMAS = Object.freeze({
   // Optional interactive successors. They are selected only after the
   // explicit feature flag and exact per-kind template mapping are enabled.
   // Until Meta approves them, every existing production mapping remains live.
-  house_service_alert_actions_v1: Object.freeze({ kind: "service", languageCode: "en", bodyParameterCount: 5, quickActions: true }),
+  // Meta created service actions v1 without the required buttons. Keep its
+  // known body shape non-interactive so it can never activate quick actions.
+  house_service_alert_actions_v1: Object.freeze({ kind: "service", languageCode: "en", bodyParameterCount: 5, quickActions: false }),
+  house_service_alert_actions_v2: Object.freeze({ kind: "service", languageCode: "en", bodyParameterCount: 5, quickActions: true }),
   house_luggage_alert_actions_v1: Object.freeze({ kind: "luggage", languageCode: "en", bodyParameterCount: 6, quickActions: true }),
   house_booking_alert_actions_v1: Object.freeze({ kind: "booking", languageCode: "en", bodyParameterCount: 6, quickActions: true }),
   house_urgent_alert_actions_v1: Object.freeze({ kind: "urgent", languageCode: "en", bodyParameterCount: 5, quickActions: true }),
@@ -585,6 +588,7 @@ export async function createConciergeAlert({ env, interactionId, sessionId, room
   const policy = classifyConciergeAlert({ result, question, room, now });
   const store = getStore(env);
   if (!policy || !store) return null;
+  if (policy.alertType === "lost_key" && !roomVerified) return null;
   // Final submission boundary: conversational or model output can never create
   // a luggage alert unless every operational field and protected contact exists.
   const luggageRequest = policy.alertType === "luggage_storage"

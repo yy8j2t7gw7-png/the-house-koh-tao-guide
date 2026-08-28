@@ -20,9 +20,9 @@ The product should feel like a competent hotel concierge in a guest’s pocket, 
 
 ### Current state
 
-Current release: v5.11.19.
+Current release: v5.11.20.
 
-The live release prioritizes the operational guest journey and AI Concierge. It supports seven guest languages across the complete live operational pages, with per-item translation isolation so one unsupported sentence cannot block an entire page. The concierge uses an animated-dot thinking state and approved external social actions for Bamboo Beach Bar. Secure guest verification is concise but retains every required privacy and registration instruction. Verified guest guidance includes the confirmed luggage-storage windows and careful use of Koh Tao's limited fresh water and island electricity. Explore is disabled through a reversible deployment feature switch; all Explore source content remains preserved for the final content phase.
+The live release prioritizes the operational guest journey and AI Concierge. v5.11.20 repairs the production conversation paths for natural cleaning requests, direct structured booking intent and verified lost-key assistance while preserving every v5.11.19 privacy, routing and scheduling gate. It supports seven guest languages across the complete live operational pages, with per-item translation isolation so one unsupported sentence cannot block an entire page. The concierge uses an animated-dot thinking state and approved external social actions for Bamboo Beach Bar. Secure guest verification is concise but retains every required privacy and registration instruction. Verified guest guidance includes the confirmed luggage-storage windows and careful use of Koh Tao's limited fresh water and island electricity. Explore is disabled through a reversible deployment feature switch; all Explore source content remains preserved for the final content phase.
 
 Existing content areas:
 
@@ -68,7 +68,7 @@ New Explore interface and content expansion remains deferred. The concierge may 
 
 Urgent property problems require a separate 24/7 on-call role. No dedicated person or number is confirmed yet, so the public product must not claim confirmed 24/7 coverage.
 
-After-hours spare-key handling applies from 19:30 to 10:30 Bangkok time. Each active room will have a key box beside its door. Lost keys add a 500 THB fee. Codes remain only in an encrypted Worker secret. Even with an active verified session, the guest must enter the Airbnb confirmation code again; the server checks it against the same room and active reservation without storing the readable code. The guest then confirms the fee and the system automatically sends the protected owner/Su WhatsApp alert before showing the room code. The WhatsApp API must confirm message submission; no guest approval of that notification is required. The key-box code never appears in that alert or operational storage, and a second release is blocked until staff rotate it.
+After-hours spare-key handling applies from 19:30 to 10:30 Bangkok time. Each active room will have a key box beside its door. Lost keys add a 500 THB fee. Codes remain only in an encrypted Worker secret. The protected operation revalidates the current room-bound active-stay session and does not depend on passport completion or ask the guest to re-enter the stay code. The guest then confirms the fee and the system automatically sends the protected owner/Su WhatsApp alert before showing the room code. The WhatsApp API must confirm message submission; no guest approval of that notification is required. The key-box code never appears in that alert or operational storage, and a second release is blocked until staff rotate it.
 
 ### Next major phase
 

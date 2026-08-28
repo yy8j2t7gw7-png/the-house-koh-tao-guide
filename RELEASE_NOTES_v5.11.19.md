@@ -1,5 +1,7 @@
 # The House – Koh Tao v5.11.19
 
+> **Historical release:** The v5.11.19 quick-action setup has been superseded. Never map the buttonless `house_service_alert_actions_v1`; use the default-off v5.11.20 guide and intended service v2 template instead.
+
 ## Release outcome
 
 v5.11.19 repairs the reported luggage submission failure, introduces real housekeeping scheduling, completes structured House booking workflows and prepares one-tap staff actions without changing the current production Meta or Cloudflare configuration.

@@ -165,7 +165,10 @@
       if (!data.verified) return;
       if (data.accessGranted && pendingPage) return window.location.reload();
       if (!data.accessGranted && pendingPage) showRegistration(data);
-      if (data.accessGranted && !pendingPage) {
+      if (!data.accessGranted && pendingPage) {
+        renderSpareKey(data);
+        if (window.location.hash === "#spareKeyAccess") openSpareKeyAccess();
+      } else if (data.accessGranted && !pendingPage) {
         renderSpareKey(data);
         if (window.location.hash === "#spareKeyAccess") openSpareKeyAccess();
       }

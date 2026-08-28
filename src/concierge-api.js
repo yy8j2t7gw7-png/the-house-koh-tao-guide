@@ -12,7 +12,7 @@ import {
 } from "./concierge-core.js";
 import { handlePassportAdminRequest } from "./passport-api.js";
 import { handleMaintenanceAdminRequest } from "./maintenance-api.js";
-import { housekeepingAvailability, normalizeBangkokRequestedDate } from "./alert-policy.js";
+import { housekeepingAvailability, isAfterHours, normalizeBangkokRequestedDate } from "./alert-policy.js";
 import { retrieveApprovedProjectKnowledge } from "./project-knowledge.js";
 import { LANGUAGE_NAMES, translateApprovedTexts, validLanguage } from "./i18n-api.js";
 import {
@@ -24,7 +24,7 @@ import {
 } from "./whatsapp-alerts.js";
 import { getGuestAccess, handleStayAdminRequest, stayConfiguration } from "./stay-api.js";
 
-const RELEASE = "5.11.19";
+const RELEASE = "5.11.20";
 const ROOM_OPTIONS = new Set(["1", "2", "3", "4", "5", "6", "8", "9", "10", "11"]);
 const MAX_HISTORY_ITEMS = 10;
 const MAX_QUESTION_LENGTH = 800;
@@ -170,9 +170,12 @@ const DIRECT_LUGGAGE_REQUEST = /^\s*(?:please\s+)?(?:store|keep|arrange)\s+(?:my
 const ACTIONABLE_DIVING_BOOKING = /(?:^\s*(?:please\s+)?(?:book|reserve|arrange)\s+.*\b(?:dive|diving|scuba|open\s+water|advanced\s+open\s+water)\b|\b(?:please\s+(?:book|reserve|arrange)|can\s+you\s+(?:book|reserve|arrange)|could\s+you\s+(?:book|reserve|arrange)|help\s+me\s+(?:book|reserve|arrange)|i\s+(?:want|wanna|need|would\s+like)\s+(?:you\s+)?(?:to\s+)?(?:book|reserve|arrange))\b[^.?!]*\b(?:dive|diving|scuba|open\s+water|advanced\s+open\s+water)\b)/i;
 const ACTIONABLE_STRUCTURED_BOOKING = /(?:^\s*(?:please\s+)?(?:book|reserve|arrange)\b|\b(?:please\s+(?:book|reserve|arrange)|can\s+you\s+(?:book|reserve|arrange)|could\s+you\s+(?:book|reserve|arrange)|help\s+me\s+(?:book|reserve|arrange)|i\s+(?:want|wanna|need|would\s+like)\s+(?:you\s+)?(?:to\s+)?(?:book|reserve|arrange)|book\s+(?:me|us)|make\s+(?:a\s+)?(?:booking|reservation))\b)/i;
 const DIRECT_TRANSPORT_BOOKING = /(?:\b(?:i\s+(?:need|want|would\s+like)|can\s+(?:i|we)\s+(?:get|have)|get\s+me|send\s+me)\s+(?:a\s+)?(?:taxi(?:\s+boat)?|longtail\s+boat|motorbike\s+taxi|ferry\s+tickets?)\b|^\s*(?:taxi(?:\s+boat)?|longtail(?:\s+boat)?|motorbike\s+taxi|ferry(?:\s+tickets?)?)\b(?=[\s\S]*\b(?:today|tomorrow|next\s+(?:mon|tues|wednes|thurs|fri|satur|sun)day|in\s+\d{1,3}\s+days?|from|to|at\s+\d)))/i;
+const DIRECT_ACTIVITY_BOOKING = /\b(?:i|we)\s+(?:want|wanna|need|would\s+like|plan)\s+to\s+(?:go\s+)?(?:fishing|snorkel(?:ing|ling)?)\b/i;
 const SUPPORTED_BOOKING_KINDS = new Set(["diving", "fishing", "snorkeling", "taxi", "taxi_boat", "ferry", "motorbike_taxi"]);
 const HOUSEKEEPING_ITEM_REQUEST = /\b(?:toilet\s+paper|soap|(?:(?:new|fresh|clean)\s+)?towels?|room\s+cleaning|clean\s+(?:my|our|the)\s+room|housekeeping)\b/i;
 const HOUSEKEEPING_REQUEST_ACTION = /\b(?:can\s+(?:i|we)\s+(?:have|get)|please\s+(?:bring|send|provide|clean)|can\s+you\s+(?:bring|send|provide|clean)|could\s+you\s+(?:bring|send|provide|clean)|i\s+(?:need|want|would\s+like)|(?:bring|send|provide)\s+(?:me\s+)?|clean\s+(?:my|our|the)\s+room)\b|\b(?:toilet\s+paper|soap|towels?)\s+please\b/i;
+const DIRTY_ROOM_CLEANING_REQUEST = /\b(?:my|our|the)\s+room\s+(?:(?:is|feels|looks|seems)\s+(?:(?:really|very|quite|so)\s+)?(?:dirty|messy|unclean)|needs?\s+(?:a\s+)?clean(?:ing)?)\b/i;
+const LOST_KEY_REQUEST = /\b(?:i\s+(?:have\s+)?lost\s+(?:my|the)\s+(?:room\s+)?key|(?:my|the)\s+(?:room\s+)?key\s+(?:is\s+)?(?:lost|missing)|cannot\s+find\s+(?:my|the)\s+(?:room\s+)?key|can['’]?t\s+find\s+(?:my|the)\s+(?:room\s+)?key|locked\s+out|need\s+(?:a\s+)?replacement\s+key)\b/i;
 const GENERIC_URGENT_WORDS = new Set([
   "a", "am", "an", "and", "bad", "emergency", "happened", "has", "have", "help", "i", "in", "is", "it",
   "my", "need", "please", "problem", "really", "room", "serious", "something", "the", "there", "urgent", "very",
@@ -423,8 +426,15 @@ function housekeepingItem(question) {
   if (/\btoilet\s+paper\b/i.test(source)) return { id: "toilet_paper", label: "toilet paper", delivery: "bring toilet paper to your room" };
   if (/\bsoap\b/i.test(source)) return { id: "soap", label: "soap", delivery: "bring soap to your room" };
   if (/\b(?:(?:new|fresh|clean)\s+)?towels?\b|\btowel\s+(?:change|replacement)\b/i.test(source)) return { id: "fresh_towels", label: "fresh towels", delivery: "bring fresh towels to your room" };
-  if (/\b(?:room\s+cleaning|clean\s+(?:my|our|the)\s+room|housekeeping)\b/i.test(source)) return { id: "room_cleaning", label: "room cleaning", delivery: "arrange room cleaning" };
+  if (/\b(?:room\s+cleaning|clean\s+(?:my|our|the)\s+room|housekeeping)\b/i.test(source) || DIRTY_ROOM_CLEANING_REQUEST.test(source)) {
+    return { id: "room_cleaning", label: "room cleaning", delivery: "arrange room cleaning" };
+  }
   return null;
+}
+
+function isActionableCleaningRequest(question) {
+  return DIRTY_ROOM_CLEANING_REQUEST.test(String(question || ""))
+    || (HOUSEKEEPING_ITEM_REQUEST.test(String(question || "")) && HOUSEKEEPING_REQUEST_ACTION.test(String(question || "")));
 }
 
 function applyHousekeepingCallAvailability(result, question, now = new Date()) {
@@ -488,7 +498,7 @@ function cleaningCompletionAnswer(preferredTime, availability) {
       : availability.weekday === "Sunday" && availability.minutes >= (19 * 60 + 30)
         ? " Housekeeping is currently off duty and is not available on Mondays, so the earliest normal availability is Tuesday from 10:30 AM."
         : ` The earliest normal housekeeping availability is ${nextHousekeepingPhrase(availability)}.`;
-  return `Thank you. We’ve sent your room-cleaning request to our housekeeping team with your preferred time of ${preferredTime}.${timing} We’ll do our best to accommodate it, but the exact cleaning time may vary depending on availability.`;
+  return `Thank you. I’ve sent your cleaning request to the team with your preferred time of ${preferredTime}.${timing} The requested time depends on staff availability and is not confirmed until the team can accommodate it.`;
 }
 
 function applyCleaningRequestPolicy(question, workflowState = null, now = new Date()) {
@@ -497,8 +507,7 @@ function applyCleaningRequestPolicy(question, workflowState = null, now = new Da
     : null;
   const item = housekeepingItem(question);
   const actionableNow = item?.id === "room_cleaning"
-    && HOUSEKEEPING_ITEM_REQUEST.test(question)
-    && HOUSEKEEPING_REQUEST_ACTION.test(question);
+    && isActionableCleaningRequest(question);
   if (!actionableNow && !pendingState) return { handled: false, result: null, alertQuestion: question, workflow: null };
   if (/^\s*(?:cancel|never\s*mind|nevermind|forget\s+it)\s*[.!]?\s*$/i.test(question)) {
     return {
@@ -561,7 +570,9 @@ function applyCleaningRequestPolicy(question, workflowState = null, now = new Da
 
 export function housekeepingServiceResult(question, now = new Date()) {
   const item = housekeepingItem(question);
-  if (!item || !HOUSEKEEPING_ITEM_REQUEST.test(question) || !HOUSEKEEPING_REQUEST_ACTION.test(question)) return null;
+  if (!item || (item.id === "room_cleaning"
+    ? !isActionableCleaningRequest(question)
+    : (!HOUSEKEEPING_ITEM_REQUEST.test(question) || !HOUSEKEEPING_REQUEST_ACTION.test(question)))) return null;
   if (item.id === "room_cleaning") return applyCleaningRequestPolicy(question, null, now).result;
   const availability = housekeepingAvailability(now);
   const afterHours = availability.afterHours;
@@ -605,6 +616,40 @@ function roomLocationResult(question, room) {
   };
 }
 
+function lostKeyPolicyResult(question, access, room, now = new Date()) {
+  if (!LOST_KEY_REQUEST.test(String(question || ""))) return null;
+  const registrationHref = room ? `/room/${room}#verifiedStayAccess` : "/rooms.html";
+  if (!access?.verified || !room) {
+    return {
+      answer: "Please verify your active stay before requesting lost-key help. Open your permanent Room page and enter your Airbnb confirmation code or private House stay code. No team alert has been sent and no spare-key code can be shown before verification.",
+      intentId: "lost_key_verification_required",
+      category: "room", confidence: 1, needsHuman: false, handoff: "none",
+      learningGap: false, learningReason: "none",
+      actions: [{ label: "Complete guest access", type: "link", href: registrationHref }],
+      suppressDefaultActions: true,
+      source: "lost-key-policy"
+    };
+  }
+  if (isAfterHours(now)) {
+    return {
+      answer: "Your stay is verified. After-hours spare-key access requires accepting the 500 THB lost-key replacement fee on your protected Room page. The House team must be notified successfully before the key-box code can be shown there. Passport registration is separate and does not block this lost-key help.",
+      intentId: "lost_key",
+      category: "room", confidence: 1, needsHuman: false, handoff: "none",
+      learningGap: false, learningReason: "none",
+      actions: [{ label: "Secure spare-key access", type: "spare-key" }],
+      suppressDefaultActions: true,
+      source: "lost-key-policy"
+    };
+  }
+  return {
+    answer: "I’m notifying The House team about your lost key now. No key-box code will be shown through the Concierge.",
+    intentId: "lost_key",
+    category: "room", confidence: 1, needsHuman: true, handoff: "stay_support",
+    learningGap: false, learningReason: "none", actions: [], suppressDefaultActions: true,
+    source: "lost-key-policy"
+  };
+}
+
 function bookingKindFromText(value) {
   const source = String(value || "");
   if (/\b(?:motorbike|motorcycle|scooter)\s+taxi\b/i.test(source)) return "motorbike_taxi";
@@ -643,7 +688,9 @@ function bookingStartPrompt(kind) {
 
 function isActionableStructuredBooking(value) {
   const source = String(value || "");
-  return ACTIONABLE_STRUCTURED_BOOKING.test(source) || DIRECT_TRANSPORT_BOOKING.test(source);
+  return ACTIONABLE_STRUCTURED_BOOKING.test(source)
+    || DIRECT_TRANSPORT_BOOKING.test(source)
+    || DIRECT_ACTIVITY_BOOKING.test(source);
 }
 
 function supportedBookingInformationResult(question) {
@@ -1804,7 +1851,10 @@ export async function handleConciergeRequest(request, env, ctx, now = new Date()
     && (isVagueUrgentMessage(question)
       || (urgentClarificationActive && !hasMeaningfulIncidentDescription(question)));
   const safetyResult = classifiedSafetyResult || (needsUrgentClarification ? urgentClarificationResult(room) : null);
-  let publicResult = access.accessGranted ? null : publicAccessResult(question, access, room, safetyResult);
+  const lostKeyResult = safetyResult ? null : lostKeyPolicyResult(question, access, room, now);
+  let publicResult = access.accessGranted || (lostKeyResult && access.verified)
+    ? null
+    : (lostKeyResult || publicAccessResult(question, access, room, safetyResult));
   if (publicResult) {
     if (language !== "en") {
       try {
@@ -1869,15 +1919,15 @@ export async function handleConciergeRequest(request, env, ctx, now = new Date()
   }
 
   const effectiveKnowledge = mergeApprovedKnowledge(knowledge, approvedKnowledge);
-  const cleaningPolicy = safetyResult
+  const cleaningPolicy = safetyResult || lostKeyResult
     ? { handled: false, result: null, alertQuestion: question, workflow: null }
     : applyCleaningRequestPolicy(question, workflowState, now);
-  const servicePolicyResult = safetyResult || cleaningPolicy.handled ? null : housekeepingServiceResult(question, now);
-  const roomPolicyResult = safetyResult || cleaningPolicy.handled || servicePolicyResult ? null : roomLocationResult(question, room);
-  const bookingInformationResult = safetyResult || cleaningPolicy.handled || servicePolicyResult || roomPolicyResult
+  const servicePolicyResult = safetyResult || lostKeyResult || cleaningPolicy.handled ? null : housekeepingServiceResult(question, now);
+  const roomPolicyResult = safetyResult || lostKeyResult || cleaningPolicy.handled || servicePolicyResult ? null : roomLocationResult(question, room);
+  const bookingInformationResult = safetyResult || lostKeyResult || cleaningPolicy.handled || servicePolicyResult || roomPolicyResult
     ? null
     : supportedBookingInformationResult(question);
-  const directPolicyResult = safetyResult || cleaningPolicy.result || servicePolicyResult || roomPolicyResult || bookingInformationResult;
+  const directPolicyResult = safetyResult || lostKeyResult || cleaningPolicy.result || servicePolicyResult || roomPolicyResult || bookingInformationResult;
   const criticalPropertyMatch = safetyResult?.intentId === "property_emergency"
     ? matchKnowledge("major water leak", effectiveKnowledge, 0.44)
     : null;
@@ -1920,14 +1970,16 @@ export async function handleConciergeRequest(request, env, ctx, now = new Date()
     : cleaningPolicy.handled
       ? cleaningPolicy.workflow
       : null;
-  const bypassOrdinaryWorkflows = Boolean(directWorkflow || servicePolicyResult || bookingInformationResult || isEmergencyResult(result));
+  const bypassOrdinaryWorkflows = Boolean(lostKeyResult || directWorkflow || servicePolicyResult || bookingInformationResult || isEmergencyResult(result));
   const bookingPolicy = bypassOrdinaryWorkflows
     ? { handled: false, result, alertQuestion: question, workflow: null }
     : applyStructuredBookingPolicy(result, question, history, currentReplyContact, workflowState, now);
   const luggagePolicy = bypassOrdinaryWorkflows || bookingPolicy.handled
     ? { handled: false, result, alertQuestion: question, workflow: null }
     : applyLuggageRequestPolicy(result, question, history, currentReplyContact, workflowState, now);
-  const workflowPolicy = cleaningPolicy.handled
+  const workflowPolicy = lostKeyResult
+    ? { result, alertQuestion: question, workflow: null }
+    : cleaningPolicy.handled
     ? { result, alertQuestion: cleaningPolicy.alertQuestion, workflow: directWorkflow }
     : directWorkflow
       ? { result, alertQuestion: question, workflow: directWorkflow }
@@ -1958,6 +2010,12 @@ export async function handleConciergeRequest(request, env, ctx, now = new Date()
       result = {
         ...result,
         answer: "Thank you. We’ve sent your request to our booking team. They’ll check availability and the current price and get back to you using the contact details you provided. Your booking is not confirmed until availability has been confirmed and payment has been received.",
+        actions: []
+      };
+    } else if (result.intentId === "lost_key") {
+      result = {
+        ...result,
+        answer: "Thank you. I’ve notified The House team about your lost key. No key-box code has been exposed through the Concierge.",
         actions: []
       };
     } else if (!result.housekeepingRequest) {
@@ -1997,6 +2055,12 @@ export async function handleConciergeRequest(request, env, ctx, now = new Date()
       luggagePolicy.workflow.status = "collecting";
       luggagePolicy.workflow.retainPrivateContact = true;
     }
+  } else if (result.intentId === "lost_key" && result.needsHuman) {
+    result = {
+      ...result,
+      answer: "I couldn’t notify The House team automatically, so please don’t rely on the lost-key request as received. Please call The House for help.",
+      actions: [{ label: "Call Us", type: "route", route: "houseCall" }]
+    };
   }
   if (language !== "en" && result.source !== "ai") {
     try {

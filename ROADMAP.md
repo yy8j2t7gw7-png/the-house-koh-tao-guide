@@ -1,6 +1,6 @@
 # Product Roadmap
 
-Baseline: v5.11.19
+Baseline: v5.11.20
 
 ## Completed
 
@@ -28,6 +28,8 @@ Baseline: v5.11.19
 - [x] Final server-side luggage alert boundary rejecting incomplete or stale requests and universal visible-contact redaction
 - [x] Explicit pending luggage state surviving local-contact rejection and corrected international contact submission
 - [x] Routine housekeeping precedence over stale luggage and booking contact collection
+- [x] Natural dirty-room wording carried through preferred-time collection to one protected cleaning alert without a second manual handoff
+- [x] Direct first-person fishing and snorkeling intent enters the same structured flow as category-specific Book with Us actions
 - [x] Vague urgent clarification and meaningful-incident quality gate before protected submission
 - [x] Conservative Airbnb first-name-only synchronization and verified guest greeting
 - [x] Signed `RECEIVED` acknowledgement with backwards-compatible `ACK`
@@ -83,6 +85,8 @@ Baseline: v5.11.19
 - [x] Permanent verified room pages using the Airbnb confirmation code
 - [x] Reservation-linked self-service passport forms and Thai-national exemption
 - [x] Verified active-stay after-hours spare-key release with 500 THB fee confirmation
+- [x] Passport-independent verified lost-key authorization with dedicated office-hours alerts and protected after-hours fee/code handling
+- [x] Lost-key state isolation across browser sessions, days, stays and rooms with a final verified-room delivery gate
 - [x] Automatic official WhatsApp urgent-team notification with confirmed API submission required before key display
 - [x] Key-code rotation lock and owner confirmation workflow
 - [x] Prepared scheduled Airbnb arrival messages for every active listing
@@ -145,8 +149,8 @@ Guests may continue using ordinary WhatsApp handoffs. Automated internal alerts 
 - [x] Push the v5.5.0 release to the existing hosting workflow
 - [x] Confirm `/api/concierge/status` reports AI and learning enabled
 - [x] Capture the exact v5.11.16 Meta failure (HTTP 404 / `132001`) and implement template-aware language resolution: current templates use `en`; deliberate v1 rollback templates retain `en_US`.
-- [ ] Deploy v5.11.19 and live-test protected luggage submission, housekeeping scheduling, every structured booking category, all six current templates, actor exclusion, duplicate-webhook idempotency, truthful guest fallbacks and every established privacy/security gate.
-- [ ] Submit and obtain Meta approval for the five optional quick-action templates documented in `META_STAFF_QUICK_ACTIONS_v5.11.19.md`; enable them only after every template is Active.
+- [ ] Deploy v5.11.20 without changing production configuration, then smoke-test only natural cleaning completion, direct/Book with Us structured-booking entry and verified/unverified lost-key handling.
+- [ ] Submit and obtain Meta approval for the five optional quick-action templates documented in `META_STAFF_QUICK_ACTIONS_v5.11.20.md`; never map the buttonless service v1 template and enable only after every intended template is Active.
 - [x] Add `STAY_TOKEN_PEPPER` and `RESERVATION_SYNC_TOKEN` Worker secrets
 - [ ] Add protected `SPARE_KEY_CODES` Worker secret before activating automatic spare-key release
 - [x] Install and authorize the included Airbnb Google Apps Script synchronizer

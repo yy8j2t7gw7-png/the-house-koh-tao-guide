@@ -472,7 +472,7 @@ test("luggage storage guidance states every available window without promising e
 
 test("an actionable luggage request routes to Su and owners with the dedicated production template", async () => {
   const { env, store } = createEnvironment({
-    OPENAI_API_KEY: "not-used",
+    OPENAI_API_KEY: "",
     WHATSAPP_ACCESS_TOKEN: "meta-test-token",
     WHATSAPP_PHONE_NUMBER_ID: "1234567890",
     WHATSAPP_WEBHOOK_VERIFY_TOKEN: "verify-test",
@@ -568,6 +568,99 @@ test("a local-format luggage contact is rejected until a country code is supplie
   assert.match(body.answer, /That looks like a local number/i);
   assert.match(body.answer, /\+66/);
   assert.equal(store.alerts.length, 0);
+});
+
+test("a corrected international contact completes the same explicit pending luggage request exactly once", async () => {
+  const localContact = "0812345678";
+  const internationalContact = "+66 81 234 5678";
+  const { env, store } = createEnvironment({
+    OPENAI_API_KEY: "",
+    WHATSAPP_ACCESS_TOKEN: "meta-test-token",
+    WHATSAPP_PHONE_NUMBER_ID: "1234567890",
+    WHATSAPP_ALERT_RECIPIENTS: JSON.stringify({
+      support: [{ label: "Su", phone: "+66 64 000 0001" }],
+      booking: [{ label: "Fah", phone: "+66 96 000 0001" }],
+      emergency: [
+        { label: "Owner 1", phone: "+66 81 000 0002" },
+        { label: "Owner 2", phone: "+66 82 000 0003" }
+      ]
+    })
+  });
+  const originalFetch = globalThis.fetch;
+  const outbound = [];
+  globalThis.fetch = async (_url, options) => {
+    outbound.push(JSON.parse(options.body));
+    return new Response(JSON.stringify({ messages: [{ id: `wamid.luggage-correction-${outbound.length}` }] }), {
+      status: 200,
+      headers: { "content-type": "application/json" }
+    });
+  };
+  try {
+    const pending = await handleConciergeRequest(guestRequest(
+      "Please store 3 bags for departure at 1:00 PM. One bag is fragile."
+    ), env);
+    const pendingBody = await pending.json();
+    assert.equal(pendingBody.workflow.status, "collecting");
+    assert.deepEqual(pendingBody.workflow.luggageRequest, {
+      context: "Departure",
+      requestedTime: "1:00 PM",
+      bagCount: "3",
+      notes: "Please store 3 bags for departure at 1:00 PM. One bag is fragile."
+    });
+    assert.deepEqual(pendingBody.workflow.missing, ["contact"]);
+
+    const rejected = await handleConciergeRequest(guestRequest(localContact, {
+      workflowState: pendingBody.workflow,
+      history: [
+        { role: "user", content: "Please store 3 bags for departure at 1:00 PM. One bag is fragile." },
+        { role: "assistant", content: pendingBody.answer }
+      ]
+    }), env);
+    const rejectedBody = await rejected.json();
+    assert.match(rejectedBody.answer, /local number/i);
+    assert.deepEqual(rejectedBody.workflow.luggageRequest, pendingBody.workflow.luggageRequest);
+    assert.deepEqual(rejectedBody.workflow.missing, ["contact"]);
+    assert.equal(store.alerts.length, 0);
+    assert.equal(outbound.length, 0);
+
+    const completed = await handleConciergeRequest(guestRequest(internationalContact, {
+      workflowState: rejectedBody.workflow,
+      history: [
+        { role: "user", content: "Please store 3 bags for departure at 1:00 PM. One bag is fragile." },
+        { role: "assistant", content: pendingBody.answer },
+        { role: "user", content: "[contact supplied privately]" },
+        { role: "assistant", content: rejectedBody.answer }
+      ]
+    }), env);
+    const completedBody = await completed.json();
+    assert.equal(completedBody.workflow.status, "submitted");
+    assert.match(completedBody.answer, /luggage request has been sent/i);
+    assert.equal(store.alerts.length, 1);
+    assert.equal(outbound.length, 3);
+    assert.equal(outbound.every((payload) => payload.template.name === "house_luggage_alert_v2"), true);
+    assert.equal(outbound.every((payload) => payload.template.language.code === "en"), true);
+    assert.equal(outbound.every((payload) => payload.template.components[0].parameters.length === 6), true);
+    assert.deepEqual(outbound.map((payload) => payload.to).sort(), ["66640000001", "66810000002", "66820000003"]);
+    assert.doesNotMatch(JSON.stringify(outbound), /66960000001/);
+    assert.doesNotMatch(JSON.stringify(store.interactions), /0812345678|66812345678|81 234 5678/);
+    assert.doesNotMatch(JSON.stringify(store.alerts), /0812345678|66812345678|81 234 5678/);
+    assert.doesNotMatch(JSON.stringify(store.alertDeliveries), /0812345678|66812345678|81 234 5678/);
+
+    const fresh = await handleConciergeRequest(guestRequest("I wanna store my luggage"), env);
+    const freshBody = await fresh.json();
+    assert.equal(freshBody.workflow.status, "collecting");
+    assert.deepEqual(freshBody.workflow.missing.sort(), ["bags", "contact", "context", "time"]);
+    assert.deepEqual(freshBody.workflow.luggageRequest, {
+      context: "",
+      requestedTime: "",
+      bagCount: "",
+      notes: "I wanna store my luggage"
+    });
+    assert.equal(store.alerts.length, 1);
+    assert.equal(outbound.length, 3);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });
 
 test("a complete luggage request with an international contact submits without redundant questions", async () => {
@@ -1043,9 +1136,12 @@ test("browser luggage workflow keeps a supplied contact out of ordinary session 
   assert.match(script, /appendMessage\("guest", redactPrivateContact\(question\)\)/);
   assert.doesNotMatch(script, /appendMessage\("guest", question\)/);
   assert.match(script, /privateReplyContact: privateWorkflowContact/);
+  assert.match(script, /workflowState: activeWorkflowState/);
+  assert.match(script, /activeWorkflowState = result\.workflow\?\.status === "collecting"/);
   assert.match(script, /result\.workflow\?\.type === "luggage"/);
   assert.match(script, /dataset\.serverQuestion = redactPrivateContact/);
   assert.doesNotMatch(script, /houseConciergeHistory[^\n]{0,200}privateWorkflowContact/);
+  assert.doesNotMatch(script, /houseConciergeHistory[^\n]{0,200}activeWorkflowState/);
 });
 
 test("browser concierge permits only one in-flight question and one rendered answer path", async () => {
@@ -1101,7 +1197,7 @@ test("guest localization supports seven languages and keeps the owner dashboard 
   assert.doesNotMatch(admin, /src="\/i18n\.js"/);
   assert.match(runtime, /exploreContentDeferred/);
   assert.match(runtime, /element\.closest\("\.section,\.footer"\)/);
-  assert.match(runtime, /houseGuideTranslations:v5\.11\.17:/);
+  assert.match(runtime, /houseGuideTranslations:v5\.11\.18:/);
   assert.match(runtime, /MAX_REQUEST_RETRIES = 2/);
   assert.match(runtime, /let flushRunning = false/);
 });
@@ -1332,11 +1428,19 @@ test("translation endpoint accepts approved page text and rejects arbitrary gues
     const approvedRequest = new Request("https://guide.example/api/i18n/translate", {
       method: "POST",
       headers: { "content-type": "application/json", "cf-connecting-ip": "203.0.113.8" },
-      body: JSON.stringify({ language: "es", page: "/index.html", texts: ["Welcome to Koh Tao"] })
+      body: JSON.stringify({
+        language: "es",
+        page: "/index.html",
+        texts: [
+          "Welcome to Koh Tao",
+          "I'm here to help. What has happened in your room? Please briefly tell me what the problem is.",
+          "Thank you for your request. We’ll bring soap to your room as soon as possible. If you haven’t received it within 30 minutes, please call us using the button below."
+        ]
+      })
     });
     const approvedResponse = await handleTranslationRequest(approvedRequest, env);
     assert.equal(approvedResponse.status, 200);
-    assert.deepEqual((await approvedResponse.json()).translations, ["Bienvenido"]);
+    assert.deepEqual((await approvedResponse.json()).translations, ["Bienvenido", "Bienvenido", "Bienvenido"]);
 
     const guestTextRequest = new Request("https://guide.example/api/i18n/translate", {
       method: "POST",
@@ -1692,6 +1796,241 @@ test("critical property messages override every stale ordinary contact workflow"
     assert.equal(body.actions[0].label, "Send urgent alert", pendingQuestion);
     assert.doesNotMatch(body.answer, /What WhatsApp or phone number/i, pendingQuestion);
     assert.equal(store.alerts.length, 0, pendingQuestion);
+  }
+});
+
+test("vague urgent wording collects a meaningful incident before offering or sending an alert", async () => {
+  const { env, store } = createEnvironment({
+    OPENAI_API_KEY: "",
+    WHATSAPP_ACCESS_TOKEN: "meta-test-token",
+    WHATSAPP_PHONE_NUMBER_ID: "1234567890",
+    WHATSAPP_ALERT_RECIPIENTS: JSON.stringify({
+      support: [{ label: "Su", phone: "+66 64 000 0001" }],
+      booking: [{ label: "Fah", phone: "+66 96 000 0001" }],
+      emergency: [
+        { label: "Owner 1", phone: "+66 81 000 0002" },
+        { label: "Owner 2", phone: "+66 82 000 0003" }
+      ]
+    })
+  });
+  const originalFetch = globalThis.fetch;
+  const outbound = [];
+  globalThis.fetch = async (_url, options) => {
+    outbound.push(JSON.parse(options.body));
+    return new Response(JSON.stringify({ messages: [{ id: `wamid.urgent-detail-${outbound.length}` }] }), {
+      status: 200,
+      headers: { "content-type": "application/json" }
+    });
+  };
+  try {
+    const vague = await handleConciergeRequest(guestRequest("There is a serious problem in my room."), env);
+    const vagueBody = await vague.json();
+    assert.equal(vagueBody.intentId, "urgent_clarification");
+    assert.match(vagueBody.answer, /What has happened in your room/i);
+    assert.deepEqual(vagueBody.actions, []);
+    assert.equal(vagueBody.actions.some((action) => action.action === "confirm_urgent_property"), false);
+    assert.equal(vagueBody.workflow.type, "urgent_clarification");
+    assert.equal(vagueBody.workflow.status, "collecting");
+    assert.equal(store.alerts.length, 0);
+    assert.equal(outbound.length, 0);
+
+    const described = await handleConciergeRequest(guestRequest(
+      "Water is pouring from the ceiling and my room is flooding.",
+      {
+        workflowState: vagueBody.workflow,
+        history: [
+          { role: "user", content: "There is a serious problem in my room." },
+          { role: "assistant", content: vagueBody.answer }
+        ]
+      }
+    ), env);
+    const describedBody = await described.json();
+    assert.equal(describedBody.intentId, "property_emergency");
+    assert.equal(describedBody.actions[0].action, "confirm_urgent_property");
+    assert.equal(describedBody.actions[0].label, "Send urgent alert");
+    assert.equal(store.alerts.length, 0);
+    assert.equal(outbound.length, 0);
+
+    const confirmed = await handleConciergeRequest(guestRequest(
+      "Water is pouring from the ceiling and my room is flooding.",
+      { action: "confirm_urgent_property" }
+    ), env);
+    const confirmedBody = await confirmed.json();
+    assert.match(confirmedBody.answer, /Urgent alert sent/i);
+    assert.equal(store.alerts.length, 1);
+    assert.equal(store.alerts[0].summary, "Water is pouring from the ceiling and my room is flooding.");
+    assert.equal(outbound.length, 3);
+    assert.equal(outbound.every((payload) => payload.template.name === "house_urgent_alert_v2"), true);
+    assert.equal(outbound.every((payload) => payload.template.language.code === "en"), true);
+    assert.equal(outbound.every((payload) => payload.template.components[0].parameters.length === 5), true);
+    assert.equal(outbound.every((payload) => payload.template.components[0].parameters[2].text === "Flooding / major water leak"), true);
+    assert.equal(outbound.every((payload) => payload.template.components[0].parameters[4].text.toLowerCase().includes("water is pouring from the ceiling")), true);
+    assert.deepEqual(outbound.map((payload) => payload.to).sort(), ["66810000002", "66820000003", "66960000001"]);
+    assert.doesNotMatch(JSON.stringify(outbound), /66640000001/);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("every generic urgent phrase asks what happened without exposing the send action", async () => {
+  for (const phrase of [
+    "I have an urgent problem.",
+    "Urgent help!",
+    "Something serious happened.",
+    "Something is wrong in my room.",
+    "Emergency!"
+  ]) {
+    const { env, store } = createEnvironment({ OPENAI_API_KEY: "" });
+    const response = await handleConciergeRequest(guestRequest(phrase), env);
+    const body = await response.json();
+    assert.equal(body.intentId, "urgent_clarification", phrase);
+    assert.match(body.answer, /What has happened/i, phrase);
+    assert.deepEqual(body.actions, [], phrase);
+    assert.equal(body.workflow.type, "urgent_clarification", phrase);
+    assert.equal(store.alerts.length, 0, phrase);
+  }
+});
+
+test("vague urgent clarification can resolve into medical, routine service or ordinary support", async () => {
+  const medical = createEnvironment({ OPENAI_API_KEY: "" });
+  const vagueMedical = await handleConciergeRequest(guestRequest("I need urgent help."), medical.env);
+  const vagueMedicalBody = await vagueMedical.json();
+  assert.equal(vagueMedicalBody.intentId, "urgent_clarification");
+  assert.equal(medical.store.alerts.length, 0);
+  const medicalFollowUp = await handleConciergeRequest(guestRequest("Someone is unconscious and won't wake up.", {
+    workflowState: vagueMedicalBody.workflow,
+    history: [
+      { role: "user", content: "I need urgent help." },
+      { role: "assistant", content: vagueMedicalBody.answer }
+    ]
+  }), medical.env);
+  const medicalBody = await medicalFollowUp.json();
+  assert.equal(medicalBody.intentId, "medical_emergency");
+  assert.equal(medicalBody.actions[0].route, "rescueCall");
+  assert.equal(medicalBody.actions[1].route, "medicalNationalCall");
+  assert.equal(medicalBody.actions[2].action, "confirm_urgent_medical");
+  assert.equal(medical.store.alerts.length, 0);
+
+  const routine = createEnvironment({
+    OPENAI_API_KEY: "",
+    WHATSAPP_ACCESS_TOKEN: "meta-test-token",
+    WHATSAPP_PHONE_NUMBER_ID: "1234567890",
+    WHATSAPP_ALERT_RECIPIENTS: JSON.stringify({
+      support: [{ label: "Su", phone: "+66 64 000 0001" }],
+      emergency: [
+        { label: "Owner 1", phone: "+66 81 000 0002" },
+        { label: "Owner 2", phone: "+66 82 000 0003" }
+      ]
+    })
+  });
+  const originalFetch = globalThis.fetch;
+  const outbound = [];
+  globalThis.fetch = async (_url, options) => {
+    outbound.push(JSON.parse(options.body));
+    return new Response(JSON.stringify({ messages: [{ id: `wamid.vague-routine-${outbound.length}` }] }), {
+      status: 200,
+      headers: { "content-type": "application/json" }
+    });
+  };
+  try {
+    const vagueRoutine = await handleConciergeRequest(guestRequest("Something is wrong in my room."), routine.env);
+    const vagueRoutineBody = await vagueRoutine.json();
+    const toiletPaper = await handleConciergeRequest(guestRequest("I need toilet paper.", {
+      workflowState: vagueRoutineBody.workflow,
+      history: [
+        { role: "user", content: "Something is wrong in my room." },
+        { role: "assistant", content: vagueRoutineBody.answer }
+      ]
+    }), routine.env);
+    const toiletPaperBody = await toiletPaper.json();
+    assert.equal(toiletPaperBody.intentId, "housekeeping_toilet_paper");
+    assert.equal(toiletPaperBody.actions.some((action) => action.action === "confirm_urgent_property"), false);
+    assert.doesNotMatch(toiletPaperBody.answer, /WhatsApp|phone number|country code/i);
+    assert.equal(routine.store.alerts.length, 1);
+    assert.equal(routine.store.alerts[0].alertType, "stay_support");
+    assert.equal(outbound.length, 3);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("urgent clarification interrupts pending luggage and never submits stale luggage state", async () => {
+  const { env, store } = createEnvironment({ OPENAI_API_KEY: "" });
+  const luggage = await handleConciergeRequest(guestRequest(
+    "Please store 3 bags for departure at 1 PM."
+  ), env);
+  const luggageBody = await luggage.json();
+  assert.equal(luggageBody.workflow.type, "luggage");
+  assert.deepEqual(luggageBody.workflow.missing, ["contact"]);
+
+  const vague = await handleConciergeRequest(guestRequest("There is a serious problem in my room.", {
+    workflowState: luggageBody.workflow,
+    history: [
+      { role: "user", content: "Please store 3 bags for departure at 1 PM." },
+      { role: "assistant", content: luggageBody.answer }
+    ]
+  }), env);
+  const vagueBody = await vague.json();
+  assert.equal(vagueBody.intentId, "urgent_clarification");
+  assert.equal(vagueBody.workflow.type, "urgent_clarification");
+  assert.doesNotMatch(vagueBody.answer, /WhatsApp|phone number|country code/i);
+  assert.equal(store.alerts.length, 0);
+
+  const flood = await handleConciergeRequest(guestRequest("Water is pouring through the ceiling.", {
+    workflowState: vagueBody.workflow,
+    history: [
+      { role: "user", content: "There is a serious problem in my room." },
+      { role: "assistant", content: vagueBody.answer }
+    ]
+  }), env);
+  const floodBody = await flood.json();
+  assert.equal(floodBody.intentId, "property_emergency");
+  assert.equal(floodBody.actions[0].action, "confirm_urgent_property");
+  assert.equal(store.alerts.length, 0);
+
+  const direct = await handleConciergeRequest(guestRequest("My room is flooding.", {
+    workflowState: luggageBody.workflow,
+    history: [
+      { role: "user", content: "Please store 3 bags for departure at 1 PM." },
+      { role: "assistant", content: luggageBody.answer }
+    ]
+  }), env);
+  const directBody = await direct.json();
+  assert.equal(directBody.intentId, "property_emergency");
+  assert.equal(directBody.actions[0].action, "confirm_urgent_property");
+  assert.equal(store.alerts.length, 0);
+});
+
+test("the urgent confirmation boundary rejects a vague incident summary", async () => {
+  const { env, store } = createEnvironment({
+    OPENAI_API_KEY: "",
+    WHATSAPP_ACCESS_TOKEN: "meta-test-token",
+    WHATSAPP_PHONE_NUMBER_ID: "1234567890",
+    WHATSAPP_ALERT_RECIPIENTS: JSON.stringify({
+      booking: [{ label: "Fah", phone: "+66 96 000 0001" }],
+      emergency: [{ label: "Owner 1", phone: "+66 81 000 0002" }]
+    })
+  });
+  const originalFetch = globalThis.fetch;
+  const outbound = [];
+  globalThis.fetch = async (_url, options) => {
+    outbound.push(JSON.parse(options.body));
+    return new Response(JSON.stringify({ messages: [{ id: "wamid.should-not-send" }] }), {
+      status: 200,
+      headers: { "content-type": "application/json" }
+    });
+  };
+  try {
+    const response = await handleConciergeRequest(guestRequest("Emergency!", {
+      action: "confirm_urgent_property"
+    }), env);
+    const body = await response.json();
+    assert.equal(body.intentId, "urgent_clarification");
+    assert.equal(body.actions.some((action) => action.action === "confirm_urgent_property"), false);
+    assert.equal(store.alerts.length, 0);
+    assert.equal(outbound.length, 0);
+  } finally {
+    globalThis.fetch = originalFetch;
   }
 });
 
@@ -2066,14 +2405,17 @@ test("routine housekeeping supplies always create one Su-and-owner service alert
   const requests = [
     ["Can I have new toilet paper?", /toilet paper/i],
     ["I need fresh towels.", /fresh towels/i],
+    ["Towels please.", /fresh towels/i],
     ["Can I have soap?", /soap/i],
+    ["Can I have fresh soap?", /soap/i],
+    ["Can I have additional toilet paper?", /toilet paper/i],
     ["Please clean my room.", /room cleaning|clean the room/i]
   ];
   const originalFetch = globalThis.fetch;
   try {
     for (const [question, itemPattern] of requests) {
       const { env, store } = createEnvironment({
-        OPENAI_API_KEY: "not-used",
+        OPENAI_API_KEY: "",
         WHATSAPP_ACCESS_TOKEN: "meta-test-token",
         WHATSAPP_PHONE_NUMBER_ID: "1234567890",
         WHATSAPP_ALERT_RECIPIENTS: JSON.stringify({
@@ -2107,6 +2449,76 @@ test("routine housekeeping supplies always create one Su-and-owner service alert
   } finally {
     globalThis.fetch = originalFetch;
   }
+});
+
+test("routine housekeeping overrides an older contact-collection workflow without asking for a phone number", async () => {
+  const pendingWorkflows = [
+    [
+      "Please arrange luggage storage after checkout at 3 PM for 2 bags.",
+      "What WhatsApp or phone number can our team use to contact you? Please include the country code."
+    ],
+    [
+      "I want to book Fun Diving tomorrow for 2 divers. I am Advanced Open Water certified.",
+      "We’d be happy to help arrange your diving. Please tell me your WhatsApp or phone number including the international country code."
+    ]
+  ];
+  const originalFetch = globalThis.fetch;
+  try {
+    for (const [pendingQuestion, pendingAnswer] of pendingWorkflows) {
+      const { env, store } = createEnvironment({
+        OPENAI_API_KEY: "",
+        WHATSAPP_ACCESS_TOKEN: "meta-test-token",
+        WHATSAPP_PHONE_NUMBER_ID: "1234567890",
+        WHATSAPP_ALERT_RECIPIENTS: JSON.stringify({
+          support: [{ label: "Su", phone: "+66 64 000 0001" }],
+          booking: [{ label: "Fah", phone: "+66 96 000 0001" }],
+          emergency: [
+            { label: "Owner 1", phone: "+66 81 000 0002" },
+            { label: "Owner 2", phone: "+66 82 000 0003" }
+          ]
+        })
+      });
+      const outbound = [];
+      globalThis.fetch = async (_url, options) => {
+        outbound.push(JSON.parse(options.body));
+        return new Response(JSON.stringify({ messages: [{ id: `wamid.soap-${outbound.length}` }] }), {
+          status: 200,
+          headers: { "content-type": "application/json" }
+        });
+      };
+      const response = await handleConciergeRequest(guestRequest("Can I have fresh soap?", {
+        history: [
+          { role: "user", content: pendingQuestion },
+          { role: "assistant", content: pendingAnswer }
+        ]
+      }), env);
+      const body = await response.json();
+      assert.equal(body.intentId, "housekeeping_soap", pendingQuestion);
+      assert.doesNotMatch(body.answer, /WhatsApp|phone number|country code/i, pendingQuestion);
+      assert.equal(store.alerts.length, 1, pendingQuestion);
+      assert.equal(store.alerts[0].recipientGroup, "support_with_owners", pendingQuestion);
+      assert.equal(outbound.length, 3, pendingQuestion);
+      assert.equal(outbound.every((payload) => payload.template.name === "house_service_alert_v3"), true, pendingQuestion);
+      assert.equal(outbound.every((payload) => payload.template.language.code === "en"), true, pendingQuestion);
+      assert.equal(outbound.every((payload) => payload.template.components[0].parameters.length === 5), true, pendingQuestion);
+      assert.equal(outbound.every((payload) => payload.template.components[0].parameters[2].text === "Soap"), true, pendingQuestion);
+      assert.deepEqual(outbound.map((payload) => payload.to).sort(), ["66640000001", "66810000002", "66820000003"], pendingQuestion);
+      assert.doesNotMatch(JSON.stringify(outbound), /66960000001/, pendingQuestion);
+    }
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("after-hours housekeeping records the request once and sets next-morning expectations", () => {
+  const result = housekeepingServiceResult("Can I have fresh soap?", new Date("2026-08-27T12:30:00.000Z"));
+  assert.ok(result);
+  assert.match(result.answer, /currently off duty/i);
+  assert.match(result.answer, /already been recorded/i);
+  assert.match(result.answer, /after 10:30 AM/i);
+  assert.match(result.answer, /do not need to request it again/i);
+  assert.doesNotMatch(result.answer, /within 30 minutes/i);
+  assert.deepEqual(result.actions, []);
 });
 
 test("fire guidance prioritizes evacuation, Rescue and safe extinguisher use before any House alert", async () => {
@@ -3393,7 +3805,7 @@ test("all active Meta templates use their exact approved body schemas", () => {
 
   const urgent = buildWhatsAppTemplatePayload({ ...base, alertType: "property_emergency", severity: "critical", summary: "Water is flooding the room." }, recipient, env);
   assertBodyOnly(urgent, "house_urgent_alert_v2", 5);
-  assert.deepEqual(values(urgent), [base.id, "Room 3", "Serious property incident", base.bangkokTime, "Water is flooding the room."]);
+  assert.deepEqual(values(urgent), [base.id, "Room 3", "Flooding / major water leak", base.bangkokTime, "Water is flooding the room."]);
 
   const lostKey = buildWhatsAppTemplatePayload({ ...base, alertType: "verified_spare_key_release", summary: "Verified spare-key release requested." }, recipient, env);
   assertBodyOnly(lostKey, "house_lost_key_alert_v3", 3);

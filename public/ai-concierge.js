@@ -92,6 +92,7 @@
   let dragCurrentY = null;
   let enginePromise = null;
   let privateWorkflowContact = "";
+  let activeWorkflowState = null;
   let requestInFlight = false;
 
   function contextValues(question = "") {
@@ -478,6 +479,7 @@
         sessionId,
         history,
         privateReplyContact: privateWorkflowContact,
+        workflowState: activeWorkflowState,
         page: currentPage,
         language: window.HOUSE_I18N?.language || window.localStorage.getItem("houseGuideLanguage") || "en"
       })
@@ -540,6 +542,9 @@
     const suppliedContact = internationalContact(question);
     const privateContactWorkflow = result.workflow?.type === "luggage"
       || result.workflow?.type === "booking";
+    activeWorkflowState = result.workflow?.status === "collecting"
+      ? result.workflow
+      : null;
     if (privateContactWorkflow
       && result.workflow.status === "collecting"
       && result.workflow.retainPrivateContact) {

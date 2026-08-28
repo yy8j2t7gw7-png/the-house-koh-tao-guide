@@ -2,6 +2,28 @@
 
 All notable changes to The House – Koh Tao guest guide are recorded here.
 
+## v5.11.18 — Workflow State, Routine Service & Urgent Clarification
+
+### Production fixes
+
+- Replaced fragile luggage-state reconstruction with explicit, validated, contact-free state carried only while the browser workflow is collecting required fields.
+- Keeps arrival/departure, requested time, bag count and sanitized notes through a local-number rejection, then attaches the corrected international contact only to the protected delivery and clears state after submission.
+- Gives deterministic towels, soap, toilet-paper and room-cleaning requests priority over older luggage or booking collection so verified rooms never receive an unnecessary phone-number prompt.
+- Adds natural office-hours and after-hours housekeeping responses while preserving immediate service-alert creation and Su-plus-owner routing.
+- Adds a high-priority urgent-clarification state for generic emergency wording and requires a meaningful incident description before exposing or accepting an urgent send action.
+- Reclassifies clarification follow-ups by their actual content, so flooding and medical incidents enter their safety flows while toilet paper and ordinary defects return to routine support.
+
+### Compatibility and security
+
+- Keeps all six current template mappings on `en`, every v1 rollback mapping on `en_US`, and preserves approved BODY counts and parameter order.
+- Changes no Meta template, WABA, app, phone-number ID, webhook, recipient mapping, Cloudflare variable or secret.
+- Preserves immediate visible contact redaction and keeps guest contacts out of ordinary history, interaction records, alerts, delivery metadata, dashboards and logs.
+
+### Regression protection
+
+- Adds exact multi-turn luggage correction, clean subsequent request, stale-workflow housekeeping, after-hours service, vague-to-flooding, vague-to-medical, vague-to-routine, direct-fire, urgent-precedence and quality-gate coverage.
+- Revalidates the complete source and independently extracted release suite before handoff.
+
 ## v5.11.17 — Meta Template Language Resolution & Admin Footer Access
 
 ### Production fix

@@ -139,7 +139,7 @@ export function classifyConciergeAlert({ result, question, room, now = new Date(
     };
   }
 
-  if (result.handoff === "stay_support" && staySupportNeedsAttention(question)) {
+  if (result.handoff === "stay_support" && (result.housekeepingRequest || staySupportNeedsAttention(question))) {
     return {
       ...base,
       alertType: "stay_support",

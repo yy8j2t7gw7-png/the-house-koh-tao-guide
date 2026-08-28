@@ -222,6 +222,19 @@ function requestLabel(alert) {
     if (/\b(?:clean|cleaning|housekeeping)\b/i.test(summary)) return "Room cleaning";
     return "Guest request";
   }
+  if (alert.alertType === "property_emergency") {
+    if (/\b(?:flood|flooded|flooding|major water leak|water leak|water leakage|water leaking|water (?:is )?pouring|water coming through|burst (?:water )?pipe|toilet overflowing)\b/i.test(summary)) {
+      return "Flooding / major water leak";
+    }
+    if (/\b(?:fire|smoke|flames?|burning)\b/i.test(summary)) return "Fire / smoke";
+    if (/\b(?:electric|electrical|sparks?|live wire|exposed wire)\b/i.test(summary)) return "Electrical danger";
+  }
+  if (alert.alertType === "medical_emergency") {
+    if (/\b(?:unconscious|unresponsive|won['’]?t wake|not waking|passed out|collapsed)\b/i.test(summary)) return "Unconscious / unresponsive person";
+    if (/\b(?:not breathing|cannot breathe|can['’]?t breathe|struggling to breathe|difficulty breathing)\b/i.test(summary)) return "Breathing emergency";
+    if (/\b(?:heavy bleeding|bleeding heavily|won['’]?t stop bleeding)\b/i.test(summary)) return "Severe bleeding";
+    if (/\b(?:accident|crash|serious injury|badly injured)\b/i.test(summary)) return "Serious injury / accident";
+  }
   return labels[alert.alertType] || String(alert.alertType || "guest request")
     .replaceAll("_", " ")
     .replace(/\b\w/g, (letter) => letter.toUpperCase());

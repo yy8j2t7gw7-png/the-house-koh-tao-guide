@@ -24,7 +24,7 @@ import {
 } from "./whatsapp-alerts.js";
 import { getGuestAccess, handleStayAdminRequest, stayConfiguration } from "./stay-api.js";
 
-const RELEASE = "5.11.17";
+const RELEASE = "5.11.18";
 const ROOM_OPTIONS = new Set(["1", "2", "3", "4", "5", "6", "8", "9", "10", "11"]);
 const MAX_HISTORY_ITEMS = 10;
 const MAX_QUESTION_LENGTH = 800;
@@ -168,8 +168,13 @@ const OPERATIONAL_REQUEST = /\b(?:luggage|baggage|book|booking|reserve|arrange|d
 const ACTIONABLE_LUGGAGE_REQUEST = /\b(?:please\s+(?:store|keep|arrange)|can\s+(?:you|we)\s+(?:store|leave|keep|arrange)|could\s+you\s+(?:store|keep|arrange)|i\s+(?:want|wanna|need|would\s+like)\s+(?:(?:you\s+)?to\s+)?(?:store|leave|arrange|keep)|arrange\s+(?:luggage|baggage|bags?))\b[^.?!]*(?:luggage|baggage|bags?)/i;
 const DIRECT_LUGGAGE_REQUEST = /^\s*(?:please\s+)?(?:store|keep|arrange)\s+(?:my\s+|our\s+)?(?:luggage|baggage|bags?)\b/i;
 const ACTIONABLE_DIVING_BOOKING = /(?:^\s*(?:please\s+)?(?:book|reserve|arrange)\s+.*\b(?:dive|diving|scuba|open\s+water|advanced\s+open\s+water)\b|\b(?:please\s+(?:book|reserve|arrange)|can\s+you\s+(?:book|reserve|arrange)|could\s+you\s+(?:book|reserve|arrange)|help\s+me\s+(?:book|reserve|arrange)|i\s+(?:want|wanna|need|would\s+like)\s+(?:you\s+)?(?:to\s+)?(?:book|reserve|arrange))\b[^.?!]*\b(?:dive|diving|scuba|open\s+water|advanced\s+open\s+water)\b)/i;
-const HOUSEKEEPING_ITEM_REQUEST = /\b(?:toilet\s+paper|soap|(?:new|fresh|clean)\s+towels?|room\s+cleaning|clean\s+(?:my|our|the)\s+room|housekeeping)\b/i;
-const HOUSEKEEPING_REQUEST_ACTION = /\b(?:can\s+(?:i|we)\s+(?:have|get)|please\s+(?:bring|send|provide|clean)|can\s+you\s+(?:bring|send|provide|clean)|could\s+you\s+(?:bring|send|provide|clean)|i\s+(?:need|want|would\s+like)|(?:bring|send|provide)\s+(?:me\s+)?|clean\s+(?:my|our|the)\s+room)\b/i;
+const HOUSEKEEPING_ITEM_REQUEST = /\b(?:toilet\s+paper|soap|(?:(?:new|fresh|clean)\s+)?towels?|room\s+cleaning|clean\s+(?:my|our|the)\s+room|housekeeping)\b/i;
+const HOUSEKEEPING_REQUEST_ACTION = /\b(?:can\s+(?:i|we)\s+(?:have|get)|please\s+(?:bring|send|provide|clean)|can\s+you\s+(?:bring|send|provide|clean)|could\s+you\s+(?:bring|send|provide|clean)|i\s+(?:need|want|would\s+like)|(?:bring|send|provide)\s+(?:me\s+)?|clean\s+(?:my|our|the)\s+room)\b|\b(?:toilet\s+paper|soap|towels?)\s+please\b/i;
+const GENERIC_URGENT_WORDS = new Set([
+  "a", "am", "an", "and", "bad", "emergency", "happened", "has", "have", "help", "i", "in", "is", "it",
+  "my", "need", "please", "problem", "really", "room", "serious", "something", "the", "there", "urgent", "very",
+  "wrong"
+]);
 
 function extractReplyContact(values) {
   for (const value of values) {
@@ -191,15 +196,57 @@ function withoutReplyContact(value) {
   return String(value || "").replace(/(?:\+|00)?\d[\d ()-]{6,20}\d/g, "[contact supplied privately]");
 }
 
+function cleanWorkflowNotes(value) {
+  return withoutReplyContact(sanitizeQuestion(value, 500))
+    .replace(/\[(?:number removed|contact supplied privately)\]/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 500);
+}
+
+function cleanWorkflowState(value) {
+  if (!value || value.status !== "collecting") return null;
+  if (value.type === "urgent_clarification") {
+    return { type: "urgent_clarification", status: "collecting" };
+  }
+  if (value.type !== "luggage") return null;
+  const request = value.luggageRequest || {};
+  const context = ["Arrival", "Departure"].includes(request.context) ? request.context : "";
+  const requestedTime = String(request.requestedTime || "").trim().slice(0, 40);
+  const bagNumber = Number(String(request.bagCount || "").trim());
+  const bagCount = Number.isInteger(bagNumber) && bagNumber >= 1 && bagNumber <= 99 ? String(bagNumber) : "";
+  return {
+    type: "luggage",
+    status: "collecting",
+    retainPrivateContact: Boolean(value.retainPrivateContact),
+    missing: Array.isArray(value.missing) ? value.missing.filter((item) => ["context", "time", "bags", "contact"].includes(item)) : [],
+    luggageRequest: {
+      context,
+      requestedTime,
+      bagCount,
+      notes: cleanWorkflowNotes(request.notes)
+    }
+  };
+}
+
 function isCriticalPropertyResult(result) {
   return result?.handoff === "property_emergency"
     || result?.intentId === "property_emergency"
     || result?.category === "property-emergency";
 }
 
+function isEmergencyResult(result) {
+  return isCriticalPropertyResult(result)
+    || result?.handoff === "medical_emergency"
+    || result?.intentId === "medical_emergency"
+    || result?.intentId === "medical_emergency_clarification"
+    || result?.intentId === "urgent_clarification"
+    || result?.category === "emergency";
+}
+
 function isCriticalPropertyMessage(question) {
   const normalized = normalizeText(question);
-  const waterHazard = /\b(?:flood|flooded|flooding|major water leak|serious water leak|water leak|water leakage|water leaking|leaking everywhere|burst water pipe|burst pipe|water coming through the ceiling|toilet overflowing)\b/.test(normalized);
+  const waterHazard = /\b(?:flood|flooded|flooding|major water leak|serious water leak|water leak|water leakage|water leaking|leaking everywhere|burst water pipe|burst pipe|water coming through the ceiling|water (?:is )?pouring (?:from|through) the ceiling|toilet overflowing)\b/.test(normalized);
   const electricalHazard = /\b(?:dangerous electrical|electrical danger|electric shock|electrical sparks|sparks from|burning electrical|electrical burning|smoke from electricity|live wire|exposed wire)\b/.test(normalized);
   const fireOrDamage = /\b(?:fire (?:in|inside|at) (?:my |the |our )?(?:room|bathroom|property|house|building)|(?:my |the |our )?(?:room|bathroom|property|house|building) is on fire|there is smoke (?:in|inside) (?:my |the |our )?(?:room|property|house|building)|smoke (?:in|inside|coming from) (?:my |the |our )?(?:room|property|house|building)|major property damage|serious property damage|immediate room danger|immediate property danger)\b/.test(normalized);
   return waterHazard || electricalHazard || fireOrDamage;
@@ -219,6 +266,52 @@ function isClearMedicalEmergency(question) {
 function isAmbiguousMedicalStatement(question) {
   const normalized = normalizeText(question);
   return /^(?:i am|i m|im) unconscious\b/.test(normalized);
+}
+
+function isVagueUrgentMessage(question) {
+  const normalized = normalizeText(question);
+  return /^(?:there is |i have )?(?:a )?serious problem(?: in (?:my|our|the) room)?$/.test(normalized)
+    || /^(?:(?:i|we) (?:(?:have|need) (?:an? )?)?)?urgent (?:problem|help)$/.test(normalized)
+    || /^(?:i|we) need help urgently$/.test(normalized)
+    || /^something serious (?:has )?happened$/.test(normalized)
+    || /^something is wrong(?: in (?:my|our|the) room)?$/.test(normalized)
+    || /^(?:this is an? )?emergency$/.test(normalized);
+}
+
+function hasMeaningfulIncidentDescription(question) {
+  if (isCriticalPropertyMessage(question)
+    || isFireEmergencyMessage(question)
+    || isClearMedicalEmergency(question)
+    || HOUSEKEEPING_ITEM_REQUEST.test(question)
+    || /\b(?:broken|not working|doesn t work|isn t working|leaking|overflowing|blocked|clogged|snake|injured|hurt|smoke|flames?|sparks?)\b/.test(normalizeText(question))) {
+    return true;
+  }
+  const useful = normalizeText(question).split(/\s+/).filter((token) => token.length > 2 && !GENERIC_URGENT_WORDS.has(token));
+  return useful.length > 0;
+}
+
+function activeUrgentClarification(history, workflowState) {
+  if (workflowState?.type === "urgent_clarification" && workflowState.status === "collecting") return true;
+  const last = history.at(-1);
+  return last?.role === "assistant" && /\bWhat has happened(?: in your room)?\b/i.test(last.content);
+}
+
+function urgentClarificationResult(room) {
+  return {
+    answer: room
+      ? "I'm here to help. What has happened in your room? Please briefly tell me what the problem is."
+      : "I'm here to help. What has happened? Please briefly tell me what the problem is.",
+    intentId: "urgent_clarification",
+    category: "emergency",
+    confidence: 1,
+    needsHuman: false,
+    handoff: "none",
+    learningGap: false,
+    learningReason: "none",
+    actions: [],
+    suppressDefaultActions: true,
+    source: "safety-policy"
+  };
 }
 
 function conversationalSafetyResult(question) {
@@ -275,10 +368,10 @@ function isFireEmergencyMessage(question) {
 
 function housekeepingItem(question) {
   const source = String(question || "");
-  if (/\btoilet\s+paper\b/i.test(source)) return { id: "toilet_paper", label: "toilet paper", delivery: "bring the toilet paper" };
-  if (/\bsoap\b/i.test(source)) return { id: "soap", label: "soap", delivery: "bring the soap" };
-  if (/\b(?:new|fresh|clean)\s+towels?\b|\btowel\s+(?:change|replacement)\b/i.test(source)) return { id: "fresh_towels", label: "fresh towels", delivery: "bring fresh towels" };
-  if (/\b(?:room\s+cleaning|clean\s+(?:my|our|the)\s+room|housekeeping)\b/i.test(source)) return { id: "room_cleaning", label: "room cleaning", delivery: "arrange the room cleaning" };
+  if (/\btoilet\s+paper\b/i.test(source)) return { id: "toilet_paper", label: "toilet paper", delivery: "bring toilet paper to your room" };
+  if (/\bsoap\b/i.test(source)) return { id: "soap", label: "soap", delivery: "bring soap to your room" };
+  if (/\b(?:(?:new|fresh|clean)\s+)?towels?\b|\btowel\s+(?:change|replacement)\b/i.test(source)) return { id: "fresh_towels", label: "fresh towels", delivery: "bring fresh towels to your room" };
+  if (/\b(?:room\s+cleaning|clean\s+(?:my|our|the)\s+room|housekeeping)\b/i.test(source)) return { id: "room_cleaning", label: "room cleaning", delivery: "arrange room cleaning" };
   return null;
 }
 
@@ -287,8 +380,8 @@ export function housekeepingServiceResult(question, now = new Date()) {
   if (!item || !HOUSEKEEPING_ITEM_REQUEST.test(question) || !HOUSEKEEPING_REQUEST_ACTION.test(question)) return null;
   const afterHours = isAfterHours(now);
   const answer = afterHours
-    ? `Thank you for your request, and sorry for the inconvenience. Our housekeeping team is currently off duty. We’ll ${item.delivery} first thing in the morning after 10:30 AM.`
-    : `Thank you for your request. We’ll ${item.delivery} to your room as soon as possible. If you haven’t received it within 30 minutes, please call us using the button below.`;
+    ? `Thank you for your request. Our housekeeping team is currently off duty, but your request has already been recorded. We’ll ${item.delivery} tomorrow morning after 10:30 AM, and you do not need to request it again.`
+    : `Thank you for your request. We’ll ${item.delivery} as soon as possible. If you haven’t received it within 30 minutes, please call us using the button below.`;
   return {
     answer,
     intentId: `housekeeping_${item.id}`,
@@ -639,10 +732,13 @@ function luggageCollectionAnswer(missing, rejectedLocalContact = false) {
   return [detailPrompt, contactPrompt, operational.length ? "You may also include any useful notes." : ""].filter(Boolean).join(" ");
 }
 
-function applyLuggageRequestPolicy(result, question, history, currentReplyContact = "") {
+function applyLuggageRequestPolicy(result, question, history, currentReplyContact = "", workflowState = null) {
+  const pendingState = workflowState?.type === "luggage" && workflowState.status === "collecting"
+    ? workflowState
+    : null;
   const priorMessages = activeLuggageWorkflowMessages(history);
   const actionableNow = isActionableLuggageMessage(question);
-  if (isCriticalPropertyResult(result) || (!actionableNow && !priorMessages.length)) {
+  if (isEmergencyResult(result) || (!actionableNow && !priorMessages.length && !pendingState)) {
     return { handled: false, result, alertQuestion: question, workflow: null };
   }
   if (/^\s*(?:cancel|never\s*mind|nevermind|forget\s+it)\s*[.!]?\s*$/i.test(question)) {
@@ -653,11 +749,14 @@ function applyLuggageRequestPolicy(result, question, history, currentReplyContac
       workflow: { type: "luggage", status: "cancelled", retainPrivateContact: false, missing: [] }
     };
   }
-  const messages = actionableNow ? [question] : [...priorMessages, question];
-  const details = withoutReplyContact(messages.join(" ")).replace(/\[number removed\]|\[contact supplied privately\]/gi, " ").replace(/\s+/g, " ").trim();
-  const context = luggageContext(details);
-  const requestedTime = luggageRequestedTime(details);
-  const bags = luggageBagCount(details);
+  const messages = actionableNow && !pendingState ? [question] : [...priorMessages, question];
+  const currentDetails = cleanWorkflowNotes(question);
+  const details = pendingState
+    ? [pendingState.luggageRequest?.notes, currentDetails].filter(Boolean).join(" ").replace(/\s+/g, " ").trim().slice(0, 500)
+    : cleanWorkflowNotes(messages.join(" "));
+  const context = luggageContext(currentDetails) || pendingState?.luggageRequest?.context || luggageContext(details);
+  const requestedTime = luggageRequestedTime(currentDetails) || pendingState?.luggageRequest?.requestedTime || luggageRequestedTime(details);
+  const bags = luggageBagCount(currentDetails) || pendingState?.luggageRequest?.bagCount || luggageBagCount(details);
   const contact = validInternationalReplyContact(currentReplyContact);
   const rejectedLocalContact = Boolean(currentReplyContact && !contact);
   const missing = [];
@@ -678,7 +777,13 @@ function applyLuggageRequestPolicy(result, question, history, currentReplyContac
         actions: []
       },
       alertQuestion: details || "Luggage storage request details pending.",
-      workflow: { type: "luggage", status: "collecting", retainPrivateContact: Boolean(contact), missing }
+      workflow: {
+        type: "luggage",
+        status: "collecting",
+        retainPrivateContact: Boolean(contact),
+        missing,
+        luggageRequest: { context, requestedTime, bagCount: bags, notes: details }
+      }
     };
   }
   const summary = `Luggage storage request for ${context} at ${requestedTime}, ${bags} ${bags === "1" ? "bag" : "bags"}. Guest details: ${details}`;
@@ -1057,7 +1162,7 @@ function applyLiveFeaturePolicy(result, env) {
 }
 
 function applyEmergencyConfirmationPolicy(result) {
-  if (result?.intentId === "fire_emergency") return result;
+  if (result?.intentId === "fire_emergency" || result?.intentId === "urgent_clarification") return result;
   if (isCriticalPropertyResult(result)) {
     return {
       ...result,
@@ -1150,6 +1255,7 @@ export async function handleConciergeRequest(request, env, ctx) {
   const requestedRoom = validRoom(body.room);
   const language = validLanguage(body.language) || "en";
   const history = cleanHistory(body.history);
+  const workflowState = cleanWorkflowState(body.workflowState);
   if (!sessionId || question.length < 2 || question.length > MAX_QUESTION_LENGTH) {
     return json({ error: "invalid_request" }, 400);
   }
@@ -1169,6 +1275,22 @@ export async function handleConciergeRequest(request, env, ctx) {
   if (["confirm_urgent_property", "confirm_urgent_medical"].includes(body.action)) {
     const medical = body.action === "confirm_urgent_medical";
     if (!medical && (!access.verified || !room)) return json({ error: "verified_guest_access_required" }, 403);
+    if (isVagueUrgentMessage(question) || !hasMeaningfulIncidentDescription(question)) {
+      const clarification = urgentClarificationResult(room);
+      return json({
+        answer: clarification.answer,
+        intentId: clarification.intentId,
+        category: clarification.category,
+        confidence: clarification.confidence,
+        needsHuman: clarification.needsHuman,
+        handoff: clarification.handoff,
+        learningGap: clarification.learningGap,
+        actions: clarification.actions,
+        source: clarification.source,
+        language,
+        workflow: { type: "urgent_clarification", status: "collecting" }
+      });
+    }
     const alert = await createProtectedOperationsAlert({
       env,
       room,
@@ -1196,7 +1318,12 @@ export async function handleConciergeRequest(request, env, ctx) {
       ], source: "confirmed-operation", language
     });
   }
-  const safetyResult = safetyResultForQuestion(question);
+  const classifiedSafetyResult = safetyResultForQuestion(question);
+  const urgentClarificationActive = activeUrgentClarification(history, workflowState);
+  const needsUrgentClarification = !classifiedSafetyResult
+    && (isVagueUrgentMessage(question)
+      || (urgentClarificationActive && !hasMeaningfulIncidentDescription(question)));
+  const safetyResult = classifiedSafetyResult || (needsUrgentClarification ? urgentClarificationResult(room) : null);
   let publicResult = access.accessGranted ? null : publicAccessResult(question, access, room, safetyResult);
   if (publicResult) {
     if (language !== "en") {
@@ -1228,7 +1355,10 @@ export async function handleConciergeRequest(request, env, ctx) {
       actions: publicResult.actions,
       source: publicResult.source,
       language,
-      interactionId: recorded.interactionId
+      interactionId: recorded.interactionId,
+      workflow: publicResult.intentId === "urgent_clarification"
+        ? { type: "urgent_clarification", status: "collecting" }
+        : null
     });
   }
 
@@ -1265,7 +1395,9 @@ export async function handleConciergeRequest(request, env, ctx) {
   const criticalPropertyMatch = safetyResult?.intentId === "property_emergency"
     ? matchKnowledge("major water leak", effectiveKnowledge, 0.44)
     : null;
-  const luggageWorkflowActive = isActionableLuggageMessage(question) || activeLuggageWorkflowMessages(history).length > 0;
+  const luggageWorkflowActive = isActionableLuggageMessage(question)
+    || workflowState?.type === "luggage"
+    || activeLuggageWorkflowMessages(history).length > 0;
   const luggageWorkflowMatch = !criticalPropertyMatch && luggageWorkflowActive
     ? matchKnowledge("luggage storage", effectiveKnowledge, 0.44)
     : null;
@@ -1296,15 +1428,25 @@ export async function handleConciergeRequest(request, env, ctx) {
   result = applyLiveFeaturePolicy(result, env);
   result = applyEmergencyConfirmationPolicy(result);
 
-  const bookingPolicy = applyDivingBookingPolicy(result, question, history, currentReplyContact);
-  const luggagePolicy = bookingPolicy.handled
+  const directWorkflow = result.intentId === "urgent_clarification"
+    ? { type: "urgent_clarification", status: "collecting" }
+    : null;
+  const bypassOrdinaryWorkflows = Boolean(directWorkflow || servicePolicyResult || isEmergencyResult(result));
+  const bookingPolicy = bypassOrdinaryWorkflows
     ? { handled: false, result, alertQuestion: question, workflow: null }
-    : applyLuggageRequestPolicy(result, question, history, currentReplyContact);
-  const workflowPolicy = bookingPolicy.handled
-    ? bookingPolicy
-    : (luggagePolicy.handled
-      ? luggagePolicy
-      : { ...applyContactRequirement(result, question, history, currentReplyContact), workflow: null });
+    : applyDivingBookingPolicy(result, question, history, currentReplyContact);
+  const luggagePolicy = bypassOrdinaryWorkflows || bookingPolicy.handled
+    ? { handled: false, result, alertQuestion: question, workflow: null }
+    : applyLuggageRequestPolicy(result, question, history, currentReplyContact, workflowState);
+  const workflowPolicy = directWorkflow
+    ? { result, alertQuestion: question, workflow: directWorkflow }
+    : servicePolicyResult
+      ? { result, alertQuestion: question, workflow: null }
+      : bookingPolicy.handled
+        ? bookingPolicy
+        : (luggagePolicy.handled
+          ? luggagePolicy
+          : { ...applyContactRequirement(result, question, history, currentReplyContact), workflow: null });
   result = workflowPolicy.result;
 
   if (language !== "en" && result.source !== "ai") {

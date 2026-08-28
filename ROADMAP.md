@@ -1,6 +1,6 @@
 # Product Roadmap
 
-Baseline: v5.11.17
+Baseline: v5.11.18
 
 ## Completed
 
@@ -26,6 +26,9 @@ Baseline: v5.11.17
 - [x] Actionable luggage requests routed to Su with structured operational details
 - [x] Complete-field luggage workflow requiring arrival/departure, requested time, bag count and a transient international reply contact before submission
 - [x] Final server-side luggage alert boundary rejecting incomplete or stale requests and universal visible-contact redaction
+- [x] Explicit pending luggage state surviving local-contact rejection and corrected international contact submission
+- [x] Routine housekeeping precedence over stale luggage and booking contact collection
+- [x] Vague urgent clarification and meaningful-incident quality gate before protected submission
 - [x] Conservative Airbnb first-name-only synchronization and verified guest greeting
 - [x] Signed `RECEIVED` acknowledgement with backwards-compatible `ACK`
 - [x] Public Privacy Policy, data-deletion instructions and Terms of Use for Meta app review
@@ -142,7 +145,7 @@ Guests may continue using ordinary WhatsApp handoffs. Automated internal alerts 
 - [x] Push the v5.5.0 release to the existing hosting workflow
 - [x] Confirm `/api/concierge/status` reports AI and learning enabled
 - [x] Capture the exact v5.11.16 Meta failure (HTTP 404 / `132001`) and implement template-aware language resolution: current templates use `en`; deliberate v1 rollback templates retain `en_US`.
-- [ ] Deploy v5.11.17 and live-test all six current templates, actor exclusion, duplicate-webhook idempotency, truthful guest fallbacks and every established privacy/security gate.
+- [ ] Deploy v5.11.18 and live-test all six current templates, workflow corrections, actor exclusion, duplicate-webhook idempotency, truthful guest fallbacks and every established privacy/security gate.
 - [x] Add `STAY_TOKEN_PEPPER` and `RESERVATION_SYNC_TOKEN` Worker secrets
 - [ ] Add protected `SPARE_KEY_CODES` Worker secret before activating automatic spare-key release
 - [x] Install and authorize the included Airbnb Google Apps Script synchronizer

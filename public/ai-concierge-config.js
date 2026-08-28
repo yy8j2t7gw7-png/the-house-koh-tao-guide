@@ -1,5 +1,5 @@
 window.AI_CONCIERGE_CONFIG = {
-  "release": "5.11.17",
+  "release": "5.11.18",
   "enabled": true,
   "propertyName": "The House",
   "buttonLabel": "Concierge",
@@ -15,6 +15,18 @@ window.AI_CONCIERGE_CONFIG = {
   "knowledgeUrl": "/data/concierge-knowledge.json",
   "minimumMatchScore": 0.62,
   "roomOptions": ["1", "2", "3", "4", "5", "6", "8", "9", "10", "11"],
+  "translationApprovedRuntimeText": [
+    "I'm here to help. What has happened in your room? Please briefly tell me what the problem is.",
+    "I'm here to help. What has happened? Please briefly tell me what the problem is.",
+    "Thank you for your request. We’ll bring toilet paper to your room as soon as possible. If you haven’t received it within 30 minutes, please call us using the button below.",
+    "Thank you for your request. We’ll bring soap to your room as soon as possible. If you haven’t received it within 30 minutes, please call us using the button below.",
+    "Thank you for your request. We’ll bring fresh towels to your room as soon as possible. If you haven’t received it within 30 minutes, please call us using the button below.",
+    "Thank you for your request. We’ll arrange room cleaning as soon as possible. If you haven’t received it within 30 minutes, please call us using the button below.",
+    "Thank you for your request. Our housekeeping team is currently off duty, but your request has already been recorded. We’ll bring toilet paper to your room tomorrow morning after 10:30 AM, and you do not need to request it again.",
+    "Thank you for your request. Our housekeeping team is currently off duty, but your request has already been recorded. We’ll bring soap to your room tomorrow morning after 10:30 AM, and you do not need to request it again.",
+    "Thank you for your request. Our housekeeping team is currently off duty, but your request has already been recorded. We’ll bring fresh towels to your room tomorrow morning after 10:30 AM, and you do not need to request it again.",
+    "Thank you for your request. Our housekeeping team is currently off duty, but your request has already been recorded. We’ll arrange room cleaning tomorrow morning after 10:30 AM, and you do not need to request it again."
+  ],
   "afterHours": {
     "timeZone": "Asia/Bangkok",
     "start": "19:30",

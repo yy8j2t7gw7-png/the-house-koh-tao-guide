@@ -19,19 +19,22 @@ const TEMPLATE_DEFAULTS = Object.freeze({
 });
 
 const TEMPLATE_SCHEMAS = Object.freeze({
-  house_service_alert_v3: Object.freeze({ kind: "service", bodyParameterCount: 5 }),
-  house_luggage_alert_v2: Object.freeze({ kind: "luggage", bodyParameterCount: 6 }),
-  house_booking_alert_v2: Object.freeze({ kind: "booking", bodyParameterCount: 6 }),
-  house_urgent_alert_v2: Object.freeze({ kind: "urgent", bodyParameterCount: 5 }),
-  house_lost_key_alert_v3: Object.freeze({ kind: "lostKey", bodyParameterCount: 3 }),
-  house_alert_status_v1: Object.freeze({ kind: "status", bodyParameterCount: 5 }),
+  // These current templates are approved in Meta as generic English. Meta
+  // treats `en` and `en_US` as different translations and returns 132001
+  // when the requested translation is not attached to the template.
+  house_service_alert_v3: Object.freeze({ kind: "service", languageCode: "en", bodyParameterCount: 5 }),
+  house_luggage_alert_v2: Object.freeze({ kind: "luggage", languageCode: "en", bodyParameterCount: 6 }),
+  house_booking_alert_v2: Object.freeze({ kind: "booking", languageCode: "en", bodyParameterCount: 6 }),
+  house_urgent_alert_v2: Object.freeze({ kind: "urgent", languageCode: "en", bodyParameterCount: 5 }),
+  house_lost_key_alert_v3: Object.freeze({ kind: "lostKey", languageCode: "en", bodyParameterCount: 3 }),
+  house_alert_status_v1: Object.freeze({ kind: "status", languageCode: "en", bodyParameterCount: 5 }),
   // Kept only as a deliberate rollback path. These are the legacy payload
   // layouts shipped before the replacement templates became active.
-  house_service_alert_v1: Object.freeze({ kind: "service", bodyParameterCount: 5 }),
-  house_luggage_alert_v1: Object.freeze({ kind: "luggage", bodyParameterCount: 6 }),
-  house_booking_alert_v1: Object.freeze({ kind: "booking", bodyParameterCount: 6 }),
-  house_urgent_alert_v1: Object.freeze({ kind: "urgent", bodyParameterCount: 5 }),
-  house_lost_key_alert_v1: Object.freeze({ kind: "lostKey", bodyParameterCount: 3 })
+  house_service_alert_v1: Object.freeze({ kind: "service", languageCode: "en_US", bodyParameterCount: 5 }),
+  house_luggage_alert_v1: Object.freeze({ kind: "luggage", languageCode: "en_US", bodyParameterCount: 6 }),
+  house_booking_alert_v1: Object.freeze({ kind: "booking", languageCode: "en_US", bodyParameterCount: 6 }),
+  house_urgent_alert_v1: Object.freeze({ kind: "urgent", languageCode: "en_US", bodyParameterCount: 5 }),
+  house_lost_key_alert_v1: Object.freeze({ kind: "lostKey", languageCode: "en_US", bodyParameterCount: 3 })
 });
 
 function digits(value) {
@@ -139,6 +142,7 @@ export function houseEmergencyContact(env) {
 export function whatsappAlertConfiguration(env) {
   const recipients = parseRecipients(env);
   const groupCounts = Object.fromEntries(Object.entries(recipients).map(([group, values]) => [group, values.length]));
+  const names = templateNames(env);
   return {
     configured: Boolean(
       env.WHATSAPP_ACCESS_TOKEN &&
@@ -147,7 +151,8 @@ export function whatsappAlertConfiguration(env) {
       env.META_APP_SECRET &&
       Object.values(groupCounts).some((count) => count > 0)
     ),
-    templateNames: templateNames(env),
+    templateNames: names,
+    templateLanguages: Object.fromEntries(Object.entries(names).map(([kind, name]) => [kind, TEMPLATE_SCHEMAS[name]?.languageCode || DEFAULT_TEMPLATE_LANGUAGE])),
     templateLanguage: String(env.WHATSAPP_ALERT_TEMPLATE_LANGUAGE || DEFAULT_TEMPLATE_LANGUAGE),
     groupCounts,
     escalationMinutes: Math.min(60, Math.max(2, Number(env.WHATSAPP_ALERT_ESCALATION_MINUTES) || DEFAULT_ESCALATION_MINUTES))
@@ -262,7 +267,7 @@ export function validateWhatsAppTemplateParameters(name, kind, parameters) {
   if (!Array.isArray(parameters) || parameters.length !== schema.bodyParameterCount) {
     return { ok: false, name, errorCode: "parameter_count_mismatch" };
   }
-  return { ok: true, name: String(name).trim(), kind, parameters };
+  return { ok: true, name: String(name).trim(), kind, languageCode: schema.languageCode, parameters };
 }
 
 function selectedTemplateForAlert(alert, env) {
@@ -283,7 +288,7 @@ export function buildWhatsAppTemplatePayload(alert, recipient, env) {
     type: "template",
     template: {
       name: selected.name,
-      language: { code: String(env.WHATSAPP_ALERT_TEMPLATE_LANGUAGE || DEFAULT_TEMPLATE_LANGUAGE) },
+      language: { code: selected.languageCode },
       components: [{
         type: "body",
         parameters: textParameters(selected.parameters)
@@ -651,7 +656,7 @@ export function buildWhatsAppStatusPayload(alert, recipient, status, actorLabel,
   if (!validated.ok) return validated;
   return { ok: true, name, bodyParameterCount: parameters.length, payload: {
     messaging_product: "whatsapp", recipient_type: "individual", to: recipient.phone, type: "template",
-    template: { name, language: { code: String(env.WHATSAPP_ALERT_TEMPLATE_LANGUAGE || DEFAULT_TEMPLATE_LANGUAGE) }, components: [{ type: "body", parameters: textParameters(parameters) }] }
+    template: { name, language: { code: validated.languageCode }, components: [{ type: "body", parameters: textParameters(parameters) }] }
   } };
 }
 

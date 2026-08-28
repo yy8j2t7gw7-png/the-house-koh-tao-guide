@@ -2,6 +2,26 @@
 
 All notable changes to The House – Koh Tao guest guide are recorded here.
 
+## v5.11.17 — Meta Template Language Resolution & Admin Footer Access
+
+### Production fix
+
+- Identified the exact v5.11.16 production failure: Meta returned HTTP 404, code `132001`, because `house_service_alert_v3` exists in generic English (`en`) while the Worker requested English (US) (`en_US`).
+- Added an immutable language code to every approved template schema and made payload construction resolve language from the selected template.
+- Sends `house_service_alert_v3`, `house_luggage_alert_v2`, `house_booking_alert_v2`, `house_urgent_alert_v2`, `house_lost_key_alert_v3` and `house_alert_status_v1` with `en`.
+- Preserves `en_US` for the five mapped v1 rollback templates and keeps the deployment’s global language variable only as a compatibility fallback for configuration reporting.
+
+### Compatibility and security
+
+- Leaves all template names, BODY-only components, parameter counts/order, recipient routing, acknowledgement behavior and Meta/Cloudflare secret mappings unchanged.
+- Retains sanitized provider diagnostics and every fail-closed lost-key, urgent-confirmation, contact-redaction, luggage, booking and verified-stay boundary.
+- Restores a discreet **Admin Login** footer link on guest-facing and legal pages without placing any token or credential in the URL; the owner console remains server-authenticated.
+
+### Regression protection
+
+- Expands the complete suite from 100 to 103 tests, including the exact Room 11 service-v3 language/shape regression, all six current template languages, every v1 rollback language and guest-page admin-footer coverage.
+- Revalidates the complete source and packaged release independently before handoff.
+
 ## v5.11.16 — Safe Meta Delivery Diagnostics
 
 ### Production evidence

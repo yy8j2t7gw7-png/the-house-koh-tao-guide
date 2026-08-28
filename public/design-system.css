@@ -177,6 +177,8 @@ html:not(.explore-enabled) a.card[href="/explore.html"]{display:none!important}
 .legal-footer-links{display:flex;justify-content:center;flex-wrap:wrap;gap:8px 14px;margin-top:8px}
 .legal-footer-links a{color:var(--green-dark);font-weight:700;text-decoration:none}
 .legal-footer-links a:hover{text-decoration:underline}
+.admin-footer-link{display:inline-block;margin-top:12px;color:var(--muted);font-size:12px;font-weight:650;text-decoration:none}
+.admin-footer-link:hover{color:var(--green-dark);text-decoration:underline}
 .float-wa{
   position:fixed;
   left:18px;

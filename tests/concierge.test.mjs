@@ -1101,7 +1101,7 @@ test("guest localization supports seven languages and keeps the owner dashboard 
   assert.doesNotMatch(admin, /src="\/i18n\.js"/);
   assert.match(runtime, /exploreContentDeferred/);
   assert.match(runtime, /element\.closest\("\.section,\.footer"\)/);
-  assert.match(runtime, /houseGuideTranslations:v5\.11\.16:/);
+  assert.match(runtime, /houseGuideTranslations:v5\.11\.17:/);
   assert.match(runtime, /MAX_REQUEST_RETRIES = 2/);
   assert.match(runtime, /let flushRunning = false/);
 });
@@ -1251,6 +1251,34 @@ test("privacy, data protection and terms are reachable from every public HTML pa
       && html.includes('href="/terms"');
     const inheritsSharedFooter = html.includes('src="/guide-app.js"') || html.includes('src="/i18n.js"');
     assert.ok(hasStaticLinks || inheritsSharedFooter, `${page.pathname} has no legal navigation`);
+  }
+});
+
+test("every guest-facing page exposes a discreet token-free admin footer link", async () => {
+  const publicRoot = new URL("../public/", import.meta.url);
+  const [runtime, styles] = await Promise.all([
+    readFile(new URL("../public/i18n.js", import.meta.url), "utf8"),
+    readFile(new URL("../public/design-system.css", import.meta.url), "utf8")
+  ]);
+  assert.match(runtime, /adminLink\.href = "\/concierge-admin"/);
+  assert.match(runtime, /adminLink\.textContent = "Admin Login"/);
+  assert.doesNotMatch(runtime, /concierge-admin\?[^"']*(?:token|auth)/i);
+  assert.match(styles, /\.admin-footer-link\{[^}]*font-size:12px[^}]*text-decoration:none/);
+
+  const pages = [];
+  async function collect(directory) {
+    for (const entry of await readdir(directory, { withFileTypes: true })) {
+      if (entry.isDirectory()) await collect(new URL(`${entry.name}/`, directory));
+      else if (entry.isFile() && entry.name.endsWith(".html") && entry.name !== "concierge-admin.html") pages.push(new URL(entry.name, directory));
+    }
+  }
+  await collect(publicRoot);
+  for (const page of pages) {
+    const html = await readFile(page, "utf8");
+    const hasStaticLink = /href="\/concierge-admin"/.test(html);
+    const inheritsSharedFooter = html.includes('src="/guide-app.js"') || html.includes('src="/i18n.js"');
+    assert.ok(hasStaticLink || inheritsSharedFooter, `${page.pathname} has no admin footer access`);
+    assert.doesNotMatch(html, /href="\/concierge-admin\?[^"']*(?:token|auth)/i);
   }
 });
 
@@ -3210,7 +3238,7 @@ test("secure guest access uses the shared header and links discreetly to owner l
   assert.doesNotMatch(inlineStyles, /\.shell\s*\{/);
   assert.doesNotMatch(inlineStyles, /\.topbar\s*\{/);
   assert.doesNotMatch(inlineStyles, /\.nav\s+a\s*\{/);
-  assert.match(html, /<a class="admin-login-link" href="\/concierge-admin">Admin login<\/a>/);
+  assert.match(html, /<a class="admin-login-link admin-footer-link" href="\/concierge-admin">Admin Login<\/a>/);
   assert.match(html, /id="createPassportUpload"/);
   assert.match(html, /id="providePassportsInPerson"/);
   assert.match(html, /Enter your stay code to unlock your private room guide/);
@@ -3322,7 +3350,7 @@ test("all active Meta templates use their exact approved body schemas", () => {
   const assertBodyOnly = (built, name, count) => {
     assert.equal(built.ok, true);
     assert.equal(built.payload.template.name, name);
-    assert.equal(built.payload.template.language.code, "en_US");
+    assert.equal(built.payload.template.language.code, "en");
     assert.equal(built.payload.template.components.length, 1);
     assert.equal(built.payload.template.components[0].type, "body");
     assert.equal(built.payload.template.components[0].parameters.length, count);
@@ -3390,6 +3418,7 @@ test("template validation supports deliberate v1 rollback and rejects unknown or
   const legacy = buildWhatsAppTemplatePayload(alert, recipient, { WHATSAPP_SERVICE_TEMPLATE_NAME: "house_service_alert_v1" });
   assert.equal(legacy.ok, true);
   assert.equal(legacy.payload.template.name, "house_service_alert_v1");
+  assert.equal(legacy.payload.template.language.code, "en_US");
   assert.equal(legacy.bodyParameterCount, 5);
   assert.deepEqual(validateWhatsAppTemplateParameters("house_service_alert_v3", "service", ["1", "2", "3", "4"]), {
     ok: false,
@@ -3399,6 +3428,64 @@ test("template validation supports deliberate v1 rollback and rejects unknown or
   const unknown = buildWhatsAppTemplatePayload(alert, recipient, { WHATSAPP_SERVICE_TEMPLATE_NAME: "unapproved_service_template" });
   assert.equal(unknown.ok, false);
   assert.equal(unknown.errorCode, "unmapped_template");
+});
+
+test("every deliberate v1 rollback template keeps its approved English US translation", () => {
+  const recipient = { label: "Team", phone: "66810000002" };
+  const base = {
+    id: "alert_legacy_language_reference",
+    room: "4",
+    severity: "attention",
+    summary: "Legacy rollback check",
+    bangkokTime: "28 Aug 2026, 18:00",
+    createdAt: "2026-08-28T11:00:00.000Z"
+  };
+  const cases = [
+    buildWhatsAppTemplatePayload({ ...base, alertType: "stay_support" }, recipient, { WHATSAPP_SERVICE_TEMPLATE_NAME: "house_service_alert_v1" }),
+    buildWhatsAppTemplatePayload({ ...base, alertType: "luggage_storage", luggageRequest: { context: "Departure", bagCount: "2", requestedTime: "1 PM" } }, recipient, { WHATSAPP_LUGGAGE_TEMPLATE_NAME: "house_luggage_alert_v1" }),
+    buildWhatsAppTemplatePayload({ ...base, alertType: "booking_request" }, recipient, { WHATSAPP_BOOKING_TEMPLATE_NAME: "house_booking_alert_v1" }),
+    buildWhatsAppTemplatePayload({ ...base, alertType: "property_emergency", severity: "critical" }, recipient, { WHATSAPP_URGENT_TEMPLATE_NAME: "house_urgent_alert_v1" }),
+    buildWhatsAppTemplatePayload({ ...base, alertType: "verified_spare_key_release" }, recipient, { WHATSAPP_LOST_KEY_TEMPLATE_NAME: "house_lost_key_alert_v1" })
+  ];
+  cases.forEach((built) => {
+    assert.equal(built.ok, true);
+    assert.equal(built.payload.template.language.code, "en_US");
+  });
+});
+
+test("production 132001 regression sends service v3 as generic English with exactly five BODY parameters", () => {
+  const built = buildWhatsAppTemplatePayload({
+    id: "alert_production_132001_regression",
+    room: "11",
+    alertType: "stay_support",
+    severity: "attention",
+    summary: "I need fresh towels.",
+    bangkokTime: "28 Aug 2026, 10:32",
+    createdAt: "2026-08-28T03:32:00.000Z"
+  }, { label: "Team", phone: "66810000002" }, {
+    WHATSAPP_ALERT_TEMPLATE_LANGUAGE: "en_US",
+    WHATSAPP_SERVICE_TEMPLATE_NAME: "house_service_alert_v3"
+  });
+  assert.equal(built.ok, true);
+  assert.equal(built.payload.template.name, "house_service_alert_v3");
+  assert.equal(built.payload.template.language.code, "en");
+  assert.deepEqual(built.payload.template.components.map((component) => component.type), ["body"]);
+  assert.equal(built.payload.template.components[0].parameters.length, 5);
+  assert.deepEqual(built.payload.template.components[0].parameters.map((parameter) => parameter.type), ["text", "text", "text", "text", "text"]);
+  const diagnostic = buildWhatsAppFailureDiagnostic({
+    built,
+    response: new Response(JSON.stringify({}), { status: 404 }),
+    responseBody: { error: {
+      type: "OAuthException",
+      code: 132001,
+      message: "(#132001) Template name does not exist in the translation",
+      error_data: { details: "template name (house_service_alert_v3) does not exist in en_US" }
+    } }
+  });
+  assert.equal(diagnostic.httpStatus, 404);
+  assert.equal(diagnostic.errorCode, "132001");
+  assert.equal(diagnostic.failureKind, "template_or_language");
+  assert.equal(diagnostic.languageCode, "en");
 });
 
 test("all active templates expose their exact value-free production request shape", () => {
@@ -3431,7 +3518,7 @@ test("all active templates expose their exact value-free production request shap
       responseBody: { error: { code: 131008 } }
     });
     assert.equal(diagnostic.templateName, name);
-    assert.equal(diagnostic.languageCode, "en_US");
+    assert.equal(diagnostic.languageCode, "en");
     assert.equal(diagnostic.componentSchema, `body(${count})[${Array.from({ length: count }, (_, index) => `${index + 1}:text`).join(",")}]`);
     assert.doesNotMatch(JSON.stringify(diagnostic), /alert_shape_reference|Room 11|fresh towels|66810000002/);
   }
@@ -3475,7 +3562,7 @@ test("sanitized Meta diagnostics retain the real provider failure without parame
     assert.equal(store.whatsappDiagnostics.length, 1);
     const diagnostic = store.whatsappDiagnostics[0];
     assert.equal(diagnostic.templateName, "house_service_alert_v3");
-    assert.equal(diagnostic.languageCode, "en_US");
+    assert.equal(diagnostic.languageCode, "en");
     assert.equal(diagnostic.componentSchema, "body(5)[1:text,2:text,3:text,4:text,5:text]");
     assert.equal(diagnostic.httpStatus, 400);
     assert.equal(diagnostic.errorCode, "132000");

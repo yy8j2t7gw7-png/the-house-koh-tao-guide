@@ -2,7 +2,7 @@
 
 ## Purpose
 
-v5.11.16 provides a protected server-side staff-alert channel through the official Meta WhatsApp Business Platform. Guests continue to use the website Concierge. Recipient telephone numbers, access tokens and app secrets stay in encrypted Cloudflare secrets and never appear in public files, Git or release archives.
+v5.11.17 provides a protected server-side staff-alert channel through the official Meta WhatsApp Business Platform. Guests continue to use the website Concierge. Recipient telephone numbers, access tokens and app secrets stay in encrypted Cloudflare secrets and never appear in public files, Git or release archives.
 
 Routing is role based:
 
@@ -35,24 +35,24 @@ Medical, personal-safety and critical-property classifications never create an a
 
 ## Production Meta templates
 
-These English (`en_US`) Utility templates are Active in WhatsApp Manager and already mapped in production Cloudflare. The Worker validates every selected name against a fixed purpose and exact body-parameter count before it sends anything. Static headers require no parameters.
+The current Utility templates are Active in WhatsApp Manager as generic English (`en`). Meta treats `en` and `en_US` as separate translations. The Worker therefore resolves the language from the exact approved template schema instead of applying one global locale. It also validates every selected name against a fixed purpose and exact BODY-parameter count before sending. Static headers require no parameters.
 
-| Purpose | Active template | Body parameters in exact order |
-| --- | --- | --- |
-| Routine service | `house_service_alert_v3` | reference, room, human-readable request, Bangkok date/time, details |
-| Luggage | `house_luggage_alert_v2` | reference, room, arrival/departure, bag count, requested time, protected guest notes |
-| Booking | `house_booking_alert_v2` | reference, room, service/activity, normalized date/time, guest count, protected guest notes |
-| Urgent property | `house_urgent_alert_v2` | reference, room, incident type, Bangkok date/time, sanitized guest summary |
-| Verified lost key | `house_lost_key_alert_v3` | reference, room, Bangkok date/time |
-| Staff status | `house_alert_status_v1` | reference, room, human-readable request, safe actor label, `ACKNOWLEDGED`/`RESOLVED` |
+| Purpose | Active template | Language | BODY parameters in exact order |
+| --- | --- | --- | --- |
+| Routine service | `house_service_alert_v3` | `en` | reference, room, human-readable request, Bangkok date/time, details |
+| Luggage | `house_luggage_alert_v2` | `en` | reference, room, arrival/departure, bag count, requested time, protected guest notes |
+| Booking | `house_booking_alert_v2` | `en` | reference, room, service/activity, normalized date/time, guest count, protected guest notes |
+| Urgent property | `house_urgent_alert_v2` | `en` | reference, room, incident type, Bangkok date/time, sanitized guest summary |
+| Verified lost key | `house_lost_key_alert_v3` | `en` | reference, room, Bangkok date/time |
+| Staff status | `house_alert_status_v1` | `en` | reference, room, human-readable request, safe actor label, `ACKNOWLEDGED`/`RESOLVED` |
 
 Luggage and booking templates have no dedicated reply-number variable. A validated international contact is therefore appended only to the transient protected notes parameter as `Guest reply: …`; it does not enter ordinary chat, alert, dashboard or log storage. The lost-key template is constructed only after the existing verified-stay, after-hours and explicit-fee gates and never receives the key-box code.
 
-The previous five v1 names remain mapped in code solely as a deliberate rollback capability. Do not switch production back without a separately authorized rollback decision. An unknown name, wrong purpose or wrong parameter count fails closed before the Graph API call.
+The previous five v1 names remain mapped in code solely as a deliberate rollback capability. Those older templates retain their approved English (US) translation (`en_US`). Do not switch production back without a separately authorized rollback decision. An unknown name, wrong purpose or wrong parameter count fails closed before the Graph API call.
 
 ## Failed-delivery diagnostics
 
-v5.11.15 kept only a short error code when Meta rejected a submission, so its production response body cannot be reconstructed later. v5.11.16 leaves the outbound payload unchanged and adds safe evidence capture at the common Graph API submission boundary.
+v5.11.15 kept only a short error code when Meta rejected a submission, so its production response body cannot be reconstructed later. v5.11.16 added safe evidence capture at the common Graph API submission boundary. That evidence confirmed HTTP 404 / Meta `132001`: `house_service_alert_v3` did not have an `en_US` translation. v5.11.17 corrects only the template-aware language selection and retains the diagnostics.
 
 For every failed initial, escalation or status submission, the Worker records for 30 days:
 
@@ -62,7 +62,7 @@ For every failed initial, escalation or status submission, the Worker records fo
 - Meta error code, subcode, type, sanitized message/details and trace ID when supplied;
 - a broad failure category for triage.
 
-The protected owner console displays these records under **WhatsApp delivery diagnostics**. Older v5.11.15 records display their retained numeric error code with a warning that full provider details were not captured by that release. Diagnostics never store recipient numbers, guest contacts, parameter values, tokens, passport data, stay/confirmation codes or key-box codes. Do not alter template names, parameters or Meta configuration until this evidence identifies the actual provider rejection.
+The protected owner console displays these records under **WhatsApp delivery diagnostics**. Older v5.11.15 records display their retained numeric error code with a warning that full provider details were not captured by that release. Diagnostics never store recipient numbers, guest contacts, parameter values, tokens, passport data, stay/confirmation codes or key-box codes.
 
 `house_alert_status_v1` is non-recursive. An authorized `RECEIVED`, `ACK` or `RESOLVE` reply updates the original alert and sends one status message only to the other recipients assigned to that alert. The actor and unrelated roles are excluded; duplicate webhook delivery is suppressed by the original alert state. Status messages create no alert and no escalation.
 
@@ -136,6 +136,8 @@ WHATSAPP_ALERT_TEMPLATE_LANGUAGE=en_US
 WHATSAPP_ALERT_ESCALATION_MINUTES=10
 ```
 
+`WHATSAPP_ALERT_TEMPLATE_LANGUAGE` remains present for compatibility and does not need a Cloudflare change for v5.11.17. Every mapped production or rollback template now uses the language attached to its immutable schema entry.
+
 Review Meta's supported Graph API versions before changing the version. The Worker checks once per minute for overdue escalations.
 
 ## Production verification
@@ -144,7 +146,7 @@ Review Meta's supported Graph API versions before changing the version. The Work
 2. Confirm the existing protected secrets and recipient groups remain present, then deploy.
 3. Confirm `/api/concierge/status` reports `whatsappAlertsConfigured: true` and the owner console says **WhatsApp connected**.
 4. Test with non-sensitive requests: room cleaning and luggage arrangement → Su plus both owners; diving booking → Fah plus both owners; confirmed serious leak → Fah plus both owners without Su; verified lost-key release → Su plus both owners.
-5. Confirm every delivery uses the expected active template and exact safe fields listed in the table.
+5. Confirm every current delivery uses language `en`, the expected active template and the exact safe fields listed in the table. Meta `132001` must not recur.
 6. Reply `RECEIVED` or `ACK` with an exact reference and confirm the other assigned recipients—but not the actor—receive one ACKNOWLEDGED status. Confirm escalation stops. Then test `RESOLVE` and one RESOLVED update per other assigned recipient.
 7. Test one unacknowledged urgent event and confirm escalation after approximately 10 minutes.
 8. Only after the protected channel passes should a temporary `SPARE_KEY_CODES` value be tested. Rotate it immediately afterward.

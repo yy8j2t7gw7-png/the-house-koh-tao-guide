@@ -2,7 +2,7 @@
   if (window.HOUSE_I18N) return;
 
   const STORAGE_KEY = "houseGuideLanguage";
-  const CACHE_PREFIX = "houseGuideTranslations:v5.11.16:";
+  const CACHE_PREFIX = "houseGuideTranslations:v5.11.17:";
   const MAX_REQUEST_RETRIES = 2;
   const languages = Object.freeze([
     { code: "en", label: "English" },
@@ -687,12 +687,21 @@
     } else {
       footer.classList.add("site-legal-footer");
     }
-    if (footer.querySelector(".legal-footer-links")) return;
-    const navigation = document.createElement("nav");
-    navigation.className = "legal-footer-links";
-    navigation.setAttribute("aria-label", "Legal information");
-    navigation.innerHTML = '<a href="/privacy">Privacy</a><a href="/data-deletion">Data Protection</a><a href="/terms">Terms</a>';
-    footer.appendChild(navigation);
+    if (!footer.querySelector(".legal-footer-links")) {
+      const navigation = document.createElement("nav");
+      navigation.className = "legal-footer-links";
+      navigation.setAttribute("aria-label", "Legal information");
+      navigation.innerHTML = '<a href="/privacy">Privacy</a><a href="/data-deletion">Data Protection</a><a href="/terms">Terms</a>';
+      footer.appendChild(navigation);
+    }
+    if (!footer.querySelector('a[href="/concierge-admin"]')) {
+      const adminLink = document.createElement("a");
+      adminLink.className = "admin-footer-link";
+      adminLink.href = "/concierge-admin";
+      adminLink.textContent = "Admin Login";
+      adminLink.dataset.i18nSkip = "true";
+      footer.appendChild(adminLink);
+    }
   }
 
   function start() {

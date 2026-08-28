@@ -1,4 +1,4 @@
-# Guest Guide Platform with AI Concierge — The House v5.11.26
+# Guest Guide Platform with AI Concierge — The House v5.11.27
 
 The House – Koh Tao guest guide is a production-oriented, mobile-first digital guest guide and concierge platform. It combines property information, curated island guidance, structured place and activity data, and centralized contact and booking routes.
 
@@ -17,6 +17,16 @@ The House – Koh Tao guest guide is a production-oriented, mobile-first digital
 - Model-powered, room-aware AI Concierge with controlled learning
 
 The Activities module contains 49 structured profiles covering diving, freediving, snorkelling, boat trips, beach experiences, kayaking, paddleboarding, hiking, viewpoints, climbing, yoga, Muay Thai, massage, cooking, wildlife, photography, night activities and rainy-day options.
+
+## v5.11.27 release focus
+
+- Introduces a restrained, shared House visual system with consistent semantic colors, typography, spacing, content widths, cards, buttons, focus states and reduced-motion behavior.
+- Reduces the guest-page hero by roughly 25–35% across breakpoints, brings useful room content higher above the fold and keeps large desktop layouts intentionally constrained.
+- Reorganizes registration and passport guidance into compact, scannable facts without changing TM30, foreign-guest, Thai-exemption, secure-upload or in-person-verification requirements.
+- Polishes the AI Concierge for clearer message hierarchy, readable long answers, touch-friendly two-column quick actions, wrapping course choices and a stronger mobile sheet layout without changing its workflows.
+- Simplifies the lost-key consent presentation to one visible `500 THB` amount while retaining explicit request-bound acceptance, notification-before-display, protected code isolation and the rotation lock.
+- Makes owner operations denser and clearer with lifecycle labels, compact delivery diagnostics, quiet resolved states, private-photo status and stacked narrow-screen table rows.
+- Adds three responsive visual-contract tests; the complete 166-test suite passes with zero failures. Explore remains disabled and `WHATSAPP_STAFF_ACTIONS_ENABLED=false` remains required.
 
 ## v5.11.26 release focus
 

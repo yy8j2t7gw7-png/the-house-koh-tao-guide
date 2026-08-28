@@ -12,11 +12,11 @@
 <link rel="stylesheet" href="/stay-access.css">
 <link rel="stylesheet" href="/ai-concierge.css">
 <style>
-body{margin:0;font-family:Arial,Helvetica,sans-serif;color:#26322f;background:#fbfcfb;line-height:1.55}
-.intro{margin:38px 0 22px}.intro h1{font-size:clamp(34px,7vw,56px);line-height:1.05;color:#173d35;margin:0 0 12px}.intro p{max-width:720px;color:#68736f;font-size:18px}.choice-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:18px}.choice{border:1px solid #dbe5e0;border-radius:16px;padding:18px;background:#fff}.choice h3{margin:0 0 8px;color:#173d35}.choice p{margin:0 0 14px}.choice label{display:block;font-weight:700;margin-bottom:6px}.choice input[type=number]{width:100%;padding:13px;border:1px solid #a8beb6;border-radius:10px;font:inherit;margin-bottom:12px}.thai-exemption-th{margin:-4px 0 10px!important;color:#1f5b4f;font-weight:700}.thai-button-label{display:block;margin-top:2px;font-size:.86em;font-weight:600}html[lang="th"] .thai-exemption-th,html[lang="th"] .thai-button-label{display:none}.important{padding:13px 15px;border-left:5px solid #1f5b4f;background:#eaf4f0;border-radius:10px}.public-help{margin-top:24px;padding:20px;border:1px solid #dbe5e0;border-radius:18px;background:#fff}.public-help h2{margin:0 0 8px;color:#173d35}.verified-lost-key-trigger{display:block;text-decoration:none;color:inherit}.footer{display:flex;flex-direction:column;align-items:center;gap:10px;margin-top:42px;padding-top:18px;border-top:1px solid #dbe5e0;color:#68736f;font-size:13px}.admin-login-link{display:inline-flex;align-items:center;justify-content:center;min-height:34px;padding:6px 12px;border:1px solid #cbdad4;border-radius:999px;background:#fff;color:#51645d;text-decoration:none;font-size:12px;font-weight:700}.admin-login-link:hover{border-color:#9db8b0;color:#173d35;background:#f4f8f6}.admin-login-link:focus-visible{outline:3px solid rgba(31,91,79,.2);outline-offset:2px}@media(max-width:650px){.choice-grid{grid-template-columns:1fr}}
+body{margin:0;color:var(--text);background:linear-gradient(180deg,#fbfaf7,#f7f3eb);line-height:1.58}
+.intro{margin:24px 0 16px}.intro h1{margin:0 0 8px;color:var(--ink);font-size:clamp(31px,5.8vw,48px);line-height:1.06;letter-spacing:-.025em}.intro p{max-width:680px;margin:0;color:var(--muted);font-size:18px}.choice-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:16px}.choice{min-width:0;padding:17px;border:1px solid var(--line);border-radius:14px;background:#fff}.choice h3{margin:0 0 7px;color:var(--ink);font-size:19px}.choice p{margin:0 0 13px;color:var(--muted)}.choice label{display:block;margin-bottom:6px;color:var(--ink);font-weight:750}.choice input[type=number]{width:100%;min-height:48px;padding:12px;border:1px solid #a8beb6;border-radius:10px;background:#fff;font:inherit;margin-bottom:12px}.thai-exemption-th{margin:-4px 0 10px!important;color:var(--green);font-weight:700}.thai-button-label{display:block;margin-top:2px;font-size:.86em;font-weight:600}html[lang="th"] .thai-exemption-th,html[lang="th"] .thai-button-label{display:none}.important{padding:13px 15px;border:1px solid #c5dbd2;border-left:4px solid var(--green);background:var(--mint);border-radius:10px}.public-help{margin-top:20px;padding:19px;border:1px solid var(--line);border-radius:16px;background:#fff;box-shadow:var(--shadow)}.public-help h2{margin:0 0 7px;color:var(--ink)}.public-help p{margin:0}.verified-lost-key-trigger{display:block;text-decoration:none;color:inherit}.footer{display:flex;flex-direction:column;align-items:center;gap:10px;margin-top:34px;padding-top:18px;border-top:1px solid var(--line);color:var(--muted);font-size:13px}.admin-login-link{display:inline-flex;align-items:center;justify-content:center;min-height:36px;padding:6px 12px;border:1px solid var(--line-strong);border-radius:999px;background:#fff;color:#51645d;text-decoration:none;font-size:12px;font-weight:700}.admin-login-link:hover{border-color:#9db8b0;color:var(--ink);background:#f4f8f6}.admin-login-link:focus-visible{outline:3px solid rgba(47,111,95,.25);outline-offset:2px}@media(max-width:650px){.intro{margin-top:18px}.choice-grid{grid-template-columns:1fr}.choice{padding:15px}}
 </style>
 </head>
-<body data-guest-access="pending">
+<body class="guest-access-page" data-guest-access="pending">
 <div class="shell">
 <header class="topbar">
   <a class="brand" href="/"><img src="/logo.svg" alt="The House Koh Tao"></a>
@@ -103,11 +103,11 @@ body{margin:0;font-family:Arial,Helvetica,sans-serif;color:#26322f;background:#f
   <div class="list compact-list">
     <div class="rule"><strong>🔑 Key box</strong>Next to your room door</div>
   </div>
-  <p>If your key has been lost, a 500 THB replacement fee applies. Confirm below if you would like to continue.</p>
+  <p class="spare-key-fee">If your key has been lost, a <strong>500 THB replacement fee</strong> applies.</p>
   <p class="stay-access-status" id="spareKeyStatus" role="status" aria-live="assertive" hidden></p>
   <form class="spare-key-form" id="spareKeyForm" hidden>
-    <label class="fee-confirmation"><input id="lostKeyFeeAccepted" type="checkbox" required> <span>I understand the 500 THB lost-key replacement fee and want to continue.</span></label>
-    <div class="stay-access-actions"><button class="btn" type="submit">Accept 500 THB fee &amp; request spare key</button><button class="btn secondary" id="cancelLostKeyRequest" type="button">Cancel</button></div>
+    <label class="fee-confirmation"><input id="lostKeyFeeAccepted" type="checkbox" required> <span>I understand and want to continue.</span></label>
+    <div class="stay-access-actions"><button class="btn" type="submit">Request spare key</button><button class="btn secondary" id="cancelLostKeyRequest" type="button">Cancel</button></div>
   </form>
   <div class="stay-access-actions" id="spareKeyViewAction" hidden>
     <button class="btn" id="viewSpareKey" type="button">View spare key</button>

@@ -2016,8 +2016,9 @@ test("main and room welcome pages make required registration prominent", async (
   assert.match(room, /Stay confirmation code/);
   assert.match(room, /Upload passport securely/);
   assert.match(room, /All overnight guests are Thai nationals/);
-  assert.match(room, /I understand the 500 THB lost-key replacement fee and want to continue/);
-  assert.match(room, />Accept 500 THB fee &amp; request spare key<\/button>/);
+  assert.match(room, /I understand and want to continue/);
+  assert.match(room, />Request spare key<\/button>/);
+  assert.equal((room.match(/500 THB/g) || []).length, 1);
   assert.match(room, /id="viewSpareKey"[^>]*>View spare key<\/button>/);
   assert.doesNotMatch(room, /lostKeyConfirmationCode/);
   assert.match(room, /id="openSpareKeyAccess"/);
@@ -2134,7 +2135,9 @@ test("rendered Concierge spare-key CTA opens the protected fee flow", async () =
   assert.match(registrationEntry, /if \(!data\.accessGranted && pendingPage\) \{[\s\S]*renderSpareKey\(data\)/);
   for (const page of [room, roomAccess]) {
     assert.match(page, /id="lostKeyFeeAccepted"[^>]*required/);
-    assert.match(page, />Accept 500 THB fee &amp; request spare key<\/button>/);
+    assert.match(page, /I understand and want to continue/);
+    assert.match(page, />Request spare key<\/button>/);
+    assert.equal((page.match(/500 THB/g) || []).length, 1);
     assert.match(page, /id="spareKeyViewAction" hidden/);
     assert.match(page, /id="viewSpareKey"[^>]*>View spare key<\/button>/);
     assert.match(page, /id="spareKeyContactHelp" hidden/);
@@ -2173,7 +2176,7 @@ test("owner dashboard major sections are independently collapsible, persistent a
   assert.match(html, /id="collapseAdminSections"[^>]*>Collapse all<\/button>/);
   assert.match(html, /id="keyRotationActivity"/);
 
-  assert.match(script, /houseConciergeAdminSections:v5\.11\.26/);
+  assert.match(script, /houseConciergeAdminSections:v5\.11\.27/);
   assert.match(script, /adminSections\.map\(\(section\) => \[section\.dataset\.adminSection, section\.open\]\)/);
   assert.match(script, /typeof saved\[id\] === "boolean"/);
   assert.match(script, /section\.addEventListener\("toggle"/);
@@ -2226,7 +2229,7 @@ test("guest localization supports seven languages and keeps the owner dashboard 
   assert.doesNotMatch(admin, /src="\/i18n\.js"/);
   assert.match(runtime, /exploreContentDeferred/);
   assert.match(runtime, /element\.closest\("\.section,\.footer"\)/);
-  assert.match(runtime, /houseGuideTranslations:v5\.11\.26:/);
+  assert.match(runtime, /houseGuideTranslations:v5\.11\.27:/);
   assert.match(runtime, /MAX_REQUEST_RETRIES = 2/);
   assert.match(runtime, /let flushRunning = false/);
 });
@@ -2266,14 +2269,14 @@ test("critical emergency and registration wording is reviewed in every guest lan
     "Emergency help remains available without verification.",
     "24-hour spare-key help",
     "Secure spare-key access is available 24 hours a day during your stay.",
-    "If your key has been lost, a 500 THB replacement fee applies. Confirm below if you would like to continue.",
+    "If your key has been lost, a 500 THB replacement fee applies.",
     "Your spare key is ready.",
     "Use the code below to open the key box next to your room door.",
     "Key-box code",
     "Please take the spare key and close the key box again.",
     "If you need any further help, contact The House Concierge.",
-    "I understand the 500 THB lost-key replacement fee and want to continue.",
-    "Accept 500 THB fee & request spare key",
+    "I understand and want to continue.",
+    "Request spare key",
     "View spare key",
     "Thank you. Your request has been sent to The House team. You can now securely view the spare-key information below.",
     "This lost-key request has expired. Refresh the page and explicitly accept the 500 THB fee again.",
@@ -4349,8 +4352,8 @@ test("agency-specific beginner and continuing courses pass the structured diving
   }
 });
 
-test("the bundled v5.11.26 catalog preserves current PADI, SSI and RAID pathways", () => {
-  assert.equal(divingCourses.updatedForRelease, "5.11.26");
+test("the bundled v5.11.27 catalog preserves current PADI, SSI and RAID pathways", () => {
+  assert.equal(divingCourses.updatedForRelease, "5.11.27");
   assert.deepEqual(divingCourses.houseRecommendation, {
     agency: "RAID",
     reason: "focus on dive safety and buoyancy control",
@@ -7900,10 +7903,12 @@ test("owner booking alerts expose sanitized alert-bound Meta diagnostics with re
     const adminScript = await readFile(new URL("../public/concierge-admin.js", import.meta.url), "utf8");
     assert.match(adminScript, /diagnostics\.find\(\(diagnostic\) => diagnostic\.alertId === item\.id\)/);
     assert.match(adminScript, /WhatsApp delivery failed/);
-    assert.match(adminScript, /Template: \$\{latestDiagnostic\.templateName\}/);
-    assert.match(adminScript, /Language: \$\{latestDiagnostic\.languageCode\}/);
-    assert.match(adminScript, /Attempted: \$\{item\.attempted \|\| 0\}/);
-    assert.match(adminScript, /Provider: Meta/);
+    assert.match(adminScript, /label: "Template", value: latestDiagnostic\.templateName/);
+    assert.match(adminScript, /label: "Language", value: latestDiagnostic\.languageCode/);
+    assert.match(adminScript, /label: "Attempted", value: item\.attempted \|\| 0/);
+    assert.match(adminScript, /label: "Provider", value: "Meta"/);
+    assert.match(adminScript, /concierge-admin-diagnostic-grid/);
+    assert.match(adminScript, /Provider message/);
   } finally {
     globalThis.fetch = originalFetch;
     console.error = originalError;
@@ -8163,15 +8168,85 @@ test("unauthorized or invalid WhatsApp status commands cannot change alerts or s
   }
 });
 
-test("desktop Concierge expands the conversation while mobile keeps its sheet layout", async () => {
+test("desktop Concierge expands the conversation while mobile keeps its polished sheet layout", async () => {
   const [styles, script] = await Promise.all([
     readFile(new URL("../public/ai-concierge.css", import.meta.url), "utf8"),
     readFile(new URL("../public/ai-concierge.js", import.meta.url), "utf8")
   ]);
-  assert.match(styles, /height:min\(85vh,860px\)/);
+  assert.match(styles, /height:min\(84dvh,800px\)/);
   assert.match(styles, /\.ai-concierge-panel\.has-conversation \.ai-concierge-messages[\s\S]*flex:1[\s\S]*max-height:none/);
   assert.match(styles, /\.ai-concierge-panel\.has-conversation \.ai-concierge-context\{display:none\}/);
-  assert.match(styles, /@media\(max-width:640px\)[\s\S]*height:auto[\s\S]*max-height:min\(84vh,760px\)/);
+  assert.match(styles, /@media\(max-width:640px\)[\s\S]*height:min\(88dvh,760px\)[\s\S]*max-height:88dvh/);
+  assert.match(styles, /\.ai-concierge-panel\.has-conversation \.ai-concierge-actions\{grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
+  assert.match(styles, /\.ai-concierge-message-action\{[^}]*white-space:normal[^}]*overflow-wrap:anywhere/);
+  assert.match(styles, /\.ai-concierge-input\{[^}]*font-size:16px/);
   assert.match(script, /panel\.classList\.add\("has-conversation"\)/);
   assert.match(styles, /\.ai-concierge-panel\.has-conversation \.ai-concierge-chat[\s\S]*flex:1/);
+});
+
+test("v5.11.27 shared visual system constrains width, hero height, motion and overflow", async () => {
+  const [styles, room, guideApp] = await Promise.all([
+    readFile(new URL("../public/design-system.css", import.meta.url), "utf8"),
+    readFile(new URL("../public/room.html", import.meta.url), "utf8"),
+    readFile(new URL("../public/guide-app.js", import.meta.url), "utf8")
+  ]);
+  assert.match(styles, /--content-width:1120px/);
+  assert.match(styles, /html\{[^}]*overflow-x:hidden/);
+  assert.match(styles, /body\{[^}]*overflow-x:hidden/);
+  assert.match(styles, /\.shell\{[\s\S]*width:min\(var\(--content-width\),calc\(100% - 32px\)\)/);
+  assert.match(styles, /\.hero\{[\s\S]*min-height:292px/);
+  assert.match(styles, /@media\(max-width:760px\)[\s\S]*\.hero\{min-height:246px/);
+  assert.match(styles, /@media\(max-width:340px\)[\s\S]*\.hero\{min-height:232px/);
+  assert.match(styles, /:where\(a,button,input,select,textarea,summary,\[tabindex\]\):focus-visible/);
+  assert.match(styles, /\.btn:disabled,\.btn\[aria-disabled="true"\]/);
+  assert.match(styles, /@media\(prefers-reduced-motion:reduce\)/);
+  assert.doesNotMatch(room, /style="(?:min-)?height:360px"/);
+  assert.match(room, /<section class="hero" aria-label="Room location overview">/);
+  assert.match(guideApp, /setAttribute\("aria-current", "page"\)/);
+});
+
+test("v5.11.27 guest visual contracts keep registration and lost-key consent scan-friendly", async () => {
+  const [home, passport, room, roomAccess, stayStyles, passportStyles] = await Promise.all([
+    readFile(new URL("../public/index.html", import.meta.url), "utf8"),
+    readFile(new URL("../public/passport-upload.html", import.meta.url), "utf8"),
+    readFile(new URL("../public/room.html", import.meta.url), "utf8"),
+    readFile(new URL("../public/room-access.html", import.meta.url), "utf8"),
+    readFile(new URL("../public/stay-access.css", import.meta.url), "utf8"),
+    readFile(new URL("../public/passport-upload.css", import.meta.url), "utf8")
+  ]);
+  assert.equal((home.match(/class="registration-fact"/g) || []).length, 3);
+  assert.match(home, /Every foreign guest/);
+  assert.match(home, /Thai nationals are exempt/);
+  assert.match(home, /Private and secure/);
+  assert.equal((passport.match(/class="passport-fact"/g) || []).length, 3);
+  for (const page of [room, roomAccess]) {
+    assert.equal((page.match(/500 THB/g) || []).length, 1);
+    assert.match(page, /id="lostKeyFeeAccepted"[^>]*required/);
+    assert.match(page, /I understand and want to continue/);
+    assert.match(page, />Request spare key<\/button>/);
+    assert.match(page, /id="spareKeyViewAction" hidden/);
+  }
+  assert.match(stayStyles, /\.fee-confirmation\{[^}]*min-height:52px/);
+  assert.match(stayStyles, /#spareKeyViewAction\{[^}]*border-top/);
+  assert.match(stayStyles, /@media\(max-width:650px\)[\s\S]*\.stay-access-actions\{display:grid/);
+  assert.match(passportStyles, /\.passport-facts\{[^}]*repeat\(3,minmax\(0,1fr\)\)/);
+  assert.match(passportStyles, /@media\(max-width:650px\)[\s\S]*\.passport-facts,\.passport-privacy ul,\.passport-session,\.registration-methods\{grid-template-columns:1fr\}/);
+});
+
+test("v5.11.27 owner operations styles distinguish lifecycle, diagnostics and narrow tables", async () => {
+  const [styles, script] = await Promise.all([
+    readFile(new URL("../public/concierge-admin.css", import.meta.url), "utf8"),
+    readFile(new URL("../public/concierge-admin.js", import.meta.url), "utf8")
+  ]);
+  assert.match(styles, /\.concierge-admin-priority-label\.is-critical,\.concierge-admin-priority-label\.is-urgent/);
+  assert.match(styles, /\.concierge-admin-pill\.is-status-acknowledged/);
+  assert.match(styles, /\.concierge-admin-alert\.is-resolved/);
+  assert.match(styles, /\.concierge-admin-diagnostic-grid\{[^}]*repeat\(4,minmax\(0,1fr\)\)/);
+  assert.match(styles, /\.concierge-admin-dialog\{[^}]*width:min\(470px,calc\(100% - 24px\)\)/);
+  assert.match(styles, /@media\(max-width:620px\)[\s\S]*td::before\{content:attr\(data-label\)/);
+  assert.match(script, /function diagnosticGrid\(fields\)/);
+  assert.match(script, /is-status-\$\{status\}/);
+  assert.match(script, /status === "resolved" \? " is-resolved"/);
+  assert.match(script, /time\.dataset\.label = "Time"/);
+  assert.match(script, /result\.dataset\.label = "Result"/);
 });

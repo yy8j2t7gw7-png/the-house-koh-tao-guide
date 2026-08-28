@@ -1,6 +1,6 @@
 # Product Roadmap
 
-Baseline: v5.11.26
+Baseline: v5.11.27
 
 ## Completed
 
@@ -24,6 +24,8 @@ Baseline: v5.11.26
 - [x] One authoritative mixed-diver booking with exact participant-subgroup allocation, one contact and one Fah-plus-owner alert
 - [x] Maintenance Resolve/Remove lifecycle with deliberate confirmation and private-photo object cleanup
 - [x] Independent WhatsApp diagnostic Dismiss/Clear visibility controls with minimal protected audit evidence
+- [x] Shared responsive House visual system across guest pages, Concierge, secure access and owner operations
+- [x] Compact room heroes, scannable registration/passport requirements and single-amount lost-key consent presentation
 - [x] Bamboo Beach Bar website follow-ups return its official Facebook and Instagram actions
 - [x] Concierge loading state uses a quiet animated-dot indicator
 - [x] Concierge startup and concierge-first House-support contact routing protected by regression tests
@@ -172,8 +174,9 @@ Guests may continue using ordinary WhatsApp handoffs. Automated internal alerts 
 - [x] Implement v5.11.25 as a narrow common-boundary Meta BODY whitespace sanitizer without changing template schemas, routes, recipients or configuration.
 - [x] Deploy v5.11.25 and confirm the common Meta BODY sanitizer restores accepted production booking delivery.
 - [x] Implement v5.11.26 as the diving course/mixed-party and owner-cleanup functional release without beginning public visual redesign.
-- [ ] Deploy v5.11.26 and run the mixed-diving and owner-cleanup smoke checks in `DEVELOPMENT_HANDOFF_v5.11.26.md`.
-- [ ] Begin v5.11.27 full public visual polish only under a separate explicit scope.
+- [x] Deploy v5.11.26 and pass its mixed-diving and owner-cleanup production smoke checks.
+- [x] Implement and package v5.11.27 full public visual polish without changing business logic.
+- [ ] Deploy v5.11.27 and run the six-step visual smoke check in `DEVELOPMENT_HANDOFF_v5.11.27.md`.
 - [ ] Submit and obtain Meta approval for the five optional quick-action templates documented in `META_STAFF_QUICK_ACTIONS_v5.11.20.md`; never map the buttonless service v1 template and enable only after every intended template is Active.
 - [x] Add `STAY_TOKEN_PEPPER` and `RESERVATION_SYNC_TOKEN` Worker secrets
 - [x] Add protected `SPARE_KEY_CODES` Worker secret before activating automatic spare-key release

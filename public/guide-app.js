@@ -24,6 +24,22 @@
     });
 })();
 
+(function markCurrentNavigationItem() {
+  const pathname = window.location.pathname.replace(/\/+$/, "") || "/";
+  const currentHref = /^\/room\/(?:1|2|3|4|5|6|8|9|10|11)$/.test(pathname)
+    ? "/rooms.html"
+    : pathname.endsWith(".html") ? pathname
+    : pathname === "/rooms" ? "/rooms.html"
+      : pathname === "/house" ? "/house.html"
+        : pathname === "/practical" ? "/practical.html"
+          : pathname === "/emergency" ? "/emergency.html"
+            : pathname === "/checkout" ? "/checkout.html"
+              : `${pathname}.html`;
+  document.querySelectorAll(".topbar .nav a").forEach((link) => {
+    if (link.getAttribute("href") === currentHref) link.setAttribute("aria-current", "page");
+  });
+})();
+
 (function () {
   const cfg = window.HOUSE_GUIDE;
   if (!cfg) return;

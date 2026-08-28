@@ -2,6 +2,27 @@
 
 All notable changes to The House – Koh Tao guest guide are recorded here.
 
+## v5.11.27 — Full Visual Polish
+
+### Shared guest visual system
+
+- Establishes one restrained House design system for semantic color, typography, content width, spacing, cards, buttons, focus treatment and reduced motion while preserving the cream, House-green and existing brand identity.
+- Reduces room and House hero height by approximately 25–35% depending on breakpoint, constrains readable text measure and prevents horizontal page overflow at guest-phone widths.
+- Polishes the established navigation and language controls and marks the current page accessibly without changing the navigation structure or exposing Explore.
+- Reorganizes registration and passport requirements into concise scan-friendly facts while preserving every foreign-guest, Thai-exemption, secure-handling and in-person-verification rule.
+
+### Concierge, lost key and owner operations
+
+- Improves the existing Concierge panel with clearer message hierarchy, readable long answers, two-column quick actions, wrapping long course choices, aligned input controls and a touch-friendly mobile sheet. The animated-dot-only thinking state remains unchanged.
+- Shows the `500 THB` replacement fee once in the lost-key consent context, followed by an explicit understanding checkbox and **Request spare key** action. Every active-stay, request-binding, notification, protected-display and rotation-lock gate remains intact.
+- Gives owner sections, alert cards, maintenance states and delivery diagnostics a compact operational hierarchy with labels in addition to color, structured provider fields and stacked narrow-screen tables.
+
+### Regression and scope
+
+- Adds three practical visual-contract tests for shared responsive constraints, registration/lost-key scanability and owner lifecycle/diagnostic presentation, expanding the complete suite from 163 to 166 passing tests.
+- Changes no booking, diving, alert, cleaning, property, passport, Airbnb, lost-key authorization, maintenance or diagnostic lifecycle behavior. Production Meta mappings, recipients, secrets and `WHATSAPP_STAFF_ACTIONS_ENABLED=false` remain unchanged.
+- Keeps the v5.11.26 RAID safety/buoyancy-control recommendation and preferred Roctopus guidance intact.
+
 ## v5.11.26 — Diving Course Model, Mixed Parties & Owner Cleanup
 
 ### Data-driven diving collection

@@ -33,7 +33,7 @@
   const adminConfirmMessage = document.getElementById("adminConfirmMessage");
   const adminConfirmSubmit = document.getElementById("adminConfirmSubmit");
   const adminSections = [...document.querySelectorAll("details[data-admin-section]")];
-  const sectionStateKey = "houseConciergeAdminSections:v5.11.26";
+  const sectionStateKey = "houseConciergeAdminSections:v5.11.27";
   let token = "";
 
   function savedAdminSectionState() {
@@ -143,6 +143,16 @@
     if (className) node.className = className;
     if (text !== undefined) node.textContent = text;
     return node;
+  }
+
+  function diagnosticGrid(fields) {
+    const grid = element("dl", "concierge-admin-diagnostic-grid");
+    fields.filter((field) => field.value !== "" && field.value !== null && field.value !== undefined).forEach((field) => {
+      const item = element("div", "concierge-admin-diagnostic-field");
+      item.append(element("dt", "", field.label), element("dd", "", String(field.value)));
+      grid.appendChild(item);
+    });
+    return grid;
   }
 
   function confirmAdminAction({ title, message, confirmLabel = "Confirm", danger = false }) {
@@ -276,14 +286,20 @@
       return;
     }
     items.forEach((item) => {
-      const card = element("article", `concierge-admin-alert is-${item.severity || "attention"}`);
+      const severity = item.severity || "attention";
+      const status = item.status || "open";
+      const card = element("article", `concierge-admin-alert is-${severity} is-status-${status}`);
       card.dataset.alertId = item.id;
       const head = element("div", "concierge-admin-card-head");
-      const title = element("h3", "", `${String(item.severity || "attention").toUpperCase()} · ${String(item.alertType || "guest request").replaceAll("_", " ")}`);
+      const title = element("div", "concierge-admin-card-title");
+      title.append(
+        element("span", `concierge-admin-priority-label is-${severity}`, String(severity).toUpperCase()),
+        element("h3", "", String(item.alertType || "guest request").replaceAll("_", " "))
+      );
       const meta = element("div", "concierge-admin-card-meta");
       meta.append(
         element("span", "concierge-admin-pill", item.room ? `Room ${item.room} · ${item.roomVerified ? "stay verified" : "guest-selected"}` : "Room not selected"),
-        element("span", "concierge-admin-pill", item.status),
+        element("span", `concierge-admin-pill is-status-${status}`, status),
         element("span", "concierge-admin-pill", `WhatsApp attempted: ${item.attempted || 0} · accepted: ${item.delivered || 0}`)
       );
       head.append(title, meta);
@@ -296,23 +312,30 @@
       if (item.alertType === "booking_request" && Number(item.delivered || 0) === 0 && latestDiagnostic) {
         const diagnostic = element("div", "concierge-admin-delivery-failure");
         diagnostic.appendChild(element("h4", "", "WhatsApp delivery failed"));
-        const deliveryFields = [
-          "Channel: WhatsApp",
-          "Provider: Meta",
-          `Route: ${item.recipientGroup}`,
-          `Attempted: ${item.attempted || 0}`,
-          `Accepted: ${item.delivered || 0}`
-        ];
-        if (latestDiagnostic.templateName) deliveryFields.push(`Template: ${latestDiagnostic.templateName}`);
-        if (latestDiagnostic.languageCode) deliveryFields.push(`Language: ${latestDiagnostic.languageCode}`);
-        if (Number(latestDiagnostic.httpStatus || 0) > 0) deliveryFields.push(`HTTP: ${latestDiagnostic.httpStatus}`);
         const errorCode = latestDiagnostic.errorCode || latestDiagnostic.storedErrorCode;
-        if (errorCode) deliveryFields.push(`Error code: ${errorCode}`);
-        if (latestDiagnostic.failureKind) deliveryFields.push(`Category: ${latestDiagnostic.failureKind}`);
-        diagnostic.appendChild(element("p", "concierge-admin-source-note", deliveryFields.join(" · ")));
-        if (latestDiagnostic.errorMessage) diagnostic.appendChild(element("p", "concierge-admin-alert-summary", latestDiagnostic.errorMessage));
-        if (latestDiagnostic.errorDetails) diagnostic.appendChild(element("p", "concierge-admin-source-note", `Details: ${latestDiagnostic.errorDetails}`));
-        diagnostic.appendChild(element("span", "concierge-admin-alert-time", `Failure recorded: ${bangkokDate(latestDiagnostic.createdAt)}`));
+        diagnostic.appendChild(diagnosticGrid([
+          { label: "Channel", value: "WhatsApp" },
+          { label: "Provider", value: "Meta" },
+          { label: "Template", value: latestDiagnostic.templateName },
+          { label: "Language", value: latestDiagnostic.languageCode },
+          { label: "Route", value: item.recipientGroup },
+          { label: "Attempted", value: item.attempted || 0 },
+          { label: "Accepted", value: item.delivered || 0 },
+          { label: "HTTP", value: Number(latestDiagnostic.httpStatus || 0) > 0 ? latestDiagnostic.httpStatus : "Not retained" },
+          { label: "Meta error code", value: errorCode || "Not supplied" },
+          { label: "Category", value: latestDiagnostic.failureKind || "Unclassified" },
+          { label: "Recorded", value: bangkokDate(latestDiagnostic.createdAt) }
+        ]));
+        if (latestDiagnostic.errorMessage) {
+          const message = element("div", "concierge-admin-diagnostic-message");
+          message.append(element("strong", "", "Provider message"), element("p", "", latestDiagnostic.errorMessage));
+          diagnostic.appendChild(message);
+        }
+        if (latestDiagnostic.errorDetails) {
+          const details = element("div", "concierge-admin-diagnostic-message");
+          details.append(element("strong", "", "Provider details"), element("p", "", latestDiagnostic.errorDetails));
+          diagnostic.appendChild(details);
+        }
         card.appendChild(diagnostic);
       }
       if (item.escalationDueAt && !item.acknowledgedAt && !item.escalatedAt) {
@@ -336,35 +359,48 @@
     });
   }
 
-  function renderWhatsAppDeliveryDiagnostics(items) {
+  function renderWhatsAppDeliveryDiagnostics(items, alertItems = []) {
     whatsappDeliveryDiagnostics.replaceChildren();
     if (!items.length) {
       whatsappDeliveryDiagnostics.appendChild(element("div", "concierge-admin-empty", "No failed WhatsApp submissions in the last 30 days."));
       return;
     }
     items.forEach((item) => {
-      const card = element("article", "concierge-admin-alert is-attention");
+      const card = element("article", "concierge-admin-alert concierge-admin-diagnostic-card is-attention");
       card.dataset.diagnosticId = item.id;
       card.dataset.diagnosticAlertId = item.alertId || "";
       card.dataset.diagnosticAlertStatus = item.alertStatus || "";
       const title = item.templateName || "Earlier delivery failure";
       const code = item.errorCode || item.storedErrorCode || "unknown";
-      card.append(
-        element("h4", "", `${title} · ${item.failureKind || "unclassified"}`),
-        element("span", "concierge-admin-alert-time", `${bangkokDate(item.createdAt)} · ${item.stage || "send"} · HTTP ${item.httpStatus || "not retained"} · Error ${code}`)
-      );
-      if (item.languageCode || item.componentSchema) {
-        card.appendChild(element("p", "concierge-admin-source-note", `Language: ${item.languageCode || "not retained"} · Components: ${item.componentSchema || "not retained"}`));
+      const parentAlert = alertItems.find((alert) => alert.id === item.alertId) || {};
+      card.append(element("h4", "", title));
+      card.appendChild(diagnosticGrid([
+        { label: "Provider", value: "Meta" },
+        { label: "Route", value: parentAlert.recipientGroup || "Not retained" },
+        { label: "Template", value: title },
+        { label: "Language", value: item.languageCode || "Not retained" },
+        { label: "Attempted", value: parentAlert.attempted ?? "Not retained" },
+        { label: "Accepted", value: parentAlert.delivered ?? "Not retained" },
+        { label: "HTTP", value: item.httpStatus || "Not retained" },
+        { label: "Meta error code", value: code },
+        { label: "Category", value: item.failureKind || "Unclassified" },
+        { label: "Stage", value: item.stage || "Send" },
+        { label: "Components", value: item.componentSchema || "Not retained" },
+        { label: "Type", value: item.errorType || "Not supplied" },
+        { label: "Subcode", value: item.errorSubcode || "Not supplied" },
+        { label: "Meta trace", value: item.traceId || "Not supplied" },
+        { label: "Recorded", value: bangkokDate(item.createdAt) }
+      ]));
+      if (item.errorMessage) {
+        const message = element("div", "concierge-admin-diagnostic-message");
+        message.append(element("strong", "", "Provider message"), element("p", "", item.errorMessage));
+        card.appendChild(message);
       }
-      if (item.errorType || item.errorSubcode || item.traceId) {
-        card.appendChild(element(
-          "p",
-          "concierge-admin-source-note",
-          `Type: ${item.errorType || "not supplied"} · Subcode: ${item.errorSubcode || "not supplied"} · Meta trace: ${item.traceId || "not supplied"}`
-        ));
+      if (item.errorDetails) {
+        const details = element("div", "concierge-admin-diagnostic-message");
+        details.append(element("strong", "", "Provider details"), element("p", "", item.errorDetails));
+        card.appendChild(details);
       }
-      if (item.errorMessage) card.appendChild(element("p", "concierge-admin-alert-summary", item.errorMessage));
-      if (item.errorDetails) card.appendChild(element("p", "concierge-admin-source-note", `Details: ${item.errorDetails}`));
       if (item.legacyDiagnostic) {
         card.appendChild(element(
           "p",
@@ -389,12 +425,25 @@
       return;
     }
     items.forEach((item) => {
-      const card = element("article", `concierge-admin-alert is-${item.severity || "attention"}`);
+      const status = item.status || "open";
+      const card = element("article", `concierge-admin-alert is-${item.severity || "attention"} is-status-${status}${status === "resolved" ? " is-resolved" : ""}`);
       card.dataset.maintenanceId = item.id;
+      const head = element("div", "concierge-admin-card-head");
+      const title = element("div", "concierge-admin-card-title");
+      title.append(
+        element("span", `concierge-admin-priority-label is-${item.severity || "attention"}`, String(item.severity || "attention").toUpperCase()),
+        element("h3", "", `Room ${item.room} · ${String(item.issueType || "room issue").replaceAll("_", " ")}`)
+      );
+      const meta = element("div", "concierge-admin-card-meta");
+      meta.append(
+        element("span", `concierge-admin-pill is-status-${status}`, status),
+        element("span", `concierge-admin-pill ${item.hasPhoto ? "has-private-photo" : "no-private-photo"}`, item.hasPhoto ? "Private photo stored" : "No photo stored")
+      );
+      head.append(title, meta);
       card.append(
-        element("h3", "", `Room ${item.room} · ${String(item.issueType || "room issue").replaceAll("_", " ")}`),
+        head,
         element("p", "concierge-admin-alert-summary", item.details || "No additional details supplied."),
-        element("span", "concierge-admin-alert-time", `${bangkokDate(item.createdAt)} · ${item.status} · Reference ${maintenanceReference(item.room, item.createdAt)}`)
+        element("span", "concierge-admin-alert-time", `${bangkokDate(item.createdAt)} · Reference ${maintenanceReference(item.room, item.createdAt)}`)
       );
       if (item.feeAccepted) card.appendChild(element("span", "concierge-admin-alert-escalation", "Guest acknowledged the conditional 1,000 THB toilet-clearance fee."));
       const actions = element("div", "concierge-admin-card-actions");
@@ -406,8 +455,6 @@
         remove.type = "button";
         remove.dataset.maintenanceAction = "delete-photo";
         actions.append(download, remove);
-      } else {
-        actions.appendChild(element("span", "concierge-admin-source-note", "No photo stored."));
       }
       if (["open", "acknowledged"].includes(item.status)) {
         const resolve = element("button", "", "Resolve");
@@ -655,6 +702,10 @@
       const room = element("td", "", item.room ? `Room ${item.room}` : "—");
       const question = element("td", "", item.question);
       const result = element("td", "concierge-admin-result", `${item.source} · ${Math.round(Number(item.confidence || 0) * 100)}%`);
+      time.dataset.label = "Time";
+      room.dataset.label = "Room";
+      question.dataset.label = "Question";
+      result.dataset.label = "Result";
       row.append(time, room, question, result);
       recent.appendChild(row);
     });
@@ -669,7 +720,7 @@
     renderPassportUploads(data.passportUploads || []);
     renderMaintenanceReports(data.maintenanceReports || []);
     renderAlerts(data.alerts || [], data.alertConfiguration || {}, data.deliveryDiagnostics || []);
-    renderWhatsAppDeliveryDiagnostics(data.deliveryDiagnostics || []);
+    renderWhatsAppDeliveryDiagnostics(data.deliveryDiagnostics || [], data.alerts || []);
     renderStayOperations(data.stayOperations || {});
     renderRecent(data.recent || []);
     updateAdminSectionSummaries(data);

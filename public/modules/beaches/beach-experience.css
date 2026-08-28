@@ -32,3 +32,4 @@
 .beach-gallery-placeholder{min-height:220px;border-radius:18px;background:linear-gradient(135deg,#edf6f2,#d9ebe6);display:grid;place-items:center;text-align:center;padding:24px;color:var(--green);font-weight:800}
 .beach-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:22px}
 @media(max-width:760px){.beach-grid{grid-template-columns:1fr}.beach-detail-hero{min-height:290px}.beach-detail-title{padding:22px}.beach-section{padding:18px}}
+.beach-grid{gap:14px}.beach-card{border-radius:16px}.beach-card:hover{transform:translateY(-2px)}.beach-detail-hero{min-height:280px;border-radius:18px}.beach-detail-title{padding:22px}.beach-section{margin-top:18px;padding:18px;border-radius:16px}.beach-gallery img,.beach-gallery-placeholder{border-radius:14px}@media(max-width:760px){.beach-detail-hero{min-height:238px}.beach-detail-title,.beach-section{padding:18px}}

@@ -2,7 +2,7 @@
   if (window.HOUSE_I18N) return;
 
   const STORAGE_KEY = "houseGuideLanguage";
-  const CACHE_PREFIX = "houseGuideTranslations:v5.11.26:";
+  const CACHE_PREFIX = "houseGuideTranslations:v5.11.27:";
   const MAX_REQUEST_RETRIES = 2;
   const languages = Object.freeze([
     { code: "en", label: "English" },
@@ -238,14 +238,14 @@
   add("🔑 Key box", "🔑 กล่องใส่กุญแจ", "🔑 钥匙盒", "🔑 Сейф для ключа", "🔑 Schlüsselkasten", "🔑 Boîte à clés", "🔑 Caja de llaves");
   add("Next to your room door", "ข้างประตูห้องของคุณ", "就在您的客房门旁", "Рядом с дверью вашего номера", "Direkt neben Ihrer Zimmertür", "À côté de la porte de votre chambre", "Junto a la puerta de tu habitación");
   add("Secure spare-key access is available 24 hours a day during your stay.", "คุณสามารถใช้กุญแจสำรองอย่างปลอดภัยได้ตลอด 24 ชั่วโมงระหว่างการเข้าพัก", "住宿期间，全天 24 小时均可安全获取备用钥匙。", "Безопасный доступ к запасному ключу доступен круглосуточно во время вашего проживания.", "Der sichere Ersatzschlüssel-Zugang ist während Ihres Aufenthalts rund um die Uhr verfügbar.", "L’accès sécurisé à la clé de secours est disponible 24 h/24 pendant votre séjour.", "El acceso seguro a la llave de repuesto está disponible las 24 horas durante tu estancia.");
-  add("If your key has been lost, a 500 THB replacement fee applies. Confirm below if you would like to continue.", "หากกุญแจสูญหาย จะมีค่าทดแทน 500 บาท โปรดยืนยันด้านล่างหากต้องการดำเนินการต่อ", "如果钥匙遗失，需支付 500 THB 更换费。如需继续，请在下方确认。", "При утере ключа взимается сбор 500 THB за замену. Подтвердите ниже, если хотите продолжить.", "Bei Verlust des Schlüssels fällt eine Ersatzgebühr von 500 THB an. Bestätigen Sie unten, wenn Sie fortfahren möchten.", "En cas de perte de la clé, des frais de remplacement de 500 THB s’appliquent. Confirmez ci-dessous si vous souhaitez continuer.", "Si has perdido la llave, se aplica una tarifa de sustitución de 500 THB. Confirma abajo si quieres continuar.");
-  add("I understand the 500 THB lost-key replacement fee and want to continue.", "ฉันเข้าใจค่าทดแทนกุญแจหาย 500 บาทและต้องการดำเนินการต่อ", "我了解钥匙遗失需支付 500 THB 更换费，并希望继续。", "Я понимаю, что за замену утерянного ключа взимается 500 THB, и хочу продолжить.", "Ich habe die Ersatzgebühr von 500 THB für einen verlorenen Schlüssel verstanden und möchte fortfahren.", "Je comprends les frais de remplacement de 500 THB en cas de perte de clé et je souhaite continuer.", "Entiendo la tarifa de sustitución de 500 THB por pérdida de llave y quiero continuar.");
+  add("If your key has been lost, a 500 THB replacement fee applies.", "หากกุญแจสูญหาย จะมีค่าทดแทน 500 บาท", "如果钥匙遗失，需支付 500 THB 更换费。", "При утере ключа взимается сбор 500 THB за замену.", "Bei Verlust des Schlüssels fällt eine Ersatzgebühr von 500 THB an.", "En cas de perte de la clé, des frais de remplacement de 500 THB s’appliquent.", "Si has perdido la llave, se aplica una tarifa de sustitución de 500 THB.");
+  add("I understand and want to continue.", "ฉันเข้าใจและต้องการดำเนินการต่อ", "我已了解并希望继续。", "Я понимаю и хочу продолжить.", "Ich habe verstanden und möchte fortfahren.", "Je comprends et je souhaite continuer.", "Lo entiendo y quiero continuar.");
   add("Request spare key", "ขอกุญแจสำรอง", "申请备用钥匙", "Запросить запасной ключ", "Ersatzschlüssel anfordern", "Demander la clé de secours", "Solicitar la llave de repuesto");
   add("Contact The House Concierge", "ติดต่อคอนเซียร์จของ The House", "联系 The House 礼宾服务", "Связаться с консьержем The House", "The House Concierge kontaktieren", "Contacter la conciergerie The House", "Contactar con el Concierge de The House");
   add("Back to room guide", "กลับไปยังคู่มือห้องพัก", "返回客房指南", "Вернуться к путеводителю по номеру", "Zurück zum Zimmerführer", "Retour au guide de la chambre", "Volver a la guía de la habitación");
   add("Show my spare-key code", "แสดงรหัสกุญแจสำรองของฉัน", "显示我的备用钥匙密码", "Показать код запасного ключа", "Code für Ersatzschlüssel anzeigen", "Afficher le code de ma clé de secours", "Mostrar el código de mi llave de repuesto");
   add("View spare key", "ดูกุญแจสำรอง", "查看备用钥匙", "Посмотреть запасной ключ", "Ersatzschlüssel ansehen", "Voir la clé de secours", "Ver llave de repuesto");
-  add("Accept 500 THB fee & request spare key", "ยอมรับค่าธรรมเนียม 500 บาทและขอกุญแจสำรอง", "接受 500 THB 费用并申请备用钥匙", "Принять сбор 500 THB и запросить запасной ключ", "500 THB Gebühr akzeptieren und Ersatzschlüssel anfordern", "Accepter les frais de 500 THB et demander la clé de secours", "Aceptar la tarifa de 500 THB y solicitar la llave de repuesto");
+  add("Request spare key", "ขอกุญแจสำรอง", "申请备用钥匙", "Запросить запасной ключ", "Ersatzschlüssel anfordern", "Demander la clé de secours", "Solicitar la llave de repuesto");
   add("Copy code", "คัดลอกรหัส", "复制密码", "Скопировать код", "Code kopieren", "Copier le code", "Copiar código");
   add("Secure spare-key access", "เข้าถึงกุญแจสำรองอย่างปลอดภัย", "安全获取备用钥匙", "Защищённый доступ к запасному ключу", "Sicherer Ersatzschlüssel-Zugang", "Accès sécurisé à la clé de secours", "Acceso seguro a la llave de repuesto");
   add("Verifying your Airbnb stay…", "กำลังยืนยันการเข้าพัก Airbnb ของคุณ…", "正在验证您的 Airbnb 住宿…", "Проверяем бронирование Airbnb…", "Airbnb-Aufenthalt wird geprüft…", "Vérification de votre séjour Airbnb…", "Verificando tu estancia de Airbnb…");

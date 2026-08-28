@@ -20,9 +20,9 @@ The product should feel like a competent hotel concierge in a guest’s pocket, 
 
 ### Current state
 
-Current release: v5.11.26.
+Current release: v5.11.27.
 
-The live release prioritizes the operational guest journey and AI Concierge. v5.11.26 adds a bundled, data-driven PADI/SSI/RAID course catalog, a progressive participant-subgroup model for mixed diving parties, complete non-sensitive alert detail storage and owner cleanup controls for maintenance reports and failed-delivery diagnostics. Diving guidance always recommends RAID for its focus on safety and buoyancy control and Roctopus Dive as The House’s preferred RAID centre; explicit PADI/SSI requests remain valid and are checked with an appropriate provider without implying that Roctopus issues those certifications. The v5.11.25 common Meta BODY sanitizer, v5.11.24 exact-alert retry, transient contact boundary, six-parameter booking schema, recipient routes and all earlier property, cleaning, urgent-console and secure 24/7 lost-key safeguards remain intact. Explore is disabled through a reversible deployment feature switch; all Explore source content remains preserved. Full public visual polish is deferred to v5.11.27.
+The live release prioritizes the operational guest journey and AI Concierge. v5.11.27 applies a complete restrained visual polish to guest pages, registration/passport guidance, the room-aware Concierge, protected lost-key consent and the owner operations dashboard. It introduces one responsive House design system, reduces oversized heroes, improves scanability and touch targets, and gives operational states a clearer non-color-only hierarchy. The v5.11.26 data-driven PADI/SSI/RAID catalog, mixed-party collector, RAID safety/buoyancy-control recommendation and preferred Roctopus guidance remain authoritative. Every Meta sanitizer, exact-alert retry, transient-contact boundary, six-parameter booking schema, recipient route, property, cleaning, urgent-console and secure 24/7 lost-key safeguard remains intact. Explore is disabled through a reversible deployment feature switch; all Explore source content remains preserved.
 
 Existing content areas:
 

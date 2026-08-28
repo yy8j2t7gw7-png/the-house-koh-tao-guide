@@ -40,3 +40,4 @@
 .menu-links{display:flex;flex-wrap:wrap;gap:10px}
 .restaurant-card-fallback{padding:22px;text-align:center;background:radial-gradient(circle at 30% 20%,rgba(255,255,255,.18),transparent 35%),linear-gradient(135deg,#183b34,#4f806f)}
 .restaurant-card-fallback::after{content:'Photos coming soon';position:absolute;left:0;right:0;bottom:18px;font-size:12px;letter-spacing:.04em;text-transform:uppercase;opacity:.72}
+.restaurant-grid{gap:14px}.restaurant-card{border-radius:16px}.restaurant-card:hover{transform:translateY(-2px)}.restaurant-detail-hero{min-height:280px;border-radius:18px}.restaurant-detail-title{padding:22px}.place-section{margin-top:18px;padding:18px;border-radius:16px}.menu-notice{border-radius:12px}.restaurant-gallery img{border-radius:14px}@media(max-width:760px){.restaurant-detail-hero{min-height:238px}.restaurant-detail-title,.place-section{padding:18px}}

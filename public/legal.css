@@ -1,13 +1,13 @@
-.legal-shell{width:min(900px,calc(100% - 28px));margin:18px auto 40px}
+.legal-shell{width:min(900px,calc(100% - 28px));margin:14px auto 40px}
 .legal-topbar{position:static}
 .legal-nav{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:6px}
 .legal-nav a{padding:8px 11px;border-radius:999px;color:var(--green-dark);font-size:14px;font-weight:750;text-decoration:none}
 .legal-nav a:hover,.legal-nav a[aria-current="page"]{background:var(--mint)}
-.legal-hero{padding:clamp(24px,6vw,48px)}
+.legal-hero{padding:clamp(20px,4vw,34px)}
 .legal-hero h1{max-width:760px}
 .legal-meta{color:var(--muted);font-size:14px}
-.legal-content{display:grid;gap:16px}
-.legal-content .rule{padding:clamp(18px,4vw,28px)}
+.legal-content{display:grid;gap:12px}
+.legal-content .rule{padding:clamp(17px,3vw,23px)}
 .legal-content h2{margin:0 0 10px;font-size:clamp(21px,3vw,28px)}
 .legal-content h3{margin:18px 0 6px;font-size:18px}
 .legal-content p,.legal-content li{color:#38534c}

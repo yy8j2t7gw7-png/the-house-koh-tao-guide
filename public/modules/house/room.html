@@ -76,7 +76,7 @@ a{color:inherit}
 <link rel="stylesheet" href="/ai-concierge.css">
 <link rel="stylesheet" href="/stay-access.css">
 </head>
-<body data-guest-access="granted">
+<body class="room-guide-page" data-guest-access="granted">
 <div class="shell">
 <header class="topbar">
   <a class="brand" href="/"><img src="/logo.svg" alt="The House Koh Tao"></a>
@@ -90,7 +90,7 @@ a{color:inherit}
   </nav>
 </header>
 
-<section class="section">
+<section class="section room-guide-intro">
   <span class="badge" id="roomBadge">Your room</span>
   <h1 id="roomTitle">Loading your room…</h1>
   <p class="section-intro">Your personal guest guide for The House – Koh Tao.</p>
@@ -98,11 +98,11 @@ a{color:inherit}
   <p class="small">Guest access is active after the required TM30 Immigration registration. Passport images are automatically deleted 14 days after upload, or sooner after processing.</p>
 </section>
 
-<section class="hero" style="min-height:360px">
-  <img id="roomPhoto" src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=" alt="Your room location" style="height:360px">
+<section class="hero" aria-label="Room location overview">
+  <img id="roomPhoto" src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=" alt="Your room location">
   <div class="hero-copy">
-    <span class="badge">Your room</span>
-    <h1 id="heroRoom" style="font-size:38px">Room</h1>
+    <span class="badge">Room location</span>
+    <h2 id="heroRoom">Room</h2>
     <p id="roomNote">Loading room details…</p>
   </div>
 </section>
@@ -135,11 +135,11 @@ a{color:inherit}
   <div class="list compact-list">
     <div class="rule"><strong>🔑 Key box</strong>Next to your room door</div>
   </div>
-  <p>If your key has been lost, a 500 THB replacement fee applies. Confirm below if you would like to continue.</p>
+  <p class="spare-key-fee">If your key has been lost, a <strong>500 THB replacement fee</strong> applies.</p>
   <p class="stay-access-status" id="spareKeyStatus" role="status" aria-live="assertive" hidden></p>
   <form class="spare-key-form" id="spareKeyForm" hidden>
-    <label class="fee-confirmation"><input id="lostKeyFeeAccepted" type="checkbox" required> <span>I understand the 500 THB lost-key replacement fee and want to continue.</span></label>
-    <div class="stay-access-actions"><button class="btn" type="submit">Accept 500 THB fee &amp; request spare key</button><button class="btn secondary" id="cancelLostKeyRequest" type="button">Cancel</button></div>
+    <label class="fee-confirmation"><input id="lostKeyFeeAccepted" type="checkbox" required> <span>I understand and want to continue.</span></label>
+    <div class="stay-access-actions"><button class="btn" type="submit">Request spare key</button><button class="btn secondary" id="cancelLostKeyRequest" type="button">Cancel</button></div>
   </form>
   <div class="stay-access-actions" id="spareKeyViewAction" hidden>
     <button class="btn" id="viewSpareKey" type="button">View spare key</button>

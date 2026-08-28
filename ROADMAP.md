@@ -1,6 +1,6 @@
 # Product Roadmap
 
-Baseline: v5.11.20
+Baseline: v5.11.21
 
 ## Completed
 
@@ -30,6 +30,9 @@ Baseline: v5.11.20
 - [x] Routine housekeeping precedence over stale luggage and booking contact collection
 - [x] Natural dirty-room wording carried through preferred-time collection to one protected cleaning alert without a second manual handoff
 - [x] Direct first-person fishing and snorkeling intent enters the same structured flow as category-specific Book with Us actions
+- [x] Bangkok-calendar cleaning validation rejects past same-day, closed-hour and Monday preferences while preserving explicit future dates and submitting one valid correction
+- [x] Robust conversational fishing and snorkeling grammar covers want, would-like, wanna, contraction and take-me/us forms without converting information questions into alerts
+- [x] Hospitality-first lost-key responses hide internal delivery, verification-state and code-release terminology while preserving every security gate
 - [x] Vague urgent clarification and meaningful-incident quality gate before protected submission
 - [x] Conservative Airbnb first-name-only synchronization and verified guest greeting
 - [x] Signed `RECEIVED` acknowledgement with backwards-compatible `ACK`
@@ -149,7 +152,7 @@ Guests may continue using ordinary WhatsApp handoffs. Automated internal alerts 
 - [x] Push the v5.5.0 release to the existing hosting workflow
 - [x] Confirm `/api/concierge/status` reports AI and learning enabled
 - [x] Capture the exact v5.11.16 Meta failure (HTTP 404 / `132001`) and implement template-aware language resolution: current templates use `en`; deliberate v1 rollback templates retain `en_US`.
-- [ ] Deploy v5.11.20 without changing production configuration, then smoke-test only natural cleaning completion, direct/Book with Us structured-booking entry and verified/unverified lost-key handling.
+- [ ] Deploy v5.11.21 without changing production configuration, then run the short changed-only smoke test for past cleaning-time correction, natural/Book with Us fishing entry and verified office-hours lost-key wording.
 - [ ] Submit and obtain Meta approval for the five optional quick-action templates documented in `META_STAFF_QUICK_ACTIONS_v5.11.20.md`; never map the buttonless service v1 template and enable only after every intended template is Active.
 - [x] Add `STAY_TOKEN_PEPPER` and `RESERVATION_SYNC_TOKEN` Worker secrets
 - [ ] Add protected `SPARE_KEY_CODES` Worker secret before activating automatic spare-key release

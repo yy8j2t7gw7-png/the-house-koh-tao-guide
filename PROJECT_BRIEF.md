@@ -20,9 +20,9 @@ The product should feel like a competent hotel concierge in a guest’s pocket, 
 
 ### Current state
 
-Current release: v5.11.20.
+Current release: v5.11.21.
 
-The live release prioritizes the operational guest journey and AI Concierge. v5.11.20 repairs the production conversation paths for natural cleaning requests, direct structured booking intent and verified lost-key assistance while preserving every v5.11.19 privacy, routing and scheduling gate. It supports seven guest languages across the complete live operational pages, with per-item translation isolation so one unsupported sentence cannot block an entire page. The concierge uses an animated-dot thinking state and approved external social actions for Bamboo Beach Bar. Secure guest verification is concise but retains every required privacy and registration instruction. Verified guest guidance includes the confirmed luggage-storage windows and careful use of Koh Tao's limited fresh water and island electricity. Explore is disabled through a reversible deployment feature switch; all Explore source content remains preserved for the final content phase.
+The live release prioritizes the operational guest journey and AI Concierge. v5.11.21 is a narrow functional correction over v5.11.20: cleaning preferences are validated against the actual Bangkok date and time, natural fishing and snorkeling wording enters protected structured collection reliably, and lost-key responses use hospitality language without exposing delivery or code-release internals. It preserves every existing privacy, routing, active-stay and lost-key security gate and makes no visual or production-configuration change. The platform supports seven guest languages across the complete live operational pages, with per-item translation isolation so one unsupported sentence cannot block an entire page. The concierge uses an animated-dot thinking state and approved external social actions for Bamboo Beach Bar. Secure guest verification is concise but retains every required privacy and registration instruction. Verified guest guidance includes the confirmed luggage-storage windows and careful use of Koh Tao's limited fresh water and island electricity. Explore is disabled through a reversible deployment feature switch; all Explore source content remains preserved for the final content phase.
 
 Existing content areas:
 

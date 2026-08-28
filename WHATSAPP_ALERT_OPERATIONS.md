@@ -2,7 +2,7 @@
 
 ## Purpose
 
-v5.11.20 provides a protected server-side staff-alert channel through the official Meta WhatsApp Business Platform. Guests continue to use the website Concierge. Recipient telephone numbers, access tokens and app secrets stay in encrypted Cloudflare secrets and never appear in public files, Git or release archives.
+v5.11.21 provides a protected server-side staff-alert channel through the official Meta WhatsApp Business Platform. Guests continue to use the website Concierge. Recipient telephone numbers, access tokens and app secrets stay in encrypted Cloudflare secrets and never appear in public files, Git or release archives.
 
 Routing is role based:
 
@@ -66,7 +66,7 @@ The protected owner console displays these records under **WhatsApp delivery dia
 
 `house_alert_status_v1` is non-recursive. An authorized `RECEIVED`, `ACK` or `RESOLVE` reply updates the original alert and sends one status message only to the other recipients assigned to that alert. The actor and unrelated roles are excluded; duplicate webhook delivery is suppressed by the original alert state. Status messages create no alert and no escalation.
 
-v5.11.20 contains a code-ready but default-off path for five separately reviewed Utility templates with **Received** and **Resolve** quick replies. Their exact Meta setup, payload strategy, activation gate and one-variable rollback are documented in `META_STAFF_QUICK_ACTIONS_v5.11.20.md`. The intended service template is `house_service_alert_actions_v2`; the accidentally created `house_service_alert_actions_v1` has no buttons and must never be mapped. Typed `RECEIVED`, `ACK` and `RESOLVE` remain available before and after activation.
+The code-ready but default-off path introduced in v5.11.20 remains available for five separately reviewed Utility templates with **Received** and **Resolve** quick replies. Their exact Meta setup, payload strategy, activation gate and one-variable rollback are documented in `META_STAFF_QUICK_ACTIONS_v5.11.20.md`. The intended service template is `house_service_alert_actions_v2`; the accidentally created `house_service_alert_actions_v1` has no buttons and must never be mapped. Typed `RECEIVED`, `ACK` and `RESOLVE` remain available before and after activation.
 
 ## Cloudflare secrets
 
@@ -138,7 +138,7 @@ WHATSAPP_ALERT_ESCALATION_MINUTES=10
 
 `WHATSAPP_ALERT_TEMPLATE_LANGUAGE` remains present for compatibility and does not need a Cloudflare change for v5.11.17. Every mapped production or rollback template now uses the language attached to its immutable schema entry.
 
-The optional v5.11.20 action templates are intentionally absent from `wrangler.jsonc`, so deploying application code cannot activate unapproved Meta definitions. After all five intended templates are Active, configure these exact non-secret variables and then enable the gate in a separate authorized activation release:
+The optional action templates are intentionally absent from `wrangler.jsonc`, so deploying v5.11.21 cannot activate unapproved Meta definitions. After all five intended templates are Active, configure these exact non-secret variables and then enable the gate in a separate authorized activation release:
 
 ```text
 WHATSAPP_SERVICE_ACTION_TEMPLATE_NAME=house_service_alert_actions_v2
@@ -153,15 +153,15 @@ If the flag is false, missing or any required action-template mapping is absent,
 
 Review Meta's supported Graph API versions before changing the version. The Worker checks once per minute for overdue escalations.
 
-## v5.11.20 deployment and changed-function verification
+## v5.11.21 deployment and changed-only verification
 
-Deploy the verified v5.11.20 bundle to the existing Worker without changing the six production template mappings, secrets, recipients, webhook settings, `SPARE_KEY_CODES` or `WHATSAPP_STAFF_ACTIONS_ENABLED=false` state.
+Deploy the verified v5.11.21 bundle to the existing Worker without changing the six production template mappings, secrets, recipients, webhook settings, `SPARE_KEY_CODES` or `WHATSAPP_STAFF_ACTIONS_ENABLED=false` state.
 
 Smoke-test only the functions changed in this release:
 
-1. From a verified room, send **my room is dirty**, then **3:30pm**. Confirm exactly one service alert reaches Su plus both owners, includes the preferred time and gives the guest no second manual-contact instruction. Repeat after hours or on Monday and confirm no routine **Call Us** action appears.
-2. Send **I want to go fishing** and separately press a category **Book with Us** action. Confirm each starts structured collection, asks only for missing fields and produces one Fah-plus-owner booking alert only after all fields and an international contact are supplied. Confirm the contact is redacted in visible history and ferry never requests passport data.
-3. Send **I lost my key** once without a verified stay and confirm no alert or code. With a verified active stay and passport pending, confirm an office-hours request creates one dedicated lost-key alert with no code path. After hours, confirm the 500 THB acceptance and accepted-team-notification gates precede protected-page code display, then confirm the rotation lock prevents a second release.
+1. At 15:33 Bangkok time from a verified room, send **my room is dirty**, then **2pm**, then **4pm**. Confirm 2:00 PM stays pending with no delivery and the correction produces exactly one service alert containing only 4:00 PM.
+2. Send **I wanna go fishing** and confirm structured fishing collection starts immediately. Ask **What fishing trips do you offer?**, then press **Book with Us** and confirm that action enters the same structured state without an informational pseudo-step.
+3. During office hours from a verified active stay, send **I lost my key**. Confirm one dedicated lost-key alert and the response: “Thank you. I’ve notified The House team about your lost key. Someone from the team will assist you as soon as possible.” Confirm the reply exposes no implementation terminology.
 
 Quick-action activation is a separate post-approval change. Follow `META_STAFF_QUICK_ACTIONS_v5.11.20.md` only after every intended template is Active; never map service v1.
 

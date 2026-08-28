@@ -2,6 +2,22 @@
 
 All notable changes to The House – Koh Tao guest guide are recorded here.
 
+## v5.11.21 — Cleaning-Time, Natural Booking & Lost-Key Copy Corrections
+
+### Production fixes
+
+- Validates a cleaning clock preference against the Bangkok date and current time before submission. Past same-day times, times outside 10:30–19:29 and Monday dates remain in the cleaning workflow with the correct next operating-day guidance; a valid correction creates exactly one alert.
+- Preserves explicit future cleaning dates across turns, so a future 2:00 PM preference is evaluated on its requested date instead of being rejected because 2:00 PM has already passed today. `now` and `ASAP` retain their existing immediate-request behavior.
+- Corrects the direct activity grammar so natural requests including **I wanna go fishing**, **I would like to go fishing**, **I’d like to book fishing** and **Take us snorkeling** enter the same protected structured flow as **Book with Us**. Information-only questions still create no alert.
+- Replaces guest-visible lost-key implementation language with natural assistance wording. A successful verified office-hours request now says: “Thank you. I’ve notified The House team about your lost key. Someone from the team will assist you as soon as possible.”
+
+### Scope and regression protection
+
+- Preserves every v5.11.20 lost-key security gate, delivery route and no-code-leak invariant; only the guest-facing copy changed.
+- Changes no visual layout, active Meta template, production variable, secret, recipient, webhook, emergency route, passport rule or Airbnb synchronization behavior.
+- Keeps `WHATSAPP_STAFF_ACTIONS_ENABLED=false`; the buttonless service action v1 remains invalid and the intended future service template remains `house_service_alert_actions_v2`.
+- Expands the complete regression suite from 126 to 129 tests, including Bangkok past-time correction, future-date retention, exact opening/closing/Monday boundaries, natural fishing/snorkeling grammar, informational booking separation and guest-copy leak checks.
+
 ## v5.11.20 — Cleaning, Booking Entry & Lost-Key Verification Fixes
 
 ### Production fixes

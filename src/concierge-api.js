@@ -24,7 +24,7 @@ import {
 } from "./whatsapp-alerts.js";
 import { getGuestAccess, handleStayAdminRequest, stayConfiguration } from "./stay-api.js";
 
-const RELEASE = "5.11.20";
+const RELEASE = "5.11.21";
 const ROOM_OPTIONS = new Set(["1", "2", "3", "4", "5", "6", "8", "9", "10", "11"]);
 const MAX_HISTORY_ITEMS = 10;
 const MAX_QUESTION_LENGTH = 800;
@@ -170,7 +170,7 @@ const DIRECT_LUGGAGE_REQUEST = /^\s*(?:please\s+)?(?:store|keep|arrange)\s+(?:my
 const ACTIONABLE_DIVING_BOOKING = /(?:^\s*(?:please\s+)?(?:book|reserve|arrange)\s+.*\b(?:dive|diving|scuba|open\s+water|advanced\s+open\s+water)\b|\b(?:please\s+(?:book|reserve|arrange)|can\s+you\s+(?:book|reserve|arrange)|could\s+you\s+(?:book|reserve|arrange)|help\s+me\s+(?:book|reserve|arrange)|i\s+(?:want|wanna|need|would\s+like)\s+(?:you\s+)?(?:to\s+)?(?:book|reserve|arrange))\b[^.?!]*\b(?:dive|diving|scuba|open\s+water|advanced\s+open\s+water)\b)/i;
 const ACTIONABLE_STRUCTURED_BOOKING = /(?:^\s*(?:please\s+)?(?:book|reserve|arrange)\b|\b(?:please\s+(?:book|reserve|arrange)|can\s+you\s+(?:book|reserve|arrange)|could\s+you\s+(?:book|reserve|arrange)|help\s+me\s+(?:book|reserve|arrange)|i\s+(?:want|wanna|need|would\s+like)\s+(?:you\s+)?(?:to\s+)?(?:book|reserve|arrange)|book\s+(?:me|us)|make\s+(?:a\s+)?(?:booking|reservation))\b)/i;
 const DIRECT_TRANSPORT_BOOKING = /(?:\b(?:i\s+(?:need|want|would\s+like)|can\s+(?:i|we)\s+(?:get|have)|get\s+me|send\s+me)\s+(?:a\s+)?(?:taxi(?:\s+boat)?|longtail\s+boat|motorbike\s+taxi|ferry\s+tickets?)\b|^\s*(?:taxi(?:\s+boat)?|longtail(?:\s+boat)?|motorbike\s+taxi|ferry(?:\s+tickets?)?)\b(?=[\s\S]*\b(?:today|tomorrow|next\s+(?:mon|tues|wednes|thurs|fri|satur|sun)day|in\s+\d{1,3}\s+days?|from|to|at\s+\d)))/i;
-const DIRECT_ACTIVITY_BOOKING = /\b(?:i|we)\s+(?:want|wanna|need|would\s+like|plan)\s+to\s+(?:go\s+)?(?:fishing|snorkel(?:ing|ling)?)\b/i;
+const DIRECT_ACTIVITY_BOOKING = /(?:\b(?:i|we)\s+(?:(?:want|need|plan)\s+to|would\s+like\s+to|wanna)\s+(?:(?:go|book|arrange)\s+)?(?:fishing|snorkel(?:ing|ling)?)\b|\b(?:i|we)['’]d\s+like\s+to\s+(?:(?:go|book|arrange)\s+)?(?:fishing|snorkel(?:ing|ling)?)\b|\b(?:i|we)\s+(?:want|need|would\s+like)\s+(?:a\s+)?(?:fishing|snorkel(?:ing|ling)?)\s+(?:trip|tour)\b|\b(?:take\s+(?:me|us)|can\s+you\s+take\s+(?:me|us)|help\s+(?:me|us)\s+(?:go\s+)?)\s*(?:fishing|snorkel(?:ing|ling)?)\b)/i;
 const SUPPORTED_BOOKING_KINDS = new Set(["diving", "fishing", "snorkeling", "taxi", "taxi_boat", "ferry", "motorbike_taxi"]);
 const HOUSEKEEPING_ITEM_REQUEST = /\b(?:toilet\s+paper|soap|(?:(?:new|fresh|clean)\s+)?towels?|room\s+cleaning|clean\s+(?:my|our|the)\s+room|housekeeping)\b/i;
 const HOUSEKEEPING_REQUEST_ACTION = /\b(?:can\s+(?:i|we)\s+(?:have|get)|please\s+(?:bring|send|provide|clean)|can\s+you\s+(?:bring|send|provide|clean)|could\s+you\s+(?:bring|send|provide|clean)|i\s+(?:need|want|would\s+like)|(?:bring|send|provide)\s+(?:me\s+)?|clean\s+(?:my|our|the)\s+room)\b|\b(?:toilet\s+paper|soap|towels?)\s+please\b/i;
@@ -228,6 +228,7 @@ function cleanWorkflowState(value) {
       missing: ["preferredTime"],
       cleaningRequest: {
         preferredTime: cleanWorkflowValue(request.preferredTime, 60),
+        requestedDate: /^\d{4}-\d{2}-\d{2}$/.test(String(request.requestedDate || "")) ? String(request.requestedDate) : "",
         notes: cleanWorkflowNotes(request.notes)
       }
     };
@@ -454,7 +455,8 @@ function displayPreferredTime(value) {
   if (/\b(?:now|right now|immediately|right away)\b/i.test(source)) return "Now";
   if (/\bnoon\b/i.test(source)) return "12:00 PM";
   const match = source.match(/\b(?:(?:at|around|by|from|prefer(?:red)?(?:\s+time)?(?:\s+is)?)\s*)?((?:[01]?\d|2[0-3])(?::[0-5]\d)?\s*(?:am|pm))\b/i)
-    || source.match(/\b(?:at|around|by|from)\s*((?:[01]?\d|2[0-3]):[0-5]\d)\b/i);
+    || source.match(/\b(?:at|around|by|from)\s*((?:[01]?\d|2[0-3]):[0-5]\d)\b/i)
+    || source.match(/^\s*((?:[01]?\d|2[0-3]):[0-5]\d)\s*[.!]?\s*$/i);
   if (!match) return "";
   const clock = match[1].trim().toLowerCase();
   const parts = clock.match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)?$/i);
@@ -469,6 +471,135 @@ function displayPreferredTime(value) {
     .format(new Date(Date.UTC(2020, 0, 1, hour, minute)));
 }
 
+const CLEANING_DAY_MS = 86_400_000;
+const HOUSEKEEPING_OPEN_MINUTES = (10 * 60) + 30;
+const HOUSEKEEPING_CLOSE_MINUTES = (19 * 60) + 30;
+const CLEANING_WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+function calendarCleaningDay(year, month, day) {
+  const date = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day), 12));
+  if (date.getUTCFullYear() !== Number(year) || date.getUTCMonth() !== Number(month) - 1 || date.getUTCDate() !== Number(day)) return null;
+  return {
+    dateKey: `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}-${String(date.getUTCDate()).padStart(2, "0")}`,
+    epochDay: Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()),
+    weekday: CLEANING_WEEKDAYS[date.getUTCDay()],
+    displayDate: new Intl.DateTimeFormat("en-GB", { timeZone: "UTC", day: "2-digit", month: "short", year: "numeric" }).format(date)
+  };
+}
+
+function bangkokCleaningDay(now = new Date()) {
+  const parts = Object.fromEntries(new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Bangkok", year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", hourCycle: "h23"
+  }).formatToParts(now).map((part) => [part.type, part.value]));
+  return {
+    ...calendarCleaningDay(parts.year, parts.month, parts.day),
+    minutes: (Number(parts.hour) * 60) + Number(parts.minute)
+  };
+}
+
+function cleaningDayFromKey(value) {
+  const match = String(value || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return match ? calendarCleaningDay(match[1], match[2], match[3]) : null;
+}
+
+function addCleaningDays(day, count) {
+  const date = new Date(day.epochDay + (Number(count) * CLEANING_DAY_MS));
+  return calendarCleaningDay(date.getUTCFullYear(), date.getUTCMonth() + 1, date.getUTCDate());
+}
+
+function nextCleaningOperatingDay(day) {
+  let candidate = addCleaningDays(day, 1);
+  while (candidate.weekday === "Monday") candidate = addCleaningDays(candidate, 1);
+  return candidate;
+}
+
+function cleaningRequestedDay(value, now = new Date()) {
+  const normalized = divingPreferredDate(value, now);
+  const dateMatch = normalized.match(/\b(\d{1,2})\s+([A-Za-z]{3})\s+(\d{4})\b/);
+  if (dateMatch) {
+    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const month = months.indexOf(dateMatch[2].slice(0, 3).replace(/^./, (letter) => letter.toUpperCase()));
+    return month >= 0 ? calendarCleaningDay(dateMatch[3], month + 1, dateMatch[1]) : null;
+  }
+  const weekdayMatch = String(value || "").match(/\b(next\s+)?(sunday|monday|tuesday|wednesday|thursday|friday|saturday)\b/i);
+  if (!weekdayMatch) return null;
+  const today = bangkokCleaningDay(now);
+  const desired = CLEANING_WEEKDAYS.findIndex((day) => day.toLowerCase() === weekdayMatch[2].toLowerCase());
+  const current = CLEANING_WEEKDAYS.indexOf(today.weekday);
+  let offset = (desired - current + 7) % 7;
+  if (weekdayMatch[1] && offset === 0) offset = 7;
+  return addCleaningDays(today, offset);
+}
+
+function cleaningPreference(value) {
+  const display = displayPreferredTime(value);
+  if (!display) return null;
+  if (display === "Now") return { kind: "immediate", display };
+  if (display === "As soon as possible") return { kind: "immediate", display };
+  const parts = display.match(/^(\d{1,2}):(\d{2})\s+(AM|PM)$/i);
+  if (!parts) return null;
+  let hour = Number(parts[1]);
+  if (parts[3].toUpperCase() === "PM" && hour < 12) hour += 12;
+  if (parts[3].toUpperCase() === "AM" && hour === 12) hour = 0;
+  return { kind: "clock", display, minutes: (hour * 60) + Number(parts[2]) };
+}
+
+function cleaningPreferenceOnly(value) {
+  return /^\s*(?:(?:today|tomorrow|(?:next\s+)?(?:sun|mon|tues|wednes|thurs|fri|satur)day)\s+)?(?:(?:at|around|by|from)\s*)?(?:asap|as\s+soon\s+as\s+possible|soonest\s+possible|now|right\s+now|immediately|right\s+away|noon|(?:[01]?\d|2[0-3])(?::[0-5]\d)?\s*(?:am|pm)|(?:[01]?\d|2[0-3]):[0-5]\d)\s*[.!]?\s*$/i.test(String(value || ""));
+}
+
+function cleaningPreferenceLabel(preference, requestedDay, today) {
+  return requestedDay.dateKey === today.dateKey
+    ? preference.display
+    : `${preference.display} on ${requestedDay.displayDate}`;
+}
+
+function validateCleaningPreference(preference, requestedDay, today) {
+  const dayOffset = Math.round((requestedDay.epochDay - today.epochDay) / CLEANING_DAY_MS);
+  if (dayOffset < 0) return { valid: false, reason: "past_date", dayOffset };
+  if (preference.kind === "immediate" && dayOffset === 0) return { valid: true, dayOffset };
+  if (requestedDay.weekday === "Monday") return { valid: false, reason: "monday_closed", dayOffset };
+  if (preference.kind === "immediate") return { valid: true, dayOffset };
+  if (dayOffset === 0 && preference.minutes <= today.minutes) return { valid: false, reason: "past_time", dayOffset };
+  if (preference.minutes < HOUSEKEEPING_OPEN_MINUTES) return { valid: false, reason: "before_open", dayOffset };
+  if (preference.minutes >= HOUSEKEEPING_CLOSE_MINUTES) return { valid: false, reason: "after_close", dayOffset };
+  return { valid: true, dayOffset };
+}
+
+function invalidCleaningPreferenceAnswer(preference, requestedDay, validation, today, availability) {
+  const dayPhrase = validation.dayOffset === 0 ? "today" : `on ${requestedDay.weekday}`;
+  if (validation.reason === "past_time") {
+    const next = availability.open ? "" : ` Housekeeping’s next opening is ${availability.nextDay} at 10:30 AM.`;
+    return `${preference.display} has already passed today.${next} What time would you prefer instead? You can also say ‘now’ or ‘ASAP’.`;
+  }
+  if (validation.reason === "monday_closed") {
+    const next = nextCleaningOperatingDay(requestedDay);
+    return `Housekeeping is closed on Mondays. The next availability begins ${next.weekday} at 10:30 AM. What time on ${next.weekday} would you prefer?`;
+  }
+  if (validation.reason === "after_close") {
+    const canChooseEarlier = validation.dayOffset > 0 || (validation.dayOffset === 0 && today.minutes < HOUSEKEEPING_CLOSE_MINUTES);
+    const alternative = canChooseEarlier
+      ? `Please choose an earlier time ${dayPhrase}, between 10:30 AM and 7:30 PM, or give a time during the next housekeeping opening.`
+      : `The next housekeeping opening is ${availability.nextDay} at 10:30 AM. What time would you prefer then?`;
+    return `Housekeeping finishes at 7:30 PM. ${alternative}`;
+  }
+  if (validation.reason === "before_open") {
+    return `Housekeeping starts at 10:30 AM. What time between 10:30 AM and 7:30 PM would you prefer ${dayPhrase}?`;
+  }
+  return `That requested date has already passed. What date and time would you prefer instead?`;
+}
+
+function nextCleaningDayAfterInvalid(requestedDay, validation, today, availability) {
+  if (validation.reason === "monday_closed") return nextCleaningOperatingDay(requestedDay);
+  if (validation.reason === "past_date") return today.weekday === "Monday" ? nextCleaningOperatingDay(today) : today;
+  if (validation.reason === "past_time" && !availability.open) return nextCleaningOperatingDay(today);
+  if (validation.reason === "after_close" && validation.dayOffset === 0 && today.minutes >= HOUSEKEEPING_CLOSE_MINUTES) {
+    return nextCleaningOperatingDay(today);
+  }
+  return requestedDay;
+}
+
 function nextHousekeepingPhrase(availability) {
   if (availability.open) return "during current housekeeping hours";
   if (availability.daysUntilOpen === 0) return "from 10:30 AM today";
@@ -476,8 +607,15 @@ function nextHousekeepingPhrase(availability) {
   return `from 10:30 AM on ${availability.nextDay}`;
 }
 
-function cleaningCollectionAnswer(availability) {
+function cleaningCollectionAnswer(availability, requestedDay = null, today = null) {
   const disclaimer = "We’ll do our best to accommodate your preferred time, but the exact cleaning time may vary depending on housekeeping availability.";
+  if (requestedDay && today && requestedDay.dateKey !== today.dateKey) {
+    if (requestedDay.weekday === "Monday") {
+      const next = nextCleaningOperatingDay(requestedDay);
+      return `Housekeeping is closed on Mondays. We can arrange your room cleaning from 10:30 AM on ${next.weekday}. What time on ${next.weekday} would be most convenient for you? ${disclaimer}`;
+    }
+    return `We can arrange your room cleaning on ${requestedDay.weekday}, ${requestedDay.displayDate}, between 10:30 AM and 7:30 PM. What time would be most convenient for you? ${disclaimer}`;
+  }
   if (availability.weekday === "Monday") {
     return `I’m sorry, but housekeeping is not available on Mondays. We can arrange your room cleaning from 10:30 AM tomorrow. What time would be most convenient for you? ${disclaimer}`;
   }
@@ -522,17 +660,26 @@ function applyCleaningRequestPolicy(question, workflowState = null, now = new Da
       workflow: { type: "cleaning", status: "cancelled", retainPrivateContact: false, missing: [] }
     };
   }
-  const currentNotes = cleanWorkflowNotes(question);
+  const currentNotes = cleaningPreferenceOnly(question) ? "" : cleanWorkflowNotes(question);
   const notes = pendingState
     ? [pendingState.cleaningRequest?.notes, currentNotes].filter(Boolean).join(" ").replace(/\s+/g, " ").trim().slice(0, 500)
     : currentNotes;
-  const preferredTime = displayPreferredTime(question) || pendingState?.cleaningRequest?.preferredTime || "";
+  const preference = cleaningPreference(question);
   const availability = housekeepingAvailability(now);
-  if (!preferredTime) {
+  const today = bangkokCleaningDay(now);
+  const explicitRequestedDay = cleaningRequestedDay(question, now);
+  const storedRequestedDay = cleaningDayFromKey(pendingState?.cleaningRequest?.requestedDate);
+  const requestedDay = explicitRequestedDay || storedRequestedDay || today;
+  if (!preference) {
+    let workflowDay = requestedDay;
+    if (workflowDay.weekday === "Monday") workflowDay = nextCleaningOperatingDay(workflowDay);
+    else if (workflowDay.dateKey === today.dateKey && !availability.open && today.minutes >= HOUSEKEEPING_CLOSE_MINUTES) {
+      workflowDay = nextCleaningOperatingDay(today);
+    }
     return {
       handled: true,
       result: {
-        answer: cleaningCollectionAnswer(availability),
+        answer: cleaningCollectionAnswer(availability, explicitRequestedDay || storedRequestedDay, today),
         intentId: "housekeeping_room_cleaning",
         category: "stay-support", confidence: 1, needsHuman: false, handoff: "stay_support",
         learningGap: false, learningReason: "none", actions: [], suppressDefaultActions: true, source: "service-policy"
@@ -540,10 +687,29 @@ function applyCleaningRequestPolicy(question, workflowState = null, now = new Da
       alertQuestion: notes || "Room-cleaning preference pending.",
       workflow: {
         type: "cleaning", status: "collecting", retainPrivateContact: false, missing: ["preferredTime"],
-        cleaningRequest: { preferredTime: "", notes }
+        cleaningRequest: { preferredTime: "", requestedDate: workflowDay.dateKey, notes }
       }
     };
   }
+  const validation = validateCleaningPreference(preference, requestedDay, today);
+  if (!validation.valid) {
+    const workflowDay = nextCleaningDayAfterInvalid(requestedDay, validation, today, availability);
+    return {
+      handled: true,
+      result: {
+        answer: invalidCleaningPreferenceAnswer(preference, requestedDay, validation, today, availability),
+        intentId: "housekeeping_room_cleaning",
+        category: "stay-support", confidence: 1, needsHuman: false, handoff: "stay_support",
+        learningGap: false, learningReason: "none", actions: [], suppressDefaultActions: true, source: "service-policy"
+      },
+      alertQuestion: notes || "Room-cleaning preference pending.",
+      workflow: {
+        type: "cleaning", status: "collecting", retainPrivateContact: false, missing: ["preferredTime"],
+        cleaningRequest: { preferredTime: "", requestedDate: workflowDay.dateKey, notes }
+      }
+    };
+  }
+  const preferredTime = cleaningPreferenceLabel(preference, requestedDay, today);
   const alertQuestion = `Room cleaning request. Preferred time: ${preferredTime}. Earliest normal housekeeping: ${availability.open ? "currently available" : availability.nextOpening}. Guest notes: ${notes}`;
   return {
     handled: true,
@@ -563,7 +729,7 @@ function applyCleaningRequestPolicy(question, workflowState = null, now = new Da
     alertQuestion,
     workflow: {
       type: "cleaning", status: "ready", retainPrivateContact: false, missing: [],
-      cleaningRequest: { preferredTime, notes }
+      cleaningRequest: { preferredTime, requestedDate: requestedDay.dateKey, notes }
     }
   };
 }
@@ -621,7 +787,7 @@ function lostKeyPolicyResult(question, access, room, now = new Date()) {
   const registrationHref = room ? `/room/${room}#verifiedStayAccess` : "/rooms.html";
   if (!access?.verified || !room) {
     return {
-      answer: "Please verify your active stay before requesting lost-key help. Open your permanent Room page and enter your Airbnb confirmation code or private House stay code. No team alert has been sent and no spare-key code can be shown before verification.",
+      answer: "Please verify your active stay before requesting lost-key help. Open your permanent Room page and enter your Airbnb confirmation code or private House stay code. I haven’t contacted the team yet, and we can continue as soon as your stay is verified.",
       intentId: "lost_key_verification_required",
       category: "room", confidence: 1, needsHuman: false, handoff: "none",
       learningGap: false, learningReason: "none",
@@ -632,7 +798,7 @@ function lostKeyPolicyResult(question, access, room, now = new Date()) {
   }
   if (isAfterHours(now)) {
     return {
-      answer: "Your stay is verified. After-hours spare-key access requires accepting the 500 THB lost-key replacement fee on your protected Room page. The House team must be notified successfully before the key-box code can be shown there. Passport registration is separate and does not block this lost-key help.",
+      answer: "Your stay is verified. For after-hours lost-key help, open your Room page and confirm the 500 THB lost-key replacement fee to continue.",
       intentId: "lost_key",
       category: "room", confidence: 1, needsHuman: false, handoff: "none",
       learningGap: false, learningReason: "none",
@@ -642,7 +808,7 @@ function lostKeyPolicyResult(question, access, room, now = new Date()) {
     };
   }
   return {
-    answer: "I’m notifying The House team about your lost key now. No key-box code will be shown through the Concierge.",
+    answer: "I’m contacting The House team about your lost key now. Someone from the team will assist you as soon as possible.",
     intentId: "lost_key",
     category: "room", confidence: 1, needsHuman: true, handoff: "stay_support",
     learningGap: false, learningReason: "none", actions: [], suppressDefaultActions: true,
@@ -2015,7 +2181,7 @@ export async function handleConciergeRequest(request, env, ctx, now = new Date()
     } else if (result.intentId === "lost_key") {
       result = {
         ...result,
-        answer: "Thank you. I’ve notified The House team about your lost key. No key-box code has been exposed through the Concierge.",
+        answer: "Thank you. I’ve notified The House team about your lost key. Someone from the team will assist you as soon as possible.",
         actions: []
       };
     } else if (!result.housekeepingRequest) {
@@ -2058,7 +2224,7 @@ export async function handleConciergeRequest(request, env, ctx, now = new Date()
   } else if (result.intentId === "lost_key" && result.needsHuman) {
     result = {
       ...result,
-      answer: "I couldn’t notify The House team automatically, so please don’t rely on the lost-key request as received. Please call The House for help.",
+      answer: "I couldn’t reach The House team just now. Please call The House for help with your lost key.",
       actions: [{ label: "Call Us", type: "route", route: "houseCall" }]
     };
   }

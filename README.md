@@ -1,4 +1,4 @@
-# Guest Guide Platform with AI Concierge — The House v5.11.14
+# Guest Guide Platform with AI Concierge — The House v5.11.15
 
 The House – Koh Tao guest guide is a production-oriented, mobile-first digital guest guide and concierge platform. It combines property information, curated island guidance, structured place and activity data, and centralized contact and booking routes.
 
@@ -17,6 +17,16 @@ The House – Koh Tao guest guide is a production-oriented, mobile-first digital
 - Model-powered, room-aware AI Concierge with controlled learning
 
 The Activities module contains 49 structured profiles covering diving, freediving, snorkelling, boat trips, beach experiences, kayaking, paddleboarding, hiking, viewpoints, climbing, yoga, Muay Thai, massage, cooking, wildlife, photography, night activities and rainy-day options.
+
+## v5.11.15 release focus
+
+- Activates template-aware payload construction for the six approved production Meta templates: service v3, luggage v2, booking v2, urgent v2, lost-key v3 and alert-status v1.
+- Enforces the exact body-parameter order and count for each template, retains the legacy v1 schemas only as an explicit rollback path, and fails closed for unknown or mismatched configurations.
+- Sends one non-recursive ACKNOWLEDGED or RESOLVED update to the other recipients assigned to an alert while excluding the actor, unrelated roles and duplicate webhook deliveries.
+- Treats Meta delivery as successful only when the Graph API accepts the request and returns a provider message ID; guest confirmations therefore remain truthful and spare-key release stays fail closed.
+- Expands the desktop Concierge to use substantially more viewport height, compacts common questions after conversation begins and preserves the mobile sheet layout.
+- Simplifies the verified lost-key explanation, protected fee step and successful spare-key instructions without weakening stay, time, fee, notification or rotation gates.
+- Preserves v5.11.14 housekeeping, fire, medical, room-location, diving-booking, contact-redaction and relative-date behavior.
 
 ## v5.11.14 release focus
 

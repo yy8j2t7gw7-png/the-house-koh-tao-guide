@@ -1,6 +1,6 @@
 # Product Roadmap
 
-Baseline: v5.11.14
+Baseline: v5.11.15
 
 ## Completed
 
@@ -22,7 +22,7 @@ Baseline: v5.11.14
 - [x] Bamboo Beach Bar website follow-ups return its official Facebook and Instagram actions
 - [x] Concierge loading state uses a quiet animated-dot indicator
 - [x] Concierge startup and concierge-first House-support contact routing protected by regression tests
-- [x] Five-purpose Meta WhatsApp template integration for service, booking, luggage, urgent and verified lost-key alerts
+- [x] Six active Meta WhatsApp template integrations for service, booking, luggage, urgent, verified lost-key and staff status updates
 - [x] Actionable luggage requests routed to Su with structured operational details
 - [x] Complete-field luggage workflow requiring arrival/departure, requested time, bag count and a transient international reply contact before submission
 - [x] Final server-side luggage alert boundary rejecting incomplete or stale requests and universal visible-contact redaction
@@ -131,7 +131,7 @@ The concierge must be useful to real guests before further Explore expansion.
 - [x] Add protected owner and Su notification recipient configuration
 - [x] Add one-alert-per-recipient delivery and escalation logic
 - [x] Integrate the official WhatsApp Business Platform adapter
-- [x] Configure the production Meta account, all five approved Utility templates and protected recipients
+- [x] Configure the production Meta account, all six approved Utility templates and protected recipients
 - [x] Verify live outbound delivery using non-sensitive test events
 - [ ] Complete production acknowledgement and ten-minute escalation checks
 
@@ -141,7 +141,7 @@ Guests may continue using ordinary WhatsApp handoffs. Automated internal alerts 
 
 - [x] Push the v5.5.0 release to the existing hosting workflow
 - [x] Confirm `/api/concierge/status` reports AI and learning enabled
-- [ ] Deploy v5.11.14 and confirm natural figurative/cancellation wording, fire evacuation/Rescue guidance, exact office/after-hours housekeeping behavior, **Your Room** navigation and the complete structured diving workflow. Also recheck v5.11.13 emergency confirmation, one-response behavior, luggage field gates, contact redaction, lost-key rotation lock, sitewide legal links and established routing.
+- [ ] Deploy v5.11.15 and live-test service v3, luggage v2, booking v2, urgent v2, lost-key v3 and staff status v1 deliveries. Confirm actor exclusion, duplicate-webhook idempotency, truthful guest fallbacks, the taller desktop Concierge and the concise protected lost-key flow. Also recheck v5.11.14 housekeeping, fire/Rescue, relative booking dates, structured diving and every established privacy/security gate.
 - [x] Add `STAY_TOKEN_PEPPER` and `RESERVATION_SYNC_TOKEN` Worker secrets
 - [ ] Add protected `SPARE_KEY_CODES` Worker secret before activating automatic spare-key release
 - [x] Install and authorize the included Airbnb Google Apps Script synchronizer

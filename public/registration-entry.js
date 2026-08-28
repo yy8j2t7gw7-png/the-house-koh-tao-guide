@@ -57,7 +57,7 @@
     keyConfirmFee: "Please confirm the 500 THB lost-key replacement fee before continuing.",
     keyRateLimited: "Too many confirmation attempts. Please wait a minute before trying again.",
     keyReleasing: "Notifying The House team and preparing your spare-key access…",
-    keyReady: "Your spare-key code is ready.",
+    keyReady: "Your spare key is ready.",
     copied: "Code copied.",
     copy: "Copy code"
   };

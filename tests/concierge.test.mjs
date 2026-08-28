@@ -26,10 +26,14 @@ import { retrieveApprovedProjectKnowledge } from "../src/project-knowledge.js";
 import { handleTranslationRequest } from "../src/i18n-api.js";
 import { classifyConciergeAlert, isAfterHours, normalizeBangkokRequestedDate, safeAlertSummary } from "../src/alert-policy.js";
 import {
+  buildWhatsAppStatusPayload,
+  buildWhatsAppTemplatePayload,
   createConciergeAlert,
+  dispatchConciergeAlert,
   handleWhatsAppWebhook,
   houseEmergencyContact,
   processDueAlertEscalations,
+  validateWhatsAppTemplateParameters,
   whatsappAlertConfiguration
 } from "../src/whatsapp-alerts.js";
 import { servePublicLegalPage } from "../src/public-legal.js";
@@ -358,6 +362,23 @@ function guestRequest(question, extra = {}) {
   });
 }
 
+async function signedWhatsAppCommand(env, from, text) {
+  const raw = JSON.stringify({ entry: [{ changes: [{ value: { messages: [{ from, text: { body: text } }] } }] }] });
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(env.META_APP_SECRET),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  const signature = `sha256=${Buffer.from(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(raw))).toString("hex")}`;
+  return new Request("https://guide.example/api/whatsapp/webhook", {
+    method: "POST",
+    headers: { "x-hub-signature-256": signature },
+    body: raw
+  });
+}
+
 test("critical guest requests stay deterministic and room-aware", async () => {
   const { env, store } = createEnvironment({ OPENAI_API_KEY: "not-used" });
   const pending = [];
@@ -484,7 +505,7 @@ test("an actionable luggage request routes to Su and owners with the dedicated p
     assert.deepEqual(body.actions, []);
     assert.equal(payloads.length, 3);
     assert.deepEqual(payloads.map((item) => item.to).sort(), ["66640000001", "66810000002", "66820000003"]);
-    assert.equal(payloads.every((item) => item.template.name === "house_luggage_alert_v1"), true);
+    assert.equal(payloads.every((item) => item.template.name === "house_luggage_alert_v2"), true);
     assert.equal(payloads[0].template.components[0].parameters[2].text, "Departure");
     assert.equal(payloads[0].template.components[0].parameters[3].text, "2");
   } finally {
@@ -980,7 +1001,7 @@ test("main and room welcome pages make required registration prominent", async (
   assert.match(room, /Secure after-hours help if you cannot enter your room/);
   assert.ok(room.indexOf('id="openSpareKeyAccess"') < room.indexOf('id="spareKeyAccess"'));
   assert.match(room, /id="spareKeyAccess"[^>]*hidden/);
-  assert.match(room, /do not need to enter your Airbnb confirmation code again/);
+  assert.match(room, /no Airbnb confirmation code is needed/);
   assert.match(room, /src="\/registration-entry\.js"/);
   assert.match(registrationEntry, /\/api\/stay\/verify/);
   assert.match(registrationEntry, /\/api\/stay\/passport-link/);
@@ -1074,7 +1095,7 @@ test("guest localization supports seven languages and keeps the owner dashboard 
   assert.doesNotMatch(admin, /src="\/i18n\.js"/);
   assert.match(runtime, /exploreContentDeferred/);
   assert.match(runtime, /element\.closest\("\.section,\.footer"\)/);
-  assert.match(runtime, /houseGuideTranslations:v5\.11\.14:/);
+  assert.match(runtime, /houseGuideTranslations:v5\.11\.15:/);
   assert.match(runtime, /MAX_REQUEST_RETRIES = 2/);
   assert.match(runtime, /let flushRunning = false/);
 });
@@ -1113,8 +1134,15 @@ test("critical emergency and registration wording is reviewed in every guest lan
     "Choice saved. Bring every required original passport to The House. The guide opens after our team completes the check and TM30 registration.",
     "Emergency help remains available without verification.",
     "After-hours spare-key help",
-    "If you are locked out after hours, you can request access to the spare key for your room here.",
-    "You are already verified for this room, so you do not need to enter your Airbnb confirmation code again.",
+    "You can access the spare key for your room between 7:30 PM and 10:30 AM.",
+    "You're already verified for this room — no Airbnb confirmation code is needed.",
+    "If your key has been lost, a 500 THB replacement fee applies. The House team will be notified before the spare-key code is released.",
+    "Your key-box code is never sent through WhatsApp.",
+    "Your spare key is ready.",
+    "Use the code below to open the key box next to your room door.",
+    "Key-box code",
+    "Please take the spare key and close the key box again.",
+    "If you need any further help, contact The House Concierge.",
     "I understand the 500 THB lost-key replacement fee and want to continue.",
     "Request spare key",
     "Contact The House Concierge",
@@ -1596,7 +1624,7 @@ test("critical concierge requests require explicit confirmation before sending W
     assert.equal(store.alerts[0].recipientGroup, "urgent_response");
     assert.equal(outbound.length, 3);
     assert.deepEqual(outbound.map((item) => item.body.to).sort(), ["66810000002", "66820000003", "66960000001"]);
-    assert.equal(outbound.every((item) => item.body.template.name === "house_urgent_alert_v1"), true);
+    assert.equal(outbound.every((item) => item.body.template.name === "house_urgent_alert_v2"), true);
     assert.doesNotMatch(JSON.stringify(outbound), /66640000001/);
     assert.doesNotMatch(JSON.stringify(store.alertDeliveries), /66810000002|66820000003|66960000001/);
     assert.equal(whatsappAlertConfiguration(env).configured, true);
@@ -1673,7 +1701,10 @@ test("a contact collected for one workflow cannot satisfy a different later work
 
 test("unacknowledged critical alerts escalate and authorized WhatsApp replies can resolve them", async () => {
   const recipientSecret = JSON.stringify({
-    emergency: [{ label: "Owner 1", phone: "+66 81 000 0002" }],
+    emergency: [
+      { label: "Owner 1", phone: "+66 81 000 0002" },
+      { label: "Owner 2", phone: "+66 82 000 0003" }
+    ],
     escalation: [{ label: "Owner 2", phone: "+66 82 000 0003" }]
   });
   const { env, store } = createEnvironment({
@@ -2169,7 +2200,7 @@ test("a complete diving request creates one protected Fah-and-owner alert and re
     assert.equal(store.alerts[0].recipientGroup, "booking_with_owners");
     assert.equal(outbound.length, 3);
     assert.deepEqual(outbound.map((item) => item.to).sort(), ["66810000002", "66820000003", "66960000001"]);
-    assert.equal(outbound.every((item) => item.template.name === "house_booking_alert_v1"), true);
+    assert.equal(outbound.every((item) => item.template.name === "house_booking_alert_v2"), true);
     const parameters = outbound[0].template.components[0].parameters;
     assert.equal(parameters[2].text, "Diving");
     assert.equal(parameters[4].text, "2");
@@ -3228,4 +3259,298 @@ test("WhatsApp acknowledgement notifies other assigned recipients once without e
     assert.doesNotMatch(JSON.stringify(outbound), /66640000001/);
     assert.equal(store.alerts.length, 1);
   } finally { globalThis.fetch = originalFetch; }
+});
+
+test("all active Meta templates use their exact approved body schemas", () => {
+  const recipient = { label: "Team", phone: "66810000002" };
+  const env = {
+    WHATSAPP_ALERT_TEMPLATE_LANGUAGE: "en_US",
+    WHATSAPP_SERVICE_TEMPLATE_NAME: "house_service_alert_v3",
+    WHATSAPP_LUGGAGE_TEMPLATE_NAME: "house_luggage_alert_v2",
+    WHATSAPP_BOOKING_TEMPLATE_NAME: "house_booking_alert_v2",
+    WHATSAPP_URGENT_TEMPLATE_NAME: "house_urgent_alert_v2",
+    WHATSAPP_LOST_KEY_TEMPLATE_NAME: "house_lost_key_alert_v3",
+    WHATSAPP_STATUS_TEMPLATE_NAME: "house_alert_status_v1"
+  };
+  const base = {
+    id: "alert_schema_reference",
+    room: "3",
+    createdAt: "2026-08-28T11:00:00.000Z",
+    bangkokTime: "28 Aug 2026, 18:00",
+    severity: "attention"
+  };
+  const values = (built) => built.payload.template.components[0].parameters.map((item) => item.text);
+  const assertBodyOnly = (built, name, count) => {
+    assert.equal(built.ok, true);
+    assert.equal(built.payload.template.name, name);
+    assert.equal(built.payload.template.language.code, "en_US");
+    assert.equal(built.payload.template.components.length, 1);
+    assert.equal(built.payload.template.components[0].type, "body");
+    assert.equal(built.payload.template.components[0].parameters.length, count);
+    assert.equal(built.payload.template.components.some((component) => component.type === "header"), false);
+  };
+
+  const service = buildWhatsAppTemplatePayload({ ...base, alertType: "stay_support", summary: "I need fresh towels." }, recipient, env);
+  assertBodyOnly(service, "house_service_alert_v3", 5);
+  assert.deepEqual(values(service), [base.id, "Room 3", "Fresh towels", base.bangkokTime, "I need fresh towels."]);
+
+  const luggage = buildWhatsAppTemplatePayload({
+    ...base,
+    alertType: "luggage_storage",
+    summary: "Please store the bags near checkout.",
+    luggageRequest: { context: "Departure", bagCount: "2", requestedTime: "3:00 PM" },
+    privateReplyContact: "+66 81 234 5678"
+  }, recipient, env);
+  assertBodyOnly(luggage, "house_luggage_alert_v2", 6);
+  assert.deepEqual(values(luggage).slice(0, 5), [base.id, "Room 3", "Departure", "2", "3:00 PM"]);
+  assert.match(values(luggage)[5], /Guest reply: \+66812345678/);
+
+  const booking = buildWhatsAppTemplatePayload({
+    ...base,
+    alertType: "booking_request",
+    summary: "Please arrange a calm morning dive.",
+    bookingRequest: {
+      kind: "diving",
+      activity: "Diving",
+      preferredDate: "29 Aug 2026",
+      guestCount: "2",
+      option: "Fun Diving",
+      certificationLevel: "Advanced Open Water",
+      notes: "Calm morning preferred"
+    },
+    privateReplyContact: "+66 81 234 5678"
+  }, recipient, env);
+  assertBodyOnly(booking, "house_booking_alert_v2", 6);
+  assert.deepEqual(values(booking).slice(0, 5), [base.id, "Room 3", "Diving", "29 Aug 2026", "2"]);
+  assert.match(values(booking)[5], /Fun Diving[\s\S]*Certification: Advanced Open Water[\s\S]*Guest reply: \+66812345678/);
+
+  const urgent = buildWhatsAppTemplatePayload({ ...base, alertType: "property_emergency", severity: "critical", summary: "Water is flooding the room." }, recipient, env);
+  assertBodyOnly(urgent, "house_urgent_alert_v2", 5);
+  assert.deepEqual(values(urgent), [base.id, "Room 3", "Serious property incident", base.bangkokTime, "Water is flooding the room."]);
+
+  const lostKey = buildWhatsAppTemplatePayload({ ...base, alertType: "verified_spare_key_release", summary: "Verified spare-key release requested." }, recipient, env);
+  assertBodyOnly(lostKey, "house_lost_key_alert_v3", 3);
+  assert.deepEqual(values(lostKey), [base.id, "Room 3", base.bangkokTime]);
+
+  const status = buildWhatsAppStatusPayload({ ...base, alertType: "stay_support", summary: "Fresh towels" }, recipient, "ACKNOWLEDGED", "Su", env);
+  assertBodyOnly(status, "house_alert_status_v1", 5);
+  assert.deepEqual(values(status), [base.id, "Room 3", "Fresh towels", "Su", "ACKNOWLEDGED"]);
+});
+
+test("template validation supports deliberate v1 rollback and rejects unknown or malformed schemas", () => {
+  const recipient = { label: "Team", phone: "66810000002" };
+  const alert = {
+    id: "alert_rollback_reference",
+    room: "4",
+    alertType: "stay_support",
+    severity: "attention",
+    summary: "Please bring soap.",
+    bangkokTime: "28 Aug 2026, 18:00",
+    createdAt: "2026-08-28T11:00:00.000Z"
+  };
+  const legacy = buildWhatsAppTemplatePayload(alert, recipient, { WHATSAPP_SERVICE_TEMPLATE_NAME: "house_service_alert_v1" });
+  assert.equal(legacy.ok, true);
+  assert.equal(legacy.payload.template.name, "house_service_alert_v1");
+  assert.equal(legacy.bodyParameterCount, 5);
+  assert.deepEqual(validateWhatsAppTemplateParameters("house_service_alert_v3", "service", ["1", "2", "3", "4"]), {
+    ok: false,
+    name: "house_service_alert_v3",
+    errorCode: "parameter_count_mismatch"
+  });
+  const unknown = buildWhatsAppTemplatePayload(alert, recipient, { WHATSAPP_SERVICE_TEMPLATE_NAME: "unapproved_service_template" });
+  assert.equal(unknown.ok, false);
+  assert.equal(unknown.errorCode, "unmapped_template");
+});
+
+test("Meta rejection and network failures stay sanitized while partial delivery is truthful", async () => {
+  const recipients = JSON.stringify({
+    support: [
+      { label: "Team A", phone: "+66 64 000 0001" },
+      { label: "Team B", phone: "+66 81 000 0002" }
+    ]
+  });
+  const alert = {
+    id: "alert_delivery_reference",
+    recipientGroup: "support",
+    room: "5",
+    alertType: "stay_support",
+    severity: "attention",
+    summary: "I need fresh towels.",
+    bangkokTime: "28 Aug 2026, 18:00",
+    createdAt: "2026-08-28T11:00:00.000Z"
+  };
+  const originalFetch = globalThis.fetch;
+  try {
+    const partial = createEnvironment({
+      WHATSAPP_ACCESS_TOKEN: "test-token",
+      WHATSAPP_PHONE_NUMBER_ID: "123",
+      META_APP_SECRET: "test-secret",
+      WHATSAPP_ALERT_RECIPIENTS: recipients
+    });
+    let calls = 0;
+    globalThis.fetch = async () => {
+      calls += 1;
+      return calls === 1
+        ? new Response(JSON.stringify({ messages: [{ id: "wamid.partial" }] }), { status: 200, headers: { "content-type": "application/json" } })
+        : new Response(JSON.stringify({ error: { code: 131008 } }), { status: 400, headers: { "content-type": "application/json" } });
+    };
+    assert.deepEqual(await dispatchConciergeAlert(alert, partial.env), { attempted: 2, accepted: 1 });
+    assert.deepEqual(partial.store.alertDeliveries.map((item) => item.status).sort(), ["accepted", "failed"]);
+    assert.doesNotMatch(JSON.stringify(partial.store.alertDeliveries), /66640000001|66810000002|test-token|test-secret/);
+
+    for (const failure of [
+      () => new Response(JSON.stringify({ error: { code: 131008 } }), { status: 400, headers: { "content-type": "application/json" } }),
+      () => new Response(JSON.stringify({ error: { code: 2 } }), { status: 500, headers: { "content-type": "application/json" } }),
+      () => { throw new TypeError("simulated network timeout"); }
+    ]) {
+      const current = createEnvironment({
+        WHATSAPP_ACCESS_TOKEN: "test-token",
+        WHATSAPP_PHONE_NUMBER_ID: "123",
+        META_APP_SECRET: "test-secret",
+        WHATSAPP_ALERT_RECIPIENTS: recipients
+      });
+      globalThis.fetch = async () => failure();
+      assert.deepEqual(await dispatchConciergeAlert(alert, current.env), { attempted: 2, accepted: 0 });
+      assert.equal(current.store.alertDeliveries.every((item) => item.status === "failed"), true);
+      assert.doesNotMatch(JSON.stringify(current.store.alertDeliveries), /66640000001|66810000002|test-token|test-secret|simulated network timeout/);
+    }
+
+    const unmapped = createEnvironment({
+      WHATSAPP_ACCESS_TOKEN: "test-token",
+      WHATSAPP_PHONE_NUMBER_ID: "123",
+      META_APP_SECRET: "test-secret",
+      WHATSAPP_ALERT_RECIPIENTS: recipients,
+      WHATSAPP_SERVICE_TEMPLATE_NAME: "wrong_template_name"
+    });
+    let networkCalled = false;
+    globalThis.fetch = async () => { networkCalled = true; throw new Error("must not run"); };
+    assert.deepEqual(await dispatchConciergeAlert(alert, unmapped.env), { attempted: 2, accepted: 0 });
+    assert.equal(networkCalled, false);
+    assert.equal(unmapped.store.alertDeliveries.every((item) => item.errorCode === "unmapped_template"), true);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("failed service-v3 delivery never produces a misleading guest success", async () => {
+  const { env, store } = createEnvironment({
+    OPENAI_API_KEY: "not-used",
+    WHATSAPP_ACCESS_TOKEN: "test-token",
+    WHATSAPP_PHONE_NUMBER_ID: "123",
+    META_APP_SECRET: "test-secret",
+    WHATSAPP_ALERT_RECIPIENTS: JSON.stringify({ support: [{ label: "Su", phone: "+66 64 000 0001" }] })
+  });
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => new Response(JSON.stringify({ error: { code: 131008 } }), {
+    status: 400,
+    headers: { "content-type": "application/json" }
+  });
+  try {
+    const response = await handleConciergeRequest(guestRequest("I need fresh towels"), env);
+    const body = await response.json();
+    assert.match(body.answer, /couldn’t send that request automatically/i);
+    assert.doesNotMatch(body.answer, /team has been notified|sent to The House team/i);
+    assert.equal(store.alerts.length, 1);
+    assert.equal(store.alertDeliveries.every((item) => item.status === "failed"), true);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("ACK and RESOLVE propagate status once to other assigned recipients only", async () => {
+  const { env, store } = createEnvironment({
+    WHATSAPP_ACCESS_TOKEN: "test-token",
+    WHATSAPP_PHONE_NUMBER_ID: "123",
+    WHATSAPP_WEBHOOK_VERIFY_TOKEN: "verify",
+    META_APP_SECRET: "status-secret",
+    WHATSAPP_STATUS_TEMPLATE_NAME: "house_alert_status_v1",
+    WHATSAPP_ALERT_RECIPIENTS: JSON.stringify({
+      support: [{ label: "Su", phone: "+66 64 000 0001" }],
+      emergency: [
+        { label: "Owner 1", phone: "+66 81 000 0002" },
+        { label: "Owner 2", phone: "+66 82 000 0003" }
+      ]
+    })
+  });
+  const id = "alert_12345678-1234-1234-1234-123456789088";
+  store.alerts.push({ id, alertType: "stay_support", recipientGroup: "support_with_owners", room: "4", status: "open", summary: "Please bring soap", escalationDueAt: "2026-08-28T12:00:00.000Z", createdAt: "2026-08-28T11:00:00.000Z" });
+  const outbound = [];
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (_url, options) => {
+    outbound.push(JSON.parse(options.body));
+    return new Response(JSON.stringify({ messages: [{ id: `wamid.status.${outbound.length}` }] }), { status: 200, headers: { "content-type": "application/json" } });
+  };
+  try {
+    const ack = await signedWhatsAppCommand(env, "66810000002", `ACK ${id}`);
+    await handleWhatsAppWebhook(ack, env);
+    assert.equal(store.alerts[0].status, "acknowledged");
+    assert.equal(outbound.length, 2);
+    assert.deepEqual(outbound.map((item) => item.to).sort(), ["66640000001", "66820000003"]);
+    outbound.forEach((item) => {
+      const parameters = item.template.components[0].parameters.map((entry) => entry.text);
+      assert.deepEqual(parameters, [id, "Room 4", "Soap", "Owner 1", "ACKNOWLEDGED"]);
+      assert.equal(item.template.name, "house_alert_status_v1");
+    });
+
+    const duplicateAck = await signedWhatsAppCommand(env, "66810000002", `ACK ${id}`);
+    await handleWhatsAppWebhook(duplicateAck, env);
+    assert.equal(outbound.length, 2);
+
+    const resolve = await signedWhatsAppCommand(env, "66820000003", `RESOLVE ${id}`);
+    await handleWhatsAppWebhook(resolve, env);
+    assert.equal(store.alerts[0].status, "resolved");
+    assert.equal(outbound.length, 4);
+    assert.deepEqual(outbound.slice(2).map((item) => item.to).sort(), ["66640000001", "66810000002"]);
+    outbound.slice(2).forEach((item) => {
+      const parameters = item.template.components[0].parameters.map((entry) => entry.text);
+      assert.deepEqual(parameters, [id, "Room 4", "Soap", "Owner 2", "RESOLVED"]);
+    });
+    const duplicateResolve = await signedWhatsAppCommand(env, "66820000003", `RESOLVE ${id}`);
+    await handleWhatsAppWebhook(duplicateResolve, env);
+    assert.equal(outbound.length, 4);
+    assert.equal(store.alerts.length, 1);
+    assert.equal(store.alertDeliveries.filter((item) => item.stage.startsWith("status_")).length, 4);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("unauthorized or invalid WhatsApp status commands cannot change alerts or send updates", async () => {
+  const { env, store } = createEnvironment({
+    WHATSAPP_ACCESS_TOKEN: "test-token",
+    WHATSAPP_PHONE_NUMBER_ID: "123",
+    META_APP_SECRET: "status-secret",
+    WHATSAPP_STATUS_TEMPLATE_NAME: "house_alert_status_v1",
+    WHATSAPP_ALERT_RECIPIENTS: JSON.stringify({
+      support: [{ label: "Su", phone: "+66 64 000 0001" }],
+      emergency: [{ label: "Owner", phone: "+66 81 000 0002" }]
+    })
+  });
+  const id = "alert_12345678-1234-1234-1234-123456789077";
+  store.alerts.push({ id, alertType: "stay_support", recipientGroup: "support", room: "5", status: "open", summary: "Fresh towels", createdAt: "2026-08-28T11:00:00.000Z" });
+  let sends = 0;
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => { sends += 1; return new Response("{}"); };
+  try {
+    await handleWhatsAppWebhook(await signedWhatsAppCommand(env, "66810000002", `ACK ${id}`), env);
+    await handleWhatsAppWebhook(await signedWhatsAppCommand(env, "66640000001", "ACK alert_00000000-0000-0000-0000-000000000000"), env);
+    assert.equal(store.alerts[0].status, "open");
+    assert.equal(sends, 0);
+    assert.equal(store.alertDeliveries.length, 0);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("desktop Concierge expands the conversation while mobile keeps its sheet layout", async () => {
+  const [styles, script] = await Promise.all([
+    readFile(new URL("../public/ai-concierge.css", import.meta.url), "utf8"),
+    readFile(new URL("../public/ai-concierge.js", import.meta.url), "utf8")
+  ]);
+  assert.match(styles, /height:min\(85vh,860px\)/);
+  assert.match(styles, /\.ai-concierge-panel\.has-conversation \.ai-concierge-messages[\s\S]*flex:1[\s\S]*max-height:none/);
+  assert.match(styles, /\.ai-concierge-panel\.has-conversation \.ai-concierge-context\{display:none\}/);
+  assert.match(styles, /@media\(max-width:640px\)[\s\S]*height:auto[\s\S]*max-height:min\(84vh,760px\)/);
+  assert.match(script, /panel\.classList\.add\("has-conversation"\)/);
+  assert.match(styles, /\.ai-concierge-panel\.has-conversation \.ai-concierge-chat[\s\S]*flex:1/);
 });

@@ -2,6 +2,33 @@
 
 All notable changes to The House – Koh Tao guest guide are recorded here.
 
+## v5.11.15 — Active Meta Templates, Staff Status Updates & Concierge UX
+
+### Meta template integration
+
+- Added one schema-controlled payload layer for `house_service_alert_v3`, `house_luggage_alert_v2`, `house_booking_alert_v2`, `house_urgent_alert_v2`, `house_lost_key_alert_v3` and `house_alert_status_v1`.
+- Enforced exact body-only parameter counts and ordering, including protected reply contacts inside luggage/booking notes where required and useful human-readable request labels for service and status messages.
+- Kept the legacy v1 schemas as an intentional rollback path while making all six active production templates the repository defaults.
+- Unknown template names, wrong template purposes and parameter-count mismatches now fail closed before any Meta request is made.
+- A Meta submission counts as accepted only after both a successful HTTP response and a returned provider message ID; sanitized failure records contain no recipient number, protected contact or secret.
+
+### Staff alert lifecycle
+
+- Authorized `RECEIVED`, `ACK` and `RESOLVE` replies now send one `house_alert_status_v1` update to the other recipients assigned to that alert.
+- Excludes the actor and unrelated recipient roles, rejects unassigned senders and invented references, and uses existing alert state to suppress duplicate webhook status messages.
+- Status messages do not create operational alerts, do not recurse and do not enter escalation; acknowledgement continues to stop applicable escalation.
+
+### Guest experience and lost-key safety
+
+- Increased the desktop Concierge height to about 85% of the viewport, kept the composer accessible and compacted common questions once conversation begins without changing mobile behavior.
+- Replaced dense lost-key copy with concise hospitality wording in the Concierge, protected fee screen and successful release state; the fallback call label is now **Call Us**.
+- Preserved the verified active-stay gate, 19:30–10:30 Bangkok window, explicit 500 THB acceptance, successful protected-notification requirement, secret exclusion, rotation lock and second-release block.
+
+### Regression protection
+
+- Expanded the complete suite from 91 to 98 tests, including every active and rollback template schema, delivery failures, staff status distribution and idempotency, desktop/mobile layout and revised lost-key wording.
+- Preserved all existing housekeeping, emergency, booking, registration, translation, privacy and operational tests.
+
 ## v5.11.14 — Guest-Natural Safety, Service Hours & Structured Diving
 
 ### Guest experience and safety

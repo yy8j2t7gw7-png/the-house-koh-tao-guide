@@ -10,11 +10,28 @@ const DEFAULT_TEMPLATE_LANGUAGE = "en_US";
 const DEFAULT_ESCALATION_MINUTES = 10;
 const MAX_RECIPIENTS_PER_GROUP = 12;
 const TEMPLATE_DEFAULTS = Object.freeze({
-  service: "house_service_alert_v1",
-  booking: "house_booking_alert_v1",
-  luggage: "house_luggage_alert_v1",
-  urgent: "house_urgent_alert_v1",
-  lostKey: "house_lost_key_alert_v1"
+  service: "house_service_alert_v3",
+  booking: "house_booking_alert_v2",
+  luggage: "house_luggage_alert_v2",
+  urgent: "house_urgent_alert_v2",
+  lostKey: "house_lost_key_alert_v3",
+  status: "house_alert_status_v1"
+});
+
+const TEMPLATE_SCHEMAS = Object.freeze({
+  house_service_alert_v3: Object.freeze({ kind: "service", bodyParameterCount: 5 }),
+  house_luggage_alert_v2: Object.freeze({ kind: "luggage", bodyParameterCount: 6 }),
+  house_booking_alert_v2: Object.freeze({ kind: "booking", bodyParameterCount: 6 }),
+  house_urgent_alert_v2: Object.freeze({ kind: "urgent", bodyParameterCount: 5 }),
+  house_lost_key_alert_v3: Object.freeze({ kind: "lostKey", bodyParameterCount: 3 }),
+  house_alert_status_v1: Object.freeze({ kind: "status", bodyParameterCount: 5 }),
+  // Kept only as a deliberate rollback path. These are the legacy payload
+  // layouts shipped before the replacement templates became active.
+  house_service_alert_v1: Object.freeze({ kind: "service", bodyParameterCount: 5 }),
+  house_luggage_alert_v1: Object.freeze({ kind: "luggage", bodyParameterCount: 6 }),
+  house_booking_alert_v1: Object.freeze({ kind: "booking", bodyParameterCount: 6 }),
+  house_urgent_alert_v1: Object.freeze({ kind: "urgent", bodyParameterCount: 5 }),
+  house_lost_key_alert_v1: Object.freeze({ kind: "lostKey", bodyParameterCount: 3 })
 });
 
 function digits(value) {
@@ -139,11 +156,12 @@ export function whatsappAlertConfiguration(env) {
 
 function templateNames(env) {
   return {
-    service: String(env.WHATSAPP_SERVICE_TEMPLATE_NAME || TEMPLATE_DEFAULTS.service),
-    booking: String(env.WHATSAPP_BOOKING_TEMPLATE_NAME || TEMPLATE_DEFAULTS.booking),
-    luggage: String(env.WHATSAPP_LUGGAGE_TEMPLATE_NAME || TEMPLATE_DEFAULTS.luggage),
-    urgent: String(env.WHATSAPP_URGENT_TEMPLATE_NAME || TEMPLATE_DEFAULTS.urgent),
-    lostKey: String(env.WHATSAPP_LOST_KEY_TEMPLATE_NAME || TEMPLATE_DEFAULTS.lostKey)
+    service: String(env.WHATSAPP_SERVICE_TEMPLATE_NAME || TEMPLATE_DEFAULTS.service).trim(),
+    booking: String(env.WHATSAPP_BOOKING_TEMPLATE_NAME || TEMPLATE_DEFAULTS.booking).trim(),
+    luggage: String(env.WHATSAPP_LUGGAGE_TEMPLATE_NAME || TEMPLATE_DEFAULTS.luggage).trim(),
+    urgent: String(env.WHATSAPP_URGENT_TEMPLATE_NAME || TEMPLATE_DEFAULTS.urgent).trim(),
+    lostKey: String(env.WHATSAPP_LOST_KEY_TEMPLATE_NAME || TEMPLATE_DEFAULTS.lostKey).trim(),
+    status: String(env.WHATSAPP_STATUS_TEMPLATE_NAME || TEMPLATE_DEFAULTS.status).trim()
   };
 }
 
@@ -164,7 +182,7 @@ async function recipientHash(phone, env) {
 
 function roomLabel(alert) {
   if (!alert.room) return "Room not selected";
-  return alert.roomVerified ? `Room ${alert.room} (stay verified)` : `Room ${alert.room} (guest-selected)`;
+  return `Room ${alert.room}`;
 }
 
 function firstMatch(value, pattern, fallback) {
@@ -176,55 +194,89 @@ function textParameters(values) {
   return values.map((value) => ({ type: "text", text: String(value || "Not provided").slice(0, 900) }));
 }
 
-function templateForAlert(alert, env) {
-  const names = templateNames(env);
-  // The stored alert summary is sanitized before this function is called.
-  // A validated reply number may be appended transiently for an urgent team message.
-  const summary = String(alert.summary || "Guest requested assistance.").slice(0, 900);
+function appendProtectedContact(value, contact) {
+  const detail = String(value || "Guest requested assistance.").trim().slice(0, 780);
+  const protectedContact = privateReplyContact(contact);
+  return protectedContact ? `${detail}\nGuest reply: ${protectedContact}`.slice(0, 900) : detail;
+}
+
+function requestLabel(alert) {
+  const summary = String(alert.summary || "");
+  const labels = {
+    maintenance_broken_light: "Broken light",
+    maintenance_wifi_problem: "Wi-Fi problem",
+    property_emergency: "Serious property incident",
+    medical_emergency: "Medical or personal-safety concern",
+    verified_spare_key_release: "Verified spare-key request",
+    lost_key: "Lost key"
+  };
+  if (alert.alertType === "stay_support") {
+    if (/\b(?:fresh\s+|clean\s+|new\s+)?towels?\b/i.test(summary)) return "Fresh towels";
+    if (/\btoilet\s+paper\b/i.test(summary)) return "Toilet paper";
+    if (/\bsoap\b/i.test(summary)) return "Soap";
+    if (/\b(?:clean|cleaning|housekeeping)\b/i.test(summary)) return "Room cleaning";
+    return "Guest request";
+  }
+  return labels[alert.alertType] || String(alert.alertType || "guest request")
+    .replaceAll("_", " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function alertTemplateKind(alert) {
+  if (alert.alertType === "verified_spare_key_release" || alert.alertType === "lost_key") return "lostKey";
+  if (alert.alertType === "luggage_storage") return "luggage";
+  if (alert.alertType === "booking_request") return "booking";
+  if (alert.severity === "critical" || alert.severity === "urgent") return "urgent";
+  return "service";
+}
+
+function templateValues(alert, kind) {
+  const summary = safeAlertSummary(alert.summary || "Guest requested assistance.").slice(0, 900);
   const room = roomLabel(alert);
   const time = alert.bangkokTime || formatBangkokAlertTime(new Date(alert.createdAt));
   const reference = alert.id;
-  if (alert.alertType === "verified_spare_key_release" || alert.alertType === "lost_key") {
-    return { name: names.lostKey, parameters: [reference, room, time] };
-  }
-  if (alert.alertType === "luggage_storage") {
+  if (kind === "lostKey") return [reference, room, time];
+  if (kind === "luggage") {
     const luggage = alert.luggageRequest || {};
-    return { name: names.luggage, parameters: [reference, room, luggage.context, luggage.bagCount, luggage.requestedTime, summary] };
+    return [reference, room, luggage.context, luggage.bagCount, luggage.requestedTime, appendProtectedContact(summary, alert.privateReplyContact)];
   }
-  if (alert.alertType === "booking_request") {
+  if (kind === "booking") {
     if (alert.bookingRequest?.kind === "diving") {
       const booking = alert.bookingRequest;
       const detail = booking.option === "Other course" ? booking.courseName : booking.option;
-      const qualification = booking.certificationLevel ? ` · Certification: ${booking.certificationLevel}` : "";
-      return {
-        name: names.booking,
-        parameters: [reference, room, booking.activity, booking.preferredDate, booking.guestCount, `${detail}${qualification} · ${summary}`]
-      };
+      const qualification = booking.certificationLevel ? `Certification: ${booking.certificationLevel}` : "";
+      const notes = [detail, qualification, booking.notes, summary].filter(Boolean).join(" · ");
+      return [reference, room, booking.activity, booking.preferredDate, booking.guestCount, appendProtectedContact(notes, alert.privateReplyContact)];
     }
     const preferredTime = alert.requestedDateTime || normalizeBangkokRequestedDate(summary, new Date(alert.createdAt));
     const guests = firstMatch(summary, /\b(\d{1,2})\s*(?:guests?|people|persons?|adults?)\b/i, "Not provided");
-    return { name: names.booking, parameters: [reference, room, summary, preferredTime, guests, summary] };
+    return [reference, room, summary, preferredTime, guests, appendProtectedContact(summary, alert.privateReplyContact)];
   }
-  if (alert.severity === "critical" || alert.severity === "urgent") {
-    return { name: names.urgent, parameters: [reference, room, String(alert.alertType || "urgent request").replaceAll("_", " "), time, summary] };
-  }
-  const labels = { maintenance_broken_light: "Broken light", maintenance_wifi_problem: "Wi-Fi problem" };
-  let requestLabel = labels[alert.alertType] || String(alert.alertType || "guest request").replaceAll("_", " ");
-  if (alert.alertType === "stay_support") {
-    if (/\b(?:fresh\s+)?towels?\b/i.test(summary)) requestLabel = "Fresh towels";
-    else if (/\btoilet\s+paper\b/i.test(summary)) requestLabel = "Toilet paper";
-    else if (/\bsoap\b/i.test(summary)) requestLabel = "Soap";
-    else if (/\b(?:clean|cleaning|housekeeping)\b/i.test(summary)) requestLabel = "Room cleaning";
-    else requestLabel = "Guest request";
-  }
-  return { name: names.service, parameters: [reference, room, requestLabel, time, summary] };
+  if (kind === "urgent") return [reference, room, requestLabel(alert), time, appendProtectedContact(summary, alert.privateReplyContact)];
+  return [reference, room, requestLabel(alert), time, appendProtectedContact(summary, alert.privateReplyContact)];
 }
 
-function templatePayload(alert, recipient, env) {
-  const summary = safeAlertSummary(alert.summary);
-  const replyContact = privateReplyContact(alert.privateReplyContact);
-  const selected = templateForAlert({ ...alert, summary: replyContact ? `${summary} · Guest reply: ${replyContact}` : summary }, env);
-  return {
+export function validateWhatsAppTemplateParameters(name, kind, parameters) {
+  const schema = TEMPLATE_SCHEMAS[String(name || "").trim()];
+  if (!schema || schema.kind !== kind) return { ok: false, name, errorCode: "unmapped_template" };
+  if (!Array.isArray(parameters) || parameters.length !== schema.bodyParameterCount) {
+    return { ok: false, name, errorCode: "parameter_count_mismatch" };
+  }
+  return { ok: true, name: String(name).trim(), kind, parameters };
+}
+
+function selectedTemplateForAlert(alert, env) {
+  const names = templateNames(env);
+  const kind = alertTemplateKind(alert);
+  const name = names[kind];
+  const parameters = templateValues(alert, kind);
+  return validateWhatsAppTemplateParameters(name, kind, parameters);
+}
+
+export function buildWhatsAppTemplatePayload(alert, recipient, env) {
+  const selected = selectedTemplateForAlert(alert, env);
+  if (!selected.ok) return selected;
+  return { ok: true, name: selected.name, bodyParameterCount: selected.parameters.length, payload: {
     messaging_product: "whatsapp",
     recipient_type: "individual",
     to: recipient.phone,
@@ -237,7 +289,7 @@ function templatePayload(alert, recipient, env) {
         parameters: textParameters(selected.parameters)
       }]
     }
-  };
+  } };
 }
 
 async function sendTemplate(alert, recipient, stage, env, store) {
@@ -245,6 +297,21 @@ async function sendTemplate(alert, recipient, stage, env, store) {
   const phoneNumberId = digits(env.WHATSAPP_PHONE_NUMBER_ID);
   const deliveryId = `delivery_${crypto.randomUUID()}`;
   const hashedRecipient = await recipientHash(recipient.phone, env);
+  const built = buildWhatsAppTemplatePayload(alert, recipient, env);
+  if (!built.ok) {
+    await store.recordAlertDelivery({
+      id: deliveryId,
+      alertId: alert.id,
+      stage,
+      recipientHash: hashedRecipient,
+      recipientLabel: recipient.label,
+      providerMessageId: "",
+      status: "failed",
+      errorCode: built.errorCode,
+      createdAt: new Date().toISOString()
+    });
+    return false;
+  }
   try {
     const response = await fetch(`https://graph.facebook.com/${graphVersion}/${phoneNumberId}/messages`, {
       method: "POST",
@@ -252,7 +319,7 @@ async function sendTemplate(alert, recipient, stage, env, store) {
         authorization: `Bearer ${env.WHATSAPP_ACCESS_TOKEN}`,
         "content-type": "application/json"
       },
-      body: JSON.stringify(templatePayload(alert, recipient, env))
+      body: JSON.stringify(built.payload)
     });
     const responseBody = await response.json().catch(() => ({}));
     const providerMessageId = String(responseBody?.messages?.[0]?.id || "").slice(0, 180);
@@ -460,30 +527,63 @@ function recipientIsAuthorized(phone, env) {
   return Object.values(parseRecipients(env)).flat().some((recipient) => recipient.phone === target);
 }
 
-function statusTemplatePayload(alert, recipient, status, actorLabel, env) {
+export function buildWhatsAppStatusPayload(alert, recipient, status, actorLabel, env) {
   const name = String(env.WHATSAPP_STATUS_TEMPLATE_NAME || "").trim();
-  if (!name) return null;
-  const category = String(alert.alertType || "guest request").replaceAll("_", " ");
-  return {
+  if (!name) return { ok: false, name: "", errorCode: "status_template_not_configured" };
+  const normalizedStatus = status === "ACKNOWLEDGED" ? status : status === "RESOLVED" ? status : "";
+  if (!normalizedStatus) return { ok: false, name, errorCode: "invalid_status" };
+  const parameters = [alert.id, roomLabel(alert), requestLabel(alert), cleanLabel(actorLabel), normalizedStatus];
+  const validated = validateWhatsAppTemplateParameters(name, "status", parameters);
+  if (!validated.ok) return validated;
+  return { ok: true, name, bodyParameterCount: parameters.length, payload: {
     messaging_product: "whatsapp", recipient_type: "individual", to: recipient.phone, type: "template",
-    template: { name, language: { code: String(env.WHATSAPP_ALERT_TEMPLATE_LANGUAGE || DEFAULT_TEMPLATE_LANGUAGE) }, components: [{ type: "body", parameters: textParameters([alert.id, `Room ${alert.room || "not selected"}`, category, actorLabel, status]) }] }
-  };
+    template: { name, language: { code: String(env.WHATSAPP_ALERT_TEMPLATE_LANGUAGE || DEFAULT_TEMPLATE_LANGUAGE) }, components: [{ type: "body", parameters: textParameters(parameters) }] }
+  } };
 }
 
 async function notifyStatusChange(alert, actorPhone, status, env, store) {
   if (!env.WHATSAPP_STATUS_TEMPLATE_NAME) return { attempted: 0, accepted: 0 };
   const assigned = parseRecipients(env)[alert.recipientGroup] || [];
   const actor = assigned.find((item) => item.phone === digits(actorPhone));
+  if (!actor) return { attempted: 0, accepted: 0 };
   const others = assigned.filter((item) => item.phone !== digits(actorPhone));
   let accepted = 0;
   for (const recipient of others) {
-    const payload = statusTemplatePayload(alert, recipient, status, actor?.label || "A team member", env);
-    if (!payload) continue;
+    const built = buildWhatsAppStatusPayload(alert, recipient, status, actor.label, env);
+    const deliveryId = `delivery_${crypto.randomUUID()}`;
+    const hashedRecipient = await recipientHash(recipient.phone, env);
+    if (!built.ok) {
+      await store.recordAlertDelivery({
+        id: deliveryId, alertId: alert.id, stage: `status_${status.toLowerCase()}`,
+        recipientHash: hashedRecipient, recipientLabel: recipient.label,
+        providerMessageId: "", status: "failed", errorCode: built.errorCode,
+        createdAt: new Date().toISOString()
+      });
+      continue;
+    }
     const graphVersion = String(env.WHATSAPP_GRAPH_API_VERSION || DEFAULT_GRAPH_VERSION).replace(/[^A-Za-z0-9.]/g, "");
-    const response = await fetch(`https://graph.facebook.com/${graphVersion}/${digits(env.WHATSAPP_PHONE_NUMBER_ID)}/messages`, {
-      method: "POST", headers: { authorization: `Bearer ${env.WHATSAPP_ACCESS_TOKEN}`, "content-type": "application/json" }, body: JSON.stringify(payload)
-    }).catch(() => null);
-    if (response?.ok) accepted += 1;
+    let providerMessageId = "";
+    let errorCode = "network_error";
+    try {
+      const response = await fetch(`https://graph.facebook.com/${graphVersion}/${digits(env.WHATSAPP_PHONE_NUMBER_ID)}/messages`, {
+        method: "POST", headers: { authorization: `Bearer ${env.WHATSAPP_ACCESS_TOKEN}`, "content-type": "application/json" }, body: JSON.stringify(built.payload)
+      });
+      const responseBody = await response.json().catch(() => ({}));
+      providerMessageId = String(responseBody?.messages?.[0]?.id || "").slice(0, 180);
+      errorCode = response.ok && providerMessageId
+        ? ""
+        : String(responseBody?.error?.code || (response.ok ? "missing_message_id" : response.status));
+    } catch (_error) {
+      // The sanitized delivery state below is the only retained diagnostic.
+    }
+    const submitted = Boolean(providerMessageId) && !errorCode;
+    await store.recordAlertDelivery({
+      id: deliveryId, alertId: alert.id, stage: `status_${status.toLowerCase()}`,
+      recipientHash: hashedRecipient, recipientLabel: recipient.label,
+      providerMessageId, status: submitted ? "accepted" : "failed", errorCode,
+      createdAt: new Date().toISOString()
+    });
+    if (submitted) accepted += 1;
   }
   return { attempted: others.length, accepted };
 }
@@ -526,12 +626,14 @@ export async function handleWhatsAppWebhook(request, env) {
     const text = String(item.message?.text?.body || "").trim();
     const match = text.match(/^(RECEIVED|ACK|RESOLVE)\s+(alert_[A-Za-z0-9-]{20,})$/i);
     if (!match || !recipientIsAuthorized(from, env)) continue;
-    const actor = await recipientHash(from, env);
     const command = match[1].toUpperCase();
     const before = store.getAlert ? await store.getAlert(match[2]) : store.alerts?.find((alert) => alert.id === match[2]);
     if (!before) continue;
+    const assignedActor = (parseRecipients(env)[before.recipientGroup] || []).find((recipient) => recipient.phone === from);
+    if (!assignedActor) continue;
     const eligible = ["RECEIVED", "ACK"].includes(command) ? before.status === "open" : ["open", "acknowledged"].includes(before.status);
     if (!eligible) continue;
+    const actor = await recipientHash(from, env);
     if (["RECEIVED", "ACK"].includes(command)) await store.acknowledgeAlert(match[2], actor, new Date().toISOString());
     else await store.resolveAlert(match[2], actor, new Date().toISOString());
     await notifyStatusChange(before, from, ["RECEIVED", "ACK"].includes(command) ? "ACKNOWLEDGED" : "RESOLVED", env, store);

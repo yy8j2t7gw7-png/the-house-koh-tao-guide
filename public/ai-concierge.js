@@ -574,6 +574,7 @@
       appendMessage("concierge", "Please shorten your question to 800 characters or fewer.");
       return;
     }
+    panel.classList.add("has-conversation");
     const priorHistory = conversationHistory.slice(-historyLimit);
     input.value = "";
     // Send the original value only to the protected request handler. Every

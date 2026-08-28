@@ -2,7 +2,7 @@
 
 ## Purpose
 
-v5.11.14 provides a protected server-side staff-alert channel through the official Meta WhatsApp Business Platform. Guests continue to use the website Concierge. Recipient telephone numbers, access tokens and app secrets stay in encrypted Cloudflare secrets and never appear in public files, Git or release archives.
+v5.11.15 provides a protected server-side staff-alert channel through the official Meta WhatsApp Business Platform. Guests continue to use the website Concierge. Recipient telephone numbers, access tokens and app secrets stay in encrypted Cloudflare secrets and never appear in public files, Git or release archives.
 
 Routing is role based:
 
@@ -35,60 +35,24 @@ Medical, personal-safety and critical-property classifications never create an a
 
 ## Production Meta templates
 
-These English (`en_US`) Utility templates are the existing production templates in WhatsApp Manager. Their names, body text, parameter order and parameter counts remain exactly aligned with the code.
+These English (`en_US`) Utility templates are Active in WhatsApp Manager and already mapped in production Cloudflare. The Worker validates every selected name against a fixed purpose and exact body-parameter count before it sends anything. Static headers require no parameters.
 
-### `house_service_alert_v1`
+| Purpose | Active template | Body parameters in exact order |
+| --- | --- | --- |
+| Routine service | `house_service_alert_v3` | reference, room, human-readable request, Bangkok date/time, details |
+| Luggage | `house_luggage_alert_v2` | reference, room, arrival/departure, bag count, requested time, protected guest notes |
+| Booking | `house_booking_alert_v2` | reference, room, service/activity, normalized date/time, guest count, protected guest notes |
+| Urgent property | `house_urgent_alert_v2` | reference, room, incident type, Bangkok date/time, sanitized guest summary |
+| Verified lost key | `house_lost_key_alert_v3` | reference, room, Bangkok date/time |
+| Staff status | `house_alert_status_v1` | reference, room, human-readable request, safe actor label, `ACKNOWLEDGED`/`RESOLVED` |
 
-```text
-The House service request {{1}}. Room: {{2}}. Request: {{3}}. Time: {{4}} Bangkok time. Details: {{5}}. Please reply RECEIVED {{1}} to acknowledge this request.
-```
+Luggage and booking templates have no dedicated reply-number variable. A validated international contact is therefore appended only to the transient protected notes parameter as `Guest reply: …`; it does not enter ordinary chat, alert, dashboard or log storage. The lost-key template is constructed only after the existing verified-stay, after-hours and explicit-fee gates and never receives the key-box code.
 
-### `house_booking_alert_v1`
+The previous five v1 names remain mapped in code solely as a deliberate rollback capability. Do not switch production back without a separately authorized rollback decision. An unknown name, wrong purpose or wrong parameter count fails closed before the Graph API call.
 
-```text
-The House booking enquiry {{1}}. Room: {{2}}. Service requested: {{3}}. Preferred date or time: {{4}}. Number of guests: {{5}}. Notes: {{6}}. Please reply RECEIVED {{1}} to acknowledge this enquiry.
-```
+`house_alert_status_v1` is non-recursive. An authorized `RECEIVED`, `ACK` or `RESOLVE` reply updates the original alert and sends one status message only to the other recipients assigned to that alert. The actor and unrelated roles are excluded; duplicate webhook delivery is suppressed by the original alert state. Status messages create no alert and no escalation.
 
-### `house_luggage_alert_v1`
-
-```text
-The House luggage request {{1}}. Room: {{2}}. Arrival or departure: {{3}}. Number of bags: {{4}}. Requested time: {{5}} Bangkok time. Notes: {{6}}. Please reply RECEIVED {{1}} to acknowledge this request.
-```
-
-### `house_urgent_alert_v1`
-
-```text
-URGENT — The House alert {{1}}. Room: {{2}}. Type: {{3}}. Time: {{4}} Bangkok time. Summary: {{5}}. Please respond immediately and reply RECEIVED {{1}} to acknowledge this alert.
-```
-
-### `house_lost_key_alert_v1`
-
-```text
-The House lost-key alert {{1}}. Room: {{2}}. Time: {{3}} Bangkok time. The guest has requested urgent assistance. Please reply RECEIVED {{1}} to acknowledge this alert.
-```
-
-Any replacement template or changed parameter list requires separate Meta approval before the code may use it.
-
-### Reviewed replacement templates
-
-The Worker is already compatible with `house_service_alert_v3`, `house_luggage_alert_v2`, `house_booking_alert_v2`, `house_urgent_alert_v2` and `house_lost_key_alert_v3` through the existing purpose-specific template-name variables. Keep the v1 values configured until every replacement reports **Active** in Meta; then change only the corresponding Cloudflare variable.
-
-### Alert status template required before enabling status messages
-
-Create one English (`en_US`) Utility template named `house_alert_status_v1` with five body variables in this exact order:
-
-```text
-{{5}} — {{2}}
-
-{{3}}
-{{4}} updated this request.
-
-Ref: {{1}}
-```
-
-Parameter order is: alert reference, room, human-readable alert type, safe actor label and status (`ACKNOWLEDGED` or `RESOLVED`). Once Meta reports the template **Active**, add `WHATSAPP_STATUS_TEMPLATE_NAME=house_alert_status_v1` as a normal Worker variable and deploy. Until then, leave the variable absent; existing acknowledgement, resolution and escalation behavior continues without status messages.
-
-One-tap acknowledgement requires separately reviewed interactive template versions with quick-reply buttons. Typed `RECEIVED`, `ACK` and `RESOLVE` remain the production fallback and are not changed by this release.
+One-tap acknowledgement requires separately reviewed interactive template versions with quick-reply buttons. Typed `RECEIVED`, `ACK` and `RESOLVE` remain the production controls.
 
 ## Cloudflare secrets
 
@@ -148,11 +112,12 @@ RESOLVE alert_REFERENCE
 
 ```text
 WHATSAPP_GRAPH_API_VERSION=v23.0
-WHATSAPP_SERVICE_TEMPLATE_NAME=house_service_alert_v1
-WHATSAPP_BOOKING_TEMPLATE_NAME=house_booking_alert_v1
-WHATSAPP_LUGGAGE_TEMPLATE_NAME=house_luggage_alert_v1
-WHATSAPP_URGENT_TEMPLATE_NAME=house_urgent_alert_v1
-WHATSAPP_LOST_KEY_TEMPLATE_NAME=house_lost_key_alert_v1
+WHATSAPP_SERVICE_TEMPLATE_NAME=house_service_alert_v3
+WHATSAPP_BOOKING_TEMPLATE_NAME=house_booking_alert_v2
+WHATSAPP_LUGGAGE_TEMPLATE_NAME=house_luggage_alert_v2
+WHATSAPP_URGENT_TEMPLATE_NAME=house_urgent_alert_v2
+WHATSAPP_LOST_KEY_TEMPLATE_NAME=house_lost_key_alert_v3
+WHATSAPP_STATUS_TEMPLATE_NAME=house_alert_status_v1
 WHATSAPP_ALERT_TEMPLATE_LANGUAGE=en_US
 WHATSAPP_ALERT_ESCALATION_MINUTES=10
 ```
@@ -161,12 +126,12 @@ Review Meta's supported Graph API versions before changing the version. The Work
 
 ## Production verification
 
-1. Confirm business verification, the WhatsApp display name and all five templates are approved.
-2. Add the secrets and recipient groups, then deploy.
+1. Confirm all six active template names above remain mapped in production; do not change Meta definitions or secrets during deployment.
+2. Confirm the existing protected secrets and recipient groups remain present, then deploy.
 3. Confirm `/api/concierge/status` reports `whatsappAlertsConfigured: true` and the owner console says **WhatsApp connected**.
-4. Test with non-sensitive requests: room cleaning and luggage arrangement → Su plus both owners; snorkelling booking → Fah plus both owners; confirmed serious leak → Fah plus both owners without Su; verified lost-key release → Su plus both owners.
-5. Confirm messages use the correct template and contain only the intended sanitized fields.
-6. Reply `RECEIVED` with the exact reference and confirm escalation stops; then test `RESOLVE`.
+4. Test with non-sensitive requests: room cleaning and luggage arrangement → Su plus both owners; diving booking → Fah plus both owners; confirmed serious leak → Fah plus both owners without Su; verified lost-key release → Su plus both owners.
+5. Confirm every delivery uses the expected active template and exact safe fields listed in the table.
+6. Reply `RECEIVED` or `ACK` with an exact reference and confirm the other assigned recipients—but not the actor—receive one ACKNOWLEDGED status. Confirm escalation stops. Then test `RESOLVE` and one RESOLVED update per other assigned recipient.
 7. Test one unacknowledged urgent event and confirm escalation after approximately 10 minutes.
 8. Only after the protected channel passes should a temporary `SPARE_KEY_CODES` value be tested. Rotate it immediately afterward.
 

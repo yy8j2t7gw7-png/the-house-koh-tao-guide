@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0.0",
-  "release": "5.11.25",
+  "release": "5.11.26",
   "language": "en",
   "updated": "2026-08-14",
   "scope": "Verified accommodation, room, house-rule, support, booking and emergency answers for guests of The House – Koh Tao.",
@@ -632,7 +632,7 @@
         "where should i learn to dive",
         "why do you recommend roctopus"
       ],
-      "answer": "We recommend Roctopus Dive because their friendly, professional team offers small groups, personal attention and a welcoming experience, especially for first-time or nervous divers. Their dive team in the shop will be happy to explain the available options and help you choose what suits you best.",
+      "answer": "We recommend RAID training because of its focus on dive safety and buoyancy control, and we recommend Roctopus Dive as The House’s preferred RAID dive centre. Their friendly, professional team offers small groups, personal attention and a welcoming experience, especially for first-time or nervous divers.",
       "actions": [
         {
           "label": "View Roctopus",

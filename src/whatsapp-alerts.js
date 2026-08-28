@@ -4,6 +4,7 @@ import {
   safeAlertSummary
 } from "./alert-policy.js";
 import { normalizeBangkokRequestedDate } from "./alert-policy.js";
+import { divingBookingSummary, validDivingGroup } from "./diving-catalog.js";
 
 const DEFAULT_GRAPH_VERSION = "v23.0";
 const DEFAULT_TEMPLATE_LANGUAGE = "en_US";
@@ -99,11 +100,43 @@ function validatedBookingSubmission(result) {
   const destination = String(request.destination || "").trim().slice(0, 160);
   const tripType = String(request.tripType || "").trim().slice(0, 60);
   if (!preferredDate || !activity || !Number.isInteger(guestCount) || guestCount < 1 || guestCount > 99) return null;
+  let divingGroups = [];
+  let planMode = "";
+  let structuredSummary = "";
   if (request.kind === "diving") {
-    const validOption = ["Fun Diving", "Open Water Course", "Advanced Open Water Course", "Other course"].includes(option);
-    if (!validOption) return null;
-    if (option === "Fun Diving" && !certificationLevel) return null;
-    if (option === "Other course" && !courseName) return null;
+    if (Array.isArray(request.groups) && request.groups.length) {
+      planMode = ["same", "different"].includes(request.planMode) ? request.planMode : "";
+      divingGroups = request.groups.slice(0, 99).map((group) => ({
+        count: String(Number(group?.count) || ""),
+        activityType: String(group?.activityType || "").trim().slice(0, 80),
+        agency: String(group?.agency || "").trim().slice(0, 40),
+        course: String(group?.course || "").trim().slice(0, 120),
+        specialty: String(group?.specialty || "").trim().slice(0, 120),
+        specialtyDetail: String(group?.specialtyDetail || "").trim().slice(0, 160),
+        currentCertification: String(group?.currentCertification || "").trim().slice(0, 160),
+        providerPreference: String(group?.providerPreference || "").trim().slice(0, 120),
+        notes: String(group?.notes || "").trim().slice(0, 300),
+        unsureCertified: ["yes", "no"].includes(group?.unsureCertified) ? group.unsureCertified : "",
+        goal: String(group?.goal || "").trim().slice(0, 180)
+      }));
+      if (!planMode || divingGroups.some((group) => !validDivingGroup(group))) return null;
+      if (divingGroups.reduce((sum, group) => sum + Number(group.count), 0) !== guestCount) return null;
+      if (planMode === "same" && divingGroups.length !== 1) return null;
+      structuredSummary = divingBookingSummary({
+        preferredDate,
+        guestCount: String(guestCount),
+        groups: divingGroups,
+        preferredProvider,
+        notes: String(request.notes || "").trim().slice(0, 500)
+      }, { includeNotes: true }).slice(0, 6000);
+    } else {
+      // v5.11.25 retry snapshots remain valid across deployment. New v5.11.26
+      // conversations always submit the structured subgroup model above.
+      const validOption = ["Fun Diving", "Open Water Course", "Advanced Open Water Course", "Other course"].includes(option);
+      if (!validOption) return null;
+      if (option === "Fun Diving" && !certificationLevel) return null;
+      if (option === "Other course" && !courseName) return null;
+    }
   }
   if (["fishing", "snorkeling"].includes(request.kind) && !option) return null;
   if (["taxi", "taxi_boat", "motorbike_taxi"].includes(request.kind) && !pickupTime) return null;
@@ -124,7 +157,13 @@ function validatedBookingSubmission(result) {
       pickupLocation,
       destination,
       tripType,
-      notes: String(request.notes || "").trim().slice(0, 500)
+      notes: String(request.notes || "").trim().slice(0, 500),
+      ...(request.kind === "diving" && divingGroups.length ? {
+        planMode,
+        totalParticipants: String(guestCount),
+        groups: divingGroups,
+        structuredSummary
+      } : {})
     }
   };
 }
@@ -324,6 +363,11 @@ function templateValues(alert, kind) {
   if (kind === "booking") {
     if (alert.bookingRequest?.kind === "diving") {
       const booking = alert.bookingRequest;
+      if (Array.isArray(booking.groups) && booking.groups.length) {
+        const structured = divingBookingSummary(booking, { includeNotes: false });
+        const notes = [structured, booking.notes ? `Notes: ${booking.notes}` : ""].filter(Boolean).join("\n");
+        return [reference, room, booking.activity, booking.preferredDate, booking.guestCount, appendProtectedContact(notes, alert.privateReplyContact)];
+      }
       const detail = booking.option === "Other course" ? booking.courseName : booking.option;
       const qualification = booking.certificationLevel ? `Certification: ${booking.certificationLevel}` : "";
       const notes = [detail, qualification, booking.notes, summary].filter(Boolean).join(" · ");
@@ -629,6 +673,7 @@ export async function createConciergeAlert({ env, interactionId, sessionId, room
     room: policy.room,
     roomVerified: Boolean(roomVerified),
     summary: safeAlertSummary(policy.summary),
+    detailSummary: bookingSubmission?.request?.structuredSummary || "",
     bangkokTime: policy.bangkokTime,
     createdAt: policy.createdAt,
     escalationDueAt

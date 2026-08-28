@@ -2,6 +2,34 @@
 
 All notable changes to The House – Koh Tao guest guide are recorded here.
 
+## v5.11.26 — Diving Course Model, Mixed Parties & Owner Cleanup
+
+### Data-driven diving collection
+
+- Replaces the old Fun Diving/Open Water/Advanced/Other mixture with a first-level activity choice: Fun Diving, Try Diving, Learn/Take a Course, Professional Training or Not Sure.
+- Adds `public/data/diving-courses.json` and `src/diving-catalog.js` for current PADI, SSI and RAID beginner, continuing, specialty and professional pathways, prerequisites, aliases and agency-specific nomenclature.
+- Supports direct natural choices such as PADI Advanced, SSI Rescue, IDC, ITC and IDP while keeping RAID “advanced” ambiguous between Explorer 30 and Advanced 35.
+- Always recommends RAID because of its focus on dive safety and buoyancy control together with Roctopus Dive as The House’s preferred RAID centre. Explicit PADI/SSI requests are retained and routed for an appropriate-provider check without implying that Roctopus issues those certifications.
+
+### Mixed-diver booking state
+
+- Adds one authoritative booking with exact-count participant groups for parties doing different activities, agencies or courses. Zero counts, over-allocation and completion with unassigned guests fail closed.
+- Asks certification only where useful, accepts compact Fun Diving level text, collects one international contact last and creates one `booking_with_owners` alert.
+- Retains the complete non-sensitive subgroup breakdown in alert and retry detail storage while sending a concise Meta-safe summary through the unchanged six ordered `house_booking_alert_v2` BODY parameters.
+
+### Owner cleanup controls
+
+- Adds maintenance **Resolve** and resolved-only **Remove** operations. Report removal deletes any remaining protected photo object first and leaves unrelated reports untouched.
+- Adds WhatsApp diagnostic **Dismiss** and resolved-alert **Clear diagnostics** operations without changing parent alert status or accepted/failed delivery evidence.
+- Uses deliberate custom-dialog confirmation and minimal contact-free, code-free admin audit rows.
+
+### Regression and scope
+
+- Adds six end-to-end test cases covering the exact course catalog, seven single-diver paths, a three-group booking, a four-person split with allocation rejection, maintenance/photo lifecycle and diagnostic visibility separation.
+- Expands the complete suite from 157 to 163 tests with zero failures.
+- Preserves v5.11.25 Meta whitespace normalization, all production template schemas/routes, explicit same-alert retry, transient contact handling and 24/7 lost-key safeguards.
+- Defers full public visual polish to v5.11.27.
+
 ## v5.11.25 — Meta Template Parameter Sanitization Hotfix
 
 ### Confirmed production cause and centralized correction

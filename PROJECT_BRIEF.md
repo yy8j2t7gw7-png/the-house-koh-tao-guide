@@ -20,9 +20,9 @@ The product should feel like a competent hotel concierge in a guest’s pocket, 
 
 ### Current state
 
-Current release: v5.11.25.
+Current release: v5.11.26.
 
-The live release prioritizes the operational guest journey and AI Concierge. v5.11.25 is a narrow Meta template-parameter hotfix over deployed v5.11.24. Production diagnostics confirmed Meta HTTP `400`, error `132018`: a textual template value contained a newline/tab or excessive consecutive spaces. The common outbound `textParameters()` boundary now converts every Unicode whitespace run to one ordinary space, trims and applies the existing length limit for service, luggage, booking, urgent, lost-key, status and future enabled action-template BODY values. The established template names, languages, BODY counts/order, recipient routes and Meta configuration remain unchanged. The v5.11.24 exact-alert booking retry, contact-free durable snapshot, contact-only reload recovery, unrelated-intent routing, sanitized diagnostics and provider normalization remain intact, as do all earlier property, cleaning, urgent-console and secure 24/7 lost-key safeguards. Explore is disabled through a reversible deployment feature switch; all Explore source content remains preserved. Full public visual polish is deferred to v5.11.26.
+The live release prioritizes the operational guest journey and AI Concierge. v5.11.26 adds a bundled, data-driven PADI/SSI/RAID course catalog, a progressive participant-subgroup model for mixed diving parties, complete non-sensitive alert detail storage and owner cleanup controls for maintenance reports and failed-delivery diagnostics. Diving guidance always recommends RAID for its focus on safety and buoyancy control and Roctopus Dive as The House’s preferred RAID centre; explicit PADI/SSI requests remain valid and are checked with an appropriate provider without implying that Roctopus issues those certifications. The v5.11.25 common Meta BODY sanitizer, v5.11.24 exact-alert retry, transient contact boundary, six-parameter booking schema, recipient routes and all earlier property, cleaning, urgent-console and secure 24/7 lost-key safeguards remain intact. Explore is disabled through a reversible deployment feature switch; all Explore source content remains preserved. Full public visual polish is deferred to v5.11.27.
 
 Existing content areas:
 

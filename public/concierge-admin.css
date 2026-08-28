@@ -105,6 +105,9 @@ tr:last-child td{border-bottom:0}
 .concierge-admin-delivery-failure{margin-top:12px;padding:12px;border:1px solid #e4bd86;border-radius:12px;background:#fff8ed}.concierge-admin-delivery-failure h4{margin:0 0 6px;color:#7c4614;font-size:14px}.concierge-admin-delivery-failure .concierge-admin-source-note{margin-top:6px!important;padding-top:0;border-top:0}
 .concierge-admin-alert-time,.concierge-admin-alert-escalation{display:block;color:var(--admin-muted);font-size:12px;line-height:1.45}
 .concierge-admin-alert-escalation{margin-top:4px;color:var(--admin-danger);font-weight:800}
+.concierge-admin-dialog{box-sizing:border-box;width:min(480px,calc(100% - 28px));padding:0;border:1px solid var(--admin-line);border-radius:20px;background:#fff;color:var(--admin-ink);box-shadow:0 24px 80px rgba(24,59,52,.22)}
+.concierge-admin-dialog::backdrop{background:rgba(12,31,27,.48)}
+.concierge-admin-dialog form{padding:22px}.concierge-admin-dialog h2{margin:0 0 8px;font-size:22px}.concierge-admin-dialog p{margin:0;color:var(--admin-muted);line-height:1.5}.concierge-admin-dialog .concierge-admin-card-actions{justify-content:flex-end;margin-top:20px}.concierge-admin-dialog button.is-danger{border-color:var(--admin-danger);background:var(--admin-danger);color:#fff}
 @media(max-width:760px){
   .concierge-admin-shell{width:min(100% - 20px,1180px);padding-top:12px}
   .concierge-admin-header{align-items:flex-start;gap:14px}

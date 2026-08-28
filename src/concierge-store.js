@@ -8,6 +8,15 @@ function cleanText(value, maximum = 1200) {
   return String(value || "").trim().slice(0, maximum);
 }
 
+function formatBangkokAuditTime(value) {
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Bangkok",
+    dateStyle: "medium",
+    timeStyle: "short",
+    hour12: false
+  }).format(value);
+}
+
 function cleanBookingRetryText(value, maximum = 1200) {
   return cleanText(value, maximum).replace(
     /(?:\+|00)?\d[\d\s().-]{6,20}\d/g,
@@ -169,6 +178,20 @@ export class ConciergeStore extends DurableObject {
         CREATE INDEX IF NOT EXISTS whatsapp_delivery_diagnostics_alert
           ON whatsapp_delivery_diagnostics(alert_id, created_at);
 
+        CREATE TABLE IF NOT EXISTS whatsapp_diagnostic_dismissals (
+          diagnostic_key TEXT PRIMARY KEY,
+          alert_id TEXT NOT NULL,
+          dismissed_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS whatsapp_diagnostic_dismissals_alert
+          ON whatsapp_diagnostic_dismissals(alert_id, dismissed_at);
+
+        CREATE TABLE IF NOT EXISTS concierge_alert_details (
+          alert_id TEXT PRIMARY KEY,
+          detail_summary TEXT NOT NULL,
+          created_at TEXT NOT NULL
+        );
+
         CREATE TABLE IF NOT EXISTS booking_retry_snapshots (
           alert_id TEXT PRIMARY KEY,
           binding_hash TEXT NOT NULL,
@@ -197,6 +220,13 @@ export class ConciergeStore extends DurableObject {
         CREATE INDEX IF NOT EXISTS booking_retry_snapshots_expiry
           ON booking_retry_snapshots(expires_at);
 
+        CREATE TABLE IF NOT EXISTS booking_retry_group_details (
+          alert_id TEXT PRIMARY KEY,
+          plan_mode TEXT NOT NULL DEFAULT '',
+          groups_json TEXT NOT NULL DEFAULT '[]',
+          updated_at TEXT NOT NULL
+        );
+
         CREATE TABLE IF NOT EXISTS maintenance_reports (
           id TEXT PRIMARY KEY,
           reservation_id TEXT NOT NULL,
@@ -220,6 +250,16 @@ export class ConciergeStore extends DurableObject {
           ON maintenance_reports(status, created_at);
         CREATE INDEX IF NOT EXISTS maintenance_reports_alert
           ON maintenance_reports(alert_id);
+
+        CREATE TABLE IF NOT EXISTS admin_operation_audit (
+          id TEXT PRIMARY KEY,
+          action TEXT NOT NULL,
+          reference TEXT NOT NULL,
+          bangkok_time TEXT NOT NULL,
+          created_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS admin_operation_audit_created
+          ON admin_operation_audit(created_at);
 
         CREATE TABLE IF NOT EXISTS stay_reservations (
           id TEXT PRIMARY KEY,
@@ -505,6 +545,7 @@ export class ConciergeStore extends DurableObject {
       SELECT a.id, a.interaction_id AS interactionId, a.severity,
              a.alert_type AS alertType, a.recipient_group AS recipientGroup,
              a.room, a.room_verified AS roomVerified, a.summary,
+             COALESCE(NULLIF(xd.detail_summary, ''), a.summary) AS detailSummary,
              a.bangkok_time AS bangkokTime, a.status, a.created_at AS createdAt,
              a.acknowledged_at AS acknowledgedAt, a.resolved_at AS resolvedAt,
              a.escalation_due_at AS escalationDueAt, a.escalated_at AS escalatedAt,
@@ -513,6 +554,7 @@ export class ConciergeStore extends DurableObject {
              SUM(CASE WHEN d.status = 'failed' THEN 1 ELSE 0 END) AS failed
       FROM concierge_alerts a
       LEFT JOIN concierge_alert_deliveries d ON d.alert_id = a.id
+      LEFT JOIN concierge_alert_details xd ON xd.alert_id = a.id
       WHERE a.status IN ('open', 'acknowledged')
       GROUP BY a.id
       ORDER BY CASE a.severity WHEN 'critical' THEN 0 WHEN 'urgent' THEN 1 ELSE 2 END,
@@ -520,7 +562,9 @@ export class ConciergeStore extends DurableObject {
       LIMIT 100
     `));
     const deliveryDiagnostics = rows(this.ctx.storage.sql.exec(`
-      SELECT d.alert_id AS alertId, d.stage, d.status,
+      SELECT COALESCE(x.id, 'legacy_' || d.id) AS id,
+             d.id AS deliveryId, d.alert_id AS alertId, COALESCE(a.status, '') AS alertStatus,
+             d.stage, d.status,
              d.error_code AS storedErrorCode, d.created_at AS createdAt,
              x.template_name AS templateName, x.language_code AS languageCode,
              x.component_schema AS componentSchema, x.http_status AS httpStatus,
@@ -531,8 +575,13 @@ export class ConciergeStore extends DurableObject {
              CASE WHEN x.id IS NULL THEN 1 ELSE 0 END AS legacyDiagnostic
       FROM concierge_alert_deliveries d
       LEFT JOIN whatsapp_delivery_diagnostics x ON x.delivery_id = d.id
+      LEFT JOIN concierge_alerts a ON a.id = d.alert_id
       WHERE d.status IN ('failed', 'not_configured')
         AND julianday(d.created_at) >= julianday('now', '-30 days')
+        AND NOT EXISTS (
+          SELECT 1 FROM whatsapp_diagnostic_dismissals z
+          WHERE z.diagnostic_key = COALESCE(x.id, 'legacy_' || d.id)
+        )
       ORDER BY d.created_at DESC
       LIMIT 100
     `));
@@ -640,6 +689,16 @@ export class ConciergeStore extends DurableObject {
       createdAt,
       cleanText(record.escalationDueAt, 40)
     );
+    const detailSummary = cleanText(record.detailSummary, 6000);
+    if (detailSummary) {
+      this.ctx.storage.sql.exec(
+        `INSERT OR REPLACE INTO concierge_alert_details
+         (alert_id, detail_summary, created_at) VALUES (?, ?, ?)`,
+        cleanText(record.id, 100),
+        detailSummary,
+        createdAt
+      );
+    }
     this.ctx.storage.sql.exec(
       "DELETE FROM concierge_alert_deliveries WHERE julianday(created_at) < julianday('now', '-30 days')"
     );
@@ -648,6 +707,15 @@ export class ConciergeStore extends DurableObject {
     );
     this.ctx.storage.sql.exec(
       "DELETE FROM concierge_alerts WHERE julianday(created_at) < julianday('now', '-30 days')"
+    );
+    this.ctx.storage.sql.exec(
+      "DELETE FROM concierge_alert_details WHERE alert_id NOT IN (SELECT id FROM concierge_alerts)"
+    );
+    this.ctx.storage.sql.exec(
+      "DELETE FROM whatsapp_diagnostic_dismissals WHERE alert_id NOT IN (SELECT id FROM concierge_alerts)"
+    );
+    this.ctx.storage.sql.exec(
+      "DELETE FROM admin_operation_audit WHERE julianday(created_at) < julianday('now', '-90 days')"
     );
     return { created: true };
   }
@@ -709,8 +777,31 @@ export class ConciergeStore extends DurableObject {
       updatedAt,
       expiresAt
     );
+    let groupsJson = "[]";
+    try {
+      const serialized = JSON.stringify(Array.isArray(record.groups) ? record.groups : []);
+      groupsJson = cleanBookingRetryText(serialized, 8000) || "[]";
+      JSON.parse(groupsJson);
+    } catch (_error) {
+      groupsJson = "[]";
+    }
+    this.ctx.storage.sql.exec(
+      `INSERT INTO booking_retry_group_details (alert_id, plan_mode, groups_json, updated_at)
+       VALUES (?, ?, ?, ?)
+       ON CONFLICT(alert_id) DO UPDATE SET
+         plan_mode = excluded.plan_mode,
+         groups_json = excluded.groups_json,
+         updated_at = excluded.updated_at`,
+      alertId,
+      ["same", "different"].includes(record.planMode) ? record.planMode : "",
+      groupsJson,
+      updatedAt
+    );
     this.ctx.storage.sql.exec(
       "DELETE FROM booking_retry_snapshots WHERE julianday(expires_at) <= julianday('now') OR julianday(created_at) < julianday('now', '-30 days')"
+    );
+    this.ctx.storage.sql.exec(
+      "DELETE FROM booking_retry_group_details WHERE alert_id NOT IN (SELECT alert_id FROM booking_retry_snapshots)"
     );
     return { ok: true, alertId };
   }
@@ -724,6 +815,8 @@ export class ConciergeStore extends DurableObject {
               b.preferred_provider AS preferredProvider, b.pickup_time AS pickupTime,
               b.pickup_location AS pickupLocation, b.destination, b.trip_type AS tripType,
               b.notes, b.status, b.created_at AS createdAt, b.updated_at AS updatedAt,
+              COALESCE(g.plan_mode, '') AS planMode,
+              COALESCE(g.groups_json, '[]') AS groupsJson,
               b.expires_at AS expiresAt,
               (SELECT COUNT(*) FROM concierge_alert_deliveries d
                WHERE d.alert_id = b.alert_id) AS deliveryAttempts,
@@ -731,6 +824,7 @@ export class ConciergeStore extends DurableObject {
                WHERE d.alert_id = b.alert_id
                  AND d.status IN ('accepted', 'sent', 'delivered', 'read')) AS acceptedDeliveries
        FROM booking_retry_snapshots b
+       LEFT JOIN booking_retry_group_details g ON g.alert_id = b.alert_id
        JOIN concierge_alerts a ON a.id = b.alert_id
        WHERE b.binding_hash = ? AND b.reservation_id = ? AND b.room = ?
          AND b.status IN ('retryable', 'submitted')
@@ -743,11 +837,22 @@ export class ConciergeStore extends DurableObject {
       cleanText(reservationId, 100),
       cleanText(room, 4),
       cleanText(nowValue, 40) || new Date().toISOString()
-    )).map((record) => ({
-      ...record,
-      deliveryAttempts: Number(record.deliveryAttempts) || 0,
-      acceptedDeliveries: Number(record.acceptedDeliveries) || 0
-    }));
+    )).map((record) => {
+      let groups = [];
+      try {
+        const parsed = JSON.parse(record.groupsJson || "[]");
+        groups = Array.isArray(parsed) ? parsed : [];
+      } catch (_error) {
+        groups = [];
+      }
+      const { groupsJson, ...safeRecord } = record;
+      return {
+        ...safeRecord,
+        groups,
+        deliveryAttempts: Number(record.deliveryAttempts) || 0,
+        acceptedDeliveries: Number(record.acceptedDeliveries) || 0
+      };
+    });
   }
 
   async setBookingRetrySnapshotStatus(alertId, bindingHash, status, updatedAt) {
@@ -851,6 +956,120 @@ export class ConciergeStore extends DurableObject {
       "DELETE FROM maintenance_reports WHERE status = 'resolved' AND julianday(resolved_at) < julianday('now', '-30 days')"
     );
     return { records };
+  }
+
+  async recordAdminAudit(action, reference, nowValue) {
+    const createdAt = cleanText(nowValue, 40) || new Date().toISOString();
+    this.ctx.storage.sql.exec(
+      `INSERT INTO admin_operation_audit (id, action, reference, bangkok_time, created_at)
+       VALUES (?, ?, ?, ?, ?)`,
+      `audit_${crypto.randomUUID()}`,
+      cleanText(action, 80),
+      cleanText(reference, 120),
+      formatBangkokAuditTime(new Date(createdAt)),
+      createdAt
+    );
+    return { ok: true };
+  }
+
+  async resolveMaintenanceReport(id, actorHash, nowValue) {
+    const reportId = cleanText(id, 100);
+    const now = cleanText(nowValue, 40) || new Date().toISOString();
+    const record = rows(this.ctx.storage.sql.exec(
+      `SELECT id, room, alert_id AS alertId, status, created_at AS createdAt
+       FROM maintenance_reports WHERE id = ? LIMIT 1`,
+      reportId
+    ))[0];
+    if (!record) return { ok: false, error: "not_found" };
+    if (record.status === "resolved") return { ok: true, status: "resolved", unchanged: true };
+    if (!["open", "acknowledged"].includes(record.status)) return { ok: false, error: "invalid_status" };
+    this.ctx.storage.sql.exec(
+      `UPDATE maintenance_reports
+       SET status = 'resolved', resolved_at = ?, delete_after = ?
+       WHERE id = ? AND status IN ('open', 'acknowledged')`,
+      now,
+      now,
+      reportId
+    );
+    if (record.alertId) {
+      this.ctx.storage.sql.exec(
+        `UPDATE concierge_alerts
+         SET status = 'resolved', resolved_at = ?, resolved_by_hash = ?
+         WHERE id = ? AND status IN ('open', 'acknowledged')`,
+        now,
+        cleanText(actorHash, 100),
+        cleanText(record.alertId, 100)
+      );
+    }
+    await this.recordAdminAudit("maintenance_report_resolved", `maintenance:${reportId}`, now);
+    return { ok: true, status: "resolved" };
+  }
+
+  async removeMaintenanceReport(id, nowValue) {
+    const reportId = cleanText(id, 100);
+    const now = cleanText(nowValue, 40) || new Date().toISOString();
+    const record = rows(this.ctx.storage.sql.exec(
+      `SELECT id, status FROM maintenance_reports WHERE id = ? LIMIT 1`,
+      reportId
+    ))[0];
+    if (!record) return { ok: false, error: "not_found" };
+    if (record.status !== "resolved") return { ok: false, error: "resolve_required" };
+    this.ctx.storage.sql.exec("DELETE FROM maintenance_reports WHERE id = ? AND status = 'resolved'", reportId);
+    await this.recordAdminAudit("maintenance_report_removed", `maintenance:${reportId}`, now);
+    return { ok: true, removed: true };
+  }
+
+  async dismissWhatsAppDiagnostic(diagnosticKey, nowValue) {
+    const key = cleanText(diagnosticKey, 120);
+    const now = cleanText(nowValue, 40) || new Date().toISOString();
+    const record = rows(this.ctx.storage.sql.exec(
+      `SELECT COALESCE(x.id, 'legacy_' || d.id) AS diagnosticKey, d.alert_id AS alertId
+       FROM concierge_alert_deliveries d
+       LEFT JOIN whatsapp_delivery_diagnostics x ON x.delivery_id = d.id
+       WHERE COALESCE(x.id, 'legacy_' || d.id) = ?
+         AND d.status IN ('failed', 'not_configured')
+       LIMIT 1`,
+      key
+    ))[0];
+    if (!record) return { ok: false, error: "not_found" };
+    this.ctx.storage.sql.exec(
+      `INSERT OR IGNORE INTO whatsapp_diagnostic_dismissals
+       (diagnostic_key, alert_id, dismissed_at) VALUES (?, ?, ?)`,
+      key,
+      cleanText(record.alertId, 100),
+      now
+    );
+    await this.recordAdminAudit("whatsapp_diagnostic_dismissed", `alert:${record.alertId}`, now);
+    return { ok: true, dismissed: true };
+  }
+
+  async clearWhatsAppDiagnosticsForAlert(alertId, nowValue) {
+    const id = cleanText(alertId, 100);
+    const now = cleanText(nowValue, 40) || new Date().toISOString();
+    const alert = rows(this.ctx.storage.sql.exec(
+      "SELECT id, status FROM concierge_alerts WHERE id = ? LIMIT 1",
+      id
+    ))[0];
+    if (!alert) return { ok: false, error: "not_found" };
+    if (alert.status !== "resolved") return { ok: false, error: "alert_not_resolved" };
+    const diagnostics = rows(this.ctx.storage.sql.exec(
+      `SELECT COALESCE(x.id, 'legacy_' || d.id) AS diagnosticKey
+       FROM concierge_alert_deliveries d
+       LEFT JOIN whatsapp_delivery_diagnostics x ON x.delivery_id = d.id
+       WHERE d.alert_id = ? AND d.status IN ('failed', 'not_configured')`,
+      id
+    ));
+    diagnostics.forEach((item) => {
+      this.ctx.storage.sql.exec(
+        `INSERT OR IGNORE INTO whatsapp_diagnostic_dismissals
+         (diagnostic_key, alert_id, dismissed_at) VALUES (?, ?, ?)`,
+        cleanText(item.diagnosticKey, 120),
+        id,
+        now
+      );
+    });
+    if (diagnostics.length) await this.recordAdminAudit("whatsapp_alert_diagnostics_cleared", `alert:${id}`, now);
+    return { ok: true, cleared: diagnostics.length };
   }
 
   async recordAlertDelivery(record) {

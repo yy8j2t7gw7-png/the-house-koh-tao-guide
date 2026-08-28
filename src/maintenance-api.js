@@ -234,7 +234,7 @@ export async function handleMaintenanceGuestRequest(request, env) {
   });
 }
 
-export async function handleMaintenanceAdminRequest(request, env, path, store) {
+export async function handleMaintenanceAdminRequest(request, env, path, store, actorHash = "") {
   const download = path.match(/^\/api\/concierge\/admin\/maintenance-files\/(maint_[A-Za-z0-9-]{20,80})$/);
   if (download) {
     if (request.method !== "GET") return json({ error: "method_not_allowed" }, 405, { allow: "GET" });
@@ -259,6 +259,37 @@ export async function handleMaintenanceAdminRequest(request, env, path, store) {
     }
     await store.deleteMaintenancePhoto(id, new Date().toISOString());
     return json({ ok: true });
+  }
+  if (path === "/api/concierge/admin/maintenance-resolve") {
+    if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405, { allow: "POST" });
+    const body = await request.json().catch(() => ({}));
+    const id = String(body.id || "");
+    if (!REPORT_ID_PATTERN.test(id)) return json({ error: "invalid_request" }, 400);
+    const result = await store.resolveMaintenanceReport?.(id, actorHash, new Date().toISOString());
+    if (!result?.ok) return json({ error: result?.error || "not_found" }, result?.error === "not_found" ? 404 : 409);
+    return json(result);
+  }
+  if (path === "/api/concierge/admin/maintenance-remove") {
+    if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405, { allow: "POST" });
+    const body = await request.json().catch(() => ({}));
+    const id = String(body.id || "");
+    if (!REPORT_ID_PATTERN.test(id) || body.confirmation !== "REMOVE RESOLVED REPORT") {
+      return json({ error: "confirmation_required" }, 400);
+    }
+    const record = await store.getMaintenanceReport(id);
+    if (!record) return json({ error: "not_found" }, 404);
+    if (record.status !== "resolved") return json({ error: "resolve_required" }, 409);
+    if (record.photoObjectKey) {
+      if (!env.PASSPORT_UPLOADS?.delete) return json({ error: "storage_unavailable" }, 503);
+      try {
+        await env.PASSPORT_UPLOADS.delete(record.photoObjectKey);
+      } catch (_error) {
+        return json({ error: "storage_unavailable" }, 503);
+      }
+    }
+    const result = await store.removeMaintenanceReport?.(id, new Date().toISOString());
+    if (!result?.ok) return json({ error: result?.error || "not_found" }, result?.error === "not_found" ? 404 : 409);
+    return json(result);
   }
   return null;
 }

@@ -1,0 +1,78 @@
+{
+  "schemaVersion": "1.0.0",
+  "updatedForRelease": "5.11.26",
+  "houseRecommendation": {
+    "agency": "RAID",
+    "reason": "focus on dive safety and buoyancy control",
+    "preferredProvider": "Roctopus Dive"
+  },
+  "activities": [
+    { "code": "fun_diving", "displayLabel": "Fun Diving" },
+    { "code": "try_diving", "displayLabel": "Try Diving" },
+    { "code": "course", "displayLabel": "Learn / Take a Course" },
+    { "code": "professional", "displayLabel": "Professional Training" },
+    { "code": "not_sure", "displayLabel": "Not Sure" }
+  ],
+  "agencies": [
+    {
+      "code": "PADI",
+      "displayLabel": "PADI",
+      "courses": [
+        { "code": "padi_scuba_diver", "displayLabel": "Scuba Diver", "stage": "beginner", "requiresCurrentCertification": false, "professional": false, "specialty": false, "aliases": ["padi scuba diver", "scuba diver"] },
+        { "code": "padi_open_water_diver", "displayLabel": "Open Water Diver", "stage": "beginner", "requiresCurrentCertification": false, "professional": false, "specialty": false, "aliases": ["padi open water diver", "padi open water", "open water diver", "open water", "owd"] },
+        { "code": "padi_advanced_open_water_diver", "displayLabel": "Advanced Open Water Diver", "stage": "continuing", "requiresCurrentCertification": true, "professional": false, "specialty": false, "aliases": ["padi advanced open water diver", "padi advanced open water", "padi advanced", "advanced open water diver", "advanced open water", "advanced", "aow", "aowd"] },
+        { "code": "padi_rescue_diver", "displayLabel": "Rescue Diver", "stage": "continuing", "requiresCurrentCertification": true, "professional": false, "specialty": false, "aliases": ["padi rescue diver", "padi rescue", "rescue diver", "rescue"] },
+        { "code": "padi_specialty", "displayLabel": "Specialty Course", "stage": "specialty", "requiresCurrentCertification": true, "professional": false, "specialty": true, "aliases": ["padi specialty course", "padi specialty", "specialty course", "speciality course", "specialty", "speciality"] },
+        { "code": "padi_divemaster", "displayLabel": "Divemaster", "stage": "professional", "requiresCurrentCertification": true, "professional": true, "specialty": false, "aliases": ["padi divemaster", "padi dive master", "divemaster", "dive master", "dm"] },
+        { "code": "padi_assistant_instructor", "displayLabel": "Assistant Instructor", "stage": "professional", "requiresCurrentCertification": true, "professional": true, "specialty": false, "aliases": ["padi assistant instructor", "assistant instructor", "ai"] },
+        { "code": "padi_idc", "displayLabel": "Instructor Development Course (IDC)", "stage": "professional", "requiresCurrentCertification": true, "professional": true, "specialty": false, "aliases": ["padi instructor development course", "padi idc", "instructor development course", "idc"], "components": ["Assistant Instructor (AI)", "Open Water Scuba Instructor (OWSI) program"] }
+      ]
+    },
+    {
+      "code": "SSI",
+      "displayLabel": "SSI",
+      "courses": [
+        { "code": "ssi_scuba_diver", "displayLabel": "Scuba Diver", "stage": "beginner", "requiresCurrentCertification": false, "professional": false, "specialty": false, "aliases": ["ssi scuba diver", "scuba diver"] },
+        { "code": "ssi_open_water_diver", "displayLabel": "Open Water Diver", "stage": "beginner", "requiresCurrentCertification": false, "professional": false, "specialty": false, "aliases": ["ssi open water diver", "ssi open water", "open water diver", "open water", "owd"] },
+        { "code": "ssi_advanced_open_water_diver", "displayLabel": "Advanced Open Water Diver", "stage": "continuing", "requiresCurrentCertification": true, "professional": false, "specialty": false, "aliases": ["ssi advanced open water diver", "ssi advanced open water", "ssi advanced", "advanced open water diver", "advanced open water", "advanced", "aow", "aowd"] },
+        { "code": "ssi_stress_rescue", "displayLabel": "Diver Stress & Rescue", "stage": "continuing", "requiresCurrentCertification": true, "professional": false, "specialty": false, "aliases": ["ssi diver stress and rescue", "ssi diver stress & rescue", "ssi stress and rescue", "ssi stress & rescue", "ssi rescue", "diver stress and rescue", "diver stress & rescue", "stress and rescue", "stress & rescue", "rescue"] },
+        { "code": "ssi_specialty", "displayLabel": "Specialty Course", "stage": "specialty", "requiresCurrentCertification": true, "professional": false, "specialty": true, "aliases": ["ssi specialty course", "ssi specialty", "specialty course", "speciality course", "specialty", "speciality"] },
+        { "code": "ssi_dive_guide", "displayLabel": "Dive Guide", "stage": "professional", "requiresCurrentCertification": true, "professional": true, "specialty": false, "aliases": ["ssi dive guide", "dive guide"] },
+        { "code": "ssi_divemaster", "displayLabel": "Divemaster", "stage": "professional", "requiresCurrentCertification": true, "professional": true, "specialty": false, "aliases": ["ssi divemaster", "ssi dive master", "divemaster", "dive master", "dm"] },
+        { "code": "ssi_assistant_instructor", "displayLabel": "Assistant Instructor", "stage": "professional", "requiresCurrentCertification": true, "professional": true, "specialty": false, "aliases": ["ssi assistant instructor", "assistant instructor", "ai"] },
+        { "code": "ssi_itc", "displayLabel": "Instructor Training Course (ITC)", "stage": "professional", "requiresCurrentCertification": true, "professional": true, "specialty": false, "aliases": ["ssi instructor training course", "ssi itc", "instructor training course", "itc"] },
+        { "code": "ssi_ie", "displayLabel": "Instructor Evaluation (IE)", "stage": "professional", "requiresCurrentCertification": true, "professional": true, "specialty": false, "aliases": ["ssi instructor evaluation", "ssi ie", "instructor evaluation", "ie"] }
+      ]
+    },
+    {
+      "code": "RAID",
+      "displayLabel": "RAID",
+      "courses": [
+        { "code": "raid_scuba_diver", "displayLabel": "Scuba Diver", "stage": "beginner", "requiresCurrentCertification": false, "professional": false, "specialty": false, "aliases": ["raid scuba diver", "scuba diver"] },
+        { "code": "raid_open_water_20", "displayLabel": "Open Water / Open Water 20", "stage": "beginner", "requiresCurrentCertification": false, "professional": false, "specialty": false, "aliases": ["raid open water 20", "raid open water", "open water 20", "open water diver", "open water", "ow20", "owd"] },
+        { "code": "raid_explorer_30", "displayLabel": "Explorer 30", "stage": "continuing", "requiresCurrentCertification": true, "professional": false, "specialty": false, "aliases": ["raid explorer 30", "explorer 30", "raid explorer", "explorer"] },
+        { "code": "raid_advanced_35", "displayLabel": "Advanced 35", "stage": "continuing", "requiresCurrentCertification": true, "professional": false, "specialty": false, "aliases": ["raid advanced 35", "advanced 35"] },
+        { "code": "raid_master_rescue", "displayLabel": "Master Rescue", "stage": "continuing", "requiresCurrentCertification": true, "professional": false, "specialty": false, "aliases": ["raid master rescue", "master rescue", "raid rescue"] },
+        { "code": "raid_specialty", "displayLabel": "Specialty Course", "stage": "specialty", "requiresCurrentCertification": true, "professional": false, "specialty": true, "aliases": ["raid specialty course", "raid specialty", "specialty course", "speciality course", "specialty", "speciality"] },
+        { "code": "raid_divemaster", "displayLabel": "Divemaster", "stage": "professional", "requiresCurrentCertification": true, "professional": true, "specialty": false, "aliases": ["raid divemaster", "raid dive master", "divemaster", "dive master", "dm"] },
+        { "code": "raid_idp", "displayLabel": "Instructor Development Program (IDP)", "stage": "professional", "requiresCurrentCertification": true, "professional": true, "specialty": false, "aliases": ["raid instructor development program", "raid idp", "instructor development program", "idp"], "progression": ["Independent instructor evaluation", "Open Circuit Instructor"] }
+      ]
+    }
+  ],
+  "specialties": [
+    { "code": "nitrox", "displayLabel": "Nitrox / Enriched Air", "aliases": ["nitrox", "enriched air", "eanx"] },
+    { "code": "deep", "displayLabel": "Deep Diving", "aliases": ["deep diving", "deep diver", "deep"] },
+    { "code": "wreck", "displayLabel": "Wreck Diving", "aliases": ["wreck diving", "wreck diver", "wreck"] },
+    { "code": "night", "displayLabel": "Night / Limited Visibility", "aliases": ["night diving", "night diver", "night", "limited visibility"] },
+    { "code": "navigation", "displayLabel": "Navigation", "aliases": ["underwater navigation", "navigation"] },
+    { "code": "buoyancy", "displayLabel": "Buoyancy / Performance", "aliases": ["perfect buoyancy", "peak performance buoyancy", "buoyancy", "performance"] },
+    { "code": "search_recovery", "displayLabel": "Search & Recovery", "aliases": ["search and recovery", "search & recovery", "recovery"] },
+    { "code": "sidemount", "displayLabel": "Sidemount", "aliases": ["sidemount", "side mount"] },
+    { "code": "dpv", "displayLabel": "DPV", "aliases": ["dpv", "diver propulsion vehicle", "scooter diving"] },
+    { "code": "photo_video", "displayLabel": "Photo / Video", "aliases": ["underwater photography", "underwater video", "photo", "video", "photography"] },
+    { "code": "dry_suit", "displayLabel": "Dry Suit", "aliases": ["dry suit", "drysuit"] },
+    { "code": "drift", "displayLabel": "Drift / Currents", "aliases": ["drift diving", "drift", "currents"] },
+    { "code": "technical", "displayLabel": "Technical / Extended Range / Other", "aliases": ["technical diving", "technical", "extended range", "xr", "tec"] },
+    { "code": "other", "displayLabel": "Other Specialty", "aliases": ["other specialty", "other speciality", "another specialty", "another speciality"] }
+  ]
+}

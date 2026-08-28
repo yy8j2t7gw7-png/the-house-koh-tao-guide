@@ -28,8 +28,12 @@
   const directStayUrlResult = document.getElementById("directStayUrlResult");
   const expandAdminSections = document.getElementById("expandAdminSections");
   const collapseAdminSections = document.getElementById("collapseAdminSections");
+  const adminConfirmDialog = document.getElementById("adminConfirmDialog");
+  const adminConfirmTitle = document.getElementById("adminConfirmTitle");
+  const adminConfirmMessage = document.getElementById("adminConfirmMessage");
+  const adminConfirmSubmit = document.getElementById("adminConfirmSubmit");
   const adminSections = [...document.querySelectorAll("details[data-admin-section]")];
-  const sectionStateKey = "houseConciergeAdminSections:v5.11.25";
+  const sectionStateKey = "houseConciergeAdminSections:v5.11.26";
   let token = "";
 
   function savedAdminSectionState() {
@@ -139,6 +143,18 @@
     if (className) node.className = className;
     if (text !== undefined) node.textContent = text;
     return node;
+  }
+
+  function confirmAdminAction({ title, message, confirmLabel = "Confirm", danger = false }) {
+    adminConfirmTitle.textContent = title;
+    adminConfirmMessage.textContent = message;
+    adminConfirmSubmit.textContent = confirmLabel;
+    adminConfirmSubmit.classList.toggle("is-danger", danger);
+    adminConfirmDialog.returnValue = "";
+    adminConfirmDialog.showModal();
+    return new Promise((resolve) => {
+      adminConfirmDialog.addEventListener("close", () => resolve(adminConfirmDialog.returnValue === "confirm"), { once: true });
+    });
   }
 
   async function api(path, options = {}) {
@@ -273,7 +289,7 @@
       head.append(title, meta);
       card.append(
         head,
-        element("p", "concierge-admin-alert-summary", item.summary),
+        element("p", "concierge-admin-alert-summary", item.detailSummary || item.summary),
         element("span", "concierge-admin-alert-time", `${item.bangkokTime || bangkokDate(item.createdAt)} · Route: ${item.recipientGroup}`)
       );
       const latestDiagnostic = diagnostics.find((diagnostic) => diagnostic.alertId === item.id);
@@ -328,6 +344,9 @@
     }
     items.forEach((item) => {
       const card = element("article", "concierge-admin-alert is-attention");
+      card.dataset.diagnosticId = item.id;
+      card.dataset.diagnosticAlertId = item.alertId || "";
+      card.dataset.diagnosticAlertStatus = item.alertStatus || "";
       const title = item.templateName || "Earlier delivery failure";
       const code = item.errorCode || item.storedErrorCode || "unknown";
       card.append(
@@ -353,6 +372,12 @@
           "Recorded before safe provider diagnostics were enabled; only the retained error code is available."
         ));
       }
+      const actions = element("div", "concierge-admin-card-actions");
+      const dismiss = element("button", item.alertStatus === "resolved" ? "danger" : "secondary", item.alertStatus === "resolved" ? "Clear diagnostics" : "Dismiss");
+      dismiss.type = "button";
+      dismiss.dataset.diagnosticAction = item.alertStatus === "resolved" ? "clear" : "dismiss";
+      actions.appendChild(dismiss);
+      card.appendChild(actions);
       whatsappDeliveryDiagnostics.appendChild(card);
     });
   }
@@ -379,10 +404,21 @@
         download.dataset.maintenanceAction = "download";
         const remove = element("button", "danger", "Delete photo now");
         remove.type = "button";
-        remove.dataset.maintenanceAction = "delete";
+        remove.dataset.maintenanceAction = "delete-photo";
         actions.append(download, remove);
       } else {
         actions.appendChild(element("span", "concierge-admin-source-note", "No photo stored."));
+      }
+      if (["open", "acknowledged"].includes(item.status)) {
+        const resolve = element("button", "", "Resolve");
+        resolve.type = "button";
+        resolve.dataset.maintenanceAction = "resolve";
+        actions.appendChild(resolve);
+      } else if (item.status === "resolved") {
+        const removeReport = element("button", "danger", "Remove");
+        removeReport.type = "button";
+        removeReport.dataset.maintenanceAction = "remove";
+        actions.appendChild(removeReport);
       }
       card.appendChild(actions);
       maintenanceReports.appendChild(card);
@@ -885,9 +921,28 @@
     if (!button) return;
     const card = button.closest("[data-maintenance-id]");
     const id = card.dataset.maintenanceId;
+    const action = button.dataset.maintenanceAction;
+    if (action === "remove") {
+      const confirmed = await confirmAdminAction({
+        title: "Remove resolved report?",
+        message: "Remove this resolved maintenance report? Any remaining private photo will also be permanently deleted.",
+        confirmLabel: "Remove report",
+        danger: true
+      });
+      if (!confirmed) return;
+    }
+    if (action === "delete-photo") {
+      const confirmed = await confirmAdminAction({
+        title: "Delete private photo?",
+        message: "The stored maintenance photo will be permanently deleted. The maintenance report itself will remain.",
+        confirmLabel: "Delete photo",
+        danger: true
+      });
+      if (!confirmed) return;
+    }
     button.disabled = true;
     try {
-      if (button.dataset.maintenanceAction === "download") {
+      if (action === "download") {
         const response = await authorizedFetch(`/api/concierge/admin/maintenance-files/${id}`);
         if (!response.ok) throw new Error("download_failed");
         const url = URL.createObjectURL(await response.blob());
@@ -897,14 +952,56 @@
         link.download = `maintenance-${id}.${extensions[response.headers.get("content-type")] || "image"}`;
         link.click();
         window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      } else if (action === "resolve") {
+        await api("/api/concierge/admin/maintenance-resolve", { method: "POST", body: JSON.stringify({ id }) });
+        await loadOverview();
+      } else if (action === "remove") {
+        await api("/api/concierge/admin/maintenance-remove", {
+          method: "POST",
+          body: JSON.stringify({ id, confirmation: "REMOVE RESOLVED REPORT" })
+        });
+        await loadOverview();
       } else {
         await api("/api/concierge/admin/maintenance-delete", { method: "POST", body: JSON.stringify({ id }) });
         await loadOverview();
       }
     } catch (_error) {
-      window.alert("The maintenance photo action could not be completed.");
+      window.alert("The maintenance action could not be completed. Open reports must be resolved before removal, and private-photo deletion must succeed first.");
     } finally {
       button.disabled = false;
+    }
+  });
+  whatsappDeliveryDiagnostics.addEventListener("click", async (event) => {
+    const button = event.target.closest("[data-diagnostic-action]");
+    if (!button) return;
+    const card = button.closest("[data-diagnostic-id]");
+    const action = button.dataset.diagnosticAction;
+    const confirmed = await confirmAdminAction({
+      title: action === "clear" ? "Clear resolved diagnostics?" : "Dismiss diagnostic?",
+      message: action === "clear"
+        ? "Hide all failed-delivery diagnostics for this resolved alert. This does not change its delivery history."
+        : "Hide this failed-delivery diagnostic from the operational view. The parent alert and delivery result will not change.",
+      confirmLabel: action === "clear" ? "Clear diagnostics" : "Dismiss",
+      danger: action === "clear"
+    });
+    if (!confirmed) return;
+    button.disabled = true;
+    try {
+      if (action === "clear") {
+        await api("/api/concierge/admin/diagnostics/clear", {
+          method: "POST",
+          body: JSON.stringify({ alertId: card.dataset.diagnosticAlertId, confirmation: "CLEAR RESOLVED DIAGNOSTICS" })
+        });
+      } else {
+        await api("/api/concierge/admin/diagnostics/dismiss", {
+          method: "POST",
+          body: JSON.stringify({ id: card.dataset.diagnosticId, confirmation: "DISMISS DIAGNOSTIC" })
+        });
+      }
+      await loadOverview();
+    } catch (_error) {
+      button.disabled = false;
+      window.alert("The diagnostic visibility could not be updated. Clearing all diagnostics is available only after the parent alert is resolved.");
     }
   });
   alerts.addEventListener("click", async (event) => {

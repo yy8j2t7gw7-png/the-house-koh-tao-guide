@@ -2,7 +2,7 @@
 
 ## Purpose
 
-v5.11.25 provides a protected server-side staff-alert channel through the official Meta WhatsApp Business Platform. Guests continue to use the website Concierge. Recipient telephone numbers, access tokens and app secrets stay in encrypted Cloudflare secrets and never appear in public files, Git or release archives.
+v5.11.26 provides a protected server-side staff-alert channel through the official Meta WhatsApp Business Platform. Guests continue to use the website Concierge. Recipient telephone numbers, access tokens and app secrets stay in encrypted Cloudflare secrets and never appear in public files, Git or release archives.
 
 Routing is role based:
 
@@ -71,6 +71,8 @@ For every failed initial, escalation or status submission, the Worker records fo
 - a broad failure category for triage.
 
 The protected owner console displays these records under **WhatsApp delivery diagnostics**. Older v5.11.15 records display their retained numeric error code with a warning that full provider details were not captured by that release. Diagnostics never store recipient numbers, guest contacts, parameter values, tokens, passport data, stay/confirmation codes or key-box codes.
+
+v5.11.26 adds visibility controls without rewriting delivery history. **Dismiss** hides one diagnostic from the operational view while leaving its parent alert and accepted/failed delivery counts unchanged. **Clear diagnostics** hides all failed-delivery diagnostics only after the parent alert is resolved. Both actions require the protected owner console and deliberate custom-dialog confirmation; minimal audit rows retain only a non-sensitive alert reference and timestamp.
 
 `house_alert_status_v1` is non-recursive. An authorized `RECEIVED`, `ACK` or `RESOLVE` reply updates the original alert and sends one status message only to the other recipients assigned to that alert. The actor and unrelated roles are excluded; duplicate webhook delivery is suppressed by the original alert state. Status messages create no alert and no escalation.
 
@@ -146,7 +148,7 @@ WHATSAPP_ALERT_ESCALATION_MINUTES=10
 
 `WHATSAPP_ALERT_TEMPLATE_LANGUAGE` remains present for compatibility and does not need a Cloudflare change for v5.11.17. Every mapped production or rollback template now uses the language attached to its immutable schema entry.
 
-The optional action templates are intentionally absent from `wrangler.jsonc`, so deploying v5.11.25 cannot activate unapproved Meta definitions. After all five intended templates are Active, configure these exact non-secret variables and then enable the gate in a separate authorized activation release:
+The optional action templates are intentionally absent from `wrangler.jsonc`, so deploying v5.11.26 cannot activate unapproved Meta definitions. After all five intended templates are Active, configure these exact non-secret variables and then enable the gate in a separate authorized activation release:
 
 ```text
 WHATSAPP_SERVICE_ACTION_TEMPLATE_NAME=house_service_alert_actions_v2
@@ -161,14 +163,14 @@ If the flag is false, missing or any required action-template mapping is absent,
 
 Review Meta's supported Graph API versions before changing the version. The Worker checks once per minute for overdue escalations.
 
-## v5.11.25 deployment and changed-function verification
+## v5.11.26 deployment and changed-function verification
 
-Deploy the verified v5.11.25 bundle to the existing Worker without changing the six production template mappings, languages, BODY counts/order, routes, secrets, recipients, webhook settings, `SPARE_KEY_CODES` or `WHATSAPP_STAFF_ACTIONS_ENABLED=false` state.
+Deploy the verified v5.11.26 bundle to the existing Worker without changing the six production template mappings, languages, BODY counts/order, routes, secrets, recipients, webhook settings, `SPARE_KEY_CODES` or `WHATSAPP_STAFF_ACTIONS_ENABLED=false` state.
 
-Run one non-sensitive production booking smoke test:
+Run one non-sensitive mixed-diving production booking smoke test:
 
-1. Create one fresh diving request and complete it normally using non-sensitive test details.
-2. Confirm exactly one booking alert record, three attempted recipients, at least one accepted delivery, a received booking message and the normal pending-booking guest confirmation.
+1. Create one fresh three-person diving request with two or more participant groups and complete it normally using non-sensitive test details.
+2. Confirm exactly one booking alert record, three attempted recipients, at least one accepted delivery, a received compact subgroup summary and the normal pending-booking guest confirmation.
 3. If Meta rejects the request, capture only the new sanitized owner diagnostic and stop; do not guess or change configuration.
 
 Quick-action activation is a separate post-approval change. Follow `META_STAFF_QUICK_ACTIONS_v5.11.20.md` only after every intended template is Active; never map service v1.

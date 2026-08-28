@@ -24,8 +24,23 @@ import {
   whatsappAlertConfiguration
 } from "./whatsapp-alerts.js";
 import { getGuestAccess, handleStayAdminRequest, stayConfiguration } from "./stay-api.js";
+import {
+  DIVING_ACTIVITY_CHOICES,
+  DIVING_AGENCY_CHOICES,
+  courseChoiceLabels,
+  courseForSelection,
+  courseRequiresCertification,
+  divingBookingSummary,
+  matchDivingActivity,
+  matchDivingAgency,
+  matchDivingCourse,
+  matchDivingSpecialty,
+  matchGeneralCourse,
+  roctopusGuidance,
+  specialtyChoiceLabels
+} from "./diving-catalog.js";
 
-const RELEASE = "5.11.25";
+const RELEASE = "5.11.26";
 const ROOM_OPTIONS = new Set(["1", "2", "3", "4", "5", "6", "8", "9", "10", "11"]);
 const MAX_HISTORY_ITEMS = 10;
 const MAX_QUESTION_LENGTH = 800;
@@ -169,6 +184,7 @@ const OPERATIONAL_REQUEST = /\b(?:luggage|baggage|book|booking|reserve|arrange|d
 const ACTIONABLE_LUGGAGE_REQUEST = /\b(?:please\s+(?:store|keep|arrange)|can\s+(?:you|we)\s+(?:store|leave|keep|arrange)|could\s+you\s+(?:store|keep|arrange)|i\s+(?:want|wanna|need|would\s+like)\s+(?:(?:you\s+)?to\s+)?(?:store|leave|arrange|keep)|arrange\s+(?:luggage|baggage|bags?))\b[^.?!]*(?:luggage|baggage|bags?)/i;
 const DIRECT_LUGGAGE_REQUEST = /^\s*(?:please\s+)?(?:store|keep|arrange)\s+(?:my\s+|our\s+)?(?:luggage|baggage|bags?)\b/i;
 const ACTIONABLE_DIVING_BOOKING = /(?:^\s*(?:please\s+)?(?:book|reserve|arrange)\s+.*\b(?:dive|diving|scuba|open\s+water|advanced\s+open\s+water)\b|\b(?:please\s+(?:book|reserve|arrange)|can\s+you\s+(?:book|reserve|arrange)|could\s+you\s+(?:book|reserve|arrange)|help\s+me\s+(?:book|reserve|arrange)|i\s+(?:want|wanna|need|would\s+like)\s+(?:you\s+)?(?:to\s+)?(?:book|reserve|arrange))\b[^.?!]*\b(?:dive|diving|scuba|open\s+water|advanced\s+open\s+water)\b)/i;
+const DIVING_COURSE_REFERENCE = /(?:\b(?:padi|ssi|raid)\b[^.?!]{0,80}\b(?:scuba\s+diver|open\s+water|advanced|rescue|stress\s*(?:&|and)\s*rescue|explorer\s*30|advanced\s*35|master\s+rescue|specialt(?:y|ies)|divemaster|dive\s+master|dive\s+guide|assistant\s+instructor|instructor\s+(?:development|training|evaluation)|idc|itc|idp)\b|\b(?:padi|ssi|raid)\s+(?:idc|itc|idp)\b)/i;
 const ACTIONABLE_STRUCTURED_BOOKING = /(?:^\s*(?:please\s+)?(?:book|reserve|arrange)\b|\b(?:please\s+(?:book|reserve|arrange)|can\s+you\s+(?:book|reserve|arrange)|could\s+you\s+(?:book|reserve|arrange)|help\s+me\s+(?:book|reserve|arrange)|i\s+(?:want|wanna|need|would\s+like)\s+(?:you\s+)?(?:to\s+)?(?:book|reserve|arrange)|book\s+(?:me|us)|make\s+(?:a\s+)?(?:booking|reservation))\b)/i;
 const DIRECT_TRANSPORT_BOOKING = /(?:\b(?:i\s+(?:need|want|would\s+like)|can\s+(?:i|we)\s+(?:get|have)|get\s+me|send\s+me)\s+(?:a\s+)?(?:taxi(?:\s+boat)?|longtail\s+boat|motorbike\s+taxi|ferry\s+tickets?)\b|^\s*(?:taxi(?:\s+boat)?|longtail(?:\s+boat)?|motorbike\s+taxi|ferry(?:\s+tickets?)?)\b(?=[\s\S]*\b(?:today|tomorrow|next\s+(?:mon|tues|wednes|thurs|fri|satur|sun)day|in\s+\d{1,3}\s+days?|from|to|at\s+\d)))/i;
 const DIRECT_ACTIVITY_BOOKING = /(?:\b(?:i|we)\s+(?:(?:want|need|plan)\s+to|would\s+like\s+to|wanna)\s+(?:(?:go|book|arrange)\s+)?(?:(?:scuba\s+)?div(?:e|ing)|fishing|snorkel(?:ing|ling)?)\b|\b(?:i|we)['’]d\s+like\s+to\s+(?:(?:go|book|arrange)\s+)?(?:(?:scuba\s+)?div(?:e|ing)|fishing|snorkel(?:ing|ling)?)\b|\b(?:i|we)\s+(?:want|need|would\s+like)\s+(?:a\s+)?(?:diving|fishing|snorkel(?:ing|ling)?)\s+(?:trip|tour)\b|\b(?:take\s+(?:me|us)|can\s+you\s+take\s+(?:me|us)|help\s+(?:me|us)\s+(?:go\s+)?)\s*(?:(?:scuba\s+)?div(?:e|ing)|fishing|snorkel(?:ing|ling)?)\b)/i;
@@ -216,6 +232,44 @@ function cleanWorkflowValue(value, maximum = 120) {
   return cleanWorkflowNotes(value).slice(0, maximum);
 }
 
+function blankDivingGroup() {
+  return {
+    count: "",
+    activityType: "",
+    agency: "",
+    course: "",
+    specialty: "",
+    specialtyDetail: "",
+    currentCertification: "",
+    providerPreference: "",
+    notes: "",
+    unsureCertified: "",
+    goal: "",
+    pendingCourseText: ""
+  };
+}
+
+function cleanDivingGroups(value) {
+  if (!Array.isArray(value)) return [];
+  return value.slice(0, 99).map((item) => {
+    const count = Number(String(item?.count || "").trim());
+    return {
+      count: Number.isInteger(count) && count >= 1 && count <= 99 ? String(count) : "",
+      activityType: DIVING_ACTIVITY_CHOICES.includes(item?.activityType) ? item.activityType : "",
+      agency: DIVING_AGENCY_CHOICES.includes(item?.agency) ? item.agency : "",
+      course: cleanWorkflowValue(item?.course, 120),
+      specialty: cleanWorkflowValue(item?.specialty, 120),
+      specialtyDetail: cleanWorkflowValue(item?.specialtyDetail, 160),
+      currentCertification: cleanWorkflowValue(item?.currentCertification, 160),
+      providerPreference: cleanWorkflowValue(item?.providerPreference, 120),
+      notes: cleanWorkflowNotes(item?.notes),
+      unsureCertified: ["yes", "no"].includes(item?.unsureCertified) ? item.unsureCertified : "",
+      goal: cleanWorkflowValue(item?.goal, 180),
+      pendingCourseText: cleanWorkflowValue(item?.pendingCourseText, 240)
+    };
+  });
+}
+
 function cleanWorkflowState(value) {
   if (!value) return null;
   if (value.type === "property_issue") {
@@ -252,7 +306,16 @@ function cleanWorkflowState(value) {
     const kind = SUPPORTED_BOOKING_KINDS.has(request.kind || value.kind) ? (request.kind || value.kind) : "";
     const countNumber = Number(String(request.guestCount || "").trim());
     const guestCount = Number.isInteger(countNumber) && countNumber >= 1 && countNumber <= 99 ? String(countNumber) : "";
-    const allowedMissing = ["kind", "date", "guests", "option", "course", "certification", "time", "pickup", "destination", "tripType", "contact"];
+    const allowedMissing = [
+      "kind", "date", "guests", "option", "course", "certification", "time", "pickup", "destination", "tripType", "contact",
+      "planMode", "groupActivity", "groupCount", "agency", "specialty", "specialtyDetail", "unsureCertified", "goal"
+    ];
+    const groups = kind === "diving" ? cleanDivingGroups(request.groups) : [];
+    const planMode = ["same", "different"].includes(request.planMode) ? request.planMode : "";
+    const activeGroupNumber = Number(request.activeGroupIndex);
+    const activeGroupIndex = Number.isInteger(activeGroupNumber) && activeGroupNumber >= 0 && activeGroupNumber < Math.max(1, groups.length)
+      ? activeGroupNumber
+      : Math.max(0, groups.length - 1);
     return {
       type: "booking",
       kind,
@@ -273,7 +336,11 @@ function cleanWorkflowState(value) {
         pickupLocation: cleanWorkflowValue(request.pickupLocation, 160),
         destination: cleanWorkflowValue(request.destination, 160),
         tripType: cleanWorkflowValue(request.tripType, 60),
-        notes: cleanWorkflowNotes(request.notes)
+        notes: cleanWorkflowNotes(request.notes),
+        planMode,
+        totalParticipants: guestCount,
+        activeGroupIndex,
+        groups
       }
     };
   }
@@ -986,7 +1053,7 @@ function bookingKindFromText(value) {
   if (/\bferr(?:y|ies)(?:\s+tickets?)?\b/i.test(source)) return "ferry";
   if (/\b(?:fish(?:ing)?\s+trip|sport\s+fishing|food\s+fishing|go\s+fishing|fishing)\b/i.test(source)) return "fishing";
   if (/\b(?:snorkel|snorkeling|snorkelling)\b/i.test(source)) return "snorkeling";
-  if (/\b(?:dive|diving|scuba|open\s+water|advanced\s+open\s+water)\b/i.test(source)) return "diving";
+  if (/\b(?:dive|diving|scuba|open\s+water|advanced\s+open\s+water)\b/i.test(source) || DIVING_COURSE_REFERENCE.test(source)) return "diving";
   if (/\btaxi\b/i.test(source)) return "taxi";
   return "";
 }
@@ -1056,11 +1123,12 @@ function supportedBookingInformationResult(question) {
 function isActionableDivingBooking(value) {
   const source = String(value || "");
   return ACTIONABLE_DIVING_BOOKING.test(source)
-    || (DIRECT_ACTIVITY_BOOKING.test(source) && bookingKindFromText(source) === "diving");
+    || (DIRECT_ACTIVITY_BOOKING.test(source) && bookingKindFromText(source) === "diving")
+    || (ACTIONABLE_STRUCTURED_BOOKING.test(source) && DIVING_COURSE_REFERENCE.test(source));
 }
 
 function isDivingCollectionPrompt(value) {
-  return /\b(?:preferred date|what date would you like to go diving|how many (?:people|guests|divers)|how many people will be diving|which diving option|fun diving|open water|advanced open water|other or higher-level diving course|certification level|which course|whatsapp or phone number|booking is only confirmed)\b/i.test(String(value || ""));
+  return /\b(?:preferred (?:start|diving) date|what date would you like to go diving|how many (?:people|guests|divers)|how many people will be diving|same for everyone|different plans|what would .*group like to do|fun diving|try diving|take a course|professional training|preferred training agency|which .*course|specialty|certification level|already certified|what would you like to achieve|whatsapp or phone number|booking is only confirmed)\b/i.test(String(value || ""));
 }
 
 function activeDivingWorkflowMessages(history) {
@@ -1101,15 +1169,29 @@ function divingGuestCount(value, allowBare = false) {
   return "";
 }
 
-function divingChoice(value) {
+function divingPlanMode(value) {
   const source = String(value || "");
-  if (/\bfun\s+div(?:e|es|ing)\b/i.test(source)) return { option: "Fun Diving", courseName: "" };
-  if (/^\s*advanced\s*[.!]?\s*$/i.test(source) || /\badvanced\s+open\s+water(?:\s+course)?\b/i.test(source)) return { option: "Advanced Open Water Course", courseName: "" };
-  if (/\bopen\s+water(?:\s+course)?\b/i.test(source)) return { option: "Open Water Course", courseName: "" };
-  const namedCourse = source.match(/\b(rescue\s+diver|divemaster|nitrox|deep\s+diver|wreck\s+diver|specialty|speciality)\s*(?:course)?\b/i);
-  if (namedCourse) return { option: "Other course", courseName: namedCourse[1].replace(/\b\w/g, (letter) => letter.toUpperCase()) };
-  if (/^\s*other\s*[.!]?\s*$/i.test(source) || /\b(?:another|other|higher(?:-level)?)\s+course\b/i.test(source)) return { option: "Other course", courseName: "" };
-  return { option: "", courseName: "" };
+  if (/\b(?:same for everyone|everyone (?:is |will be )?(?:doing|taking|diving)|all (?:the )?(?:same|together))\b/i.test(source)) return "same";
+  if (/\b(?:different plans|different things|different activities|different courses|not (?:all )?the same|split (?:the )?group)\b/i.test(source)) return "different";
+  return "";
+}
+
+function divingGroupCount(value, allowBare = false) {
+  const source = String(value || "");
+  const numeric = source.match(/\b(\d{1,2})\s*(?:people|persons?|guests?|divers?)\b/i);
+  if (numeric) return String(Number(numeric[1]));
+  if (allowBare) {
+    const bare = source.trim().match(/^(\d{1,2})$/);
+    if (bare && Number(bare[1]) >= 1) return String(Number(bare[1]));
+  }
+  return "";
+}
+
+function divingYesNo(value) {
+  const source = String(value || "").trim();
+  if (/^(?:yes|yeah|yep|already certified|i am certified)[.!]?$/i.test(source)) return "yes";
+  if (/^(?:no|nope|not yet|not certified|beginner)[.!]?$/i.test(source)) return "no";
+  return "";
 }
 
 function divingCertification(value) {
@@ -1118,6 +1200,10 @@ function divingCertification(value) {
     .replace(/[.!]+$/g, "")
     .trim();
   if (!source || source.length > 120 || /^(?:none|no|not\s+sure|i\s+don['’]?t\s+know|beginner)$/i.test(source)) return "";
+  if (/\b\d+\s+(?:PADI\s+|SSI\s+|RAID\s+)?(?:open\s+water|advanced|rescue|divemaster|instructors?)\b/i.test(source)
+    && /\b(?:and|plus)\b|,/.test(source)) {
+    return source;
+  }
   const agencyMatch = source.match(/\b(PADI|SSI|RAID|NAUI|CMAS|BSAC|SDI|TDI)\b/i);
   const agency = agencyMatch ? agencyMatch[1].toUpperCase() : "";
   let level = "";
@@ -1135,6 +1221,21 @@ function divingCertification(value) {
     && source.split(/\s+/).length <= 10
     && !/[?]/.test(source);
   return usefulFreeText ? source : "";
+}
+
+function divingExplicitCertification(value) {
+  const source = String(value || "");
+  const match = source.match(/\b(?:current\s+(?:diving\s+)?(?:certification|level)(?:\s+is|\s*:)?|certification\s*(?:is|:)|i\s+(?:am|'m))\s+([^.;!?]{2,120}?)(?:\s+certified)?(?:[.;!?]|$)/i);
+  return match ? divingCertification(match[1]) : "";
+}
+
+function divingRequestedCourseText(value) {
+  return String(value || "")
+    .replace(/\b(?:my\s+)?current\s+(?:diving\s+)?(?:certification|level)\s*(?:is|:)?\s*[^.;!?]{2,120}(?=[.;!?]|$)/gi, " ")
+    .replace(/\bcertification\s*(?:is|:)\s*[^.;!?]{2,120}(?=[.;!?]|$)/gi, " ")
+    .replace(/\bi\s+(?:am|'m)\s+[^.;!?]{2,80}?\s+certified\b/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function preferredBookingProvider(kind, value) {
@@ -1162,8 +1263,8 @@ function bookingSideContext(kind, value) {
     return {
       preferredProvider,
       acknowledgement: preferredProvider === "Roctopus Dive"
-        ? "I’ve included Roctopus Dive as your preferred dive school."
-        : `We normally recommend Roctopus Dive, but I can include ${preferredProvider} as your preferred dive school and our booking team can check whether that can be arranged.`
+        ? "We recommend RAID training because of its focus on dive safety and buoyancy control, and I’ve included Roctopus Dive as your preferred dive school."
+        : `We recommend RAID training because of its focus on dive safety and buoyancy control and normally recommend Roctopus Dive, but I can include ${preferredProvider} as your preferred dive school and our booking team can check whether that can be arranged.`
     };
   }
   if (/\b(?:suitcases?|luggage|bags?)\b/i.test(source)
@@ -1206,11 +1307,16 @@ function bookingValidationAnswer(kind, field, parsedDate = null) {
   if (field === "time") return "I couldn’t understand that pickup time. You can enter something like ‘9:30 AM’ or ‘14:00’.";
   if (field === "pickup") return "I couldn’t identify the pickup location. Please enter the place or pier where the journey should start.";
   if (field === "destination") return "I couldn’t identify the destination. Please enter where you would like to go.";
-  if (field === "option") return kind === "diving"
-    ? "I didn’t recognize that diving option. Please choose Fun Diving, Open Water, Advanced Open Water, or Other course."
-    : `I didn’t recognize that ${kind === "fishing" ? "fishing" : "snorkeling"} preference. Please choose one of the options below.`;
+  if (field === "option") return `I didn’t recognize that ${kind === "fishing" ? "fishing" : "snorkeling"} preference. Please choose one of the options below.`;
   if (field === "course") return "Please enter the diving course you would like us to check.";
   if (field === "certification") return "I didn’t recognize a certification level there. You can enter something like Open Water, Advanced, Rescue, Divemaster or Instructor.";
+  if (field === "planMode") return "Please choose whether everyone has the same plan or the party has different plans.";
+  if (field === "groupActivity") return "Please choose Fun Diving, Try Diving, Learn / Take a Course, Professional Training, or Not Sure.";
+  if (field === "groupCount") return "Please enter a whole number of people for this group.";
+  if (field === "agency") return "Please choose PADI, SSI, RAID, or No preference.";
+  if (field === "specialty" || field === "specialtyDetail") return "Please choose a specialty or briefly type the specialty or technical training you want us to check.";
+  if (field === "unsureCertified") return "Please tell me whether you are already certified.";
+  if (field === "goal") return "Please briefly tell me what you would like to achieve, such as trying diving, diving deeper, rescue training, a specialty, or professional training.";
   if (field === "tripType") return "Please choose whether you need a one-way or return boat trip.";
   if (field === "contact") return `I couldn’t find a usable contact number. ${CONTACT_PROMPT}`;
   return "I couldn’t use that answer. Please try again.";
@@ -1219,12 +1325,6 @@ function bookingValidationAnswer(kind, field, parsedDate = null) {
 function bookingChoiceActions(kind, field) {
   const choices = field === "option"
     ? {
-        diving: [
-          ["Fun Diving", "Fun Diving"],
-          ["Open Water", "Open Water"],
-          ["Advanced", "Advanced Open Water"],
-          ["Other", "Other course"]
-        ],
         fishing: [
           ["Sport fishing", "Sport fishing"],
           ["Food fishing", "Food fishing"],
@@ -1245,20 +1345,148 @@ function bookingChoiceActions(kind, field) {
   return (choices || []).map(([label, prompt]) => ({ label, type: "prompt", prompt }));
 }
 
-function divingCollectionStep(missing, rejectedLocalContact = false, isNewRequest = false) {
+function specialtyNeedsDetail(value) {
+  return ["Other Specialty", "Technical / Extended Range / Other"].includes(value);
+}
+
+function divingGroupMissingField(group) {
+  if (!group?.activityType) return "groupActivity";
+  if (!group.count) return "groupCount";
+  if (group.activityType === "Fun Diving" && !group.currentCertification) return "certification";
+  if (["Learn / Take a Course", "Professional Training"].includes(group.activityType)) {
+    if (!group.agency) return "agency";
+    if (!group.course) return "course";
+    const professional = group.activityType === "Professional Training";
+    const selectedCourse = courseForSelection(group.agency, group.course, { professional });
+    if (!selectedCourse) return "course";
+    if (selectedCourse.specialty && !group.specialty) return "specialty";
+    if (selectedCourse.specialty && specialtyNeedsDetail(group.specialty) && !group.specialtyDetail) return "specialtyDetail";
+    if (selectedCourse.requiresCurrentCertification && !group.currentCertification) return "certification";
+  }
+  if (group.activityType === "Not Sure") {
+    if (!group.unsureCertified) return "unsureCertified";
+    if (group.unsureCertified === "yes" && !group.currentCertification) return "certification";
+    if (!group.goal) return "goal";
+  }
+  return "";
+}
+
+function divingAllocatedCount(groups) {
+  return (groups || []).reduce((total, group) => total + (Number(group.count) || 0), 0);
+}
+
+function prepareDivingMissing(request, contact) {
+  if (!request.preferredDate) return ["date"];
+  const total = Number(request.guestCount);
+  if (!Number.isInteger(total) || total < 1) return ["guests"];
+  request.totalParticipants = String(total);
+  if (total === 1) request.planMode = "same";
+  if (!request.planMode) return ["planMode"];
+  if (!request.groups.length) request.groups.push(blankDivingGroup());
+  if (request.planMode === "same") {
+    request.groups = [request.groups[0]];
+    request.groups[0].count = String(total);
+    request.activeGroupIndex = 0;
+  }
+  request.activeGroupIndex = Math.min(Math.max(0, Number(request.activeGroupIndex) || 0), request.groups.length - 1);
+  let active = request.groups[request.activeGroupIndex];
+  let field = divingGroupMissingField(active);
+  if (request.planMode === "different" && !field) {
+    const allocated = divingAllocatedCount(request.groups);
+    if (allocated < total) {
+      request.groups.push(blankDivingGroup());
+      request.activeGroupIndex = request.groups.length - 1;
+      active = request.groups[request.activeGroupIndex];
+      field = "groupActivity";
+    } else if (allocated > total) {
+      active.count = "";
+      field = "groupCount";
+    }
+  }
+  if (field) return [field, "contact"].filter(Boolean);
+  if (divingAllocatedCount(request.groups) !== total) return ["groupCount", "contact"];
+  return contact ? [] : ["contact"];
+}
+
+function divingChoiceActions(request, field) {
+  let choices = [];
+  const group = request.groups?.[request.activeGroupIndex] || {};
+  if (field === "planMode") choices = [["Same for everyone", "Same for everyone"], ["Different plans", "Different plans"]];
+  if (field === "groupActivity") choices = DIVING_ACTIVITY_CHOICES.map((label) => [label, label]);
+  if (field === "agency") choices = DIVING_AGENCY_CHOICES.map((label) => [label, label]);
+  if (field === "course") {
+    choices = courseChoiceLabels(group.agency, { professional: group.activityType === "Professional Training" })
+      .map((label) => [label, label]);
+  }
+  if (field === "specialty") {
+    const compact = new Set([
+      "Nitrox / Enriched Air", "Deep Diving", "Wreck Diving", "Night / Limited Visibility",
+      "Navigation", "Buoyancy / Performance", "Technical / Extended Range / Other", "Other Specialty"
+    ]);
+    choices = specialtyChoiceLabels().filter((label) => compact.has(label)).map((label) => [label, label]);
+  }
+  if (field === "unsureCertified") choices = [["Yes", "Yes"], ["No", "No"]];
+  if (field === "goal") choices = [
+    ["Try diving", "Try Diving"], ["Learn to dive", "Open Water"], ["Dive deeper", "Dive deeper"],
+    ["Rescue training", "Rescue training"], ["Specialty", "Specialty"], ["Go professional", "Become a dive professional"]
+  ];
+  return choices.map(([label, prompt]) => ({ label, type: "prompt", prompt }));
+}
+
+function notSureDivingSuggestion(certified, goal = "") {
+  const source = String(goal || "").toLowerCase();
+  let category;
+  if (certified === "no") {
+    category = /\b(?:try|first|experience)\b/.test(source)
+      ? "Try Diving"
+      : /\b(?:learn|certif|open\s+water)\b/.test(source)
+        ? "an entry-level Open Water course"
+        : "Try Diving or an entry-level Open Water course";
+  } else if (/\b(?:instructor|professional|divemaster|dive\s+master)\b/.test(source)) {
+    category = "Professional Training";
+  } else if (/\brescue\b/.test(source)) {
+    category = "rescue training";
+  } else if (/\b(?:specialt|nitrox|wreck|night|navigation|sidemount|photo|video|dry\s+suit|drift|current)\b/.test(source)) {
+    category = "a Specialty Course";
+  } else if (/\b(?:deep|deeper|improve|skill|buoyancy|performance)\b/.test(source)) {
+    category = "continuing education or a suitable specialty course";
+  } else {
+    category = certified === "yes"
+      ? "continuing education or a suitable specialty course"
+      : "Try Diving or an entry-level Open Water course";
+  }
+  return `Based on what you told me, ${category} is the most relevant category for the booking team to check. The dive operator will verify the suitable course and any prerequisites. ${roctopusGuidance("")}`;
+}
+
+function divingCollectionStep(request, missing, rejectedLocalContact = false, isNewRequest = false) {
   const field = missing[0];
-  const intro = isNewRequest ? "Of course. We recommend Roctopus Dive. " : "";
+  const intro = isNewRequest ? "Of course. We normally recommend Roctopus Dive. For training, we recommend RAID because of its focus on dive safety and buoyancy control. " : "";
+  const group = request.groups?.[request.activeGroupIndex] || {};
+  const total = Number(request.guestCount) || 0;
+  const assignedBefore = (request.groups || []).slice(0, request.activeGroupIndex).reduce((sum, item) => sum + (Number(item.count) || 0), 0);
+  const remaining = Math.max(0, total - assignedBefore);
+  const groupOrdinal = request.activeGroupIndex === 0 ? "first" : "next";
+  const courseType = group.activityType === "Professional Training" ? "professional course" : "course";
   const questions = {
-    date: "What date would you like to go diving?",
+    date: "What is your preferred start or diving date?",
     guests: "How many people will be diving?",
-    option: "Which diving option would you prefer?",
-    course: "Which other or higher-level diving course would you like?",
-    certification: "What is your current diving certification level?",
+    planMode: "Will everyone be doing the same diving activity or course?",
+    groupActivity: request.planMode === "different"
+      ? `${remaining} ${remaining === 1 ? "person remains" : "people remain"}. What would the ${groupOrdinal} group like to do?`
+      : "What would you like to do?",
+    groupCount: `How many people will be doing ${group.activityType || "this plan"}? ${remaining} ${remaining === 1 ? "person is" : "people are"} available to assign.`,
+    agency: `${roctopusGuidance("")} Do you have a preferred training agency?`,
+    course: `Which ${group.agency === "No preference" ? "" : `${group.agency} `}${courseType} would you like the booking team to check?`,
+    specialty: "Which specialty would you like? Choose a common option below, or type another such as Search & Recovery, Sidemount, DPV, Photo / Video, Dry Suit, or Drift / Currents.",
+    specialtyDetail: "What specialty or technical / extended-range training would you like the booking team to check?",
+    certification: `What is the current diving certification for ${request.planMode === "different" ? "this group" : "the diver or group"}?`,
+    unsureCertified: "Are you already certified?",
+    goal: "What would you like to achieve—for example, try diving, learn to dive, go deeper, improve skills, take rescue or specialty training, become a dive professional, or become an instructor?",
     contact: rejectedLocalContact ? LOCAL_CONTACT_PROMPT : CONTACT_PROMPT
   };
   return {
     answer: `${intro}${questions[field] || "What would you like to add to your diving request?"}`,
-    actions: bookingChoiceActions("diving", field)
+    actions: divingChoiceActions(request, field)
   };
 }
 
@@ -1290,41 +1518,143 @@ function applyDivingBookingPolicy(result, question, history, currentReplyContact
   const expectedField = pendingState?.missing?.[0] || "";
   const sideContext = bookingSideContext("diving", currentDetails);
   const parsedDate = parseBangkokRequestedDate(question, now);
+  const request = {
+    kind: "diving",
+    activity: "Diving",
+    preferredDate: previous.preferredDate || "",
+    guestCount: previous.guestCount || "",
+    totalParticipants: previous.totalParticipants || previous.guestCount || "",
+    planMode: previous.planMode || "",
+    activeGroupIndex: Number(previous.activeGroupIndex) || 0,
+    groups: cleanDivingGroups(previous.groups),
+    preferredProvider: previous.preferredProvider || "",
+    pickupTime: "",
+    pickupLocation: "",
+    destination: "",
+    tripType: "",
+    notes: details
+  };
+  const initialInput = !pendingState;
   const currentDate = parsedDate.status === "valid" ? parsedDate.displayDate : "";
-  const currentChoice = expectedField === "certification"
-    ? { option: "", courseName: "" }
-    : divingChoice(currentDetails);
-  const choice = currentChoice.option
-    ? currentChoice
-    : { option: previous.option || "", courseName: previous.courseName || "" };
-  const preferredDate = currentDate || previous.preferredDate || (!pendingState ? divingPreferredDate(details, now) : "");
+  if ((initialInput || expectedField === "date") && currentDate) request.preferredDate = currentDate;
+  if (initialInput && !request.preferredDate) request.preferredDate = divingPreferredDate(details, now);
   const currentGuestCount = divingGuestCount(currentDetails, expectedField === "guests");
-  const guestCount = currentGuestCount || previous.guestCount || (!pendingState ? divingGuestCount(details) : "");
-  const currentCertification = divingCertification(currentDetails);
-  const certificationLevel = choice.option === "Fun Diving"
-    ? (currentCertification || previous.certificationLevel || (!pendingState ? divingCertification(details) : ""))
+  if ((initialInput || expectedField === "guests") && currentGuestCount) request.guestCount = currentGuestCount;
+  if (initialInput && !request.guestCount) request.guestCount = divingGuestCount(details);
+  if (Number(request.guestCount) === 1) request.planMode = "same";
+  const selectedPlanMode = divingPlanMode(currentDetails);
+  if ((initialInput || expectedField === "planMode") && selectedPlanMode) request.planMode = selectedPlanMode;
+  if (!request.groups.length) request.groups.push(blankDivingGroup());
+  request.activeGroupIndex = Math.min(Math.max(0, request.activeGroupIndex), request.groups.length - 1);
+  let group = request.groups[request.activeGroupIndex];
+  const selectedActivity = (initialInput || expectedField === "groupActivity") ? matchDivingActivity(currentDetails) : "";
+  if (selectedActivity) {
+    const preservedCount = group.count;
+    const preservedProvider = group.providerPreference;
+    group = { ...blankDivingGroup(), count: preservedCount, activityType: selectedActivity, providerPreference: preservedProvider };
+    request.groups[request.activeGroupIndex] = group;
+    if (["Learn / Take a Course", "Professional Training"].includes(selectedActivity)) {
+      group.pendingCourseText = divingRequestedCourseText(currentDetails);
+    }
+  }
+  if (request.planMode === "same" && request.guestCount) group.count = request.guestCount;
+  let groupCountRejected = false;
+  if (expectedField === "groupCount") {
+    const proposed = Number(divingGroupCount(currentDetails, true));
+    const assignedElsewhere = request.groups.reduce((sum, item, index) => index === request.activeGroupIndex ? sum : sum + (Number(item.count) || 0), 0);
+    const available = Math.max(0, Number(request.guestCount) - assignedElsewhere);
+    if (Number.isInteger(proposed) && proposed >= 1 && proposed <= available) group.count = String(proposed);
+    else groupCountRejected = true;
+  }
+  const selectedAgency = (initialInput || ["groupActivity", "agency", "course"].includes(expectedField))
+    ? matchDivingAgency(currentDetails)
     : "";
-  const preferredProvider = sideContext.preferredProvider || previous.preferredProvider || "";
+  if (selectedAgency && ["Learn / Take a Course", "Professional Training"].includes(group.activityType)) group.agency = selectedAgency;
+  const professional = group.activityType === "Professional Training";
+  if (["Learn / Take a Course", "Professional Training"].includes(group.activityType)) {
+    const courseText = expectedField === "course"
+      ? divingRequestedCourseText(currentDetails)
+      : group.pendingCourseText || (initialInput ? divingRequestedCourseText(currentDetails) : "");
+    const selectedCourse = group.agency === "No preference"
+      ? matchGeneralCourse(courseText, { professional })
+      : matchDivingCourse(courseText, group.agency, { professional })?.displayLabel || "";
+    if (selectedCourse) group.course = selectedCourse;
+  }
+  if (expectedField === "specialty") {
+    const selectedSpecialty = matchDivingSpecialty(currentDetails);
+    if (selectedSpecialty) group.specialty = selectedSpecialty;
+    else if (currentDetails.length >= 3) {
+      group.specialty = "Other Specialty";
+      group.specialtyDetail = currentDetails;
+    }
+  }
+  if (expectedField === "specialtyDetail" && currentDetails.length >= 3) group.specialtyDetail = currentDetails;
+  const currentCertification = expectedField === "certification"
+    ? divingCertification(currentDetails)
+    : initialInput ? divingExplicitCertification(currentDetails) : "";
+  if (currentCertification) {
+    group.currentCertification = currentCertification;
+  }
+  const certifiedAnswer = expectedField === "unsureCertified" ? divingYesNo(currentDetails) : "";
+  if (certifiedAnswer) group.unsureCertified = certifiedAnswer;
+  let notSureSuggestion = expectedField === "unsureCertified" && certifiedAnswer === "no"
+    ? notSureDivingSuggestion("no")
+    : "";
+  if (expectedField === "goal" && currentDetails.length >= 3) {
+    const unsureCertified = group.unsureCertified;
+    const redirectedActivity = matchDivingActivity(currentDetails);
+    if (["Try Diving", "Learn / Take a Course", "Professional Training"].includes(redirectedActivity)) {
+      const preservedCount = group.count;
+      group = { ...blankDivingGroup(), count: preservedCount, activityType: redirectedActivity, pendingCourseText: currentDetails };
+      request.groups[request.activeGroupIndex] = group;
+    } else {
+      group.goal = currentDetails;
+    }
+    notSureSuggestion = notSureDivingSuggestion(unsureCertified, currentDetails);
+  }
+  if (sideContext.preferredProvider) {
+    request.preferredProvider = sideContext.preferredProvider;
+    group.providerPreference = sideContext.preferredProvider;
+  }
   const contact = validInternationalReplyContact(currentReplyContact);
   const rejectedLocalContact = Boolean(currentReplyContact && !contact);
-  const missing = [];
-  if (!preferredDate) missing.push("date");
-  if (!guestCount) missing.push("guests");
-  if (!choice.option) missing.push("option");
-  if (choice.option === "Other course" && !choice.courseName) missing.push("course");
-  if (choice.option === "Fun Diving" && !certificationLevel) missing.push("certification");
-  if (!contact) missing.push("contact");
+  const missing = prepareDivingMissing(request, contact);
+  group = request.groups[request.activeGroupIndex] || group;
+  const firstGroup = request.groups[0] || {};
+  request.option = firstGroup.activityType || "";
+  request.courseName = firstGroup.course || "";
+  request.certificationLevel = firstGroup.currentCertification || "";
   if (missing.length) {
-    const step = divingCollectionStep(missing, rejectedLocalContact, actionableNow && !pendingState);
+    const step = divingCollectionStep(request, missing, rejectedLocalContact, actionableNow && !pendingState);
     const acceptedExpectedField = {
       date: parsedDate.status === "valid",
       guests: Boolean(currentGuestCount),
-      option: Boolean(currentChoice.option),
-      course: Boolean(currentChoice.courseName),
+      planMode: Boolean(selectedPlanMode),
+      groupActivity: Boolean(selectedActivity),
+      groupCount: !groupCountRejected && Boolean(group.count),
+      agency: Boolean(selectedAgency),
+      course: Boolean(group.course),
+      specialty: Boolean(group.specialty),
+      specialtyDetail: Boolean(group.specialtyDetail),
       certification: Boolean(currentCertification),
+      unsureCertified: Boolean(certifiedAnswer),
+      goal: Boolean(group.goal) || ["Try Diving", "Learn / Take a Course", "Professional Training"].includes(group.activityType),
       contact: Boolean(contact)
     }[expectedField];
     let prefix = sideContext.acknowledgement;
+    if (notSureSuggestion) prefix = [prefix, notSureSuggestion].filter(Boolean).join(" ");
+    if (sideContext.preferredProvider === "Roctopus Dive" && ["PADI", "SSI"].includes(group.agency)) {
+      prefix = roctopusGuidance(group.agency);
+    }
+    if (expectedField === "agency" && selectedAgency) prefix = roctopusGuidance(selectedAgency);
+    if (groupCountRejected) {
+      const assignedElsewhere = request.groups.reduce((sum, item, index) => index === request.activeGroupIndex ? sum : sum + (Number(item.count) || 0), 0);
+      const available = Math.max(0, Number(request.guestCount) - assignedElsewhere);
+      prefix = `Please assign between 1 and ${available} ${available === 1 ? "person" : "people"} to this group.`;
+    }
+    if (expectedField === "course" && group.agency === "RAID" && /\badvanced\b/i.test(currentDetails) && !group.course) {
+      prefix = "RAID has distinct Explorer 30 and Advanced 35 pathways, so please choose the one you want us to check.";
+    }
     if (pendingState && missing[0] === expectedField && !acceptedExpectedField && !prefix && !(expectedField === "contact" && rejectedLocalContact)) {
       prefix = bookingValidationAnswer("diving", expectedField, parsedDate);
     } else if (!pendingState && missing[0] === "date" && ["past", "invalid"].includes(parsedDate.status)) {
@@ -1346,16 +1676,11 @@ function applyDivingBookingPolicy(result, question, history, currentReplyContact
       alertQuestion: details || "Diving booking details pending.",
       workflow: {
         type: "booking", kind: "diving", status: "collecting", retainPrivateContact: Boolean(contact), missing,
-        bookingRequest: {
-          kind: "diving", activity: "Diving", preferredDate, guestCount,
-          option: choice.option, courseName: choice.courseName, certificationLevel, preferredProvider,
-          pickupTime: "", pickupLocation: "", destination: "", tripType: "", notes: details
-        }
+        bookingRequest: request
       }
     };
   }
-  const optionDetail = choice.option === "Other course" ? choice.courseName : choice.option;
-  const summary = `Diving booking request: ${optionDetail}; preferred date ${preferredDate}; ${guestCount} ${guestCount === "1" ? "person" : "people"}${certificationLevel ? `; certification ${certificationLevel}` : ""}${preferredProvider ? `; preferred dive school ${preferredProvider}` : ""}. Guest notes: ${details}`;
+  const summary = divingBookingSummary(request, { includeNotes: true });
   return {
     handled: true,
     result: {
@@ -1367,28 +1692,14 @@ function applyDivingBookingPolicy(result, question, history, currentReplyContact
       actions: [],
       suppressDefaultActions: true,
       privateReplyContact: contact,
-      requestedDateTime: preferredDate,
+      requestedDateTime: request.preferredDate,
       source: "booking-policy",
-      bookingRequest: {
-        kind: "diving",
-        activity: "Diving",
-        preferredDate,
-        guestCount,
-        option: choice.option,
-        courseName: choice.courseName,
-        certificationLevel,
-        preferredProvider,
-        notes: details
-      }
+      bookingRequest: request
     },
     alertQuestion: summary,
     workflow: {
       type: "booking", kind: "diving", status: "ready", retainPrivateContact: false, missing: [],
-      bookingRequest: {
-        kind: "diving", activity: "Diving", preferredDate, guestCount,
-        option: choice.option, courseName: choice.courseName, certificationLevel, preferredProvider,
-        pickupTime: "", pickupLocation: "", destination: "", tripType: "", notes: details
-      }
+      bookingRequest: request
     }
   };
 }
@@ -2015,7 +2326,7 @@ AUTHORITATIVE KNOWLEDGE
 - RETRIEVED APPROVED PROJECT RECORDS contain the most relevant existing activity, restaurant, café, beach, bar and shopping records for this question.
 - When a retrieved record is relevant, use it instead of claiming that no confirmed recommendation exists.
 - When asked for a general recommendation, lead with a record explicitly marked preferredByTheHouse=true. Otherwise choose by the guest's stated constraints and explain the fit without claiming every alternative is inferior.
-- For a Roctopus recommendation, explain only why The House recommends the team: friendly professional service, small groups, personal attention and a welcoming approach for first-time or nervous divers. Leave training systems, certifications, course structures and detailed options to the Roctopus team in the shop unless a later owner-approved answer explicitly changes this rule.
+- For diving recommendations, always recommend RAID training because of its focus on dive safety and buoyancy control, and always recommend Roctopus Dive as The House’s preferred RAID dive centre. You may also explain the team’s friendly professional service, small groups, personal attention and welcoming approach for first-time or nervous divers. If a guest explicitly requests PADI or SSI, state accurately that Roctopus offers RAID training and that the booking team will check an appropriate provider; never imply that Roctopus issues PADI or SSI certification.
 - Treat hours, prices, availability, schedules and conditions as changeable. Mention verification when the record or question requires current confirmation.
 - The current Bangkok date and time is ${bangkokContext()}.
 - ${roomContext}
@@ -2184,13 +2495,16 @@ function finalizeResult(result, question = "") {
   let actions = replacesPrivateCommercialLanguage || replacesRoctopusTechnicalDetail
     ? actionsForHandoff("booking")
     : (result.suppressDefaultActions ? (result.actions || []) : (result.actions?.length ? result.actions : actionsForHandoff(handoff)));
+  const inferredBookingKind = bookingKindFromText(`${question} ${result.intentId} ${result.answer}`);
   actions = actions.map((action) => {
+    if (action?.type === "prompt" && action.prompt === "I would like to make a booking." && inferredBookingKind) {
+      return { ...action, prompt: bookingStartPrompt(inferredBookingKind) };
+    }
     if (action?.route === "bookingWhatsapp") {
-      const kind = bookingKindFromText(`${question} ${result.intentId} ${result.answer}`);
       return {
         label: action.label || "Book with Us",
         type: "prompt",
-        prompt: bookingStartPrompt(kind)
+        prompt: bookingStartPrompt(inferredBookingKind)
       };
     }
     if (action?.route === "bookingCall") return { ...action, route: "houseCall" };
@@ -2199,7 +2513,7 @@ function finalizeResult(result, question = "") {
   let answer = replacesPrivateCommercialLanguage
     ? "Our concierge can help arrange this for you. Use the booking options below and tell us what you need."
     : replacesRoctopusTechnicalDetail
-      ? "We recommend Roctopus Dive because their friendly, professional team offers small groups, personal attention and a welcoming experience, especially for first-time or nervous divers. Their dive team in the shop will be happy to explain the available options and help you choose what suits you best."
+      ? "We recommend RAID training because of its focus on dive safety and buoyancy control, and we recommend Roctopus Dive as The House’s preferred RAID dive centre. Their friendly, professional team offers small groups, personal attention and a welcoming experience, especially for first-time or nervous divers."
       : result.answer;
   if (actions.some((action) => action?.route === "rescueCall")
     && /(?:do not|don['’]?t|cannot|can['’]?t|unable to)\s+have|not\s+(?:have|confirmed|available)|contact (?:information|number) is unavailable|no confirmed (?:phone|contact|number)/i.test(answer)) {
@@ -2338,7 +2652,10 @@ function bookingRequestFromRetrySnapshot(snapshot) {
     pickupLocation: snapshot.pickupLocation,
     destination: snapshot.destination,
     tripType: snapshot.tripType,
-    notes: snapshot.notes
+    notes: snapshot.notes,
+    planMode: snapshot.planMode || "",
+    totalParticipants: snapshot.guestCount,
+    groups: cleanDivingGroups(snapshot.groups)
   };
 }
 
@@ -2590,7 +2907,7 @@ export async function handleConciergeRequest(request, env, ctx, now = new Date()
   const history = cleanHistory(body.history);
   const workflowState = cleanWorkflowState(body.workflowState);
   const validShortWorkflowReply = /^\d$/.test(question)
-    && ((workflowState?.type === "booking" && workflowState.missing?.[0] === "guests")
+    && ((workflowState?.type === "booking" && ["guests", "groupCount"].includes(workflowState.missing?.[0]))
       || (workflowState?.type === "luggage" && workflowState.missing?.[0] === "bags"));
   if (!sessionId || (question.length < 2 && !validShortWorkflowReply) || question.length > MAX_QUESTION_LENGTH) {
     return json({ error: "invalid_request" }, 400);
@@ -2813,7 +3130,17 @@ export async function handleConciergeRequest(request, env, ctx, now = new Date()
   const replyContactForTurn = failedBookingState && !explicitBookingRetry
     ? questionReplyContact
     : currentReplyContact;
-  const bypassOrdinaryWorkflows = Boolean(lostKeyResult || directWorkflow || servicePolicyResult || bookingInformationResult || isEmergencyResult(result));
+  const expectedDivingCertificationAnswer = workflowState?.type === "booking"
+    && workflowState.status === "collecting"
+    && workflowState.kind === "diving"
+    && workflowState.missing?.[0] === "unsureCertified"
+    && Boolean(divingYesNo(question));
+  const bypassOrdinaryWorkflows = Boolean(lostKeyResult
+    || directWorkflow
+    || servicePolicyResult
+    || bookingInformationResult
+    || safetyResult
+    || (isEmergencyResult(result) && !expectedDivingCertificationAnswer));
   const bookingPolicy = failedBookingCancel
     ? {
         handled: true,
@@ -2965,6 +3292,8 @@ export async function handleConciergeRequest(request, env, ctx, now = new Date()
           destination: safeRequest.destination,
           tripType: safeRequest.tripType,
           notes: safeRequest.notes,
+          planMode: safeRequest.planMode,
+          groups: safeRequest.groups,
           createdAt: recorded.alert.createdAt || now.toISOString(),
           updatedAt: now.toISOString(),
           expiresAt: retryContext.expiresAt
@@ -3053,6 +3382,7 @@ export async function handleAdminRequest(request, env, path) {
   if (!authorizedAdmin(request, env)) return json({ error: "unauthorized" }, 401);
   const store = getStore(env);
   if (!store) return json({ error: "learning_store_unavailable" }, 503);
+  const actorHash = await hashSession(`admin:${request.headers.get("authorization") || ""}`, env.CONCIERGE_HASH_SALT);
 
   if (path.includes("/passport-")) {
     const passportResponse = await handlePassportAdminRequest(request, env, path, store);
@@ -3060,7 +3390,7 @@ export async function handleAdminRequest(request, env, path) {
   }
 
   if (path.includes("/maintenance-")) {
-    const maintenanceResponse = await handleMaintenanceAdminRequest(request, env, path, store);
+    const maintenanceResponse = await handleMaintenanceAdminRequest(request, env, path, store, actorHash);
     if (maintenanceResponse) return maintenanceResponse;
   }
 
@@ -3075,6 +3405,37 @@ export async function handleAdminRequest(request, env, path) {
       stayOperations: await store.getStayOperationsOverview(),
       alertConfiguration: whatsappAlertConfiguration(env)
     });
+  }
+  if (path === "/api/concierge/admin/diagnostics/dismiss" && request.method === "POST") {
+    let body;
+    try {
+      body = await readJson(request, 4_000);
+    } catch (response) {
+      if (response instanceof Response) return response;
+      return json({ error: "invalid_request" }, 400);
+    }
+    const id = String(body.id || "");
+    if (!/^(?:diagnostic|legacy)_[A-Za-z0-9_-]{12,}$/.test(id) || body.confirmation !== "DISMISS DIAGNOSTIC") {
+      return json({ error: "confirmation_required" }, 400);
+    }
+    const outcome = await store.dismissWhatsAppDiagnostic?.(id, new Date().toISOString());
+    return json(outcome || { ok: false, error: "not_found" }, outcome?.ok ? 200 : 404);
+  }
+  if (path === "/api/concierge/admin/diagnostics/clear" && request.method === "POST") {
+    let body;
+    try {
+      body = await readJson(request, 4_000);
+    } catch (response) {
+      if (response instanceof Response) return response;
+      return json({ error: "invalid_request" }, 400);
+    }
+    const id = String(body.alertId || "");
+    if (!/^alert_[A-Za-z0-9-]{20,}$/.test(id) || body.confirmation !== "CLEAR RESOLVED DIAGNOSTICS") {
+      return json({ error: "confirmation_required" }, 400);
+    }
+    const outcome = await store.clearWhatsAppDiagnosticsForAlert?.(id, new Date().toISOString());
+    const status = outcome?.ok ? 200 : outcome?.error === "alert_not_resolved" ? 409 : 404;
+    return json(outcome || { ok: false, error: "not_found" }, status);
   }
   if (path === "/api/concierge/admin/export" && request.method === "GET") {
     const entries = await store.getApprovedKnowledge();
@@ -3120,7 +3481,6 @@ export async function handleAdminRequest(request, env, path) {
     }
     const id = String(body.id || "");
     if (!/^alert_[A-Za-z0-9-]{20,}$/.test(id)) return json({ error: "invalid_request" }, 400);
-    const actorHash = await hashSession(`admin:${request.headers.get("authorization") || ""}`, env.CONCIERGE_HASH_SALT);
     const now = new Date().toISOString();
     const result = path.endsWith("/acknowledge")
       ? await store.acknowledgeAlert(id, actorHash, now)

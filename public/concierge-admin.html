@@ -221,6 +221,16 @@
       </details>
     </div>
   </main>
+  <dialog id="adminConfirmDialog" class="concierge-admin-dialog" aria-labelledby="adminConfirmTitle" aria-describedby="adminConfirmMessage">
+    <form method="dialog">
+      <h2 id="adminConfirmTitle">Confirm action</h2>
+      <p id="adminConfirmMessage"></p>
+      <div class="concierge-admin-card-actions">
+        <button type="submit" class="secondary" value="cancel">Cancel</button>
+        <button type="submit" id="adminConfirmSubmit" value="confirm">Confirm</button>
+      </div>
+    </form>
+  </dialog>
   <footer class="footer">
     <div>The House – Koh Tao</div>
     <nav class="legal-footer-links" aria-label="Legal information"><a href="/privacy">Privacy</a><a href="/data-deletion">Data Protection</a><a href="/terms">Terms</a></nav>

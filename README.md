@@ -1,4 +1,4 @@
-# Guest Guide Platform with AI Concierge — The House v5.11.25
+# Guest Guide Platform with AI Concierge — The House v5.11.26
 
 The House – Koh Tao guest guide is a production-oriented, mobile-first digital guest guide and concierge platform. It combines property information, curated island guidance, structured place and activity data, and centralized contact and booking routes.
 
@@ -17,6 +17,15 @@ The House – Koh Tao guest guide is a production-oriented, mobile-first digital
 - Model-powered, room-aware AI Concierge with controlled learning
 
 The Activities module contains 49 structured profiles covering diving, freediving, snorkelling, boat trips, beach experiences, kayaking, paddleboarding, hiking, viewpoints, climbing, yoga, Muay Thai, massage, cooking, wildlife, photography, night activities and rainy-day options.
+
+## v5.11.26 release focus
+
+- Replaces the mixed activity/course diving chooser with a data-driven PADI, SSI and RAID model covering beginner, continuing, specialty and professional pathways under current nomenclature.
+- Always recommends RAID for its safety and buoyancy-control focus and Roctopus Dive as The House’s preferred RAID centre, while routing explicit PADI/SSI requests accurately through an appropriate provider check.
+- Supports one diving booking with exact participant subgroups, including different activities, agencies, courses and relevant current certifications; one international contact is collected last and one Fah-plus-owner alert is sent.
+- Stores the complete non-sensitive subgroup breakdown with the alert while retaining the existing concise, Meta-safe six-parameter `house_booking_alert_v2` delivery and contact-last boundary.
+- Adds owner maintenance **Resolve → Remove** controls with private-photo cleanup, plus independent WhatsApp diagnostic **Dismiss/Clear** controls that never alter alert or delivery truth.
+- Expands the complete suite from 157 to 163 tests with zero failures. Staff quick actions remain disabled; full public visual polish is deferred to v5.11.27.
 
 ## v5.11.25 release focus
 

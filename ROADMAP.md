@@ -1,6 +1,6 @@
 # Product Roadmap
 
-Baseline: v5.11.25
+Baseline: v5.11.26
 
 ## Completed
 
@@ -19,6 +19,11 @@ Baseline: v5.11.25
 - [x] Private commercial terminology removed from guest-facing booking answers
 - [x] Existing approved Activities, Restaurants, Cafés, Beaches, Bars and Shopping data connected to the AI Concierge
 - [x] Roctopus Dive and Bamboo Beach Bar preferred recommendations available as direct approved answers
+- [x] Data-driven current PADI, SSI and RAID recreational, specialty and professional course pathways
+- [x] House diving guidance always pairs the RAID safety/buoyancy recommendation with Roctopus Dive while preserving accurate PADI/SSI provider routing
+- [x] One authoritative mixed-diver booking with exact participant-subgroup allocation, one contact and one Fah-plus-owner alert
+- [x] Maintenance Resolve/Remove lifecycle with deliberate confirmation and private-photo object cleanup
+- [x] Independent WhatsApp diagnostic Dismiss/Clear visibility controls with minimal protected audit evidence
 - [x] Bamboo Beach Bar website follow-ups return its official Facebook and Instagram actions
 - [x] Concierge loading state uses a quiet animated-dot indicator
 - [x] Concierge startup and concierge-first House-support contact routing protected by regression tests
@@ -165,8 +170,10 @@ Guests may continue using ordinary WhatsApp handoffs. Automated internal alerts 
 - [x] Deploy v5.11.23 without changing production configuration and use its observed explicit-retry/history-contamination failure as the authoritative narrow v5.11.24 correction scope.
 - [x] Deploy v5.11.24 without changing production configuration and capture the real booking-delivery rejection: Meta HTTP 400 / `132018`, caused by invalid whitespace inside a textual template parameter.
 - [x] Implement v5.11.25 as a narrow common-boundary Meta BODY whitespace sanitizer without changing template schemas, routes, recipients or configuration.
-- [ ] Deploy v5.11.25, run one fresh non-sensitive diving booking and confirm at least one of three booking notifications is accepted; if Meta still rejects it, retain the new sanitized provider diagnostic and stop.
-- [ ] After v5.11.25 passes production smoke testing, begin v5.11.26 as the full public visual-polish milestone under a separate explicit scope.
+- [x] Deploy v5.11.25 and confirm the common Meta BODY sanitizer restores accepted production booking delivery.
+- [x] Implement v5.11.26 as the diving course/mixed-party and owner-cleanup functional release without beginning public visual redesign.
+- [ ] Deploy v5.11.26 and run the mixed-diving and owner-cleanup smoke checks in `DEVELOPMENT_HANDOFF_v5.11.26.md`.
+- [ ] Begin v5.11.27 full public visual polish only under a separate explicit scope.
 - [ ] Submit and obtain Meta approval for the five optional quick-action templates documented in `META_STAFF_QUICK_ACTIONS_v5.11.20.md`; never map the buttonless service v1 template and enable only after every intended template is Active.
 - [x] Add `STAY_TOKEN_PEPPER` and `RESERVATION_SYNC_TOKEN` Worker secrets
 - [x] Add protected `SPARE_KEY_CODES` Worker secret before activating automatic spare-key release

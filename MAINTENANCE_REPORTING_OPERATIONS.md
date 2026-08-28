@@ -52,7 +52,7 @@ The public reference appears in the guest confirmation, protected alert summary 
 
 One optional JPEG, PNG, WebP or HEIC image up to 10 MB may be attached. The server validates the file signature and stores it under the private `maintenance/` prefix in the existing `PASSPORT_UPLOADS` R2 binding. The object is never public and never enters AI, guest chat, model prompts or ordinary WhatsApp content.
 
-An authorized owner can download or delete the image from `/concierge-admin`. Resolved report records and old images are cleaned by the scheduled application job. R2 lifecycle deletion is the independent maximum-retention control.
+An authorized owner can download or delete the image from `/concierge-admin`. Removing a resolved report also deletes any remaining image object first; a storage failure leaves the report intact so no private image is orphaned. Resolved report records and old images are cleaned by the scheduled application job. R2 lifecycle deletion is the independent maximum-retention control.
 
 ## Required R2 lifecycle rule
 
@@ -74,7 +74,9 @@ Keep the existing `passport/` 14-day rule unchanged. Do not apply the maintenanc
 4. For critical events, contact the guest using the reply number delivered through the protected WhatsApp alert; it is intentionally not retained in the dashboard.
 5. Download an attached image only when required for the response.
 6. Delete the image as soon as it is no longer needed.
-7. Acknowledge and resolve the associated alert through the owner console.
+7. Press **Resolve** when the issue is complete; this also resolves the associated alert where present.
+8. A resolved report may then be removed with the deliberate custom-dialog confirmation. Any remaining private photo is deleted first.
+9. Open reports cannot be removed through the normal path. An unrelated report is never changed by resolving or removing another report.
 
 ## Privacy invariants
 
@@ -84,3 +86,4 @@ Keep the existing `passport/` 14-day rule unchanged. Do not apply the maintenanc
 - Passport and maintenance objects use different prefixes and different lifecycle periods.
 - No key-box code, stay confirmation code, passport information or private session token is included in a maintenance report or staff alert.
 - Internal maintenance UUIDs are never shown to guests or used as the operational reference shared with staff.
+- Minimal admin audit rows retain only the removal/resolution action, a non-sensitive report reference and timestamp; they do not retain the deleted report, photo, contact, key code or provider payload.

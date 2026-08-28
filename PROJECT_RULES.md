@@ -153,7 +153,7 @@ Public interface rules:
 
 ## Current baseline
 
-Current release: v5.11.15.
+Current release: v5.11.16 (diagnostic evidence release; production Meta rejection still requires evidence-based resolution).
 
 Explore is intentionally disabled in the live v5.11.6 release. Do not delete its pages, structured records or media. Restore it only after the planned Explore rebuild and review by changing the protected deployment feature variable. Do not expose internal Explore detail paths in live concierge answers while the feature remains disabled; use approved external actions where supplied.
 

@@ -134,6 +134,29 @@ export class ConciergeStore extends DurableObject {
         CREATE INDEX IF NOT EXISTS concierge_alert_deliveries_alert ON concierge_alert_deliveries(alert_id, created_at);
         CREATE INDEX IF NOT EXISTS concierge_alert_deliveries_provider ON concierge_alert_deliveries(provider_message_id);
 
+        CREATE TABLE IF NOT EXISTS whatsapp_delivery_diagnostics (
+          id TEXT PRIMARY KEY,
+          delivery_id TEXT NOT NULL UNIQUE,
+          alert_id TEXT NOT NULL,
+          stage TEXT NOT NULL,
+          template_name TEXT NOT NULL DEFAULT '',
+          language_code TEXT NOT NULL DEFAULT '',
+          component_schema TEXT NOT NULL DEFAULT '',
+          http_status INTEGER NOT NULL DEFAULT 0,
+          error_code TEXT NOT NULL DEFAULT '',
+          error_subcode TEXT NOT NULL DEFAULT '',
+          error_type TEXT NOT NULL DEFAULT '',
+          error_message TEXT NOT NULL DEFAULT '',
+          error_details TEXT NOT NULL DEFAULT '',
+          trace_id TEXT NOT NULL DEFAULT '',
+          failure_kind TEXT NOT NULL DEFAULT 'unknown',
+          created_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS whatsapp_delivery_diagnostics_created
+          ON whatsapp_delivery_diagnostics(created_at);
+        CREATE INDEX IF NOT EXISTS whatsapp_delivery_diagnostics_alert
+          ON whatsapp_delivery_diagnostics(alert_id, created_at);
+
         CREATE TABLE IF NOT EXISTS maintenance_reports (
           id TEXT PRIMARY KEY,
           reservation_id TEXT NOT NULL,
@@ -447,6 +470,23 @@ export class ConciergeStore extends DurableObject {
                a.created_at DESC
       LIMIT 100
     `));
+    const deliveryDiagnostics = rows(this.ctx.storage.sql.exec(`
+      SELECT d.alert_id AS alertId, d.stage, d.status,
+             d.error_code AS storedErrorCode, d.created_at AS createdAt,
+             x.template_name AS templateName, x.language_code AS languageCode,
+             x.component_schema AS componentSchema, x.http_status AS httpStatus,
+             x.error_code AS errorCode, x.error_subcode AS errorSubcode,
+             x.error_type AS errorType, x.error_message AS errorMessage,
+             x.error_details AS errorDetails, x.trace_id AS traceId,
+             x.failure_kind AS failureKind,
+             CASE WHEN x.id IS NULL THEN 1 ELSE 0 END AS legacyDiagnostic
+      FROM concierge_alert_deliveries d
+      LEFT JOIN whatsapp_delivery_diagnostics x ON x.delivery_id = d.id
+      WHERE d.status IN ('failed', 'not_configured')
+        AND julianday(d.created_at) >= julianday('now', '-30 days')
+      ORDER BY d.created_at DESC
+      LIMIT 100
+    `));
     const maintenanceReports = rows(this.ctx.storage.sql.exec(`
       SELECT id, room, issue_type AS issueType, severity, details,
              fee_accepted AS feeAccepted, photo_object_key AS photoObjectKey,
@@ -491,6 +531,11 @@ export class ConciergeStore extends DurableObject {
         delivered: Number(alert.delivered) || 0,
         failed: Number(alert.failed) || 0
       })),
+      deliveryDiagnostics: deliveryDiagnostics.map((item) => ({
+        ...item,
+        httpStatus: Number(item.httpStatus) || 0,
+        legacyDiagnostic: Boolean(item.legacyDiagnostic)
+      })),
       recent
     };
   }
@@ -532,6 +577,9 @@ export class ConciergeStore extends DurableObject {
     );
     this.ctx.storage.sql.exec(
       "DELETE FROM concierge_alert_deliveries WHERE julianday(created_at) < julianday('now', '-30 days')"
+    );
+    this.ctx.storage.sql.exec(
+      "DELETE FROM whatsapp_delivery_diagnostics WHERE julianday(created_at) < julianday('now', '-30 days')"
     );
     this.ctx.storage.sql.exec(
       "DELETE FROM concierge_alerts WHERE julianday(created_at) < julianday('now', '-30 days')"
@@ -619,6 +667,34 @@ export class ConciergeStore extends DurableObject {
       cleanText(record.status, 30),
       cleanText(record.errorCode, 80),
       createdAt,
+      createdAt
+    );
+    return { ok: true };
+  }
+
+  async recordWhatsAppDiagnostic(record) {
+    const createdAt = cleanText(record.createdAt, 40) || new Date().toISOString();
+    this.ctx.storage.sql.exec(
+      `INSERT OR REPLACE INTO whatsapp_delivery_diagnostics
+       (id, delivery_id, alert_id, stage, template_name, language_code,
+        component_schema, http_status, error_code, error_subcode, error_type,
+        error_message, error_details, trace_id, failure_kind, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      cleanText(record.id, 100),
+      cleanText(record.deliveryId, 100),
+      cleanText(record.alertId, 100),
+      cleanText(record.stage, 30),
+      cleanText(record.templateName, 160),
+      cleanText(record.languageCode, 30),
+      cleanText(record.componentSchema, 300),
+      Number(record.httpStatus) || 0,
+      cleanText(record.errorCode, 80),
+      cleanText(record.errorSubcode, 80),
+      cleanText(record.errorType, 120),
+      cleanText(record.errorMessage, 600),
+      cleanText(record.errorDetails, 600),
+      cleanText(record.traceId, 180),
+      cleanText(record.failureKind, 80) || "unknown",
       createdAt
     );
     return { ok: true };

@@ -14,6 +14,7 @@
   const passportLinkForm = document.getElementById("passportLinkForm");
   const passportLinkResult = document.getElementById("passportLinkResult");
   const alerts = document.getElementById("conciergeAlerts");
+  const whatsappDeliveryDiagnostics = document.getElementById("whatsappDeliveryDiagnostics");
   const maintenanceReports = document.getElementById("maintenanceReports");
   const alertStatus = document.getElementById("whatsappAlertStatus");
   const activeStayReservations = document.getElementById("activeStayReservations");
@@ -191,6 +192,43 @@
       actions.appendChild(resolve);
       card.appendChild(actions);
       alerts.appendChild(card);
+    });
+  }
+
+  function renderWhatsAppDeliveryDiagnostics(items) {
+    whatsappDeliveryDiagnostics.replaceChildren();
+    if (!items.length) {
+      whatsappDeliveryDiagnostics.appendChild(element("div", "concierge-admin-empty", "No failed WhatsApp submissions in the last 30 days."));
+      return;
+    }
+    items.forEach((item) => {
+      const card = element("article", "concierge-admin-alert is-attention");
+      const title = item.templateName || "Earlier delivery failure";
+      const code = item.errorCode || item.storedErrorCode || "unknown";
+      card.append(
+        element("h4", "", `${title} · ${item.failureKind || "unclassified"}`),
+        element("span", "concierge-admin-alert-time", `${bangkokDate(item.createdAt)} · ${item.stage || "send"} · HTTP ${item.httpStatus || "not retained"} · Error ${code}`)
+      );
+      if (item.languageCode || item.componentSchema) {
+        card.appendChild(element("p", "concierge-admin-source-note", `Language: ${item.languageCode || "not retained"} · Components: ${item.componentSchema || "not retained"}`));
+      }
+      if (item.errorType || item.errorSubcode || item.traceId) {
+        card.appendChild(element(
+          "p",
+          "concierge-admin-source-note",
+          `Type: ${item.errorType || "not supplied"} · Subcode: ${item.errorSubcode || "not supplied"} · Meta trace: ${item.traceId || "not supplied"}`
+        ));
+      }
+      if (item.errorMessage) card.appendChild(element("p", "concierge-admin-alert-summary", item.errorMessage));
+      if (item.errorDetails) card.appendChild(element("p", "concierge-admin-source-note", `Details: ${item.errorDetails}`));
+      if (item.legacyDiagnostic) {
+        card.appendChild(element(
+          "p",
+          "concierge-admin-alert-escalation",
+          "Recorded before safe provider diagnostics were enabled; only the retained error code is available."
+        ));
+      }
+      whatsappDeliveryDiagnostics.appendChild(card);
     });
   }
 
@@ -449,6 +487,7 @@
     renderPassportUploads(data.passportUploads || []);
     renderMaintenanceReports(data.maintenanceReports || []);
     renderAlerts(data.alerts || [], data.alertConfiguration || {});
+    renderWhatsAppDeliveryDiagnostics(data.deliveryDiagnostics || []);
     renderStayOperations(data.stayOperations || {});
     renderRecent(data.recent || []);
     login.hidden = true;

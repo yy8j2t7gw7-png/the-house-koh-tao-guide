@@ -1,4 +1,4 @@
-# Guest Guide Platform with AI Concierge — The House v5.11.15
+# Guest Guide Platform with AI Concierge — The House v5.11.16
 
 The House – Koh Tao guest guide is a production-oriented, mobile-first digital guest guide and concierge platform. It combines property information, curated island guidance, structured place and activity data, and centralized contact and booking routes.
 
@@ -17,6 +17,15 @@ The House – Koh Tao guest guide is a production-oriented, mobile-first digital
 - Model-powered, room-aware AI Concierge with controlled learning
 
 The Activities module contains 49 structured profiles covering diving, freediving, snorkelling, boat trips, beach experiences, kayaking, paddleboarding, hiking, viewpoints, climbing, yoga, Muay Thai, massage, cooking, wildlife, photography, night activities and rainy-day options.
+
+## v5.11.16 release focus
+
+- Adds safe, provider-response diagnostics for failed Meta template submissions without changing the v5.11.15 outbound payload construction.
+- Records the exact selected template name, language, value-free component structure, HTTP status, safe Meta error code/subcode/type/message/details and trace ID for 30 days.
+- Shows those records only in the protected owner console and also exposes the numeric error code already retained by v5.11.15 failures, clearly labelled when fuller legacy evidence is unavailable.
+- Keeps recipients, guest contacts, template parameter values, access tokens, passport data, confirmation codes, stay tokens and key-box codes out of diagnostics and logs.
+- Routes all six production templates through the same inspected submission function and verifies their exact body-only request shapes with automated tests.
+- This is an evidence-capture release. It does not claim the production Meta rejection is resolved until the retained provider response identifies the actual cause.
 
 ## v5.11.15 release focus
 

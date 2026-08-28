@@ -2,7 +2,7 @@
 
 ## Purpose
 
-v5.11.15 provides a protected server-side staff-alert channel through the official Meta WhatsApp Business Platform. Guests continue to use the website Concierge. Recipient telephone numbers, access tokens and app secrets stay in encrypted Cloudflare secrets and never appear in public files, Git or release archives.
+v5.11.16 provides a protected server-side staff-alert channel through the official Meta WhatsApp Business Platform. Guests continue to use the website Concierge. Recipient telephone numbers, access tokens and app secrets stay in encrypted Cloudflare secrets and never appear in public files, Git or release archives.
 
 Routing is role based:
 
@@ -49,6 +49,20 @@ These English (`en_US`) Utility templates are Active in WhatsApp Manager and alr
 Luggage and booking templates have no dedicated reply-number variable. A validated international contact is therefore appended only to the transient protected notes parameter as `Guest reply: …`; it does not enter ordinary chat, alert, dashboard or log storage. The lost-key template is constructed only after the existing verified-stay, after-hours and explicit-fee gates and never receives the key-box code.
 
 The previous five v1 names remain mapped in code solely as a deliberate rollback capability. Do not switch production back without a separately authorized rollback decision. An unknown name, wrong purpose or wrong parameter count fails closed before the Graph API call.
+
+## Failed-delivery diagnostics
+
+v5.11.15 kept only a short error code when Meta rejected a submission, so its production response body cannot be reconstructed later. v5.11.16 leaves the outbound payload unchanged and adds safe evidence capture at the common Graph API submission boundary.
+
+For every failed initial, escalation or status submission, the Worker records for 30 days:
+
+- selected template name and language;
+- value-free component structure, such as `body(5)[1:text,2:text,3:text,4:text,5:text]`;
+- HTTP status;
+- Meta error code, subcode, type, sanitized message/details and trace ID when supplied;
+- a broad failure category for triage.
+
+The protected owner console displays these records under **WhatsApp delivery diagnostics**. Older v5.11.15 records display their retained numeric error code with a warning that full provider details were not captured by that release. Diagnostics never store recipient numbers, guest contacts, parameter values, tokens, passport data, stay/confirmation codes or key-box codes. Do not alter template names, parameters or Meta configuration until this evidence identifies the actual provider rejection.
 
 `house_alert_status_v1` is non-recursive. An authorized `RECEIVED`, `ACK` or `RESOLVE` reply updates the original alert and sends one status message only to the other recipients assigned to that alert. The actor and unrelated roles are excluded; duplicate webhook delivery is suppressed by the original alert state. Status messages create no alert and no escalation.
 

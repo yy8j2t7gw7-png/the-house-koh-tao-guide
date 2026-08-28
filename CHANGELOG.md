@@ -2,6 +2,27 @@
 
 All notable changes to The House – Koh Tao guest guide are recorded here.
 
+## v5.11.16 — Safe Meta Delivery Diagnostics
+
+### Production evidence
+
+- Preserves Meta Graph API rejection details that v5.11.15 previously discarded after extracting only a numeric error code.
+- Records the exact selected template name, configured language, value-free component/parameter structure, HTTP status, safe Meta error code, subcode, type, message, details and trace ID.
+- Makes the retained numeric code from v5.11.15 delivery failures visible in the protected owner console even when the older request has no structured diagnostic record.
+- Classifies failures as configuration, local schema, authentication/permission, template/language, template parameters, recipient delivery, rate limit, Meta service, network or unknown without treating a category as a final root cause.
+
+### Security and compatibility
+
+- Redacts template values, guest contacts, recipient numbers and credential-like text before any provider detail is stored or logged.
+- Keeps the existing six active template names, `en_US`, body-only component construction, exact parameter counts/order, recipient routing and fail-closed delivery behavior unchanged.
+- Uses one common inspected submission function for service, luggage, booking, urgent, lost-key and status sends.
+- Adds protected owner-console diagnostics with a 30-day retention window and no public endpoint.
+
+### Regression protection
+
+- Expands the complete suite from 98 to 100 tests, covering every active template's value-free production request shape, sanitized structured Meta errors, network failures, legacy failure visibility and truthful service failure behavior.
+- This diagnostic release intentionally makes no speculative payload or Meta configuration change. A final corrective patch follows only after production evidence identifies the provider rejection.
+
 ## v5.11.15 — Active Meta Templates, Staff Status Updates & Concierge UX
 
 ### Meta template integration

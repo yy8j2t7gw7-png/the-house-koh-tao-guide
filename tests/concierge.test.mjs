@@ -26,6 +26,7 @@ import { retrieveApprovedProjectKnowledge } from "../src/project-knowledge.js";
 import { handleTranslationRequest } from "../src/i18n-api.js";
 import { classifyConciergeAlert, isAfterHours, normalizeBangkokRequestedDate, safeAlertSummary } from "../src/alert-policy.js";
 import {
+  buildWhatsAppFailureDiagnostic,
   buildWhatsAppStatusPayload,
   buildWhatsAppTemplatePayload,
   createConciergeAlert,
@@ -267,6 +268,11 @@ function createStore() {
       return { created: true };
     },
     async recordAlertDelivery(record) { this.alertDeliveries.push(record); return { ok: true }; },
+    async recordWhatsAppDiagnostic(record) {
+      this.whatsappDiagnostics ||= [];
+      this.whatsappDiagnostics.push(record);
+      return { ok: true };
+    },
     async updateAlertDeliveryStatus(record) {
       const target = this.alertDeliveries.find((delivery) => delivery.providerMessageId === record.providerMessageId);
       if (target) Object.assign(target, record);
@@ -1095,7 +1101,7 @@ test("guest localization supports seven languages and keeps the owner dashboard 
   assert.doesNotMatch(admin, /src="\/i18n\.js"/);
   assert.match(runtime, /exploreContentDeferred/);
   assert.match(runtime, /element\.closest\("\.section,\.footer"\)/);
-  assert.match(runtime, /houseGuideTranslations:v5\.11\.15:/);
+  assert.match(runtime, /houseGuideTranslations:v5\.11\.16:/);
   assert.match(runtime, /MAX_REQUEST_RETRIES = 2/);
   assert.match(runtime, /let flushRunning = false/);
 });
@@ -2817,6 +2823,7 @@ test("Durable Object SQLite schema initializes every operational table used by a
   for (const required of [
     "concierge_alerts",
     "concierge_alert_deliveries",
+    "whatsapp_delivery_diagnostics",
     "maintenance_reports",
     "stay_reservations",
     "stay_checkout_overrides",
@@ -2829,6 +2836,38 @@ test("Durable Object SQLite schema initializes every operational table used by a
 
   const overview = await store.getAdminOverview();
   assert.equal(overview.totals.openAlerts, 0);
+  assert.deepEqual(overview.deliveryDiagnostics, []);
+  await store.recordAlertDelivery({
+    id: "delivery_schema_diagnostic",
+    alertId: "alert_schema_diagnostic",
+    stage: "initial",
+    status: "failed",
+    errorCode: "132000",
+    createdAt: new Date().toISOString()
+  });
+  await store.recordWhatsAppDiagnostic({
+    id: "diagnostic_schema_test",
+    deliveryId: "delivery_schema_diagnostic",
+    alertId: "alert_schema_diagnostic",
+    stage: "initial",
+    templateName: "house_service_alert_v3",
+    languageCode: "en_US",
+    componentSchema: "body(5)[1:text,2:text,3:text,4:text,5:text]",
+    httpStatus: 400,
+    errorCode: "132000",
+    errorSubcode: "2494073",
+    errorType: "OAuthException",
+    errorMessage: "Parameter count mismatch",
+    errorDetails: "Expected a different count",
+    traceId: "SAFE_TRACE",
+    failureKind: "template_parameters",
+    createdAt: new Date().toISOString()
+  });
+  const diagnosticOverview = await store.getAdminOverview();
+  assert.equal(diagnosticOverview.deliveryDiagnostics.length, 1);
+  assert.equal(diagnosticOverview.deliveryDiagnostics[0].templateName, "house_service_alert_v3");
+  assert.equal(diagnosticOverview.deliveryDiagnostics[0].componentSchema, "body(5)[1:text,2:text,3:text,4:text,5:text]");
+  assert.equal(diagnosticOverview.deliveryDiagnostics[0].legacyDiagnostic, false);
   assert.deepEqual(await store.getDueAlertEscalations(new Date().toISOString()), []);
   const synced = await store.syncStayReservations({
     room: "2",
@@ -3362,6 +3401,99 @@ test("template validation supports deliberate v1 rollback and rejects unknown or
   assert.equal(unknown.errorCode, "unmapped_template");
 });
 
+test("all active templates expose their exact value-free production request shape", () => {
+  const recipient = { label: "Team", phone: "66810000002" };
+  const env = {
+    WHATSAPP_ALERT_TEMPLATE_LANGUAGE: "en_US",
+    WHATSAPP_STATUS_TEMPLATE_NAME: "house_alert_status_v1"
+  };
+  const base = {
+    id: "alert_shape_reference",
+    room: "11",
+    summary: "I need fresh towels.",
+    bangkokTime: "28 Aug 2026, 10:32",
+    createdAt: "2026-08-28T03:32:00.000Z",
+    severity: "attention"
+  };
+  const cases = [
+    [buildWhatsAppTemplatePayload({ ...base, alertType: "stay_support" }, recipient, env), "house_service_alert_v3", 5],
+    [buildWhatsAppTemplatePayload({ ...base, alertType: "luggage_storage", luggageRequest: { context: "Departure", bagCount: "2", requestedTime: "1 PM" } }, recipient, env), "house_luggage_alert_v2", 6],
+    [buildWhatsAppTemplatePayload({ ...base, alertType: "booking_request" }, recipient, env), "house_booking_alert_v2", 6],
+    [buildWhatsAppTemplatePayload({ ...base, alertType: "property_emergency", severity: "critical" }, recipient, env), "house_urgent_alert_v2", 5],
+    [buildWhatsAppTemplatePayload({ ...base, alertType: "verified_spare_key_release" }, recipient, env), "house_lost_key_alert_v3", 3],
+    [buildWhatsAppStatusPayload(base, recipient, "ACKNOWLEDGED", "Su", env), "house_alert_status_v1", 5]
+  ];
+
+  for (const [built, name, count] of cases) {
+    const diagnostic = buildWhatsAppFailureDiagnostic({
+      built,
+      response: new Response(JSON.stringify({}), { status: 400 }),
+      responseBody: { error: { code: 131008 } }
+    });
+    assert.equal(diagnostic.templateName, name);
+    assert.equal(diagnostic.languageCode, "en_US");
+    assert.equal(diagnostic.componentSchema, `body(${count})[${Array.from({ length: count }, (_, index) => `${index + 1}:text`).join(",")}]`);
+    assert.doesNotMatch(JSON.stringify(diagnostic), /alert_shape_reference|Room 11|fresh towels|66810000002/);
+  }
+});
+
+test("sanitized Meta diagnostics retain the real provider failure without parameter or recipient data", async () => {
+  const rawContact = "+66 81 234 5678";
+  const recipients = JSON.stringify({ support: [{ label: "Su", phone: "+66 64 000 0001" }] });
+  const alert = {
+    id: "alert_production_service_failure",
+    recipientGroup: "support",
+    room: "11",
+    alertType: "stay_support",
+    severity: "attention",
+    summary: `I need fresh towels. Reply on ${rawContact}`,
+    bangkokTime: "28 Aug 2026, 10:32",
+    createdAt: "2026-08-28T03:32:00.000Z"
+  };
+  const { env, store } = createEnvironment({
+    WHATSAPP_ACCESS_TOKEN: "EA_TEST_SECRET_SHOULD_NOT_APPEAR_123456789",
+    WHATSAPP_PHONE_NUMBER_ID: "1234567890",
+    META_APP_SECRET: "meta-app-secret",
+    WHATSAPP_ALERT_RECIPIENTS: recipients
+  });
+  const originalFetch = globalThis.fetch;
+  const originalError = console.error;
+  const safeLogs = [];
+  console.error = (...values) => safeLogs.push(values.join(" "));
+  globalThis.fetch = async () => new Response(JSON.stringify({
+    error: {
+      message: `Template parameter ${alert.summary} was rejected for ${rawContact}`,
+      type: "OAuthException",
+      code: 132000,
+      error_subcode: 2494073,
+      error_data: { details: `body parameter ${alert.bangkokTime} has the wrong count` },
+      fbtrace_id: "SAFE_TRACE_123"
+    }
+  }), { status: 400, headers: { "content-type": "application/json" } });
+  try {
+    assert.deepEqual(await dispatchConciergeAlert(alert, env), { attempted: 1, accepted: 0 });
+    assert.equal(store.whatsappDiagnostics.length, 1);
+    const diagnostic = store.whatsappDiagnostics[0];
+    assert.equal(diagnostic.templateName, "house_service_alert_v3");
+    assert.equal(diagnostic.languageCode, "en_US");
+    assert.equal(diagnostic.componentSchema, "body(5)[1:text,2:text,3:text,4:text,5:text]");
+    assert.equal(diagnostic.httpStatus, 400);
+    assert.equal(diagnostic.errorCode, "132000");
+    assert.equal(diagnostic.errorSubcode, "2494073");
+    assert.equal(diagnostic.errorType, "OAuthException");
+    assert.equal(diagnostic.failureKind, "template_parameters");
+    assert.equal(diagnostic.traceId, "SAFE_TRACE_123");
+    const retained = JSON.stringify({ diagnostic, safeLogs });
+    assert.doesNotMatch(retained, /66812345678|81 234 5678|66640000001|EA_TEST_SECRET|meta-app-secret/);
+    assert.doesNotMatch(retained, /I need fresh towels|28 Aug 2026/);
+    assert.match(diagnostic.errorMessage, /\[parameter\]/);
+    assert.match(diagnostic.errorDetails, /\[parameter\]/);
+  } finally {
+    globalThis.fetch = originalFetch;
+    console.error = originalError;
+  }
+});
+
 test("Meta rejection and network failures stay sanitized while partial delivery is truthful", async () => {
   const recipients = JSON.stringify({
     support: [
@@ -3396,6 +3528,8 @@ test("Meta rejection and network failures stay sanitized while partial delivery 
     };
     assert.deepEqual(await dispatchConciergeAlert(alert, partial.env), { attempted: 2, accepted: 1 });
     assert.deepEqual(partial.store.alertDeliveries.map((item) => item.status).sort(), ["accepted", "failed"]);
+    assert.equal(partial.store.whatsappDiagnostics.length, 1);
+    assert.equal(partial.store.whatsappDiagnostics[0].errorCode, "131008");
     assert.doesNotMatch(JSON.stringify(partial.store.alertDeliveries), /66640000001|66810000002|test-token|test-secret/);
 
     for (const failure of [
@@ -3412,6 +3546,7 @@ test("Meta rejection and network failures stay sanitized while partial delivery 
       globalThis.fetch = async () => failure();
       assert.deepEqual(await dispatchConciergeAlert(alert, current.env), { attempted: 2, accepted: 0 });
       assert.equal(current.store.alertDeliveries.every((item) => item.status === "failed"), true);
+      assert.equal(current.store.whatsappDiagnostics.length, 2);
       assert.doesNotMatch(JSON.stringify(current.store.alertDeliveries), /66640000001|66810000002|test-token|test-secret|simulated network timeout/);
     }
 

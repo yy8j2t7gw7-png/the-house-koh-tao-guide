@@ -292,26 +292,97 @@ export function buildWhatsAppTemplatePayload(alert, recipient, env) {
   } };
 }
 
-async function sendTemplate(alert, recipient, stage, env, store) {
+function templateComponentSchema(built) {
+  const components = built?.payload?.template?.components;
+  if (!Array.isArray(components) || !components.length) return "none";
+  return components.map((component) => {
+    const parameters = Array.isArray(component?.parameters) ? component.parameters : [];
+    const orderedTypes = parameters.map((parameter, index) => `${index + 1}:${String(parameter?.type || "unknown")}`);
+    return `${String(component?.type || "unknown")}(${parameters.length})[${orderedTypes.join(",")}]`;
+  }).join(";");
+}
+
+function parameterValues(built) {
+  const components = built?.payload?.template?.components;
+  if (!Array.isArray(components)) return [];
+  return components.flatMap((component) => Array.isArray(component?.parameters) ? component.parameters : [])
+    .map((parameter) => String(parameter?.text || "").trim())
+    .filter(Boolean)
+    .sort((left, right) => right.length - left.length);
+}
+
+function safeProviderText(value, built) {
+  let text = String(value || "")
+    .replace(/[\r\n\t]+/g, " ")
+    .replace(/(?:\+|00)?\d(?:[\s().-]*\d){7,14}/g, "[private number]")
+    .trim();
+  const candidates = parameterValues(built).flatMap((parameter) => [
+    parameter.replace(/(?:\+|00)?\d(?:[\s().-]*\d){7,14}/g, "[private number]"),
+    ...parameter.split(/\[[^\]]+\]/g).map((part) => part.trim())
+  ]).filter((parameter) => parameter.length >= 3).sort((left, right) => right.length - left.length);
+  for (const parameter of candidates) text = text.split(parameter).join("[parameter]");
+  return text
+    .replace(/(?:EA[A-Za-z0-9_-]{20,}|Bearer\s+[A-Za-z0-9._-]+)/gi, "[credential]")
+    .slice(0, 600);
+}
+
+function failureKind(httpStatus, errorCode, localCode = "") {
+  const code = String(errorCode || localCode || "");
+  if (localCode === "missing_configuration") return "configuration";
+  if (["unmapped_template", "parameter_count_mismatch", "status_template_not_configured", "invalid_status"].includes(localCode)) return "local_template_schema";
+  if (code === "190" || httpStatus === 401 || httpStatus === 403) return "authentication_or_permission";
+  if (code === "132001") return "template_or_language";
+  if (["131008", "132000", "132012"].includes(code)) return "template_parameters";
+  if (code === "131026") return "recipient_delivery";
+  if (["4", "80007", "130429", "131048"].includes(code) || httpStatus === 429) return "rate_limit";
+  if (httpStatus >= 500) return "meta_service";
+  if (localCode === "network_error") return "network";
+  return "unknown";
+}
+
+export function buildWhatsAppFailureDiagnostic({ built, response, responseBody, localCode = "", networkError } = {}) {
+  const providerError = responseBody?.error || {};
+  const httpStatus = Number(response?.status) || 0;
+  const errorCode = String(providerError.code || localCode || (response?.ok ? "missing_message_id" : httpStatus || "unknown"));
+  const languageCode = String(built?.payload?.template?.language?.code || "").slice(0, 30);
+  return {
+    templateName: String(built?.payload?.template?.name || built?.name || "").slice(0, 160),
+    languageCode,
+    componentSchema: templateComponentSchema(built),
+    httpStatus,
+    errorCode: errorCode.slice(0, 80),
+    errorSubcode: String(providerError.error_subcode || "").slice(0, 80),
+    errorType: safeProviderText(providerError.type || networkError?.name || "", built).slice(0, 120),
+    errorMessage: safeProviderText(providerError.message || networkError?.message || "", built),
+    errorDetails: safeProviderText(
+      providerError.error_data?.details || providerError.error_user_msg || providerError.error_user_title || "",
+      built
+    ),
+    traceId: String(providerError.fbtrace_id || "").replace(/[^A-Za-z0-9_-]/g, "").slice(0, 180),
+    failureKind: failureKind(httpStatus, errorCode, localCode)
+  };
+}
+
+async function recordWhatsAppFailure(store, deliveryId, alert, stage, diagnostic, createdAt) {
+  const safeRecord = {
+    id: `diagnostic_${crypto.randomUUID()}`,
+    deliveryId,
+    alertId: alert.id,
+    stage,
+    ...diagnostic,
+    createdAt
+  };
+  if (store.recordWhatsAppDiagnostic) await store.recordWhatsAppDiagnostic(safeRecord).catch(() => {});
+  try {
+    console.error("whatsapp_template_delivery_failed", JSON.stringify(safeRecord));
+  } catch (_error) {
+    // Diagnostics must never alter the fail-closed delivery outcome.
+  }
+}
+
+async function submitBuiltTemplate(built, env) {
   const graphVersion = String(env.WHATSAPP_GRAPH_API_VERSION || DEFAULT_GRAPH_VERSION).replace(/[^A-Za-z0-9.]/g, "");
   const phoneNumberId = digits(env.WHATSAPP_PHONE_NUMBER_ID);
-  const deliveryId = `delivery_${crypto.randomUUID()}`;
-  const hashedRecipient = await recipientHash(recipient.phone, env);
-  const built = buildWhatsAppTemplatePayload(alert, recipient, env);
-  if (!built.ok) {
-    await store.recordAlertDelivery({
-      id: deliveryId,
-      alertId: alert.id,
-      stage,
-      recipientHash: hashedRecipient,
-      recipientLabel: recipient.label,
-      providerMessageId: "",
-      status: "failed",
-      errorCode: built.errorCode,
-      createdAt: new Date().toISOString()
-    });
-    return false;
-  }
   try {
     const response = await fetch(`https://graph.facebook.com/${graphVersion}/${phoneNumberId}/messages`, {
       method: "POST",
@@ -324,19 +395,28 @@ async function sendTemplate(alert, recipient, stage, env, store) {
     const responseBody = await response.json().catch(() => ({}));
     const providerMessageId = String(responseBody?.messages?.[0]?.id || "").slice(0, 180);
     const submitted = response.ok && Boolean(providerMessageId);
-    await store.recordAlertDelivery({
-      id: deliveryId,
-      alertId: alert.id,
-      stage,
-      recipientHash: hashedRecipient,
-      recipientLabel: recipient.label,
+    return {
+      submitted,
       providerMessageId,
-      status: submitted ? "accepted" : "failed",
       errorCode: submitted ? "" : String(responseBody?.error?.code || (response.ok ? "missing_message_id" : response.status)),
-      createdAt: new Date().toISOString()
-    });
-    return submitted;
-  } catch (_error) {
+      diagnostic: submitted ? null : buildWhatsAppFailureDiagnostic({ built, response, responseBody })
+    };
+  } catch (networkError) {
+    return {
+      submitted: false,
+      providerMessageId: "",
+      errorCode: "network_error",
+      diagnostic: buildWhatsAppFailureDiagnostic({ built, localCode: "network_error", networkError })
+    };
+  }
+}
+
+async function sendTemplate(alert, recipient, stage, env, store) {
+  const deliveryId = `delivery_${crypto.randomUUID()}`;
+  const hashedRecipient = await recipientHash(recipient.phone, env);
+  const built = buildWhatsAppTemplatePayload(alert, recipient, env);
+  if (!built.ok) {
+    const createdAt = new Date().toISOString();
     await store.recordAlertDelivery({
       id: deliveryId,
       alertId: alert.id,
@@ -345,18 +425,43 @@ async function sendTemplate(alert, recipient, stage, env, store) {
       recipientLabel: recipient.label,
       providerMessageId: "",
       status: "failed",
-      errorCode: "network_error",
-      createdAt: new Date().toISOString()
-    }).catch(() => {});
+      errorCode: built.errorCode,
+      createdAt
+    });
+    await recordWhatsAppFailure(
+      store,
+      deliveryId,
+      alert,
+      stage,
+      buildWhatsAppFailureDiagnostic({ built, localCode: built.errorCode }),
+      createdAt
+    );
     return false;
   }
+  const outcome = await submitBuiltTemplate(built, env);
+  const createdAt = new Date().toISOString();
+  await store.recordAlertDelivery({
+    id: deliveryId,
+    alertId: alert.id,
+    stage,
+    recipientHash: hashedRecipient,
+    recipientLabel: recipient.label,
+    providerMessageId: outcome.providerMessageId,
+    status: outcome.submitted ? "accepted" : "failed",
+    errorCode: outcome.errorCode,
+    createdAt
+  });
+  if (!outcome.submitted) await recordWhatsAppFailure(store, deliveryId, alert, stage, outcome.diagnostic, createdAt);
+  return outcome.submitted;
 }
 
 async function sendToGroup(alert, group, stage, env, store) {
   const recipients = parseRecipients(env)[group] || [];
   if (!recipients.length || !env.WHATSAPP_ACCESS_TOKEN || !digits(env.WHATSAPP_PHONE_NUMBER_ID)) {
+    const deliveryId = `delivery_${crypto.randomUUID()}`;
+    const createdAt = new Date().toISOString();
     await store.recordAlertDelivery({
-      id: `delivery_${crypto.randomUUID()}`,
+      id: deliveryId,
       alertId: alert.id,
       stage,
       recipientHash: "",
@@ -364,8 +469,17 @@ async function sendToGroup(alert, group, stage, env, store) {
       providerMessageId: "",
       status: "not_configured",
       errorCode: "missing_configuration",
-      createdAt: new Date().toISOString()
+      createdAt
     });
+    const built = buildWhatsAppTemplatePayload(alert, { phone: "" }, env);
+    await recordWhatsAppFailure(
+      store,
+      deliveryId,
+      alert,
+      stage,
+      buildWhatsAppFailureDiagnostic({ built, localCode: "missing_configuration" }),
+      createdAt
+    );
     return { attempted: 0, accepted: 0 };
   }
   const outcomes = await Promise.all(recipients.map((recipient) => sendTemplate(alert, recipient, stage, env, store)));
@@ -553,37 +667,42 @@ async function notifyStatusChange(alert, actorPhone, status, env, store) {
     const deliveryId = `delivery_${crypto.randomUUID()}`;
     const hashedRecipient = await recipientHash(recipient.phone, env);
     if (!built.ok) {
+      const createdAt = new Date().toISOString();
       await store.recordAlertDelivery({
         id: deliveryId, alertId: alert.id, stage: `status_${status.toLowerCase()}`,
         recipientHash: hashedRecipient, recipientLabel: recipient.label,
         providerMessageId: "", status: "failed", errorCode: built.errorCode,
-        createdAt: new Date().toISOString()
+        createdAt
       });
+      await recordWhatsAppFailure(
+        store,
+        deliveryId,
+        alert,
+        `status_${status.toLowerCase()}`,
+        buildWhatsAppFailureDiagnostic({ built, localCode: built.errorCode }),
+        createdAt
+      );
       continue;
     }
-    const graphVersion = String(env.WHATSAPP_GRAPH_API_VERSION || DEFAULT_GRAPH_VERSION).replace(/[^A-Za-z0-9.]/g, "");
-    let providerMessageId = "";
-    let errorCode = "network_error";
-    try {
-      const response = await fetch(`https://graph.facebook.com/${graphVersion}/${digits(env.WHATSAPP_PHONE_NUMBER_ID)}/messages`, {
-        method: "POST", headers: { authorization: `Bearer ${env.WHATSAPP_ACCESS_TOKEN}`, "content-type": "application/json" }, body: JSON.stringify(built.payload)
-      });
-      const responseBody = await response.json().catch(() => ({}));
-      providerMessageId = String(responseBody?.messages?.[0]?.id || "").slice(0, 180);
-      errorCode = response.ok && providerMessageId
-        ? ""
-        : String(responseBody?.error?.code || (response.ok ? "missing_message_id" : response.status));
-    } catch (_error) {
-      // The sanitized delivery state below is the only retained diagnostic.
-    }
-    const submitted = Boolean(providerMessageId) && !errorCode;
+    const outcome = await submitBuiltTemplate(built, env);
+    const createdAt = new Date().toISOString();
     await store.recordAlertDelivery({
       id: deliveryId, alertId: alert.id, stage: `status_${status.toLowerCase()}`,
       recipientHash: hashedRecipient, recipientLabel: recipient.label,
-      providerMessageId, status: submitted ? "accepted" : "failed", errorCode,
-      createdAt: new Date().toISOString()
+      providerMessageId: outcome.providerMessageId,
+      status: outcome.submitted ? "accepted" : "failed",
+      errorCode: outcome.errorCode,
+      createdAt
     });
-    if (submitted) accepted += 1;
+    if (outcome.submitted) accepted += 1;
+    else await recordWhatsAppFailure(
+      store,
+      deliveryId,
+      alert,
+      `status_${status.toLowerCase()}`,
+      outcome.diagnostic,
+      createdAt
+    );
   }
   return { attempted: others.length, accepted };
 }

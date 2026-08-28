@@ -1,6 +1,6 @@
 # Product Roadmap
 
-Baseline: v5.11.23
+Baseline: v5.11.24
 
 ## Completed
 
@@ -32,6 +32,11 @@ Baseline: v5.11.23
 - [x] Direct first-person fishing and snorkeling intent enters the same structured flow as category-specific Book with Us actions
 - [x] Bangkok-calendar cleaning validation rejects past same-day, closed-hour and Monday preferences while preserving explicit future dates and submitting one valid correction
 - [x] Robust conversational fishing and snorkeling grammar covers want, would-like, wanna, contraction and take-me/us forms without converting information questions into alerts
+- [x] Explicit booking retries resolve before knowledge/model routing and reuse a verified-stay/room/session-bound original alert without duplicate booking storage
+- [x] Contact-free durable retry snapshots preserve completed safe fields across reloads and recollect only the transient international contact
+- [x] Failed booking state yields to unrelated bar, check-out and property intents while explicit retry remains context-isolated from stale medical, lost-key and property history
+- [x] Owner booking-alert cards show sanitized alert-bound WhatsApp/Meta failure evidence and real attempted/accepted counts
+- [x] Conversational Master Divers preferences normalize cleanly without third-party availability promises
 - [x] Hospitality-first lost-key responses hide internal delivery, verification-state and code-release terminology while preserving every security gate
 - [x] One-question-at-a-time booking collection for diving, fishing, snorkeling, taxi, taxi boat, ferry and motorbike taxi, with finite-choice buttons and contact collected last
 - [x] Deterministic property intelligence for pests, odors, plumbing, equipment, fixtures, mold/damp and room condition, including routine deduplication and urgent confirmation boundaries
@@ -157,8 +162,9 @@ Guests may continue using ordinary WhatsApp handoffs. Automated internal alerts 
 - [x] Confirm `/api/concierge/status` reports AI and learning enabled
 - [x] Capture the exact v5.11.16 Meta failure (HTTP 404 / `132001`) and implement template-aware language resolution: current templates use `en`; deliberate v1 rollback templates retain `en_US`.
 - [x] Deploy v5.11.22 without changing production configuration and run its production smoke matrix; use the observed conversation/state defects as the authoritative v5.11.23 correction scope.
-- [ ] Deploy v5.11.23 without changing production configuration, then run only the short booking date/side-question/certification/Open-Water-contact-retry/unrelated-intent, property isolation, urgent-section and controlled-test reset checks in `DEVELOPMENT_HANDOFF_v5.11.23.md`.
-- [ ] After v5.11.23 passes production smoke testing, begin v5.11.24 as the full public visual-polish milestone under a separate explicit scope.
+- [x] Deploy v5.11.23 without changing production configuration and use its observed explicit-retry/history-contamination failure as the authoritative narrow v5.11.24 correction scope.
+- [ ] Deploy v5.11.24 without changing production configuration, then run only the failed-booking retry, owner-diagnostic, unrelated-intent and Master Divers checks in `DEVELOPMENT_HANDOFF_v5.11.24.md`.
+- [ ] After v5.11.24 passes production smoke testing, begin v5.11.25 as the full public visual-polish milestone under a separate explicit scope.
 - [ ] Submit and obtain Meta approval for the five optional quick-action templates documented in `META_STAFF_QUICK_ACTIONS_v5.11.20.md`; never map the buttonless service v1 template and enable only after every intended template is Active.
 - [x] Add `STAY_TOKEN_PEPPER` and `RESERVATION_SYNC_TOKEN` Worker secrets
 - [x] Add protected `SPARE_KEY_CODES` Worker secret before activating automatic spare-key release

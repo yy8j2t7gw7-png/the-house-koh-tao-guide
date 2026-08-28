@@ -93,6 +93,7 @@ function validatedBookingSubmission(result) {
   const option = String(request.option || "").trim().slice(0, 120);
   const courseName = String(request.courseName || "").trim().slice(0, 120);
   const certificationLevel = String(request.certificationLevel || "").trim().slice(0, 120);
+  const preferredProvider = String(request.preferredProvider || "").trim().slice(0, 120);
   const pickupTime = String(request.pickupTime || "").trim().slice(0, 60);
   const pickupLocation = String(request.pickupLocation || "").trim().slice(0, 160);
   const destination = String(request.destination || "").trim().slice(0, 160);
@@ -118,6 +119,7 @@ function validatedBookingSubmission(result) {
       option,
       courseName,
       certificationLevel,
+      preferredProvider,
       pickupTime,
       pickupLocation,
       destination,
@@ -702,6 +704,42 @@ export async function dispatchConciergeAlert(alert, env) {
   const store = getStore(env);
   if (!store) return { attempted: 0, accepted: 0 };
   return sendToGroup(alert, alert.recipientGroup, alert.duplicate ? "retry" : "initial", env, store);
+}
+
+export async function retryConciergeBookingAlert({ env, alertId, room, bookingRequest, replyContact }) {
+  const store = getStore(env);
+  if (!store?.getBookingAlertForRetry) {
+    return { attempted: 0, accepted: 0, error: "retry_store_unavailable" };
+  }
+  const protectedSubmission = validatedBookingSubmission({
+    bookingRequest,
+    privateReplyContact: replyContact
+  });
+  if (!protectedSubmission) {
+    return { attempted: 0, accepted: 0, error: "invalid_booking_submission" };
+  }
+  const alert = await store.getBookingAlertForRetry(alertId);
+  if (!alert
+    || alert.alertType !== "booking_request"
+    || alert.recipientGroup !== "booking_with_owners"
+    || String(alert.room || "") !== String(room || "")) {
+    return { attempted: 0, accepted: 0, error: "retry_alert_not_found" };
+  }
+  if (Number(alert.acceptedDeliveries) > 0) {
+    return { attempted: 0, accepted: Number(alert.acceptedDeliveries), alreadyAccepted: true, alert };
+  }
+  if (Number(alert.deliveryAttempts) < 1) {
+    return { attempted: 0, accepted: 0, error: "retry_not_authorized" };
+  }
+  const retryAlert = {
+    ...alert,
+    bookingRequest: protectedSubmission.request,
+    privateReplyContact: protectedSubmission.contact,
+    duplicate: true,
+    retryableDelivery: true
+  };
+  const delivery = await sendToGroup(retryAlert, alert.recipientGroup, "retry", env, store);
+  return { ...delivery, alreadyAccepted: false, alert };
 }
 
 export async function processDueAlertEscalations(env, now = new Date()) {

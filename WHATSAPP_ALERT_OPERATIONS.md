@@ -2,7 +2,7 @@
 
 ## Purpose
 
-v5.11.23 provides a protected server-side staff-alert channel through the official Meta WhatsApp Business Platform. Guests continue to use the website Concierge. Recipient telephone numbers, access tokens and app secrets stay in encrypted Cloudflare secrets and never appear in public files, Git or release archives.
+v5.11.24 provides a protected server-side staff-alert channel through the official Meta WhatsApp Business Platform. Guests continue to use the website Concierge. Recipient telephone numbers, access tokens and app secrets stay in encrypted Cloudflare secrets and never appear in public files, Git or release archives.
 
 Routing is role based:
 
@@ -16,7 +16,9 @@ Every luggage alert is independently validated at the final server-side creation
 
 Every structured booking alert is also validated at the final server-side creation boundary. Diving retains its preferred date, diver count, recognised experience/course choice, useful sanitized certification or named-course detail, optional preferred provider and usable international contact. Open Water and Advanced Open Water require no Fun Diving certification. A local contact is rejected without changing the other fields; the corrected international contact replaces it. Fishing and snorkeling require date, guest count and trip style; taxi and motorbike taxi require date, time, pickup, destination and passenger count; taxi/longtail boat additionally requires one-way or return; ferry requires date, origin, destination and traveler count, with time accepted when supplied. Side questions and preferences stay in the same protected booking state and cannot create an incomplete alert. Every category requires a usable international contact. Complete requests route through `booking_with_owners`; recommendation-only questions create no alert. The guest never receives a personal Fah WhatsApp action.
 
-Booking alert storage and provider delivery are separate fail-closed boundaries. If an existing deduplicated booking alert has delivery attempts but no accepted provider message ID, the browser retains a safe `delivery_failed` snapshot in memory. It does not submit on an unrelated guest message; only an explicit retry reuses that alert ID and sends a `retry` delivery with the current transient payload. If any earlier delivery was accepted, the duplicate is treated as already sent and no second message is produced. No contact or template value is added to the stored alert or delivery-count metadata.
+Booking alert storage and provider delivery are separate fail-closed boundaries. If an alert has delivery attempts but no accepted provider message ID, the Worker stores a contact-free safe retry snapshot bound by a one-way hash to the verified reservation, room and protected browser session. The browser may retain the transient contact in memory, but a reload intentionally removes it. Explicit retry is recognized before knowledge or model routing and reuses that exact alert ID; it never creates a second booking record. If the contact is gone, only the international contact is recollected. If any earlier delivery was accepted, no second notification is produced. Unrelated messages never retry. No raw contact is added to the snapshot, interaction, alert, delivery metadata, diagnostics or dashboard.
+
+The protected owner alert card binds failed-delivery evidence to the relevant booking alert. It shows channel/provider, route, template, language, actual attempted and accepted counts, HTTP status when present, actual sanitized provider error code/category/message and Bangkok time. It does not show recipient numbers, guest contact, parameter values, access tokens, request authorization, stay credentials or raw payloads. The active booking mapping remains `house_booking_alert_v2`, generic English (`en`), six ordered BODY parameters and `booking_with_owners`; v5.11.24 does not change production configuration or infer an error Meta did not return.
 
 Routine property reports for pests/animals, odors, plumbing, equipment, fixtures, mold/damp and room condition route through `support_with_owners`. Detail state is isolated by protected session, verified room, normalized property category and active issue instance. A recognizable follow-up may extend that one issue without another alert; an exact reload repeat is deduplicated by its clean content fingerprint, while a later distinct issue in the same category may create its own alert. Category transitions always begin with an empty detail buffer. Dirty-room, bathroom, sheet or disinfection requests use the cleaning workflow instead. Potential fire, dangerous electrical, major leak/flooding or other critical property incidents remain behind the guest's explicit **Send urgent alert** boundary and route through `urgent_response` only after confirmation.
 
@@ -142,7 +144,7 @@ WHATSAPP_ALERT_ESCALATION_MINUTES=10
 
 `WHATSAPP_ALERT_TEMPLATE_LANGUAGE` remains present for compatibility and does not need a Cloudflare change for v5.11.17. Every mapped production or rollback template now uses the language attached to its immutable schema entry.
 
-The optional action templates are intentionally absent from `wrangler.jsonc`, so deploying v5.11.23 cannot activate unapproved Meta definitions. After all five intended templates are Active, configure these exact non-secret variables and then enable the gate in a separate authorized activation release:
+The optional action templates are intentionally absent from `wrangler.jsonc`, so deploying v5.11.24 cannot activate unapproved Meta definitions. After all five intended templates are Active, configure these exact non-secret variables and then enable the gate in a separate authorized activation release:
 
 ```text
 WHATSAPP_SERVICE_ACTION_TEMPLATE_NAME=house_service_alert_actions_v2
@@ -157,16 +159,16 @@ If the flag is false, missing or any required action-template mapping is absent,
 
 Review Meta's supported Graph API versions before changing the version. The Worker checks once per minute for overdue escalations.
 
-## v5.11.23 deployment and changed-function verification
+## v5.11.24 deployment and changed-function verification
 
-Deploy the verified v5.11.23 bundle to the existing Worker without changing the six production template mappings, secrets, recipients, webhook settings, `SPARE_KEY_CODES` or `WHATSAPP_STAFF_ACTIONS_ENABLED=false` state.
+Deploy the verified v5.11.24 bundle to the existing Worker without changing the six production template mappings, secrets, recipients, webhook settings, `SPARE_KEY_CODES` or `WHATSAPP_STAFF_ACTIONS_ENABLED=false` state.
 
 Smoke-test the changed functions with non-sensitive data:
 
-1. In an active diving booking, enter `30.08.2026`, separately try a past date, ask **Can we go with French Kiss Divers instead?**, and enter **Dive Instructor** for Fun Diving. Confirm useful acknowledgements, no availability promise, preserved state and no premature alert. Separately choose Open Water, enter a local contact and then a corrected international contact; confirm one Fah-plus-owner alert and normal pending-booking success. A simulated/no-send provider failure must remain fail closed; **is there a good bar around** must route normally with no retry, and only **try my diving booking again** may retry the same alert.
-2. In one verified session, report a rat, sewage odor and an AC that is not cold. Confirm three alerts with clean category-specific details and no earlier issue text.
-3. With non-sensitive unresolved urgent work, confirm the alerts section cannot be hidden through Collapse all, pointer activation or keyboard activation; resolve the test item and confirm ordinary collapse returns.
-4. In an authorized lost-key test state, use **Controlled admin test — keep existing code**. Confirm deliberate typed confirmation, a truthful code-free activity entry, lock clearing and continued replay rejection. Do not claim or perform physical rotation for this controlled test.
+1. Create one non-sensitive completed booking whose protected delivery is rejected. Confirm the owner alert has one alert ID, route `booking_with_owners`, zero accepted messages and a sanitized alert-bound real provider reason.
+2. Say **try my diving booking again**. Confirm there is no checklist or stale medical text, the same alert ID receives a `retry` delivery and success appears only if a provider message ID is accepted. Refresh before a separate retry and confirm only the international contact is requested.
+3. After a failed delivery ask **is there a good bar around**, **What time is check-out?** and a non-sensitive property question. Confirm normal routing and no automatic booking resend.
+4. During an active diving request say **or with Master Divers would be even better**. Confirm the preference is stored as **Master Divers**, the current field remains pending and no availability is promised.
 
 Quick-action activation is a separate post-approval change. Follow `META_STAFF_QUICK_ACTIONS_v5.11.20.md` only after every intended template is Active; never map service v1.
 

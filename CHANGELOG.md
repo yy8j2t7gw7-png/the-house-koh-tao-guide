@@ -2,6 +2,29 @@
 
 All notable changes to The House – Koh Tao guest guide are recorded here.
 
+## v5.11.24 — Booking Retry & Delivery-State Correction
+
+### Bound deterministic retry
+
+- Moves explicit booking retry recognition ahead of knowledge retrieval, broad transcript context, model routing, generic booking information and progressive collection.
+- Adds durable contact-free booking retry snapshots bound by a one-way hash to the verified reservation, room and protected browser session. Snapshots expire with the verified stay/session boundary.
+- Reuses the exact failed alert ID when delivery attempts exist and accepted deliveries remain zero. An accepted alert is never resent, and ambiguous failed categories produce one concise choice instead of a guess.
+- Preserves activity, date, party size, course/product, relevant certification, preferred provider and sanitized notes. After a reload, only the transient international reply contact is requested again.
+- Keeps raw contacts out of interactions, snapshots, alerts, dashboards, diagnostics, logs and release files. The contact exists only in the protected request and outbound template payload.
+- Keeps unrelated bar, check-out and property intents in normal routing after failure, with no automatic retry or repeated failure response.
+
+### Delivery evidence and provider normalization
+
+- Adds alert-bound owner diagnostics for failed booking delivery: WhatsApp/Meta channel, route, template, language, real attempted/accepted totals, HTTP status, actual safe provider code/category/message and Bangkok timestamp.
+- Confirms the runtime booking mapping remains `house_booking_alert_v2`, language `en`, six ordered BODY parameters and `booking_with_owners`. No deterministic source-side mismatch or unobserved Meta error is invented; production diagnostics now capture the actual rejection.
+- Normalizes conversational preferences such as **or with Master Divers would be even better** to **Master Divers** while preserving the no-availability-promise rule.
+
+### Scope and validation
+
+- Preserves every passed v5.11.23 date, side-question, certification, Open Water, property, cleaning, urgent-console and 24/7 lost-key behavior.
+- Changes no Meta mapping, recipient, secret, webhook, emergency route, passport/Airbnb rule or quick-action state. `WHATSAPP_STAFF_ACTIONS_ENABLED=false` remains required.
+- Expands the complete suite from 148 to 155 tests. The next planned milestone is v5.11.25 full visual polish.
+
 ## v5.11.23 — Production Conversation & State Corrections
 
 ### Booking conversation and validation
@@ -27,7 +50,7 @@ All notable changes to The House – Koh Tao guest guide are recorded here.
 
 - Preserves the production-passed cleaning sequence, seven-category progressive structure, property classifiers, urgent confirmation boundary and 24/7 guest lost-key release.
 - Changes no Meta template mapping, recipient, secret, webhook, emergency route, passport/Airbnb rule or public visual design. `WHATSAPP_STAFF_ACTIONS_ENABLED=false` remains required.
-- Expands the complete regression suite from 140 to 148 tests. The next planned milestone is v5.11.24 full visual polish.
+- Expands the complete regression suite from 140 to 148 tests. The visual milestone was subsequently moved to v5.11.25 after the narrow v5.11.24 production correction.
 
 ## v5.11.22 — Progressive Booking, Property Intelligence & 24/7 Lost-Key Recovery
 

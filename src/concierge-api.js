@@ -20,11 +20,12 @@ import {
   createProtectedOperationsAlert,
   dispatchConciergeAlert,
   houseEmergencyContact,
+  retryConciergeBookingAlert,
   whatsappAlertConfiguration
 } from "./whatsapp-alerts.js";
 import { getGuestAccess, handleStayAdminRequest, stayConfiguration } from "./stay-api.js";
 
-const RELEASE = "5.11.23";
+const RELEASE = "5.11.24";
 const ROOM_OPTIONS = new Set(["1", "2", "3", "4", "5", "6", "8", "9", "10", "11"]);
 const MAX_HISTORY_ITEMS = 10;
 const MAX_QUESTION_LENGTH = 800;
@@ -256,6 +257,7 @@ function cleanWorkflowState(value) {
       type: "booking",
       kind,
       status: retryableBooking ? "delivery_failed" : "collecting",
+      retryAlertId: /^alert_[A-Za-z0-9-]{20,}$/.test(String(value.retryAlertId || "")) ? String(value.retryAlertId) : "",
       retainPrivateContact: Boolean(value.retainPrivateContact),
       missing: Array.isArray(value.missing) ? value.missing.filter((item) => allowedMissing.includes(item)) : [],
       bookingRequest: {
@@ -1021,8 +1023,12 @@ function isActionableStructuredBooking(value) {
 }
 
 function isExplicitBookingRetry(value) {
-  const source = String(value || "").trim();
-  return /^(?:please\s+)?(?:retry|try\s+(?:it|again)|try\s+(?:my|the)\s+(?:(?:diving|fishing|snorkeling|taxi|ferry|motorbike)\s+)?(?:booking|request)\s+again|retry\s+(?:my|the)?\s*(?:(?:diving|fishing|snorkeling|taxi|ferry|motorbike)\s+)?(?:booking|request)|(?:can|could|would)\s+you\s+(?:please\s+)?(?:send|try)\s+(?:my|the)\s+(?:(?:diving|fishing|snorkeling|taxi|ferry|motorbike)\s+)?(?:booking|request)\s+again|send\s+(?:my|the)\s+(?:(?:diving|fishing|snorkeling|taxi|ferry|motorbike)\s+)?(?:booking|request)\s+again)[.!?]*$/i.test(source);
+  const source = String(value || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  if (["retry", "try again", "try it again", "try sending it again"].includes(source)) return true;
+  const prefix = "(?:(?:can|could|would) you (?:please )?|please )?";
+  const activity = "(?:diving|fishing(?: trip)?|snorkeling(?: trip)?|taxi|ferry(?: tickets?)?|motorbike(?: taxi)?|taxi boat)";
+  const target = `(?:it|(?:(?:my|the) )?(?:${activity} )?(?:booking|request))`;
+  return new RegExp(`^${prefix}(?:retry(?: ${target})?|(?:try|send|resend)(?: sending)? ${target} again)$`, "i").test(source);
 }
 
 function supportedBookingInformationResult(question) {
@@ -1135,15 +1141,18 @@ function preferredBookingProvider(kind, value) {
   if (kind !== "diving") return "";
   const source = cleanWorkflowValue(value, 180);
   const candidates = [...source.matchAll(/\b([A-Za-z&'’.-]+(?:\s+[A-Za-z&'’.-]+){0,4}\s+(?:Divers?|Dive(?:\s+(?:Center|Centre|School))?))\b/gi)]
-    .map((match) => match[1].replace(/^(?:(?:can|could|would|we|i|to|go|with|the|use|choose|prefer)\s+)+/i, "").trim())
+    .map((match) => match[1]
+      .replace(/^(?:(?:or|and|but|instead|rather|can|could|would|we|i|to|go|at|via|through|with|the|use|choose|prefer|please)\s+)+/i, "")
+      .trim())
     .filter(Boolean);
   const provider = candidates.at(-1) || "";
   if (!provider || provider.split(/\s+/).length > 5) return "";
-  return provider.toLowerCase() === "french kiss divers"
-    ? "French Kiss Divers"
-    : provider.toLowerCase() === "roctopus dive"
-      ? "Roctopus Dive"
-      : provider.replace(/\b\w/g, (letter) => letter.toUpperCase());
+  const canonical = {
+    "french kiss divers": "French Kiss Divers",
+    "roctopus dive": "Roctopus Dive",
+    "master divers": "Master Divers"
+  }[provider.toLowerCase()];
+  return canonical || provider;
 }
 
 function bookingSideContext(kind, value) {
@@ -2293,6 +2302,272 @@ async function recordInteractionAndAlert({ env, store, ctx, sessionId, room, roo
   return { interactionId, alert, delivery };
 }
 
+async function bookingRetryContext(access, sessionId, room, env, now, enforceGuestAccess) {
+  const reservationId = cleanWorkflowValue(
+    access?.session?.reservationId || (!enforceGuestAccess && access?.verified ? `test-stay-room-${room}` : ""),
+    100
+  );
+  if (!access?.verified || !reservationId || !room) return null;
+  const sessionExpiry = new Date(access?.session?.expiresAt || "");
+  const fallbackExpiry = new Date(now.getTime() + (24 * 60 * 60 * 1000));
+  const expiresAt = Number.isFinite(sessionExpiry.getTime()) && sessionExpiry > now
+    ? sessionExpiry.toISOString()
+    : fallbackExpiry.toISOString();
+  return {
+    reservationId,
+    room,
+    bindingHash: await hashSession(
+      `booking-retry:${reservationId}:${room}:${sessionId}`,
+      env.CONCIERGE_HASH_SALT || env.STAY_TOKEN_PEPPER
+    ),
+    expiresAt
+  };
+}
+
+function bookingRequestFromRetrySnapshot(snapshot) {
+  return {
+    kind: snapshot.kind,
+    activity: snapshot.activity,
+    preferredDate: snapshot.preferredDate,
+    guestCount: snapshot.guestCount,
+    option: snapshot.option,
+    courseName: snapshot.courseName,
+    certificationLevel: snapshot.certificationLevel,
+    preferredProvider: snapshot.preferredProvider,
+    pickupTime: snapshot.pickupTime,
+    pickupLocation: snapshot.pickupLocation,
+    destination: snapshot.destination,
+    tripType: snapshot.tripType,
+    notes: snapshot.notes
+  };
+}
+
+function bookingRetryWorkflow(snapshot, status, retainPrivateContact = false) {
+  return {
+    type: "booking",
+    kind: snapshot.kind,
+    status,
+    retryAlertId: snapshot.alertId,
+    retainPrivateContact,
+    missing: status === "collecting" ? ["contact"] : [],
+    bookingRequest: bookingRequestFromRetrySnapshot(snapshot)
+  };
+}
+
+function bookingRetryResult(snapshot, answer, { actions = [], needsHuman = false } = {}) {
+  return {
+    answer,
+    intentId: `${snapshot?.kind || "booking"}_booking_retry`,
+    category: "booking",
+    confidence: 1,
+    needsHuman,
+    handoff: "booking",
+    learningGap: false,
+    learningReason: "none",
+    actions,
+    suppressDefaultActions: true,
+    source: "booking-retry-policy"
+  };
+}
+
+function bookingRetryPromptActivity(kind) {
+  return {
+    diving: "diving",
+    fishing: "fishing",
+    snorkeling: "snorkeling",
+    taxi: "taxi",
+    taxi_boat: "taxi boat",
+    ferry: "ferry",
+    motorbike_taxi: "motorbike taxi"
+  }[kind] || "booking";
+}
+
+async function bookingRetryResponse({ env, store, sessionId, room, question, language, result, workflow }) {
+  let localized = result;
+  if (language !== "en") {
+    try {
+      const [translatedAnswer] = await translateApprovedTexts(env, language, [result.answer]);
+      localized = { ...result, answer: translatedAnswer };
+    } catch (_error) {
+      // The deterministic English retry response remains available.
+    }
+  }
+  const interactionId = `int_${crypto.randomUUID()}`;
+  const recordedId = await interactionRecord({ env, store, interactionId, sessionId, room, question, result: localized })
+    .catch(() => null);
+  return json({
+    answer: localized.answer,
+    intentId: localized.intentId,
+    category: localized.category,
+    confidence: localized.confidence,
+    needsHuman: localized.needsHuman,
+    handoff: localized.handoff,
+    learningGap: localized.learningGap,
+    actions: localized.actions,
+    source: localized.source,
+    language,
+    interactionId: recordedId,
+    workflow
+  });
+}
+
+async function handleExplicitBookingRetry({
+  env,
+  store,
+  access,
+  enforceGuestAccess,
+  sessionId,
+  room,
+  question,
+  currentReplyContact,
+  workflowState,
+  language,
+  now
+}) {
+  const explicitRetry = isExplicitBookingRetry(question);
+  const normalizedRetry = String(question || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  const genericRetry = ["retry", "try again", "try it again", "try sending it again"].includes(normalizedRetry);
+  const failedClientState = workflowState?.type === "booking" && workflowState.status === "delivery_failed";
+  const retryContactStep = workflowState?.type === "booking"
+    && workflowState.status === "collecting"
+    && workflowState.retryAlertId
+    && workflowState.missing?.[0] === "contact";
+  const cancelRetry = workflowState?.type === "booking"
+    && ["collecting", "delivery_failed"].includes(workflowState.status)
+    && workflowState.retryAlertId
+    && /^\s*(?:cancel|never\s*mind|nevermind|forget\s+it)\s*[.!]?\s*$/i.test(question);
+  if (!explicitRetry && !retryContactStep && !cancelRetry) return null;
+
+  const context = await bookingRetryContext(access, sessionId, room, env, now, enforceGuestAccess);
+  const unavailable = bookingRetryResult(
+    { kind: "booking" },
+    "I couldn’t find a failed booking request in this protected session to retry. If you would like to make a new request, tell me what you’d like to book."
+  );
+  if (!context || !store?.getBookingRetrySnapshots) {
+    if (genericRetry && !failedClientState && !retryContactStep) return null;
+    return bookingRetryResponse({ env, store, sessionId, room, question, language, result: unavailable, workflow: null });
+  }
+
+  const snapshots = await store.getBookingRetrySnapshots(
+    context.bindingHash,
+    context.reservationId,
+    context.room,
+    now.toISOString()
+  ).catch(() => []);
+  const requestedAlertId = retryContactStep || cancelRetry ? workflowState.retryAlertId : "";
+  let candidates = requestedAlertId
+    ? snapshots.filter((snapshot) => snapshot.alertId === requestedAlertId)
+    : snapshots.filter((snapshot) => Number(snapshot.deliveryAttempts) > 0 && Number(snapshot.acceptedDeliveries) === 0);
+  const requestedKind = bookingKindFromText(question);
+  if (requestedKind) candidates = candidates.filter((snapshot) => snapshot.kind === requestedKind);
+
+  if (!candidates.length && !requestedAlertId) {
+    const alreadySent = snapshots.filter((snapshot) => Number(snapshot.acceptedDeliveries) > 0
+      && (!requestedKind || snapshot.kind === requestedKind));
+    if (alreadySent.length) {
+      const snapshot = alreadySent[0];
+      await store.setBookingRetrySnapshotStatus?.(snapshot.alertId, context.bindingHash, "submitted", now.toISOString()).catch(() => {});
+      const label = bookingActivity(snapshot.kind).toLowerCase();
+      const result = bookingRetryResult(snapshot, `Your ${label} request has already been sent to our booking team, so I haven’t sent a duplicate.`);
+      return bookingRetryResponse({ env, store, sessionId, room, question, language, result, workflow: bookingRetryWorkflow(snapshot, "submitted") });
+    }
+  }
+  if (!candidates.length) {
+    if (genericRetry && !failedClientState && !retryContactStep && snapshots.length === 0) return null;
+    return bookingRetryResponse({ env, store, sessionId, room, question, language, result: unavailable, workflow: null });
+  }
+
+  if (cancelRetry) {
+    const snapshot = candidates[0];
+    await store.setBookingRetrySnapshotStatus?.(snapshot.alertId, context.bindingHash, "cancelled", now.toISOString()).catch(() => {});
+    const result = bookingRetryResult(snapshot, `No problem. I have cancelled the failed ${bookingActivity(snapshot.kind).toLowerCase()} request.`);
+    return bookingRetryResponse({
+      env,
+      store,
+      sessionId,
+      room,
+      question,
+      language,
+      result,
+      workflow: bookingRetryWorkflow(snapshot, "cancelled")
+    });
+  }
+
+  const distinctKinds = [...new Set(candidates.map((snapshot) => snapshot.kind))];
+  if (!requestedAlertId && !requestedKind && distinctKinds.length > 1) {
+    const labels = distinctKinds.slice(0, 3).map((kind) => bookingActivity(kind).toLowerCase());
+    const choiceText = labels.length === 2
+      ? `${labels[0]} request or your ${labels[1]} request`
+      : `${labels.slice(0, -1).join(", ")} or your ${labels.at(-1)} request`;
+    const result = bookingRetryResult(candidates[0], `Would you like me to retry your ${choiceText}?`, {
+      actions: distinctKinds.slice(0, 3).map((kind) => ({
+        label: `Retry ${bookingActivity(kind)}`,
+        type: "prompt",
+        prompt: `retry my ${bookingRetryPromptActivity(kind)} booking`
+      }))
+    });
+    return bookingRetryResponse({ env, store, sessionId, room, question, language, result, workflow: null });
+  }
+
+  const snapshot = candidates[0];
+  if (Number(snapshot.acceptedDeliveries) > 0 || snapshot.status === "submitted") {
+    await store.setBookingRetrySnapshotStatus?.(snapshot.alertId, context.bindingHash, "submitted", now.toISOString()).catch(() => {});
+    const label = bookingActivity(snapshot.kind).toLowerCase();
+    const result = bookingRetryResult(snapshot, `Your ${label} request has already been sent to our booking team, so I haven’t sent a duplicate.`);
+    return bookingRetryResponse({ env, store, sessionId, room, question, language, result, workflow: bookingRetryWorkflow(snapshot, "submitted") });
+  }
+
+  const contact = validInternationalReplyContact(currentReplyContact);
+  if (!contact) {
+    const answer = currentReplyContact
+      ? LOCAL_CONTACT_PROMPT
+      : `I still have your ${bookingActivity(snapshot.kind).toLowerCase()} request details, but for privacy I need your WhatsApp or phone number again. Please include the country code.`;
+    const result = bookingRetryResult(snapshot, answer);
+    return bookingRetryResponse({
+      env,
+      store,
+      sessionId,
+      room,
+      question,
+      language,
+      result,
+      workflow: bookingRetryWorkflow(snapshot, "collecting", false)
+    });
+  }
+
+  const delivery = await retryConciergeBookingAlert({
+    env,
+    alertId: snapshot.alertId,
+    room,
+    bookingRequest: bookingRequestFromRetrySnapshot(snapshot),
+    replyContact: contact
+  }).catch(() => ({ attempted: 0, accepted: 0, error: "delivery_exception" }));
+  const label = bookingActivity(snapshot.kind).toLowerCase();
+  if (delivery.alreadyAccepted || delivery.accepted > 0) {
+    await store.setBookingRetrySnapshotStatus?.(snapshot.alertId, context.bindingHash, "submitted", now.toISOString()).catch(() => {});
+    const answer = delivery.alreadyAccepted
+      ? `Your ${label} request has already been sent to our booking team, so I haven’t sent a duplicate.`
+      : `Thank you. Your ${label} request has been sent to our booking team. They’ll check current availability and price and get back to you. The booking is confirmed only after availability has been confirmed and payment has been received.`;
+    const result = bookingRetryResult(snapshot, answer);
+    return bookingRetryResponse({ env, store, sessionId, room, question, language, result, workflow: bookingRetryWorkflow(snapshot, "submitted") });
+  }
+
+  await store.setBookingRetrySnapshotStatus?.(snapshot.alertId, context.bindingHash, "retryable", now.toISOString()).catch(() => {});
+  const result = bookingRetryResult(snapshot, `I still couldn’t send your ${label} request automatically. Your booking has not been sent.`, {
+    actions: [{ label: "Call Us", type: "route", route: "houseCall" }]
+  });
+  return bookingRetryResponse({
+    env,
+    store,
+    sessionId,
+    room,
+    question,
+    language,
+    result,
+    workflow: bookingRetryWorkflow(snapshot, "delivery_failed", true)
+  });
+}
+
 export async function handleConciergeRequest(request, env, ctx, now = new Date()) {
   if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405, { allow: "POST" });
   let body;
@@ -2425,6 +2700,21 @@ export async function handleConciergeRequest(request, env, ctx, now = new Date()
         : null
     });
   }
+
+  const bookingRetry = await handleExplicitBookingRetry({
+    env,
+    store,
+    access,
+    enforceGuestAccess,
+    sessionId,
+    room,
+    question,
+    currentReplyContact,
+    workflowState,
+    language,
+    now
+  });
+  if (bookingRetry) return bookingRetry;
 
   let knowledge;
   try {
@@ -2654,6 +2944,33 @@ export async function handleConciergeRequest(request, env, ctx, now = new Date()
     if (bookingPolicy.handled && bookingPolicy.workflow) {
       bookingPolicy.workflow.status = "delivery_failed";
       bookingPolicy.workflow.retainPrivateContact = true;
+      const retryContext = await bookingRetryContext(access, sessionId, room, env, now, enforceGuestAccess).catch(() => null);
+      const safeRequest = bookingPolicy.workflow.bookingRequest || result.bookingRequest;
+      if (retryContext && recorded.alert?.id && safeRequest && store?.upsertBookingRetrySnapshot) {
+        const saved = await store.upsertBookingRetrySnapshot({
+          alertId: recorded.alert.id,
+          bindingHash: retryContext.bindingHash,
+          reservationId: retryContext.reservationId,
+          room,
+          kind: safeRequest.kind,
+          activity: safeRequest.activity,
+          preferredDate: safeRequest.preferredDate,
+          guestCount: safeRequest.guestCount,
+          option: safeRequest.option,
+          courseName: safeRequest.courseName,
+          certificationLevel: safeRequest.certificationLevel,
+          preferredProvider: safeRequest.preferredProvider,
+          pickupTime: safeRequest.pickupTime,
+          pickupLocation: safeRequest.pickupLocation,
+          destination: safeRequest.destination,
+          tripType: safeRequest.tripType,
+          notes: safeRequest.notes,
+          createdAt: recorded.alert.createdAt || now.toISOString(),
+          updatedAt: now.toISOString(),
+          expiresAt: retryContext.expiresAt
+        }).catch(() => ({ ok: false }));
+        if (saved?.ok) bookingPolicy.workflow.retryAlertId = recorded.alert.id;
+      }
     }
   } else if (result.intentId === "luggage_storage" && result.needsHuman) {
     result = {

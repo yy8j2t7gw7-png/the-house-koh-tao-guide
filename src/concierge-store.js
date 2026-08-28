@@ -8,6 +8,18 @@ function cleanText(value, maximum = 1200) {
   return String(value || "").trim().slice(0, maximum);
 }
 
+function cleanBookingRetryText(value, maximum = 1200) {
+  return cleanText(value, maximum).replace(
+    /(?:\+|00)?\d[\d\s().-]{6,20}\d/g,
+    (candidate) => {
+      const compact = candidate.trim();
+      const digits = compact.replace(/\D/g, "");
+      const dateLike = /^\d{1,2}[./-]\d{1,2}[./-]\d{4}$/.test(compact);
+      return digits.length >= 8 && digits.length <= 15 && !dateLike ? "[private number]" : candidate;
+    }
+  ).slice(0, maximum);
+}
+
 export class ConciergeStore extends DurableObject {
   constructor(ctx, env) {
     super(ctx, env);
@@ -156,6 +168,34 @@ export class ConciergeStore extends DurableObject {
           ON whatsapp_delivery_diagnostics(created_at);
         CREATE INDEX IF NOT EXISTS whatsapp_delivery_diagnostics_alert
           ON whatsapp_delivery_diagnostics(alert_id, created_at);
+
+        CREATE TABLE IF NOT EXISTS booking_retry_snapshots (
+          alert_id TEXT PRIMARY KEY,
+          binding_hash TEXT NOT NULL,
+          reservation_id TEXT NOT NULL,
+          room TEXT NOT NULL,
+          kind TEXT NOT NULL,
+          activity TEXT NOT NULL,
+          preferred_date TEXT NOT NULL DEFAULT '',
+          guest_count TEXT NOT NULL DEFAULT '',
+          option_value TEXT NOT NULL DEFAULT '',
+          course_name TEXT NOT NULL DEFAULT '',
+          certification_level TEXT NOT NULL DEFAULT '',
+          preferred_provider TEXT NOT NULL DEFAULT '',
+          pickup_time TEXT NOT NULL DEFAULT '',
+          pickup_location TEXT NOT NULL DEFAULT '',
+          destination TEXT NOT NULL DEFAULT '',
+          trip_type TEXT NOT NULL DEFAULT '',
+          notes TEXT NOT NULL DEFAULT '',
+          status TEXT NOT NULL DEFAULT 'retryable',
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          expires_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS booking_retry_snapshots_binding
+          ON booking_retry_snapshots(binding_hash, reservation_id, room, status, updated_at);
+        CREATE INDEX IF NOT EXISTS booking_retry_snapshots_expiry
+          ON booking_retry_snapshots(expires_at);
 
         CREATE TABLE IF NOT EXISTS maintenance_reports (
           id TEXT PRIMARY KEY,
@@ -468,6 +508,7 @@ export class ConciergeStore extends DurableObject {
              a.bangkok_time AS bangkokTime, a.status, a.created_at AS createdAt,
              a.acknowledged_at AS acknowledgedAt, a.resolved_at AS resolvedAt,
              a.escalation_due_at AS escalationDueAt, a.escalated_at AS escalatedAt,
+             SUM(CASE WHEN d.status <> 'not_configured' THEN 1 ELSE 0 END) AS attempted,
              SUM(CASE WHEN d.status IN ('accepted', 'sent', 'delivered', 'read') THEN 1 ELSE 0 END) AS delivered,
              SUM(CASE WHEN d.status = 'failed' THEN 1 ELSE 0 END) AS failed
       FROM concierge_alerts a
@@ -536,6 +577,7 @@ export class ConciergeStore extends DurableObject {
       alerts: alerts.map((alert) => ({
         ...alert,
         roomVerified: Boolean(alert.roomVerified),
+        attempted: Number(alert.attempted) || 0,
         delivered: Number(alert.delivered) || 0,
         failed: Number(alert.failed) || 0
       })),
@@ -608,6 +650,143 @@ export class ConciergeStore extends DurableObject {
       "DELETE FROM concierge_alerts WHERE julianday(created_at) < julianday('now', '-30 days')"
     );
     return { created: true };
+  }
+
+  async upsertBookingRetrySnapshot(record) {
+    const alertId = cleanText(record.alertId, 100);
+    const bindingHash = cleanText(record.bindingHash, 100);
+    const reservationId = cleanText(record.reservationId, 100);
+    const room = cleanText(record.room, 4);
+    const kind = cleanText(record.kind, 40);
+    const createdAt = cleanText(record.createdAt, 40) || new Date().toISOString();
+    const updatedAt = cleanText(record.updatedAt, 40) || createdAt;
+    const expiresAt = cleanText(record.expiresAt, 40);
+    if (!alertId || !bindingHash || !reservationId || !room || !kind || !expiresAt) return { ok: false };
+    this.ctx.storage.sql.exec(
+      `INSERT INTO booking_retry_snapshots
+       (alert_id, binding_hash, reservation_id, room, kind, activity, preferred_date,
+        guest_count, option_value, course_name, certification_level, preferred_provider,
+        pickup_time, pickup_location, destination, trip_type, notes, status,
+        created_at, updated_at, expires_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'retryable', ?, ?, ?)
+       ON CONFLICT(alert_id) DO UPDATE SET
+         activity = excluded.activity,
+         preferred_date = excluded.preferred_date,
+         guest_count = excluded.guest_count,
+         option_value = excluded.option_value,
+         course_name = excluded.course_name,
+         certification_level = excluded.certification_level,
+         preferred_provider = excluded.preferred_provider,
+         pickup_time = excluded.pickup_time,
+         pickup_location = excluded.pickup_location,
+         destination = excluded.destination,
+         trip_type = excluded.trip_type,
+         notes = excluded.notes,
+         status = 'retryable',
+         updated_at = excluded.updated_at,
+         expires_at = excluded.expires_at
+       WHERE booking_retry_snapshots.binding_hash = excluded.binding_hash
+         AND booking_retry_snapshots.reservation_id = excluded.reservation_id
+         AND booking_retry_snapshots.room = excluded.room`,
+      alertId,
+      bindingHash,
+      reservationId,
+      room,
+      kind,
+      cleanBookingRetryText(record.activity, 80),
+      cleanBookingRetryText(record.preferredDate, 120),
+      cleanText(record.guestCount, 4),
+      cleanBookingRetryText(record.option, 120),
+      cleanBookingRetryText(record.courseName, 120),
+      cleanBookingRetryText(record.certificationLevel, 120),
+      cleanBookingRetryText(record.preferredProvider, 120),
+      cleanBookingRetryText(record.pickupTime, 60),
+      cleanBookingRetryText(record.pickupLocation, 160),
+      cleanBookingRetryText(record.destination, 160),
+      cleanBookingRetryText(record.tripType, 60),
+      cleanBookingRetryText(record.notes, 500),
+      createdAt,
+      updatedAt,
+      expiresAt
+    );
+    this.ctx.storage.sql.exec(
+      "DELETE FROM booking_retry_snapshots WHERE julianday(expires_at) <= julianday('now') OR julianday(created_at) < julianday('now', '-30 days')"
+    );
+    return { ok: true, alertId };
+  }
+
+  async getBookingRetrySnapshots(bindingHash, reservationId, room, nowValue) {
+    return rows(this.ctx.storage.sql.exec(
+      `SELECT b.alert_id AS alertId, b.room, b.kind, b.activity,
+              b.preferred_date AS preferredDate, b.guest_count AS guestCount,
+              b.option_value AS option, b.course_name AS courseName,
+              b.certification_level AS certificationLevel,
+              b.preferred_provider AS preferredProvider, b.pickup_time AS pickupTime,
+              b.pickup_location AS pickupLocation, b.destination, b.trip_type AS tripType,
+              b.notes, b.status, b.created_at AS createdAt, b.updated_at AS updatedAt,
+              b.expires_at AS expiresAt,
+              (SELECT COUNT(*) FROM concierge_alert_deliveries d
+               WHERE d.alert_id = b.alert_id) AS deliveryAttempts,
+              (SELECT COUNT(*) FROM concierge_alert_deliveries d
+               WHERE d.alert_id = b.alert_id
+                 AND d.status IN ('accepted', 'sent', 'delivered', 'read')) AS acceptedDeliveries
+       FROM booking_retry_snapshots b
+       JOIN concierge_alerts a ON a.id = b.alert_id
+       WHERE b.binding_hash = ? AND b.reservation_id = ? AND b.room = ?
+         AND b.status IN ('retryable', 'submitted')
+         AND a.alert_type = 'booking_request'
+         AND a.status IN ('open', 'acknowledged')
+         AND julianday(b.expires_at) > julianday(?)
+       ORDER BY b.updated_at DESC, b.created_at DESC
+       LIMIT 10`,
+      cleanText(bindingHash, 100),
+      cleanText(reservationId, 100),
+      cleanText(room, 4),
+      cleanText(nowValue, 40) || new Date().toISOString()
+    )).map((record) => ({
+      ...record,
+      deliveryAttempts: Number(record.deliveryAttempts) || 0,
+      acceptedDeliveries: Number(record.acceptedDeliveries) || 0
+    }));
+  }
+
+  async setBookingRetrySnapshotStatus(alertId, bindingHash, status, updatedAt) {
+    const nextStatus = status === "submitted" ? "submitted" : status === "cancelled" ? "cancelled" : "retryable";
+    this.ctx.storage.sql.exec(
+      `UPDATE booking_retry_snapshots SET status = ?, updated_at = ?
+       WHERE alert_id = ? AND binding_hash = ?`,
+      nextStatus,
+      cleanText(updatedAt, 40) || new Date().toISOString(),
+      cleanText(alertId, 100),
+      cleanText(bindingHash, 100)
+    );
+    return { ok: true };
+  }
+
+  async getBookingAlertForRetry(alertId) {
+    const record = rows(this.ctx.storage.sql.exec(
+      `SELECT a.id, a.interaction_id AS interactionId, a.severity,
+              a.alert_type AS alertType, a.recipient_group AS recipientGroup,
+              a.room, a.room_verified AS roomVerified, a.summary,
+              a.bangkok_time AS bangkokTime, a.status, a.created_at AS createdAt,
+              a.escalation_due_at AS escalationDueAt, a.escalated_at AS escalatedAt,
+              (SELECT COUNT(*) FROM concierge_alert_deliveries d
+               WHERE d.alert_id = a.id) AS deliveryAttempts,
+              (SELECT COUNT(*) FROM concierge_alert_deliveries d
+               WHERE d.alert_id = a.id
+                 AND d.status IN ('accepted', 'sent', 'delivered', 'read')) AS acceptedDeliveries
+       FROM concierge_alerts a
+       WHERE a.id = ? AND a.alert_type = 'booking_request'
+         AND a.status IN ('open', 'acknowledged')
+       LIMIT 1`,
+      cleanText(alertId, 100)
+    ))[0];
+    return record ? {
+      ...record,
+      roomVerified: Boolean(record.roomVerified),
+      deliveryAttempts: Number(record.deliveryAttempts) || 0,
+      acceptedDeliveries: Number(record.acceptedDeliveries) || 0
+    } : null;
   }
 
   async createMaintenanceReport(record) {

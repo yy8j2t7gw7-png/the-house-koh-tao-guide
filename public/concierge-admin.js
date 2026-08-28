@@ -29,7 +29,7 @@
   const expandAdminSections = document.getElementById("expandAdminSections");
   const collapseAdminSections = document.getElementById("collapseAdminSections");
   const adminSections = [...document.querySelectorAll("details[data-admin-section]")];
-  const sectionStateKey = "houseConciergeAdminSections:v5.11.23";
+  const sectionStateKey = "houseConciergeAdminSections:v5.11.24";
   let token = "";
 
   function savedAdminSectionState() {
@@ -247,7 +247,7 @@
     });
   }
 
-  function renderAlerts(items, configuration = {}) {
+  function renderAlerts(items, configuration = {}, diagnostics = []) {
     alerts.replaceChildren();
     alertStatus.textContent = configuration.configured ? "WhatsApp connected" : "WhatsApp setup incomplete";
     alertStatus.className = `concierge-admin-config-status ${configuration.configured ? "is-ready" : "is-missing"}`;
@@ -268,7 +268,7 @@
       meta.append(
         element("span", "concierge-admin-pill", item.room ? `Room ${item.room} · ${item.roomVerified ? "stay verified" : "guest-selected"}` : "Room not selected"),
         element("span", "concierge-admin-pill", item.status),
-        element("span", "concierge-admin-pill", `WhatsApp submitted: ${item.delivered || 0}`)
+        element("span", "concierge-admin-pill", `WhatsApp attempted: ${item.attempted || 0} · accepted: ${item.delivered || 0}`)
       );
       head.append(title, meta);
       card.append(
@@ -276,6 +276,29 @@
         element("p", "concierge-admin-alert-summary", item.summary),
         element("span", "concierge-admin-alert-time", `${item.bangkokTime || bangkokDate(item.createdAt)} · Route: ${item.recipientGroup}`)
       );
+      const latestDiagnostic = diagnostics.find((diagnostic) => diagnostic.alertId === item.id);
+      if (item.alertType === "booking_request" && Number(item.delivered || 0) === 0 && latestDiagnostic) {
+        const diagnostic = element("div", "concierge-admin-delivery-failure");
+        diagnostic.appendChild(element("h4", "", "WhatsApp delivery failed"));
+        const deliveryFields = [
+          "Channel: WhatsApp",
+          "Provider: Meta",
+          `Route: ${item.recipientGroup}`,
+          `Attempted: ${item.attempted || 0}`,
+          `Accepted: ${item.delivered || 0}`
+        ];
+        if (latestDiagnostic.templateName) deliveryFields.push(`Template: ${latestDiagnostic.templateName}`);
+        if (latestDiagnostic.languageCode) deliveryFields.push(`Language: ${latestDiagnostic.languageCode}`);
+        if (Number(latestDiagnostic.httpStatus || 0) > 0) deliveryFields.push(`HTTP: ${latestDiagnostic.httpStatus}`);
+        const errorCode = latestDiagnostic.errorCode || latestDiagnostic.storedErrorCode;
+        if (errorCode) deliveryFields.push(`Error code: ${errorCode}`);
+        if (latestDiagnostic.failureKind) deliveryFields.push(`Category: ${latestDiagnostic.failureKind}`);
+        diagnostic.appendChild(element("p", "concierge-admin-source-note", deliveryFields.join(" · ")));
+        if (latestDiagnostic.errorMessage) diagnostic.appendChild(element("p", "concierge-admin-alert-summary", latestDiagnostic.errorMessage));
+        if (latestDiagnostic.errorDetails) diagnostic.appendChild(element("p", "concierge-admin-source-note", `Details: ${latestDiagnostic.errorDetails}`));
+        diagnostic.appendChild(element("span", "concierge-admin-alert-time", `Failure recorded: ${bangkokDate(latestDiagnostic.createdAt)}`));
+        card.appendChild(diagnostic);
+      }
       if (item.escalationDueAt && !item.acknowledgedAt && !item.escalatedAt) {
         card.appendChild(element("span", "concierge-admin-alert-escalation", `Escalates if not acknowledged by ${bangkokDate(item.escalationDueAt)}`));
       } else if (item.escalatedAt) {
@@ -609,7 +632,7 @@
     renderPendingRegistrations(data.pendingRegistrations || []);
     renderPassportUploads(data.passportUploads || []);
     renderMaintenanceReports(data.maintenanceReports || []);
-    renderAlerts(data.alerts || [], data.alertConfiguration || {});
+    renderAlerts(data.alerts || [], data.alertConfiguration || {}, data.deliveryDiagnostics || []);
     renderWhatsAppDeliveryDiagnostics(data.deliveryDiagnostics || []);
     renderStayOperations(data.stayOperations || {});
     renderRecent(data.recent || []);

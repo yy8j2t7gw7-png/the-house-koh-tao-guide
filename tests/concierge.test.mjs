@@ -59,6 +59,7 @@ function createStore() {
     maintenanceReports: [],
     alerts: [],
     alertDeliveries: [],
+    bookingRetrySnapshots: [],
     async getApprovedKnowledge() { return []; },
     async recordInteraction(record) { this.interactions.push(record); return { stored: true }; },
     async recordFeedback(record) {
@@ -69,9 +70,18 @@ function createStore() {
       return { stored: true };
     },
     async getAdminOverview() {
+      const alerts = this.alerts.filter((alert) => alert.status !== "resolved").map((alert) => {
+        const deliveries = this.alertDeliveries.filter((delivery) => delivery.alertId === alert.id);
+        return {
+          ...alert,
+          attempted: deliveries.filter((delivery) => delivery.status !== "not_configured").length,
+          delivered: deliveries.filter((delivery) => ["accepted", "sent", "delivered", "read"].includes(delivery.status)).length,
+          failed: deliveries.filter((delivery) => delivery.status === "failed").length
+        };
+      });
       return {
         totals: { interactions24h: 1, interactions30d: 1, gaps30d: 0, handoffs30d: 0, positive: 0, negative: 0, pending: 0, approved: 0 },
-        queue: [], approved: [], alerts: this.alerts.filter((alert) => alert.status !== "resolved"), recent: []
+        queue: [], approved: [], alerts, recent: [], deliveryDiagnostics: this.whatsappDiagnostics || []
       };
     },
     async getStayOperationsOverview() {
@@ -316,6 +326,50 @@ function createStore() {
       this.alerts.push({ ...record, status: "open", acknowledgedAt: "", resolvedAt: "", escalatedAt: "" });
       return { created: true };
     },
+    async upsertBookingRetrySnapshot(record) {
+      if (!record.alertId || !record.bindingHash || !record.reservationId || !record.room || !record.kind || !record.expiresAt) {
+        return { ok: false };
+      }
+      const existing = this.bookingRetrySnapshots.find((item) => item.alertId === record.alertId);
+      const value = { ...record, status: "retryable" };
+      if (existing) Object.assign(existing, value);
+      else this.bookingRetrySnapshots.push(value);
+      return { ok: true, alertId: record.alertId };
+    },
+    async getBookingRetrySnapshots(bindingHash, reservationId, room, nowValue) {
+      return this.bookingRetrySnapshots
+        .filter((item) => item.bindingHash === bindingHash
+          && item.reservationId === reservationId
+          && item.room === room
+          && ["retryable", "submitted"].includes(item.status)
+          && item.expiresAt > nowValue)
+        .map((item) => {
+          const deliveries = this.alertDeliveries.filter((delivery) => delivery.alertId === item.alertId);
+          return {
+            ...item,
+            deliveryAttempts: deliveries.length,
+            acceptedDeliveries: deliveries.filter((delivery) => ["accepted", "sent", "delivered", "read"].includes(delivery.status)).length
+          };
+        })
+        .sort((left, right) => String(right.updatedAt || right.createdAt).localeCompare(String(left.updatedAt || left.createdAt)));
+    },
+    async setBookingRetrySnapshotStatus(alertId, bindingHash, status, updatedAt) {
+      const target = this.bookingRetrySnapshots.find((item) => item.alertId === alertId && item.bindingHash === bindingHash);
+      if (target) Object.assign(target, { status, updatedAt });
+      return { ok: Boolean(target) };
+    },
+    async getBookingAlertForRetry(alertId) {
+      const alert = this.alerts.find((item) => item.id === alertId
+        && item.alertType === "booking_request"
+        && ["open", "acknowledged"].includes(item.status));
+      if (!alert) return null;
+      const deliveries = this.alertDeliveries.filter((delivery) => delivery.alertId === alertId);
+      return {
+        ...alert,
+        deliveryAttempts: deliveries.length,
+        acceptedDeliveries: deliveries.filter((delivery) => ["accepted", "sent", "delivered", "read"].includes(delivery.status)).length
+      };
+    },
     async recordAlertDelivery(record) { this.alertDeliveries.push(record); return { ok: true }; },
     async recordWhatsAppDiagnostic(record) {
       this.whatsappDiagnostics ||= [];
@@ -429,6 +483,30 @@ function verifiedConciergeRequest(question, cookie, extra = {}) {
       ...extra
     })
   });
+}
+
+async function createFailedOpenWaterBooking(env, now, {
+  sessionId = "session_failed_open_water_12345",
+  requestFactory = (question, extra) => guestRequest(question, { sessionId, ...extra })
+} = {}) {
+  const ready = await handleConciergeRequest(
+    requestFactory("I want to book the Open Water course tomorrow for 4 divers.", {}),
+    env,
+    undefined,
+    now
+  );
+  const readyBody = await ready.json();
+  assert.deepEqual(readyBody.workflow.missing, ["contact"]);
+  const failed = await handleConciergeRequest(
+    requestFactory("+66 81 234 5678", { workflowState: readyBody.workflow }),
+    env,
+    undefined,
+    new Date(now.getTime() + 100)
+  );
+  const failedBody = await failed.json();
+  assert.equal(failedBody.workflow.status, "delivery_failed");
+  assert.match(failedBody.workflow.retryAlertId, /^alert_[A-Za-z0-9-]{20,}$/);
+  return { readyBody, failedBody };
 }
 
 async function syncAndVerifyStay(env, {
@@ -1941,7 +2019,9 @@ test("protected workflows never fall back to the device-only answer engine", asy
     readFile(new URL("../public/concierge-booking.js", import.meta.url), "utf8")
   ]);
   assert.match(script, /function requiresProtectedServer\(question\)/);
+  assert.match(script, /function isExplicitBookingRetry\(question\)/);
   assert.match(script, /if \(activeWorkflowState\) return true/);
+  assert.match(script, /return isExplicitBookingRetry\(source\)/);
   assert.match(script, /const impliedLuggageRequest = \/\\b\(\?:arrival\|arriving\|departure\|departing\)\\b\/i\.test\(source\)/);
   assert.match(script, /\|\| impliedLuggageRequest/);
   assert.match(script, /if \(requiresProtectedServer\(question\)\) \{[\s\S]*protectedError\.protectedWorkflow = true;[\s\S]*throw protectedError;/);
@@ -2032,7 +2112,7 @@ test("owner dashboard major sections are independently collapsible, persistent a
   assert.match(html, /id="collapseAdminSections"[^>]*>Collapse all<\/button>/);
   assert.match(html, /id="keyRotationActivity"/);
 
-  assert.match(script, /houseConciergeAdminSections:v5\.11\.23/);
+  assert.match(script, /houseConciergeAdminSections:v5\.11\.24/);
   assert.match(script, /adminSections\.map\(\(section\) => \[section\.dataset\.adminSection, section\.open\]\)/);
   assert.match(script, /typeof saved\[id\] === "boolean"/);
   assert.match(script, /section\.addEventListener\("toggle"/);
@@ -2085,7 +2165,7 @@ test("guest localization supports seven languages and keeps the owner dashboard 
   assert.doesNotMatch(admin, /src="\/i18n\.js"/);
   assert.match(runtime, /exploreContentDeferred/);
   assert.match(runtime, /element\.closest\("\.section,\.footer"\)/);
-  assert.match(runtime, /houseGuideTranslations:v5\.11\.23:/);
+  assert.match(runtime, /houseGuideTranslations:v5\.11\.24:/);
   assert.match(runtime, /MAX_REQUEST_RETRIES = 2/);
   assert.match(runtime, /let flushRunning = false/);
 });
@@ -4808,7 +4888,7 @@ test("failed Open Water protected delivery retries the same alert and succeeds o
     }), env, undefined, new Date(now.getTime() + 1000));
     const retriedBody = await retried.json();
     assert.equal(retriedBody.workflow.status, "submitted");
-    assert.match(retriedBody.answer, /sent your request to our booking team/i);
+    assert.match(retriedBody.answer, /diving request has been sent to our booking team/i);
     assert.equal(store.alerts.filter((item) => item.alertType === "booking_request").length, 1);
     assert.equal(store.alerts.length, 2);
     assert.equal(outbound.length, 9);
@@ -4824,6 +4904,435 @@ test("failed Open Water protected delivery retries the same alert and succeeds o
     assert.equal(store.alerts.filter((item) => item.alertType === "booking_request").length, 1);
     assert.equal(store.alerts.length, 2);
     assert.equal(outbound.length, 9);
+  } finally {
+    globalThis.fetch = originalFetch;
+    console.error = originalError;
+  }
+});
+
+test("every natural explicit retry phrase reuses one failed alert before generic or model routing", async () => {
+  const now = new Date("2026-08-28T03:00:00.000Z");
+  const sessionId = "session_retry_phrase_variants_12345";
+  const { env, store } = createEnvironment({
+    OPENAI_API_KEY: "must-not-run-for-deterministic-retry",
+    WHATSAPP_ACCESS_TOKEN: "meta-test-token",
+    WHATSAPP_PHONE_NUMBER_ID: "1234567890",
+    WHATSAPP_WEBHOOK_VERIFY_TOKEN: "verify-test",
+    META_APP_SECRET: "app-secret-test",
+    WHATSAPP_ALERT_RECIPIENTS: JSON.stringify({
+      booking: [{ label: "Fah", phone: "+66 96 000 0001" }],
+      emergency: [
+        { label: "Owner 1", phone: "+66 81 000 0002" },
+        { label: "Owner 2", phone: "+66 82 000 0003" }
+      ]
+    })
+  });
+  const originalFetch = globalThis.fetch;
+  const originalError = console.error;
+  const outbound = [];
+  console.error = () => {};
+  globalThis.fetch = async (url, options) => {
+    assert.match(String(url), /graph\.facebook\.com/);
+    outbound.push(JSON.parse(options.body));
+    return new Response(JSON.stringify({ error: { code: 131026, message: "Simulated delivery rejection" } }), {
+      status: 400,
+      headers: { "content-type": "application/json" }
+    });
+  };
+  try {
+    const { failedBody } = await createFailedOpenWaterBooking(env, now, { sessionId });
+    const alertId = failedBody.workflow.retryAlertId;
+    const phrases = [
+      "try my diving booking again",
+      "retry my diving booking",
+      "retry my booking",
+      "send my booking again",
+      "try sending it again",
+      "retry",
+      "try again"
+    ];
+    let workflow = failedBody.workflow;
+    for (const [index, phrase] of phrases.entries()) {
+      const response = await handleConciergeRequest(guestRequest(phrase, {
+        sessionId,
+        workflowState: workflow,
+        privateReplyContact: "+66 81 234 5678",
+        history: [
+          { role: "user", content: "There was a medical problem yesterday" },
+          { role: "assistant", content: "Call Koh Tao Rescue or 1669" }
+        ]
+      }), env, undefined, new Date(now.getTime() + 500 + index));
+      const body = await response.json();
+      assert.equal(body.workflow.status, "delivery_failed", phrase);
+      assert.equal(body.workflow.retryAlertId, alertId, phrase);
+      assert.match(body.answer, /still couldn.t send your diving request/i, phrase);
+      assert.doesNotMatch(body.answer, /preferred date|how many divers|certification|1669|Rescue|medical/i, phrase);
+      workflow = body.workflow;
+    }
+    assert.equal(store.alerts.length, 1);
+    assert.equal(store.alerts[0].id, alertId);
+    assert.equal(store.alertDeliveries.filter((item) => item.stage === "retry").length, phrases.length * 3);
+    assert.equal(outbound.length, (phrases.length + 1) * 3);
+  } finally {
+    globalThis.fetch = originalFetch;
+    console.error = originalError;
+  }
+});
+
+test("generic try-again wording is not hijacked when no failed booking exists", async () => {
+  const { env, store } = createEnvironment({ OPENAI_API_KEY: "" });
+  const response = await handleConciergeRequest(
+    guestRequest("try again", { sessionId: "session_no_failed_booking_retry_12345" }),
+    env,
+    undefined,
+    new Date("2026-08-28T03:00:00.000Z")
+  );
+  const body = await response.json();
+  assert.notEqual(body.source, "booking-retry-policy");
+  assert.equal(store.alerts.length, 0);
+});
+
+test("a reload preserves safe failed-booking fields, recollects only contact and retries the same alert once", async () => {
+  const now = new Date("2026-08-28T03:00:00.000Z");
+  const sessionId = "session_retry_reload_privacy_12345";
+  const { env, store } = createEnvironment({
+    OPENAI_API_KEY: "",
+    WHATSAPP_ACCESS_TOKEN: "meta-test-token",
+    WHATSAPP_PHONE_NUMBER_ID: "1234567890",
+    WHATSAPP_WEBHOOK_VERIFY_TOKEN: "verify-test",
+    META_APP_SECRET: "app-secret-test",
+    WHATSAPP_ALERT_RECIPIENTS: JSON.stringify({
+      booking: [{ label: "Fah", phone: "+66 96 000 0001" }],
+      emergency: [
+        { label: "Owner 1", phone: "+66 81 000 0002" },
+        { label: "Owner 2", phone: "+66 82 000 0003" }
+      ]
+    })
+  });
+  const originalFetch = globalThis.fetch;
+  const originalError = console.error;
+  let acceptDelivery = false;
+  let sends = 0;
+  console.error = () => {};
+  globalThis.fetch = async () => {
+    sends += 1;
+    return acceptDelivery
+      ? new Response(JSON.stringify({ messages: [{ id: `wamid.reload-retry-${sends}` }] }), { status: 200 })
+      : new Response(JSON.stringify({ error: { code: 131026, message: "Simulated delivery rejection" } }), { status: 400 });
+  };
+  try {
+    const { failedBody } = await createFailedOpenWaterBooking(env, now, { sessionId });
+    const alertId = failedBody.workflow.retryAlertId;
+    assert.equal(sends, 3);
+    assert.equal(store.bookingRetrySnapshots.length, 1);
+    assert.equal("privateReplyContact" in store.bookingRetrySnapshots[0], false);
+
+    const afterReload = await handleConciergeRequest(guestRequest("try my diving booking again", {
+      sessionId,
+      workflowState: null,
+      privateReplyContact: ""
+    }), env, undefined, new Date(now.getTime() + 500));
+    const reloadBody = await afterReload.json();
+    assert.deepEqual(reloadBody.workflow.missing, ["contact"]);
+    assert.equal(reloadBody.workflow.retryAlertId, alertId);
+    assert.equal(reloadBody.workflow.bookingRequest.preferredDate, "29 Aug 2026");
+    assert.equal(reloadBody.workflow.bookingRequest.guestCount, "4");
+    assert.equal(reloadBody.workflow.bookingRequest.option, "Open Water Course");
+    assert.equal(reloadBody.workflow.bookingRequest.certificationLevel, "");
+    assert.match(reloadBody.answer, /still have your diving request details.*privacy.*phone number again/i);
+    assert.doesNotMatch(reloadBody.answer, /what date|how many|which diving option|certification level/i);
+    assert.equal(sends, 3);
+
+    const local = await handleConciergeRequest(guestRequest("081 234 5678", {
+      sessionId,
+      workflowState: reloadBody.workflow
+    }), env, undefined, new Date(now.getTime() + 600));
+    const localBody = await local.json();
+    assert.deepEqual(localBody.workflow.missing, ["contact"]);
+    assert.equal(localBody.workflow.retryAlertId, alertId);
+    assert.equal(localBody.workflow.bookingRequest.option, "Open Water Course");
+    assert.match(localBody.answer, /local number.*country code.*\+66/i);
+    assert.equal(sends, 3);
+
+    acceptDelivery = true;
+    const corrected = await handleConciergeRequest(guestRequest("+66 81 234 5678", {
+      sessionId,
+      workflowState: localBody.workflow
+    }), env, undefined, new Date(now.getTime() + 700));
+    const correctedBody = await corrected.json();
+    assert.equal(correctedBody.workflow.status, "submitted");
+    assert.equal(correctedBody.workflow.retryAlertId, alertId);
+    assert.match(correctedBody.answer, /diving request has been sent to our booking team/i);
+    assert.equal(store.alerts.length, 1);
+    assert.equal(sends, 6);
+
+    const alreadySent = await handleConciergeRequest(guestRequest("retry my booking", {
+      sessionId,
+      workflowState: null,
+      privateReplyContact: ""
+    }), env, undefined, new Date(now.getTime() + 800));
+    const alreadySentBody = await alreadySent.json();
+    assert.match(alreadySentBody.answer, /already been sent.*haven.t sent a duplicate/i);
+    assert.equal(alreadySentBody.workflow.status, "submitted");
+    assert.equal(sends, 6);
+    assert.equal(store.alerts.length, 1);
+    assert.doesNotMatch(JSON.stringify({
+      interactions: store.interactions,
+      alerts: store.alerts,
+      snapshots: store.bookingRetrySnapshots,
+      diagnostics: store.whatsappDiagnostics
+    }), /081 234 5678|\+66 81 234 5678/);
+  } finally {
+    globalThis.fetch = originalFetch;
+    console.error = originalError;
+  }
+});
+
+test("failed booking state releases unrelated intents and an isolated explicit retry ignores stale history", async () => {
+  const now = new Date("2026-08-28T03:00:00.000Z");
+  const sessionId = "session_retry_context_isolation_12345";
+  const { env, store } = createEnvironment({
+    OPENAI_API_KEY: "must-not-run-for-these-deterministic-paths",
+    WHATSAPP_ACCESS_TOKEN: "meta-test-token",
+    WHATSAPP_PHONE_NUMBER_ID: "1234567890",
+    WHATSAPP_WEBHOOK_VERIFY_TOKEN: "verify-test",
+    META_APP_SECRET: "app-secret-test",
+    WHATSAPP_ALERT_RECIPIENTS: JSON.stringify({
+      booking: [{ label: "Fah", phone: "+66 96 000 0001" }],
+      support: [{ label: "Su", phone: "+66 64 000 0004" }],
+      emergency: [
+        { label: "Owner 1", phone: "+66 81 000 0002" },
+        { label: "Owner 2", phone: "+66 82 000 0003" }
+      ]
+    })
+  });
+  const originalFetch = globalThis.fetch;
+  const originalError = console.error;
+  const outbound = [];
+  let acceptBooking = false;
+  console.error = () => {};
+  globalThis.fetch = async (url, options) => {
+    assert.match(String(url), /graph\.facebook\.com/);
+    const payload = JSON.parse(options.body);
+    outbound.push(payload);
+    const booking = payload.template.name === "house_booking_alert_v2";
+    return booking && !acceptBooking
+      ? new Response(JSON.stringify({ error: { code: 131026, message: "Simulated booking rejection" } }), { status: 400 })
+      : new Response(JSON.stringify({ messages: [{ id: `wamid.context-${outbound.length}` }] }), { status: 200 });
+  };
+  try {
+    const { failedBody } = await createFailedOpenWaterBooking(env, now, { sessionId });
+    const unrelatedHistory = [
+      { role: "user", content: "Someone felt very sick yesterday" },
+      { role: "assistant", content: "Call Koh Tao Rescue or 1669 for a medical emergency" },
+      { role: "user", content: "I lost my key" },
+      { role: "assistant", content: "A lost-key fee applies" },
+      { role: "user", content: "There was a sewage smell" },
+      { role: "assistant", content: "The property team can inspect it" }
+    ];
+
+    const bar = await handleConciergeRequest(guestRequest("is there a good bar around", {
+      sessionId,
+      workflowState: failedBody.workflow,
+      privateReplyContact: "+66 81 234 5678",
+      history: unrelatedHistory
+    }), env, undefined, new Date(now.getTime() + 500));
+    const barBody = await bar.json();
+    assert.match(`${barBody.answer} ${JSON.stringify(barBody.actions)}`, /bar|Bamboo|night/i);
+    assert.doesNotMatch(barBody.answer, /booking request automatically|Rescue|1669|lost key|sewage/i);
+    assert.equal(outbound.filter((payload) => payload.template.name === "house_booking_alert_v2").length, 3);
+
+    const checkout = await handleConciergeRequest(guestRequest("What time is checkout?", {
+      sessionId,
+      workflowState: failedBody.workflow,
+      privateReplyContact: "+66 81 234 5678",
+      history: unrelatedHistory
+    }), env, undefined, new Date(now.getTime() + 600));
+    const checkoutBody = await checkout.json();
+    assert.match(checkoutBody.answer, /11:00|11 AM|11\.00/i);
+    assert.doesNotMatch(checkoutBody.answer, /booking request automatically|Rescue|1669/i);
+
+    const property = await handleConciergeRequest(guestRequest("My AC isn’t cold.", {
+      sessionId,
+      workflowState: failedBody.workflow,
+      privateReplyContact: "+66 81 234 5678",
+      history: unrelatedHistory
+    }), env, undefined, new Date(now.getTime() + 700));
+    const propertyBody = await property.json();
+    assert.equal(propertyBody.intentId, "property_issue_equipment");
+    assert.equal(propertyBody.workflow.type, "property_issue");
+    assert.equal(outbound.filter((payload) => payload.template.name === "house_booking_alert_v2").length, 3);
+
+    acceptBooking = true;
+    const retry = await handleConciergeRequest(guestRequest("try my diving booking again", {
+      sessionId,
+      workflowState: propertyBody.workflow,
+      privateReplyContact: "+66 81 234 5678",
+      history: unrelatedHistory
+    }), env, undefined, new Date(now.getTime() + 800));
+    const retryBody = await retry.json();
+    assert.equal(retryBody.workflow.status, "submitted");
+    assert.match(retryBody.answer, /diving request has been sent/i);
+    assert.doesNotMatch(retryBody.answer, /medical|Rescue|1669|lost key|sewage|\bAC\b/i);
+    assert.equal(store.alerts.filter((item) => item.alertType === "booking_request").length, 1);
+    assert.equal(outbound.filter((payload) => payload.template.name === "house_booking_alert_v2").length, 6);
+  } finally {
+    globalThis.fetch = originalFetch;
+    console.error = originalError;
+  }
+});
+
+test("booking retry snapshots are bound to the verified stay, room and protected browser session", async () => {
+  const now = new Date("2026-08-28T04:30:00.000Z");
+  const sessionId = "session_verified_retry_binding_12345";
+  const { env, store } = createEnvironment({
+    GUEST_ACCESS_ENFORCEMENT: "true",
+    OPENAI_API_KEY: "",
+    WHATSAPP_ACCESS_TOKEN: "meta-test-token",
+    WHATSAPP_PHONE_NUMBER_ID: "1234567890",
+    WHATSAPP_WEBHOOK_VERIFY_TOKEN: "verify-test",
+    META_APP_SECRET: "app-secret-test",
+    WHATSAPP_ALERT_RECIPIENTS: JSON.stringify({
+      booking: [{ label: "Fah", phone: "+66 96 000 0001" }],
+      emergency: [
+        { label: "Owner 1", phone: "+66 81 000 0002" },
+        { label: "Owner 2", phone: "+66 82 000 0003" }
+      ]
+    })
+  });
+  const room11Cookie = await syncAndVerifyStay(env, { room: "11", confirmationCode: "HMRETRY11", now });
+  await handleStayGuestRequest(new Request("https://guide.example/api/stay/nationality", {
+    method: "POST",
+    headers: { origin: "https://guide.example", cookie: room11Cookie, "content-type": "application/json" },
+    body: JSON.stringify({ nationality: "thai", allGuestsThai: true })
+  }), env, "/api/stay/nationality", null, new Date(now.getTime() + 10));
+  const requestFactory = (question, extra = {}) => verifiedConciergeRequest(question, room11Cookie, {
+    sessionId,
+    ...extra
+  });
+  const originalFetch = globalThis.fetch;
+  const originalError = console.error;
+  let acceptDelivery = false;
+  let sends = 0;
+  console.error = () => {};
+  globalThis.fetch = async () => {
+    sends += 1;
+    return acceptDelivery
+      ? new Response(JSON.stringify({ messages: [{ id: `wamid.verified-retry-${sends}` }] }), { status: 200 })
+      : new Response(JSON.stringify({ error: { code: 131026, message: "Simulated delivery rejection" } }), { status: 400 });
+  };
+  try {
+    const { failedBody } = await createFailedOpenWaterBooking(env, now, { sessionId, requestFactory });
+    assert.equal(sends, 3);
+
+    const otherBrowserSession = await handleConciergeRequest(verifiedConciergeRequest("retry my booking", room11Cookie, {
+      sessionId: "session_other_browser_123456",
+      privateReplyContact: "+66 81 234 5678"
+    }), env, undefined, new Date(now.getTime() + 500));
+    const otherBrowserBody = await otherBrowserSession.json();
+    assert.match(otherBrowserBody.answer, /couldn.t find a failed booking request in this protected session/i);
+    assert.equal(sends, 3);
+
+    const room10Cookie = await syncAndVerifyStay(env, {
+      room: "10",
+      confirmationCode: "HMRETRY10",
+      checkInDate: "2026-08-27",
+      checkOutDate: "2026-08-30",
+      now: new Date(now.getTime() + 600)
+    });
+    await handleStayGuestRequest(new Request("https://guide.example/api/stay/nationality", {
+      method: "POST",
+      headers: { origin: "https://guide.example", cookie: room10Cookie, "content-type": "application/json" },
+      body: JSON.stringify({ nationality: "thai", allGuestsThai: true })
+    }), env, "/api/stay/nationality", null, new Date(now.getTime() + 610));
+    const otherStay = await handleConciergeRequest(verifiedConciergeRequest("retry my booking", room10Cookie, {
+      room: "10",
+      sessionId,
+      privateReplyContact: "+66 81 234 5678"
+    }), env, undefined, new Date(now.getTime() + 700));
+    const otherStayBody = await otherStay.json();
+    assert.match(otherStayBody.answer, /couldn.t find a failed booking request in this protected session/i);
+    assert.equal(sends, 3);
+
+    acceptDelivery = true;
+    const correctContext = await handleConciergeRequest(verifiedConciergeRequest("retry my diving booking", room11Cookie, {
+      sessionId,
+      workflowState: failedBody.workflow,
+      privateReplyContact: "+66 81 234 5678"
+    }), env, undefined, new Date(now.getTime() + 800));
+    const correctBody = await correctContext.json();
+    assert.equal(correctBody.workflow.status, "submitted");
+    assert.equal(store.alerts.length, 1);
+    assert.equal(sends, 6);
+  } finally {
+    globalThis.fetch = originalFetch;
+    console.error = originalError;
+  }
+});
+
+test("generic retry asks one concise question when two failed booking categories are ambiguous", async () => {
+  const now = new Date("2026-08-28T03:00:00.000Z");
+  const sessionId = "session_retry_ambiguity_12345";
+  const { env, store } = createEnvironment({
+    OPENAI_API_KEY: "",
+    WHATSAPP_ACCESS_TOKEN: "meta-test-token",
+    WHATSAPP_PHONE_NUMBER_ID: "1234567890",
+    META_APP_SECRET: "app-secret-test",
+    WHATSAPP_ALERT_RECIPIENTS: JSON.stringify({
+      booking: [{ label: "Fah", phone: "+66 96 000 0001" }],
+      emergency: [
+        { label: "Owner 1", phone: "+66 81 000 0002" },
+        { label: "Owner 2", phone: "+66 82 000 0003" }
+      ]
+    })
+  });
+  const originalFetch = globalThis.fetch;
+  const originalError = console.error;
+  let sends = 0;
+  console.error = () => {};
+  globalThis.fetch = async () => {
+    sends += 1;
+    return new Response(JSON.stringify({ error: { code: 131026, message: "Simulated delivery rejection" } }), { status: 400 });
+  };
+  try {
+    await createFailedOpenWaterBooking(env, now, { sessionId });
+    const fishing = await handleConciergeRequest(guestRequest("I want to book sport fishing tomorrow for 2 people", {
+      sessionId
+    }), env, undefined, new Date(now.getTime() + 300));
+    const fishingBody = await fishing.json();
+    assert.deepEqual(fishingBody.workflow.missing, ["contact"]);
+    const failedFishing = await handleConciergeRequest(guestRequest("+66 81 234 5678", {
+      sessionId,
+      workflowState: fishingBody.workflow
+    }), env, undefined, new Date(now.getTime() + 400));
+    const failedFishingBody = await failedFishing.json();
+    assert.equal(failedFishingBody.workflow.status, "delivery_failed");
+    assert.equal(store.alerts.length, 2);
+    assert.equal(sends, 6);
+
+    const ambiguous = await handleConciergeRequest(guestRequest("retry", {
+      sessionId,
+      privateReplyContact: "+66 81 234 5678"
+    }), env, undefined, new Date(now.getTime() + 500));
+    const ambiguousBody = await ambiguous.json();
+    assert.match(ambiguousBody.answer, /retry your (?:diving request.*fishing(?: trip)? request|fishing(?: trip)? request.*diving request)/i);
+    assert.equal(ambiguousBody.actions.length, 2);
+    assert.deepEqual(new Set(ambiguousBody.actions.map((action) => action.prompt)), new Set([
+      "retry my diving booking",
+      "retry my fishing booking"
+    ]));
+    assert.doesNotMatch(ambiguousBody.answer, /preferred date|certification|phone number/i);
+    assert.equal(sends, 6);
+
+    const divingOnly = await handleConciergeRequest(guestRequest("retry my diving booking", {
+      sessionId,
+      privateReplyContact: "+66 81 234 5678"
+    }), env, undefined, new Date(now.getTime() + 600));
+    const divingOnlyBody = await divingOnly.json();
+    assert.equal(divingOnlyBody.workflow.kind, "diving");
+    assert.equal(divingOnlyBody.workflow.status, "delivery_failed");
+    assert.equal(store.alerts.length, 2);
+    assert.equal(sends, 9);
   } finally {
     globalThis.fetch = originalFetch;
     console.error = originalError;
@@ -4881,7 +5390,15 @@ test("active bookings acknowledge side questions, preserve one authoritative sta
     assert.equal(store.alerts.length, 0);
     assert.equal(outbound.length, 0);
 
-    const guests = await handleConciergeRequest(guestRequest("2", { workflowState: sideBody.workflow }), env, undefined, now);
+    const updatedProvider = await handleConciergeRequest(guestRequest("or with Master Divers would be even better", {
+      workflowState: sideBody.workflow
+    }), env, undefined, now);
+    const updatedProviderBody = await updatedProvider.json();
+    assert.equal(updatedProviderBody.workflow.bookingRequest.preferredProvider, "Master Divers");
+    assert.doesNotMatch(updatedProviderBody.answer, /Or With Master Divers/);
+    assert.equal(updatedProviderBody.workflow.missing[0], "guests");
+
+    const guests = await handleConciergeRequest(guestRequest("2", { workflowState: updatedProviderBody.workflow }), env, undefined, now);
     const guestsBody = await guests.json();
     const option = await handleConciergeRequest(guestRequest("Fun Diving", { workflowState: guestsBody.workflow }), env, undefined, now);
     const optionBody = await option.json();
@@ -4894,7 +5411,7 @@ test("active bookings acknowledge side questions, preserve one authoritative sta
     const submittedBody = await submitted.json();
     assert.equal(submittedBody.workflow.status, "submitted");
     assert.equal(store.alerts.length, 1);
-    assert.match(store.alerts[0].summary, /preferred dive school French Kiss Divers/i);
+    assert.match(store.alerts[0].summary, /preferred dive school Master Divers/i);
     assert.equal(outbound.length, 3);
   } finally {
     globalThis.fetch = originalFetch;
@@ -5699,6 +6216,7 @@ test("Durable Object SQLite schema initializes every operational table used by a
     "concierge_alerts",
     "concierge_alert_deliveries",
     "whatsapp_delivery_diagnostics",
+    "booking_retry_snapshots",
     "maintenance_reports",
     "stay_reservations",
     "stay_checkout_overrides",
@@ -5743,6 +6261,63 @@ test("Durable Object SQLite schema initializes every operational table used by a
   assert.equal(diagnosticOverview.deliveryDiagnostics[0].templateName, "house_service_alert_v3");
   assert.equal(diagnosticOverview.deliveryDiagnostics[0].componentSchema, "body(5)[1:text,2:text,3:text,4:text,5:text]");
   assert.equal(diagnosticOverview.deliveryDiagnostics[0].legacyDiagnostic, false);
+  const retryCreatedAt = new Date().toISOString();
+  const retryExpiresAt = new Date(Date.now() + 86_400_000).toISOString();
+  const retryAlertId = "alert_schema_booking_retry_123456789";
+  await store.createAlert({
+    id: retryAlertId,
+    interactionId: "int_schema_booking_retry",
+    dedupeKey: "schema-booking-retry-dedupe",
+    severity: "attention",
+    alertType: "booking_request",
+    recipientGroup: "booking_with_owners",
+    room: "11",
+    roomVerified: true,
+    summary: "Diving booking request",
+    bangkokTime: "28 Aug 2026, 10:00",
+    createdAt: retryCreatedAt,
+    escalationDueAt: ""
+  });
+  await store.recordAlertDelivery({
+    id: "delivery_schema_booking_retry",
+    alertId: retryAlertId,
+    stage: "initial",
+    recipientHash: "safe-recipient-hash",
+    recipientLabel: "Fah",
+    providerMessageId: "",
+    status: "failed",
+    errorCode: "132000",
+    createdAt: retryCreatedAt
+  });
+  assert.deepEqual(await store.upsertBookingRetrySnapshot({
+    alertId: retryAlertId,
+    bindingHash: "safe-binding-hash",
+    reservationId: "stay_schema_retry",
+    room: "11",
+    kind: "diving",
+    activity: "Diving",
+    preferredDate: "30 Aug 2026",
+    guestCount: "4",
+    option: "Open Water Course",
+    courseName: "",
+    certificationLevel: "",
+    preferredProvider: "Master Divers",
+    notes: "Private attempt +66 81 234 5678",
+    createdAt: retryCreatedAt,
+    updatedAt: retryCreatedAt,
+    expiresAt: retryExpiresAt
+  }), { ok: true, alertId: retryAlertId });
+  const retrySnapshots = await store.getBookingRetrySnapshots(
+    "safe-binding-hash",
+    "stay_schema_retry",
+    "11",
+    retryCreatedAt
+  );
+  assert.equal(retrySnapshots.length, 1);
+  assert.equal(retrySnapshots[0].deliveryAttempts, 1);
+  assert.equal(retrySnapshots[0].acceptedDeliveries, 0);
+  assert.equal(retrySnapshots[0].notes.includes("+66 81 234 5678"), false);
+  assert.equal((await store.getBookingAlertForRetry(retryAlertId)).id, retryAlertId);
   assert.deepEqual(await store.getDueAlertEscalations(new Date().toISOString()), []);
   const synced = await store.syncStayReservations({
     room: "2",
@@ -6521,6 +7096,76 @@ test("sanitized Meta diagnostics retain the real provider failure without parame
   }
 });
 
+test("owner booking alerts expose sanitized alert-bound Meta diagnostics with real attempt counts", async () => {
+  const now = new Date("2026-08-28T03:00:00.000Z");
+  const sessionId = "session_owner_booking_diagnostic_12345";
+  const rawContact = "+66 81 234 5678";
+  const accessToken = "EA_OWNER_DIAGNOSTIC_SECRET_123456789";
+  const { env } = createEnvironment({
+    OPENAI_API_KEY: "",
+    WHATSAPP_ACCESS_TOKEN: accessToken,
+    WHATSAPP_PHONE_NUMBER_ID: "1234567890",
+    WHATSAPP_WEBHOOK_VERIFY_TOKEN: "verify-test",
+    META_APP_SECRET: "owner-diagnostic-app-secret",
+    WHATSAPP_ALERT_RECIPIENTS: JSON.stringify({
+      booking: [{ label: "Fah", phone: "+66 96 000 0001" }],
+      emergency: [
+        { label: "Owner 1", phone: "+66 81 000 0002" },
+        { label: "Owner 2", phone: "+66 82 000 0003" }
+      ]
+    })
+  });
+  const originalFetch = globalThis.fetch;
+  const originalError = console.error;
+  console.error = () => {};
+  globalThis.fetch = async () => new Response(JSON.stringify({
+    error: {
+      message: `Booking template rejected for ${rawContact}; Bearer ${accessToken}`,
+      type: "OAuthException",
+      code: 132000,
+      error_subcode: 2494073,
+      error_data: { details: `BODY parameter containing ${rawContact} has the wrong count` },
+      fbtrace_id: "BOOKING_TRACE_SAFE_24"
+    }
+  }), { status: 400, headers: { "content-type": "application/json" } });
+  try {
+    const { failedBody } = await createFailedOpenWaterBooking(env, now, { sessionId });
+    const overview = await handleAdminRequest(new Request("https://guide.example/api/concierge/admin/overview", {
+      headers: { authorization: "Bearer admin_token_test_5500" }
+    }), env, "/api/concierge/admin/overview");
+    assert.equal(overview.status, 200);
+    const body = await overview.json();
+    const alert = body.alerts.find((item) => item.id === failedBody.workflow.retryAlertId);
+    assert.equal(alert.alertType, "booking_request");
+    assert.equal(alert.recipientGroup, "booking_with_owners");
+    assert.equal(alert.attempted, 3);
+    assert.equal(alert.delivered, 0);
+    assert.equal(alert.failed, 3);
+    const diagnostic = body.deliveryDiagnostics.find((item) => item.alertId === alert.id);
+    assert.equal(diagnostic.templateName, "house_booking_alert_v2");
+    assert.equal(diagnostic.languageCode, "en");
+    assert.equal(diagnostic.componentSchema, "body(6)[1:text,2:text,3:text,4:text,5:text,6:text]");
+    assert.equal(diagnostic.httpStatus, 400);
+    assert.equal(diagnostic.errorCode, "132000");
+    assert.equal(diagnostic.failureKind, "template_parameters");
+    assert.equal(diagnostic.traceId, "BOOKING_TRACE_SAFE_24");
+    const retained = JSON.stringify(body);
+    assert.doesNotMatch(retained, /66812345678|81 234 5678|66810000002|66820000003|66960000001/);
+    assert.doesNotMatch(retained, /EA_OWNER_DIAGNOSTIC_SECRET|owner-diagnostic-app-secret|Bearer/);
+
+    const adminScript = await readFile(new URL("../public/concierge-admin.js", import.meta.url), "utf8");
+    assert.match(adminScript, /diagnostics\.find\(\(diagnostic\) => diagnostic\.alertId === item\.id\)/);
+    assert.match(adminScript, /WhatsApp delivery failed/);
+    assert.match(adminScript, /Template: \$\{latestDiagnostic\.templateName\}/);
+    assert.match(adminScript, /Language: \$\{latestDiagnostic\.languageCode\}/);
+    assert.match(adminScript, /Attempted: \$\{item\.attempted \|\| 0\}/);
+    assert.match(adminScript, /Provider: Meta/);
+  } finally {
+    globalThis.fetch = originalFetch;
+    console.error = originalError;
+  }
+});
+
 test("Meta rejection and network failures stay sanitized while partial delivery is truthful", async () => {
   const recipients = JSON.stringify({
     support: [
@@ -6608,7 +7253,12 @@ test("failed service-v3 delivery never produces a misleading guest success", asy
     headers: { "content-type": "application/json" }
   });
   try {
-    const response = await handleConciergeRequest(guestRequest("I need fresh towels"), env);
+    const response = await handleConciergeRequest(
+      guestRequest("I need fresh towels"),
+      env,
+      undefined,
+      new Date("2026-08-28T09:00:00.000Z")
+    );
     const body = await response.json();
     assert.match(body.answer, /couldn’t send that request automatically/i);
     assert.doesNotMatch(body.answer, /team has been notified|sent to The House team/i);

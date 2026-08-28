@@ -548,6 +548,15 @@
     return { ...engine.answer(question), source: "device-fallback", interactionId: null };
   }
 
+  function isExplicitBookingRetry(question) {
+    const source = String(question || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+    if (["retry", "try again", "try it again", "try sending it again"].includes(source)) return true;
+    const prefix = "(?:(?:can|could|would) you (?:please )?|please )?";
+    const activity = "(?:diving|fishing(?: trip)?|snorkeling(?: trip)?|taxi|ferry(?: tickets?)?|motorbike(?: taxi)?|taxi boat)";
+    const target = `(?:it|(?:(?:my|the) )?(?:${activity} )?(?:booking|request))`;
+    return new RegExp(`^${prefix}(?:retry(?: ${target})?|(?:try|send|resend)(?: sending)? ${target} again)$`, "i").test(source);
+  }
+
   function requiresProtectedServer(question) {
     if (activeWorkflowState) return true;
     const source = String(question || "");
@@ -561,7 +570,8 @@
       || /\b(?:bathroom|toilet|shower|drain|sink|tap|faucet|pipe|ac|air con|air conditioner|fan|fridge|refrigerator|tv|light|socket|outlet|wifi|internet|bed|chair|desk|curtain|door|window|lock|furniture)\b.{0,65}\b(?:smells?|stinks?|leak|leaking|drip|dripping|blocked|clogged|overflowing|not cold|isn t cold|not working|doesn t work|isn t working|broken|damaged|stuck|loose|no hot water|no water|low water pressure)\b/.test(normalized)
       || /\b(?:burning smell|smell(?:s|ing)? (?:like )?burning|smoke (?:is )?(?:coming )?from|water (?:is )?pouring|ceiling (?:is )?(?:falling down|collapsing|caving in)|snake)\b/.test(normalized)
     );
-    return /(?:\+|00)?\d[\d ()-]{6,20}\d/.test(source)
+    return isExplicitBookingRetry(source)
+      || /(?:\+|00)?\d[\d ()-]{6,20}\d/.test(source)
       || impliedLuggageRequest
       || /\b(?:luggage|baggage|store\s+(?:my|our)?\s*bags?|room\s+cleaning|clean\s+(?:my|our|the)\s+room)\b/i.test(source)
       || /\b(?:my|our|the)\s+room\s+(?:(?:is|feels|looks|seems)\s+(?:(?:really|very|quite|so)\s+)?(?:dirty|messy|unclean)|needs?\s+(?:a\s+)?clean(?:ing)?)\b/i.test(source)

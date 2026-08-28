@@ -1,4 +1,4 @@
-# Guest Guide Platform with AI Concierge — The House v5.11.23
+# Guest Guide Platform with AI Concierge — The House v5.11.24
 
 The House – Koh Tao guest guide is a production-oriented, mobile-first digital guest guide and concierge platform. It combines property information, curated island guidance, structured place and activity data, and centralized contact and booking routes.
 
@@ -18,6 +18,16 @@ The House – Koh Tao guest guide is a production-oriented, mobile-first digital
 
 The Activities module contains 49 structured profiles covering diving, freediving, snorkelling, boat trips, beach experiences, kayaking, paddleboarding, hiking, viewpoints, climbing, yoga, Muay Thai, massage, cooking, wildlife, photography, night activities and rainy-day options.
 
+## v5.11.24 release focus
+
+- Moves explicit booking retry ahead of approved-knowledge retrieval, broad history and model routing, so retry commands cannot become a new checklist or inherit stale medical, property, lost-key, cleaning or luggage context.
+- Stores a durable, contact-free retry snapshot bound to the verified reservation, room and protected browser session. A retry reuses the exact alert ID; it cannot cross to another stay or room and it never resends an alert that already has an accepted delivery.
+- Keeps completed safe booking fields across a reload. If the transient contact is gone, the Concierge asks only for an international WhatsApp/phone number, then retries the same alert without recollecting date, guest count, product/course, relevant certification, provider or sanitized notes.
+- Keeps unrelated bar, check-out and property questions in ordinary Concierge routing after a delivery failure. A retry happens only after an explicit retry command.
+- Adds owner-visible alert-bound WhatsApp diagnostics with the real sanitized template, language, route, attempted/accepted totals, HTTP/provider classification and Bangkok time. The established `house_booking_alert_v2`, `en`, six-BODY-parameter mapping remains unchanged because source inspection found no deterministic payload mismatch; the next production rejection will expose the actual Meta response safely.
+- Normalizes conversational provider wording such as **or with Master Divers would be even better** to **Master Divers** without promising availability.
+- Preserves every passed v5.11.23 booking, property, cleaning, urgent-console and 24/7 lost-key safeguard. Staff quick actions remain disabled; public visual polish is deferred to v5.11.25.
+
 ## v5.11.23 release focus
 
 - Keeps active structured bookings conversational: side questions and preferences are acknowledged, stored as protected notes and returned to the same next missing field without promising third-party availability or creating an early alert.
@@ -27,7 +37,7 @@ The Activities module contains 49 structured profiles covering diving, freedivin
 - Isolates routine property detail buffers and deduplication by category and issue content, preventing rat, sewage, AC and later pest reports from contaminating one another while retaining genuine same-issue follow-ups.
 - Prevents unresolved urgent owner-console sections from being hidden by manual, keyboard or **Collapse all** actions.
 - Adds truthful protected reset modes for a controlled owner-only test that retains the current code and a real physical-code rotation. Both create distinguishable code-free audit entries and never revive a historical lost-key request.
-- Preserves the passed v5.11.22 cleaning, property classification, 24/7 lost-key release and Meta routing behavior. Staff quick actions remain disabled; public visual polish is deferred to v5.11.24.
+- Preserves the passed v5.11.22 cleaning, property classification, 24/7 lost-key release and Meta routing behavior. Staff quick actions remain disabled. The planned visual milestone was subsequently moved to v5.11.25 after the narrow v5.11.24 production correction.
 
 ## v5.11.22 release focus
 

@@ -102,6 +102,7 @@ tr:last-child td{border-bottom:0}
 .concierge-admin-alert.is-critical{border-left-color:#b52f2b;background:#fff5f3}
 .concierge-admin-alert.is-urgent{border-left-color:#d06c24;background:#fff8ef}
 .concierge-admin-alert-summary{margin:8px 0;color:var(--admin-ink);font-weight:700;line-height:1.45}
+.concierge-admin-delivery-failure{margin-top:12px;padding:12px;border:1px solid #e4bd86;border-radius:12px;background:#fff8ed}.concierge-admin-delivery-failure h4{margin:0 0 6px;color:#7c4614;font-size:14px}.concierge-admin-delivery-failure .concierge-admin-source-note{margin-top:6px!important;padding-top:0;border-top:0}
 .concierge-admin-alert-time,.concierge-admin-alert-escalation{display:block;color:var(--admin-muted);font-size:12px;line-height:1.45}
 .concierge-admin-alert-escalation{margin-top:4px;color:var(--admin-danger);font-weight:800}
 @media(max-width:760px){

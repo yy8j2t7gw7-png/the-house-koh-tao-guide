@@ -1,4 +1,4 @@
-# Guest Guide Platform with AI Concierge — The House v5.11.21
+# Guest Guide Platform with AI Concierge — The House v5.11.22
 
 The House – Koh Tao guest guide is a production-oriented, mobile-first digital guest guide and concierge platform. It combines property information, curated island guidance, structured place and activity data, and centralized contact and booking routes.
 
@@ -17,6 +17,16 @@ The House – Koh Tao guest guide is a production-oriented, mobile-first digital
 - Model-powered, room-aware AI Concierge with controlled learning
 
 The Activities module contains 49 structured profiles covering diving, freediving, snorkelling, boat trips, beach experiences, kayaking, paddleboarding, hiking, viewpoints, climbing, yoga, Muay Thai, massage, cooking, wildlife, photography, night activities and rainy-day options.
+
+## v5.11.22 release focus
+
+- Replaces multi-field booking forms with one-question-at-a-time, category-specific Concierge collection for diving, fishing, snorkeling, taxi, taxi boat, ferry and motorbike taxi requests. Supplied details are preserved, finite choices use buttons and the international reply contact is collected last.
+- Adds deterministic property intelligence for pests/animals, odors, plumbing, equipment, fixtures, mold/damp and room condition. Routine reports create one Su-plus-owner service alert; ambiguous odors receive one clarification; dirty-room reports stay in the cleaning workflow; serious property hazards still require deliberate urgent-alert confirmation.
+- Makes the protected lost-key self-service flow available 24/7. Every request starts with fresh, request-bound `feeAccepted=false` state, requires explicit 500 THB acceptance and an accepted Su-plus-owner notification, displays the code only on the protected guest page and immediately engages the physical-code rotation lock.
+- Makes the owner console sections independently collapsible, remembers authorized-browser preferences, keeps unresolved urgent work open and visible, and adds clear counts and rotation-required status without changing protected data APIs.
+- Preserves all production Meta mappings, secrets, recipients, webhook behavior, emergency routing, passport retention and Airbnb synchronization. Staff quick actions remain disabled and the only valid future service-action template remains `house_service_alert_actions_v2`.
+
+The v5.11.22 24/7 lost-key rule supersedes time-window behavior described in the historical release summaries below.
 
 ## v5.11.21 release focus
 
@@ -386,17 +396,17 @@ Major water leaks, flooding, burst pipes, dangerous electrical problems and seri
 
 No dedicated on-call person or number has been confirmed yet. The role therefore remains disabled and temporarily falls back to House support without publicly claiming 24/7 availability.
 
-## Verified stays and after-hours spare keys
+## Verified stays and 24/7 spare keys
 
-After hours are 19:30–10:30 in the `Asia/Bangkok` time zone. Each room will have one spare-key box next to its door, and a lost key adds a 500 THB replacement fee.
+Secure self-service lost-key recovery is available at every time of day. Housekeeping and office schedules do not limit this protected operation. Each room has one spare-key box next to its door, and a lost key adds a 500 THB replacement fee. During normal service hours the guest may additionally be offered a **Call Us** fallback, but staff assistance is never a prerequisite for the secure flow.
 
 Each active room uses one permanent page. An Airbnb guest enters the HM confirmation code from the trip details; a walk-in or direct guest enters the private House stay code supplied by the owner. The Worker compares only the HMAC hash with the protected reservation for that room and stay period. The secure browser session expires at checkout.
 
 The owner console separates active and upcoming stays. An active stay may be extended to a later checkout date while preserving the current verified session within its security limit. For a walk-in or direct reservation, **Create direct stay** records the room and dates and shows the readable House stay code only once. Copy the generated room link and code to the guest; the database stores only the hash. **Add missing reservation** remains a fallback for an Airbnb booking that did not synchronize automatically.
 
-Key-box codes are deliberately absent from this repository and release archive. Put them only in the encrypted `SPARE_KEY_CODES` Worker secret. Automatic release activates only when the production official WhatsApp alert channel has at least one protected urgent recipient. The Worker sends the owner/Su notification automatically and waits for the WhatsApp API to confirm submission, records the event, shows the code only to the verified guest and then blocks another release until staff rotate the physical code. The guest does not approve the notification; the guest confirms only the 500 THB lost-key fee.
+Key-box codes are deliberately absent from this repository and release archive. Put them only in the encrypted `SPARE_KEY_CODES` Worker secret. Each new lost-key request is bound to the current verified active stay, room and protected session and begins with no accepted fee. Only explicit acceptance for that request permits the Worker to send the protected Su-and-owner notification. At least one recipient delivery must be accepted before the code can appear on the protected guest page. The request is single-use, and display immediately blocks another release until staff physically rotate the code, update the encrypted secret, redeploy and complete the authorized rotation reset. The guest does not approve the notification; the guest confirms only the 500 THB lost-key fee.
 
-See `SECURE_AFTER_HOURS_ACCESS.md` and `AIRBNB_AUTOMATION_SETUP.md`.
+See `SECURE_24_HOUR_LOST_KEY_ACCESS.md` and `AIRBNB_AUTOMATION_SETUP.md`.
 
 ## Secure passport information
 
@@ -477,6 +487,7 @@ Transport still requires an authoritative Transport Deep Research document. See 
 - `WORK_HANDOVER_PROMPT.md`
 - `TRANSPORT_RESEARCH_REQUIREMENTS.md`
 - `CONCIERGE_KNOWLEDGE_GUIDE.md`
-- `SECURE_AFTER_HOURS_ACCESS.md`
+- `SECURE_24_HOUR_LOST_KEY_ACCESS.md`
+- `SECURE_AFTER_HOURS_ACCESS.md` (compatibility pointer)
 - `AI_CONCIERGE_OPERATIONS.md`
 - `PASSPORT_DATA_OPERATIONS.md`

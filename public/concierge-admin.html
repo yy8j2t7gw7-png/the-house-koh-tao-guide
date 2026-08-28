@@ -38,6 +38,8 @@
           <span>Approvals take effect immediately. The concierge never approves its own facts.</span>
         </div>
         <div class="concierge-admin-toolbar-actions">
+          <button type="button" class="secondary" id="expandAdminSections">Expand all</button>
+          <button type="button" class="secondary" id="collapseAdminSections">Collapse all</button>
           <button type="button" class="secondary" id="exportKnowledge">Export approved answers</button>
           <button type="button" class="secondary" id="adminLogout">Lock</button>
         </div>
@@ -45,13 +47,14 @@
 
       <section class="concierge-admin-stats" id="adminStats" aria-label="Concierge statistics"></section>
 
-      <section class="concierge-admin-section">
-        <div class="concierge-admin-section-head">
+      <details class="concierge-admin-section" data-admin-section="stays" open>
+        <summary class="concierge-admin-section-head">
           <div>
             <p class="concierge-admin-kicker">Verified guest access</p>
             <h2>Guest stays & spare-key safety</h2>
           </div>
-        </div>
+          <span class="concierge-admin-section-summary"><span class="concierge-admin-section-count" data-section-count>0</span><span data-section-state>Expanded</span><span class="concierge-admin-section-chevron" aria-hidden="true"></span></span>
+        </summary>
         <p>The automatic Gmail and Airbnb iCal sync supplies confirmation codes and stay dates. Codes are hashed immediately and never shown here. Use the manual form only when an Airbnb reservation is missing because it has not synchronized.</p>
         <form id="manualStayForm" class="concierge-admin-registration-form">
           <div class="concierge-admin-field"><label for="manualStayRoom">Room</label><select id="manualStayRoom" required><option value="">Select room</option><option value="1">Room 1</option><option value="2">Room 2</option><option value="3">Room 3</option><option value="4">Room 4</option><option value="5">Room 5</option><option value="6">Room 6</option><option value="8">Room 8</option><option value="9">Room 9</option><option value="10">Room 10</option><option value="11">Room 11</option></select></div>
@@ -83,43 +86,45 @@
           <div><h3>Upcoming stays</h3><div id="upcomingStayReservations" class="concierge-admin-queue"></div></div>
         </div>
         <div class="concierge-admin-operations-block"><h3>Key-box codes requiring rotation</h3><div id="keyRotations" class="concierge-admin-queue"></div></div>
-      </section>
+      </details>
 
-      <section class="concierge-admin-section">
-        <div class="concierge-admin-section-head">
+      <details class="concierge-admin-section" data-admin-section="alerts" open>
+        <summary class="concierge-admin-section-head">
           <div>
             <p class="concierge-admin-kicker">Guest requests needing action</p>
             <h2>Concierge requests &amp; operational alerts</h2>
           </div>
-          <span id="whatsappAlertStatus" class="concierge-admin-config-status"></span>
-        </div>
-        <p>Critical incidents, after-hours lost keys and actionable guest requests are routed to the configured WhatsApp groups. Room numbers shown here come from the guest’s private room link or selection and must be confirmed before protected access is given.</p>
+          <span class="concierge-admin-section-summary"><span id="whatsappAlertStatus" class="concierge-admin-config-status"></span><span class="concierge-admin-section-count" data-section-count>0</span><span data-section-state>Expanded</span><span class="concierge-admin-section-chevron" aria-hidden="true"></span></span>
+        </summary>
+        <p>Critical incidents, verified lost-key releases and actionable guest requests are routed to the configured WhatsApp groups. Room numbers shown here come from the guest’s private room link or selection and must be confirmed before protected access is given.</p>
         <div id="conciergeAlerts" class="concierge-admin-queue"></div>
         <div class="concierge-admin-operations-block">
           <h3>WhatsApp delivery diagnostics</h3>
           <p>Failed submissions only. This view contains the template request shape and Meta’s sanitized response, never recipients, message values, contacts, tokens or protected guest data.</p>
           <div id="whatsappDeliveryDiagnostics" class="concierge-admin-queue"></div>
         </div>
-      </section>
+      </details>
 
-      <section class="concierge-admin-section">
-        <div class="concierge-admin-section-head">
+      <details class="concierge-admin-section" data-admin-section="maintenance">
+        <summary class="concierge-admin-section-head">
           <div>
             <p class="concierge-admin-kicker">Verified room reports</p>
             <h2>Guest maintenance reports &amp; private photos</h2>
           </div>
-        </div>
+          <span class="concierge-admin-section-summary"><span class="concierge-admin-section-count" data-section-count>0</span><span data-section-state>Collapsed</span><span class="concierge-admin-section-chevron" aria-hidden="true"></span></span>
+        </summary>
         <p>Reports below come from a verified, registered stay. Routine issues route to Su and both owners. Serious water, electrical, overflow or room-security reports route immediately to both owners and Fah. Photos are private and automatically deleted within 30 days or sooner after resolution.</p>
         <div id="maintenanceReports" class="concierge-admin-queue"></div>
-      </section>
+      </details>
 
-      <section class="concierge-admin-section">
-        <div class="concierge-admin-section-head">
+      <details class="concierge-admin-section" data-admin-section="passports">
+        <summary class="concierge-admin-section-head">
           <div>
             <p class="concierge-admin-kicker">Required guest registration</p>
             <h2>Passport requests & reminders</h2>
           </div>
-        </div>
+          <span class="concierge-admin-section-summary"><span class="concierge-admin-section-count" data-section-count>0</span><span data-section-state>Collapsed</span><span class="concierge-admin-section-chevron" aria-hidden="true"></span></span>
+        </summary>
         <p>Verified guests create their own one-time passport form from the permanent Room page, so routine owner-created links are no longer required. The form below remains only as an operational fallback. Thai nationals do not need TM30 passport registration.</p>
         <form id="passportLinkForm" class="concierge-admin-registration-form">
           <div class="concierge-admin-field">
@@ -171,37 +176,40 @@
         </div>
         <p class="concierge-admin-source-note"><strong>Downloaded copies are outside automatic deletion.</strong> Remove the local file from the device as soon as the registration work is complete, then use “Delete now” to remove the stored copy.</p>
         <p class="concierge-admin-source-note">The current approved House information supports secure passport-photo collection. The alternative manual TM30 details form remains disabled until the exact authoritative field list is supplied.</p>
-      </section>
+      </details>
 
-      <section class="concierge-admin-section">
-        <div class="concierge-admin-section-head">
+      <details class="concierge-admin-section" data-admin-section="learning">
+        <summary class="concierge-admin-section-head">
           <div>
             <p class="concierge-admin-kicker">Needs attention</p>
             <h2>Learning queue</h2>
           </div>
-          <button type="button" class="secondary" id="refreshAdmin">Refresh</button>
-        </div>
+          <span class="concierge-admin-section-summary"><span class="concierge-admin-section-count" data-section-count>0</span><span data-section-state>Collapsed</span><span class="concierge-admin-section-chevron" aria-hidden="true"></span></span>
+        </summary>
+        <div class="concierge-admin-section-actions"><button type="button" class="secondary" id="refreshAdmin">Refresh learning queue</button></div>
         <p>Each item comes from an unanswered question or negative guest rating. Check the facts, edit the answer, then approve or reject it.</p>
         <div id="learningQueue" class="concierge-admin-queue"></div>
-      </section>
+      </details>
 
-      <section class="concierge-admin-section">
-        <div class="concierge-admin-section-head">
+      <details class="concierge-admin-section" data-admin-section="approved">
+        <summary class="concierge-admin-section-head">
           <div>
             <p class="concierge-admin-kicker">Live knowledge</p>
             <h2>Owner-approved answers</h2>
           </div>
-        </div>
+          <span class="concierge-admin-section-summary"><span class="concierge-admin-section-count" data-section-count>0</span><span data-section-state>Collapsed</span><span class="concierge-admin-section-chevron" aria-hidden="true"></span></span>
+        </summary>
         <div id="approvedKnowledge" class="concierge-admin-approved"></div>
-      </section>
+      </details>
 
-      <section class="concierge-admin-section">
-        <div class="concierge-admin-section-head">
+      <details class="concierge-admin-section" data-admin-section="recent">
+        <summary class="concierge-admin-section-head">
           <div>
             <p class="concierge-admin-kicker">Quality review</p>
             <h2>Recent questions</h2>
           </div>
-        </div>
+          <span class="concierge-admin-section-summary"><span class="concierge-admin-section-count" data-section-count>0</span><span data-section-state>Collapsed</span><span class="concierge-admin-section-chevron" aria-hidden="true"></span></span>
+        </summary>
         <p>Guest text is sanitized before storage and interaction records are retained for no more than 30 days.</p>
         <div class="concierge-admin-table-wrap">
           <table>
@@ -209,7 +217,7 @@
             <tbody id="recentQuestions"></tbody>
           </table>
         </div>
-      </section>
+      </details>
     </div>
   </main>
   <footer class="footer">

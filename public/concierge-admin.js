@@ -25,7 +25,96 @@
   const directStayResult = document.getElementById("directStayResult");
   const directStayCodeResult = document.getElementById("directStayCodeResult");
   const directStayUrlResult = document.getElementById("directStayUrlResult");
+  const expandAdminSections = document.getElementById("expandAdminSections");
+  const collapseAdminSections = document.getElementById("collapseAdminSections");
+  const adminSections = [...document.querySelectorAll("details[data-admin-section]")];
+  const sectionStateKey = "houseConciergeAdminSections:v5.11.22";
   let token = "";
+
+  function savedAdminSectionState() {
+    try {
+      const parsed = JSON.parse(window.localStorage.getItem(sectionStateKey) || "{}");
+      return parsed && typeof parsed === "object" ? parsed : {};
+    } catch (_error) {
+      return {};
+    }
+  }
+
+  function persistAdminSectionState() {
+    try {
+      window.localStorage.setItem(sectionStateKey, JSON.stringify(Object.fromEntries(
+        adminSections.map((section) => [section.dataset.adminSection, section.open])
+      )));
+    } catch (_error) {
+      // Section controls remain fully usable when storage is unavailable.
+    }
+  }
+
+  function syncAdminSectionState(section) {
+    const summary = section.querySelector(":scope > summary");
+    summary?.setAttribute("aria-expanded", String(section.open));
+    const state = summary?.querySelector("[data-section-state]");
+    if (state) state.textContent = section.open ? "Expanded" : "Collapsed";
+  }
+
+  function setAdminSectionOpen(section, open, persist = true) {
+    section.open = Boolean(open);
+    syncAdminSectionState(section);
+    if (persist) persistAdminSectionState();
+  }
+
+  function initializeAdminSections() {
+    const saved = savedAdminSectionState();
+    adminSections.forEach((section) => {
+      const id = section.dataset.adminSection;
+      if (typeof saved[id] === "boolean") section.open = saved[id];
+      syncAdminSectionState(section);
+      section.addEventListener("toggle", () => {
+        syncAdminSectionState(section);
+        persistAdminSectionState();
+      });
+    });
+  }
+
+  function setAdminSectionCount(id, count) {
+    const section = adminSections.find((item) => item.dataset.adminSection === id);
+    const target = section?.querySelector("[data-section-count]");
+    if (target) {
+      target.textContent = String(Number(count) || 0);
+      target.setAttribute("aria-label", `${Number(count) || 0} item${Number(count) === 1 ? "" : "s"}`);
+    }
+  }
+
+  function markUrgentAdminSection(id, urgent) {
+    const section = adminSections.find((item) => item.dataset.adminSection === id);
+    if (!section) return;
+    section.classList.toggle("has-urgent", urgent);
+    const summaryGroup = section.querySelector(".concierge-admin-section-summary");
+    let badge = summaryGroup?.querySelector("[data-section-urgent]");
+    if (urgent && !badge) {
+      badge = element("span", "concierge-admin-section-urgent", "Urgent");
+      badge.dataset.sectionUrgent = "";
+      summaryGroup?.prepend(badge);
+    } else if (!urgent) {
+      badge?.remove();
+    }
+    if (urgent) setAdminSectionOpen(section, true, false);
+  }
+
+  function updateAdminSectionSummaries(data) {
+    const stayOperations = data.stayOperations || {};
+    setAdminSectionCount("stays", (stayOperations.reservations || []).length + (stayOperations.rotations || []).length);
+    setAdminSectionCount("alerts", (data.alerts || []).length);
+    setAdminSectionCount("maintenance", (data.maintenanceReports || []).length);
+    setAdminSectionCount("passports", (data.pendingRegistrations || []).length + (data.passportUploads || []).length);
+    setAdminSectionCount("learning", (data.queue || []).length);
+    setAdminSectionCount("approved", (data.approved || []).length);
+    setAdminSectionCount("recent", (data.recent || []).length);
+    markUrgentAdminSection("alerts", (data.alerts || []).some((item) => ["critical", "urgent"].includes(item.severity) && item.status !== "resolved"));
+    markUrgentAdminSection("maintenance", (data.maintenanceReports || []).some((item) => ["critical", "urgent"].includes(item.severity) && item.status !== "resolved"));
+  }
+
+  initializeAdminSections();
 
   const categories = [
     "arrival", "booking", "concierge", "departure", "emergency", "fallback",
@@ -490,6 +579,7 @@
     renderWhatsAppDeliveryDiagnostics(data.deliveryDiagnostics || []);
     renderStayOperations(data.stayOperations || {});
     renderRecent(data.recent || []);
+    updateAdminSectionSummaries(data);
     login.hidden = true;
     workspace.hidden = false;
   }
@@ -513,6 +603,18 @@
   loginForm.addEventListener("submit", (event) => {
     event.preventDefault();
     loginWith(tokenInput.value);
+  });
+
+  expandAdminSections?.addEventListener("click", () => {
+    adminSections.forEach((section) => setAdminSectionOpen(section, true, false));
+    persistAdminSectionState();
+  });
+
+  collapseAdminSections?.addEventListener("click", () => {
+    adminSections.forEach((section) => {
+      if (!section.classList.contains("has-urgent")) setAdminSectionOpen(section, false, false);
+    });
+    persistAdminSectionState();
   });
 
   passportLinkForm.addEventListener("submit", async (event) => {

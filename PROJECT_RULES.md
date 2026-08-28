@@ -42,14 +42,15 @@ Do not claim that a person or number is available 24/7 until that contact is con
 
 Medical or personal emergencies must remain separate from property emergencies and use the verified emergency-service routes.
 
-## After-hours spare-key security
+## 24/7 lost-key and spare-key security
 
-- After hours: 19:30–10:30, Asia/Bangkok.
+- Secure self-service lost-key recovery is available 24 hours a day and is not gated by office or housekeeping hours.
 - One key box will be located next to each room door.
 - A 500 THB replacement fee is added for a lost key.
 - Never store key-box codes in public files, URLs, structured content, repository history or release archives.
 - Never reveal a code based only on a selected room number.
-- Secure code delivery requires server-side secrets, a current verified room-bound stay session, after-hours validation, deliberate 500 THB fee acceptance, accepted protected team notification, event logging and the rotation lock. The guest does not repeat the stay code for the lost-key request.
+- Every new lost-key request begins with `feeAccepted=false`. Fee acceptance and release authorization must be bound to the current verified active stay, room, protected session and request instance; no historical acceptance may be inherited.
+- Secure code delivery requires server-side secrets, a current verified room-bound stay session, deliberate 500 THB fee acceptance for the current request, at least one accepted protected Su-and-owner notification, event logging, single-use request enforcement and the rotation lock. The guest does not repeat the stay code for the lost-key request.
 - Current-guest verification and the fresh lost-key check use either the Airbnb HM confirmation code from the guest's trip details or the private House stay code created for a direct/walk-in reservation. The code is checked against the protected room and stay dates; the readable value is never stored or sent to AI, alerts or logs.
 - Each active room may use one permanent public page, but that URL and a selected room are not proof of a reservation.
 - Store confirmation codes only as keyed one-way hashes; never store, log or export readable codes.
@@ -58,6 +59,7 @@ Medical or personal emergencies must remain separate from property emergencies a
 - Every approved spare-key event must notify the configured owners and Su when the protected messaging integration is enabled.
 - Notification recipient numbers and names are server-side configuration and must never appear in public files.
 - Staff notifications must not contain the key-box code or the guest's private access token.
+- During normal service hours, personal assistance may be offered in addition to self-service but may not be required before the protected flow.
 
 ## Passport and Immigration registration data
 
@@ -153,7 +155,7 @@ Public interface rules:
 
 ## Current baseline
 
-Current release: v5.11.21 (Bangkok-aware cleaning-time validation, robust natural structured-booking entry and hospitality-first lost-key copy).
+Current release: v5.11.22 (progressive category booking, property intelligence, protected 24/7 request-bound lost-key release and collapsible owner operations).
 
 Explore is intentionally disabled in the live v5.11.6 release. Do not delete its pages, structured records or media. Restore it only after the planned Explore rebuild and review by changing the protected deployment feature variable. Do not expose internal Explore detail paths in live concierge answers while the feature remains disabled; use approved external actions where supplied.
 

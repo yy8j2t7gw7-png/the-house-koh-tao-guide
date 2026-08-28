@@ -1,6 +1,6 @@
 # Product Roadmap
 
-Baseline: v5.11.21
+Baseline: v5.11.22
 
 ## Completed
 
@@ -33,6 +33,10 @@ Baseline: v5.11.21
 - [x] Bangkok-calendar cleaning validation rejects past same-day, closed-hour and Monday preferences while preserving explicit future dates and submitting one valid correction
 - [x] Robust conversational fishing and snorkeling grammar covers want, would-like, wanna, contraction and take-me/us forms without converting information questions into alerts
 - [x] Hospitality-first lost-key responses hide internal delivery, verification-state and code-release terminology while preserving every security gate
+- [x] One-question-at-a-time booking collection for diving, fishing, snorkeling, taxi, taxi boat, ferry and motorbike taxi, with finite-choice buttons and contact collected last
+- [x] Deterministic property intelligence for pests, odors, plumbing, equipment, fixtures, mold/damp and room condition, including routine deduplication and urgent confirmation boundaries
+- [x] Protected 24/7 lost-key self-service with request-bound fee acceptance, accepted Su-and-owner notification, single-use authorization and immediate rotation lock
+- [x] Owner-console sections with independent persisted collapse state, live counts and forced visibility for unresolved urgent work
 - [x] Vague urgent clarification and meaningful-incident quality gate before protected submission
 - [x] Conservative Airbnb first-name-only synchronization and verified guest greeting
 - [x] Signed `RECEIVED` acknowledgement with backwards-compatible `ACK`
@@ -52,7 +56,7 @@ Baseline: v5.11.21
 - [x] Concierge-first public Contact Us actions
 - [x] Separate urgent property-emergency classification
 - [x] Safe unsupported-question and deferred-Explore fallbacks
-- [x] After-hours window and secure spare-key policy documented
+- [x] Secure 24/7 lost-key and spare-key policy documented
 - [x] Server-side model-powered concierge contract
 - [x] Multilingual and conversational follow-up support
 - [x] Strict structured model output and deterministic safety bypass
@@ -87,8 +91,8 @@ Baseline: v5.11.21
 - [x] Automatic reservation-code and stay-date synchronization from Airbnb iCal plus host email
 - [x] Permanent verified room pages using the Airbnb confirmation code
 - [x] Reservation-linked self-service passport forms and Thai-national exemption
-- [x] Verified active-stay after-hours spare-key release with 500 THB fee confirmation
-- [x] Passport-independent verified lost-key authorization with dedicated office-hours alerts and protected after-hours fee/code handling
+- [x] Verified active-stay 24/7 spare-key release with current-request 500 THB fee confirmation
+- [x] Passport-independent verified lost-key authorization with the same protected self-service path at every time of day
 - [x] Lost-key state isolation across browser sessions, days, stays and rooms with a final verified-room delivery gate
 - [x] Automatic official WhatsApp urgent-team notification with confirmed API submission required before key display
 - [x] Key-code rotation lock and owner confirmation workflow
@@ -99,7 +103,7 @@ Baseline: v5.11.21
 - [x] Keep the private guide locked until all declared non-Thai passport submissions are received
 - [x] Restrict the unverified public concierge to verification, registration reminders and emergency handling
 - [x] Revalidate verified access against updated synchronized checkout dates
-- [x] Use the verified active room-bound session for after-hours spare-key release without asking the guest to repeat the stay code
+- [x] Use the verified active room-bound session for 24/7 spare-key release without asking the guest to repeat the stay code
 - [x] Present protected lost-key access as an on-demand room-dashboard option rather than a prominent welcome panel
 - [x] Wire the rendered AI Concierge spare-key CTA to the protected fee-confirmation flow on the active room page
 - [x] Standardize the secure verification page on the shared single-line desktop header and add a discreet owner-dashboard login entry
@@ -110,7 +114,7 @@ Baseline: v5.11.21
 - [x] Reduce secure guest-verification copy without removing any mandatory registration, privacy or group-coverage requirement
 - [x] Show the Thai-national exemption bilingually in English and Thai without duplicate copy in Thai-language mode
 
-## Current priority — v5.10.x Verified Guest Launch
+## Current priority — verified guest operations
 
 The concierge must be useful to real guests before further Explore expansion.
 
@@ -136,7 +140,7 @@ The concierge must be useful to real guests before further Explore expansion.
 - [x] Use one permanent URL per active room with protected reservation verification
 - [x] Validate every verified session against its room, listing and reservation validity period
 - [x] Implement protected server-side key-code secret parsing without repository values
-- [x] Implement the 19:30–10:30 Bangkok-time spare-key flow
+- [x] Implement the protected 24/7 spare-key flow independently of office and housekeeping hours
 - [x] Log spare-key access and require key-code rotation before reuse
 - [x] Add protected owner and Su notification recipient configuration
 - [x] Add one-alert-per-recipient delivery and escalation logic
@@ -152,7 +156,7 @@ Guests may continue using ordinary WhatsApp handoffs. Automated internal alerts 
 - [x] Push the v5.5.0 release to the existing hosting workflow
 - [x] Confirm `/api/concierge/status` reports AI and learning enabled
 - [x] Capture the exact v5.11.16 Meta failure (HTTP 404 / `132001`) and implement template-aware language resolution: current templates use `en`; deliberate v1 rollback templates retain `en_US`.
-- [ ] Deploy v5.11.21 without changing production configuration, then run the short changed-only smoke test for past cleaning-time correction, natural/Book with Us fishing entry and verified office-hours lost-key wording.
+- [ ] Deploy v5.11.22 without changing production configuration, then run the release smoke matrix for progressive booking, routine and urgent property reports, daytime/nighttime lost-key recovery, rotation lock and owner-console collapse behavior.
 - [ ] Submit and obtain Meta approval for the five optional quick-action templates documented in `META_STAFF_QUICK_ACTIONS_v5.11.20.md`; never map the buttonless service v1 template and enable only after every intended template is Active.
 - [x] Add `STAY_TOKEN_PEPPER` and `RESERVATION_SYNC_TOKEN` Worker secrets
 - [ ] Add protected `SPARE_KEY_CODES` Worker secret before activating automatic spare-key release

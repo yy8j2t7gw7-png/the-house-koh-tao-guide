@@ -111,7 +111,7 @@ function createStore() {
       const session = this.staySessions.find((item) => item.tokenHash === tokenHash && item.expiresAt > now && !item.revokedAt);
       if (!session) return null;
       const reservation = this.stayReservations.find((item) => item.id === session.reservationId);
-      return reservation ? { ...session, ...reservation, reservationId: reservation.id, reservationStatus: reservation.status } : null;
+      return reservation ? { ...reservation, ...session, reservationId: reservation.id, reservationStatus: reservation.status } : null;
     },
     async revokeVerifiedStaySession(tokenHash, now) {
       const session = this.staySessions.find((item) => item.tokenHash === tokenHash);
@@ -180,7 +180,8 @@ function createStore() {
     },
     async getSpareKeyState(reservationId, room) {
       return {
-        releasedForReservation: this.spareKeyEvents.some((item) => item.reservationId === reservationId && item.codeReleased),
+        releasedForReservation: this.spareKeyRotations.get(room) === true
+          && this.spareKeyEvents.some((item) => item.reservationId === reservationId && item.codeReleased),
         rotationRequired: this.spareKeyRotations.get(room) === true
       };
     },
@@ -190,26 +191,44 @@ function createStore() {
       return { ok: true };
     },
     async claimSpareKeyRelease(record) {
+      if (this.spareKeyEvents.some((item) => item.requestHash === record.requestHash)) {
+        return { ok: false, error: "lost_key_request_used" };
+      }
       if (this.spareKeyRotations.get(record.room) === true) return { ok: false, error: "key_code_rotation_required" };
-      if (this.spareKeyEvents.some((item) => item.reservationId === record.reservationId)) return { ok: false, error: "spare_key_already_released" };
+      this.spareKeyEvents.forEach((item) => {
+        if (item.room === record.room && !item.codeReleased
+          && ["notification_pending", "notification_accepted"].includes(item.eventType)) item.eventType = "superseded";
+      });
       this.spareKeyEvents.push({ ...record, eventType: "notification_pending", feeAccepted: true, codeReleased: false, alertId: "" });
-      this.spareKeyRotations.set(record.room, true);
+      return { ok: true };
+    },
+    async authorizeSpareKeyView(record) {
+      const target = this.spareKeyEvents.find((item) => item.id === record.id
+        && item.reservationId === record.reservationId
+        && item.room === record.room
+        && item.requestHash === record.requestHash
+        && item.eventType === "notification_pending"
+        && !item.codeReleased);
+      if (!target) return { ok: false };
+      Object.assign(target, { eventType: "notification_accepted", alertId: record.alertId || "" });
       return { ok: true };
     },
     async finalizeSpareKeyRelease(record) {
-      const target = this.spareKeyEvents.find((item) => item.id === record.id && !item.codeReleased);
+      if (this.spareKeyRotations.get(record.room) === true) return { ok: false, error: "key_code_rotation_required" };
+      const target = this.spareKeyEvents.find((item) => item.id === record.id
+        && item.reservationId === record.reservationId
+        && item.room === record.room
+        && item.requestHash === record.requestHash
+        && item.eventType === "notification_accepted"
+        && !item.codeReleased);
       if (!target) return { ok: false, error: "claim_not_found" };
-      Object.assign(target, record, { eventType: "verified_after_hours_release", codeReleased: true });
+      Object.assign(target, record, { eventType: "verified_spare_key_release", codeReleased: true });
       this.spareKeyRotations.set(record.room, true);
       return { ok: true };
     },
     async cancelSpareKeyClaim(id) {
       const index = this.spareKeyEvents.findIndex((item) => item.id === id && !item.codeReleased);
-      if (index >= 0) {
-        const room = this.spareKeyEvents[index].room;
-        this.spareKeyEvents.splice(index, 1);
-        this.spareKeyRotations.set(room, false);
-      }
+      if (index >= 0) this.spareKeyEvents.splice(index, 1);
       return { ok: true };
     },
     async confirmSpareKeyRotation(room, rotationConfirmedAt) {
@@ -406,6 +425,27 @@ async function syncAndVerifyStay(env, {
   return verified.headers.get("set-cookie").split(";")[0];
 }
 
+async function currentLostKeyRequest(env, cookie, room = "11", now = new Date("2026-08-28T04:30:00.000Z")) {
+  const response = await handleStayGuestRequest(new Request(`https://guide.example/api/stay/status?room=${room}`, {
+    headers: { origin: "https://guide.example", cookie }
+  }), env, "/api/stay/status", null, now);
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.equal(body.verified, true);
+  return body;
+}
+
+async function viewAuthorizedSpareKey(env, cookie, authorization, now) {
+  assert.equal(authorization.canViewSpareKey, true);
+  assert.ok(authorization.spareKeyViewToken);
+  assert.equal("keyBoxCode" in authorization, false);
+  return handleStayGuestRequest(new Request("https://guide.example/api/stay/spare-key/view", {
+    method: "POST",
+    headers: { origin: "https://guide.example", cookie, "content-type": "application/json" },
+    body: JSON.stringify({ spareKeyViewToken: authorization.spareKeyViewToken })
+  }), env, "/api/stay/spare-key/view", null, now);
+}
+
 async function markForeignRegistrationPending(env, cookie, count = 2, now = new Date("2026-08-28T04:30:00.000Z")) {
   const response = await handleStayGuestRequest(new Request("https://guide.example/api/stay/nationality", {
     method: "POST",
@@ -469,7 +509,7 @@ test("critical guest requests stay deterministic and room-aware", async () => {
   assert.equal(body.intentId, "lost_key");
   assert.match(body.answer, /500 THB/);
   assert.equal(body.actions[0].type, "spare-key");
-  assert.equal(body.actions[0].label, "Secure spare-key access");
+  assert.equal(body.actions[0].label, "Continue securely");
   assert.equal(body.source, "lost-key-policy");
   assert.match(body.interactionId, /^int_/);
   assert.equal(store.interactions[0].room, "6");
@@ -531,8 +571,8 @@ test("an unverified lost-key request sends no alert and exposes no spare-key pat
   }
 });
 
-test("a verified office-hours lost-key request works with passport pending and uses only the dedicated alert", async () => {
-  const officeHours = new Date("2026-08-28T04:30:00.000Z");
+test("a verified daytime lost-key request asks for this request’s fee acceptance before 24-hour self-service release", async () => {
+  const officeHours = new Date("2026-08-28T09:00:00.000Z");
   const { env, store } = createEnvironment({
     GUEST_ACCESS_ENFORCEMENT: "true",
     SPARE_KEY_CODES: JSON.stringify({ "11": "9753" }),
@@ -569,26 +609,61 @@ test("a verified office-hours lost-key request works with passport pending and u
     const body = await response.json();
     assert.equal(body.intentId, "lost_key");
     assert.equal(body.source, "lost-key-policy");
-    assert.match(body.answer, /notified The House team/i);
-    assert.match(body.answer, /assist you as soon as possible/i);
+    assert.match(body.answer, /500 THB replacement fee/i);
+    assert.match(body.answer, /Would you like to continue\?/i);
     assert.doesNotMatch(body.answer, /\b(?:exposed|key-box code|protected|verification state|alert|webhook)\b/i);
-    assert.equal(body.actions.some((action) => action.type === "spare-key"), false);
+    assert.equal(body.actions.some((action) => action.type === "spare-key"), true);
+    assert.equal(body.actions.some((action) => action.route === "houseCall"), true);
     assert.equal(store.registrationStatuses.values().next().value.status, "passport_pending");
+    assert.equal(store.alerts.length, 0);
+    assert.equal(outbound.length, 0);
+
+    const status = await currentLostKeyRequest(env, cookie, "11", officeHours);
+    assert.match(status.lostKeyRequestToken, /^[A-Za-z0-9_-]+\.[a-f0-9]{64}$/);
+    const noAcceptance = await handleStayGuestRequest(new Request("https://guide.example/api/stay/spare-key", {
+      method: "POST",
+      headers: { origin: "https://guide.example", cookie, "content-type": "application/json" },
+      body: JSON.stringify({ feeAccepted: false, lostKeyRequestToken: status.lostKeyRequestToken })
+    }), env, "/api/stay/spare-key", null, officeHours);
+    assert.equal(noAcceptance.status, 400);
+    assert.equal((await noAcceptance.json()).error, "fee_acceptance_required");
+    assert.equal(store.alerts.length, 0);
+    assert.equal(outbound.length, 0);
+
+    const accepted = await handleStayGuestRequest(new Request("https://guide.example/api/stay/spare-key", {
+      method: "POST",
+      headers: { origin: "https://guide.example", cookie, "content-type": "application/json" },
+      body: JSON.stringify({ feeAccepted: true, lostKeyRequestToken: status.lostKeyRequestToken })
+    }), env, "/api/stay/spare-key", null, officeHours);
+    const acceptedBody = await accepted.json();
+    assert.equal(accepted.status, 200);
+    assert.equal(acceptedBody.teamNotificationSubmitted, true);
+    assert.equal(acceptedBody.canViewSpareKey, true);
+    assert.equal("keyBoxCode" in acceptedBody, false);
     assert.equal(store.alerts.length, 1);
-    assert.equal(store.alerts[0].alertType, "lost_key");
+    assert.equal(store.alerts[0].alertType, "verified_spare_key_release");
     assert.equal(store.alerts[0].recipientGroup, "lost_key_team");
     assert.equal(store.alerts[0].room, "11");
-    assert.equal(store.alerts.some((alert) => alert.alertType === "stay_support"), false);
     assert.equal(outbound.length, 3);
     assert.equal(outbound.every((payload) => payload.template.name === "house_lost_key_alert_v3"), true);
+    assert.equal(store.spareKeyEvents[0].feeAccepted, true);
+    assert.equal(store.spareKeyEvents[0].codeReleased, false);
+    assert.equal(store.spareKeyRotations.get("11") === true, false);
+    assert.match(store.alerts[0].summary, /explicitly accepted the 500 THB/i);
+    const release = await viewAuthorizedSpareKey(env, cookie, acceptedBody, officeHours);
+    const releaseBody = await release.json();
+    assert.equal(release.status, 200);
+    assert.equal(releaseBody.keyBoxCode, "9753");
+    assert.equal(store.spareKeyEvents[0].codeReleased, true);
+    assert.equal(store.spareKeyRotations.get("11"), true);
     assert.doesNotMatch(JSON.stringify({ body, outbound, alerts: store.alerts, interactions: store.interactions }), /9753/);
   } finally {
     globalThis.fetch = originalFetch;
   }
 });
 
-test("after-hours lost-key release is passport-independent, fee-gated and isolated by stay and room", async () => {
-  const afterHours = new Date("2026-08-28T14:00:00.000Z");
+test("nighttime lost-key release matches the same passport-independent, request-bound 24-hour flow", async () => {
+  const afterHours = new Date("2026-08-28T16:00:00.000Z");
   const { env, store } = createEnvironment({
     GUEST_ACCESS_ENFORCEMENT: "true",
     SPARE_KEY_CODES: JSON.stringify({ "10": "8642", "11": "9753" }),
@@ -616,15 +691,17 @@ test("after-hours lost-key release is passport-independent, fee-gated and isolat
   const conciergeBody = await concierge.json();
   assert.equal(conciergeBody.intentId, "lost_key");
   assert.match(conciergeBody.answer, /500 THB/);
-  assert.match(conciergeBody.answer, /after-hours lost-key help/i);
+  assert.match(conciergeBody.answer, /Would you like to continue\?/i);
+  assert.doesNotMatch(conciergeBody.answer, /after-hours/i);
   assert.doesNotMatch(conciergeBody.answer, /\b(?:notification|key-box code|protected|verification state|alert|webhook)\b/i);
   assert.equal(conciergeBody.actions[0].type, "spare-key");
   assert.equal(store.alerts.length, 0);
+  const room11Status = await currentLostKeyRequest(env, room11Cookie, "11", afterHours);
 
   const noFee = await handleStayGuestRequest(new Request("https://guide.example/api/stay/spare-key", {
     method: "POST",
     headers: { origin: "https://guide.example", cookie: room11Cookie, "content-type": "application/json" },
-    body: JSON.stringify({ feeAccepted: false })
+    body: JSON.stringify({ feeAccepted: false, lostKeyRequestToken: room11Status.lostKeyRequestToken })
   }), env, "/api/stay/spare-key", null, afterHours);
   assert.equal(noFee.status, 400);
   assert.equal((await noFee.json()).error, "fee_acceptance_required");
@@ -639,11 +716,16 @@ test("after-hours lost-key release is passport-independent, fee-gated and isolat
     });
   };
   try {
-    const released = await handleStayGuestRequest(new Request("https://guide.example/api/stay/spare-key", {
+    const accepted = await handleStayGuestRequest(new Request("https://guide.example/api/stay/spare-key", {
       method: "POST",
       headers: { origin: "https://guide.example", cookie: room11Cookie, "content-type": "application/json" },
-      body: JSON.stringify({ feeAccepted: true })
+      body: JSON.stringify({ feeAccepted: true, lostKeyRequestToken: room11Status.lostKeyRequestToken })
     }), env, "/api/stay/spare-key", null, afterHours);
+    const acceptedBody = await accepted.json();
+    assert.equal(accepted.status, 200);
+    assert.equal("keyBoxCode" in acceptedBody, false);
+    assert.equal(store.spareKeyRotations.get("11") === true, false);
+    const released = await viewAuthorizedSpareKey(env, room11Cookie, acceptedBody, afterHours);
     const releasedBody = await released.json();
     assert.equal(released.status, 200);
     assert.equal(releasedBody.keyBoxCode, "9753");
@@ -657,7 +739,7 @@ test("after-hours lost-key release is passport-independent, fee-gated and isolat
     const repeated = await handleStayGuestRequest(new Request("https://guide.example/api/stay/spare-key", {
       method: "POST",
       headers: { origin: "https://guide.example", cookie: secondSession, "content-type": "application/json" },
-      body: JSON.stringify({ feeAccepted: true })
+      body: JSON.stringify({ feeAccepted: true, lostKeyRequestToken: room11Status.lostKeyRequestToken })
     }), env, "/api/stay/spare-key", null, afterHours);
     assert.equal(repeated.status, 409);
     assert.equal((await repeated.json()).error, "key_code_rotation_required");
@@ -667,7 +749,7 @@ test("after-hours lost-key release is passport-independent, fee-gated and isolat
     const differentStayAttempt = await handleStayGuestRequest(new Request("https://guide.example/api/stay/spare-key", {
       method: "POST",
       headers: { origin: "https://guide.example", cookie: differentStay, "content-type": "application/json" },
-      body: JSON.stringify({ feeAccepted: true })
+      body: JSON.stringify({ feeAccepted: true, lostKeyRequestToken: room11Status.lostKeyRequestToken })
     }), env, "/api/stay/spare-key", null, afterHours);
     assert.equal(differentStayAttempt.status, 409);
     assert.equal((await differentStayAttempt.json()).error, "key_code_rotation_required");
@@ -679,11 +761,16 @@ test("after-hours lost-key release is passport-independent, fee-gated and isolat
       now: afterHours
     });
     await markForeignRegistrationPending(env, room10Cookie, 1, afterHours);
-    const room10Release = await handleStayGuestRequest(new Request("https://guide.example/api/stay/spare-key", {
+    const room10Status = await currentLostKeyRequest(env, room10Cookie, "10", afterHours);
+    const room10Accepted = await handleStayGuestRequest(new Request("https://guide.example/api/stay/spare-key", {
       method: "POST",
       headers: { origin: "https://guide.example", cookie: room10Cookie, "content-type": "application/json" },
-      body: JSON.stringify({ feeAccepted: true })
+      body: JSON.stringify({ feeAccepted: true, lostKeyRequestToken: room10Status.lostKeyRequestToken })
     }), env, "/api/stay/spare-key", null, afterHours);
+    const room10AcceptedBody = await room10Accepted.json();
+    assert.equal(room10Accepted.status, 200);
+    assert.equal("keyBoxCode" in room10AcceptedBody, false);
+    const room10Release = await viewAuthorizedSpareKey(env, room10Cookie, room10AcceptedBody, afterHours);
     const room10Body = await room10Release.json();
     assert.equal(room10Release.status, 200);
     assert.equal(room10Body.keyBoxCode, "8642");
@@ -697,6 +784,167 @@ test("after-hours lost-key release is passport-independent, fee-gated and isolat
       diagnostics: store.whatsappDiagnostics || [],
       events: store.spareKeyEvents
     }), /8642|9753/);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("lost-key authorization is fresh, session-and-room bound, one-use and reset only after confirmed rotation", async () => {
+  const now = new Date("2026-08-28T09:00:00.000Z");
+  const later = new Date(now.getTime() + (16 * 60_000));
+  const { env, store } = createEnvironment({
+    SPARE_KEY_CODES: JSON.stringify({ "10": "8642", "11": "9753" }),
+    WHATSAPP_ACCESS_TOKEN: "meta-test-token",
+    WHATSAPP_PHONE_NUMBER_ID: "1234567890",
+    WHATSAPP_WEBHOOK_VERIFY_TOKEN: "verify-test",
+    META_APP_SECRET: "app-secret-test",
+    WHATSAPP_ALERT_RECIPIENTS: JSON.stringify({
+      support: [{ label: "Su", phone: "+66 64 000 0001" }],
+      emergency: [
+        { label: "Owner 1", phone: "+66 81 000 0002" },
+        { label: "Owner 2", phone: "+66 82 000 0003" }
+      ]
+    })
+  });
+  const room11Cookie = await syncAndVerifyStay(env, { now });
+  const room11Status = await currentLostKeyRequest(env, room11Cookie, "11", now);
+  assert.equal(room11Status.feeAccepted, false);
+  assert.ok(room11Status.lostKeyRequestToken);
+
+  const secondRoom11Session = await syncAndVerifyStay(env, { now });
+  const staleSession = await handleStayGuestRequest(new Request("https://guide.example/api/stay/spare-key", {
+    method: "POST",
+    headers: { origin: "https://guide.example", cookie: secondRoom11Session, "content-type": "application/json" },
+    body: JSON.stringify({ feeAccepted: true, lostKeyRequestToken: room11Status.lostKeyRequestToken })
+  }), env, "/api/stay/spare-key", null, now);
+  assert.equal(staleSession.status, 400);
+  assert.equal((await staleSession.json()).error, "lost_key_request_required");
+  assert.equal(store.alerts.length, 0);
+
+  const room10Cookie = await syncAndVerifyStay(env, {
+    room: "10",
+    confirmationCode: "HMROOM10FRESH",
+    now
+  });
+  const differentRoom = await handleStayGuestRequest(new Request("https://guide.example/api/stay/spare-key", {
+    method: "POST",
+    headers: { origin: "https://guide.example", cookie: room10Cookie, "content-type": "application/json" },
+    body: JSON.stringify({ feeAccepted: true, lostKeyRequestToken: room11Status.lostKeyRequestToken })
+  }), env, "/api/stay/spare-key", null, now);
+  assert.equal(differentRoom.status, 400);
+  assert.equal((await differentRoom.json()).error, "lost_key_request_required");
+  assert.equal(store.alerts.length, 0);
+
+  const expired = await handleStayGuestRequest(new Request("https://guide.example/api/stay/spare-key", {
+    method: "POST",
+    headers: { origin: "https://guide.example", cookie: room11Cookie, "content-type": "application/json" },
+    body: JSON.stringify({ feeAccepted: true, lostKeyRequestToken: room11Status.lostKeyRequestToken })
+  }), env, "/api/stay/spare-key", null, later);
+  assert.equal(expired.status, 400);
+  assert.equal((await expired.json()).error, "lost_key_request_required");
+  assert.equal(store.alerts.length, 0);
+
+  const current = await currentLostKeyRequest(env, room11Cookie, "11", later);
+  assert.equal(current.feeAccepted, false);
+  const noAcceptance = await handleStayGuestRequest(new Request("https://guide.example/api/stay/spare-key", {
+    method: "POST",
+    headers: { origin: "https://guide.example", cookie: room11Cookie, "content-type": "application/json" },
+    body: JSON.stringify({ feeAccepted: false, lostKeyRequestToken: current.lostKeyRequestToken })
+  }), env, "/api/stay/spare-key", null, later);
+  assert.equal(noAcceptance.status, 400);
+  assert.equal((await noAcceptance.json()).error, "fee_acceptance_required");
+  assert.equal(store.alerts.length, 0);
+
+  const originalFetch = globalThis.fetch;
+  const outbound = [];
+  globalThis.fetch = async (_url, options) => {
+    outbound.push(JSON.parse(options.body));
+    return new Response(JSON.stringify({ messages: [{ id: `wamid.request-bound-key-${outbound.length}` }] }), {
+      status: 200,
+      headers: { "content-type": "application/json" }
+    });
+  };
+  try {
+    const accepted = await handleStayGuestRequest(new Request("https://guide.example/api/stay/spare-key", {
+      method: "POST",
+      headers: { origin: "https://guide.example", cookie: room11Cookie, "content-type": "application/json" },
+      body: JSON.stringify({ feeAccepted: true, lostKeyRequestToken: current.lostKeyRequestToken })
+    }), env, "/api/stay/spare-key", null, later);
+    const acceptedBody = await accepted.json();
+    assert.equal(accepted.status, 200);
+    assert.equal("keyBoxCode" in acceptedBody, false);
+    assert.equal(store.spareKeyRotations.get("11") === true, false);
+
+    const reloadedRequest = await currentLostKeyRequest(env, room11Cookie, "11", later);
+    assert.equal(reloadedRequest.feeAccepted, false);
+    assert.notEqual(reloadedRequest.lostKeyRequestToken, current.lostKeyRequestToken);
+    const replacementAccepted = await handleStayGuestRequest(new Request("https://guide.example/api/stay/spare-key", {
+      method: "POST",
+      headers: { origin: "https://guide.example", cookie: room11Cookie, "content-type": "application/json" },
+      body: JSON.stringify({ feeAccepted: true, lostKeyRequestToken: reloadedRequest.lostKeyRequestToken })
+    }), env, "/api/stay/spare-key", null, later);
+    const replacementAcceptedBody = await replacementAccepted.json();
+    assert.equal(replacementAccepted.status, 200);
+    assert.equal("keyBoxCode" in replacementAcceptedBody, false);
+    const supersededView = await viewAuthorizedSpareKey(env, room11Cookie, acceptedBody, later);
+    assert.equal(supersededView.status, 409);
+    assert.equal((await supersededView.json()).error, "claim_not_found");
+
+    const released = await viewAuthorizedSpareKey(env, room11Cookie, replacementAcceptedBody, later);
+    assert.equal(released.status, 200);
+    assert.equal((await released.json()).keyBoxCode, "9753");
+    assert.equal(store.spareKeyRotations.get("11"), true);
+    assert.equal(outbound.length, 6);
+
+    const locked = await handleStayGuestRequest(new Request("https://guide.example/api/stay/spare-key", {
+      method: "POST",
+      headers: { origin: "https://guide.example", cookie: room11Cookie, "content-type": "application/json" },
+      body: JSON.stringify({ feeAccepted: true, lostKeyRequestToken: current.lostKeyRequestToken })
+    }), env, "/api/stay/spare-key", null, later);
+    assert.equal(locked.status, 409);
+    assert.equal((await locked.json()).error, "key_code_rotation_required");
+    assert.equal(outbound.length, 6);
+
+    env.SPARE_KEY_CODES = JSON.stringify({ "10": "8642", "11": "5319" });
+    const reset = await handleStayAdminRequest(new Request("https://guide.example/api/concierge/admin/spare-key-rotation", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ room: "11", confirmed: true })
+    }), env, "/api/concierge/admin/spare-key-rotation", store);
+    assert.equal(reset.status, 200);
+    assert.equal(store.spareKeyRotations.get("11"), false);
+
+    const replay = await handleStayGuestRequest(new Request("https://guide.example/api/stay/spare-key", {
+      method: "POST",
+      headers: { origin: "https://guide.example", cookie: room11Cookie, "content-type": "application/json" },
+      body: JSON.stringify({ feeAccepted: true, lostKeyRequestToken: current.lostKeyRequestToken })
+    }), env, "/api/stay/spare-key", null, later);
+    assert.equal(replay.status, 409);
+    assert.equal((await replay.json()).error, "lost_key_request_used");
+    assert.equal(outbound.length, 6);
+
+    const nextRequest = await currentLostKeyRequest(env, room11Cookie, "11", later);
+    assert.equal(nextRequest.feeAccepted, false);
+    assert.notEqual(nextRequest.lostKeyRequestToken, current.lostKeyRequestToken);
+    const nextAccepted = await handleStayGuestRequest(new Request("https://guide.example/api/stay/spare-key", {
+      method: "POST",
+      headers: { origin: "https://guide.example", cookie: room11Cookie, "content-type": "application/json" },
+      body: JSON.stringify({ feeAccepted: true, lostKeyRequestToken: nextRequest.lostKeyRequestToken })
+    }), env, "/api/stay/spare-key", null, later);
+    const nextAcceptedBody = await nextAccepted.json();
+    assert.equal(nextAccepted.status, 200);
+    assert.equal("keyBoxCode" in nextAcceptedBody, false);
+    const nextRelease = await viewAuthorizedSpareKey(env, room11Cookie, nextAcceptedBody, later);
+    assert.equal(nextRelease.status, 200);
+    assert.equal((await nextRelease.json()).keyBoxCode, "5319");
+    assert.equal(outbound.length, 9);
+    assert.equal(store.spareKeyEvents.filter((item) => item.codeReleased).length, 2);
+    assert.doesNotMatch(JSON.stringify({
+      alerts: store.alerts,
+      deliveries: store.alertDeliveries,
+      events: store.spareKeyEvents,
+      outbound
+    }), /"(?:keyBoxCode|text)"\s*:\s*"(?:9753|5319)"/);
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -746,7 +994,8 @@ test("activity booking uses guest-service wording and starts the structured Conc
   assert.equal(body.source, "booking-policy");
   assert.equal(body.intentId, "snorkeling_booking_request");
   assert.equal(body.handoff, "booking");
-  assert.match(body.answer, /snorkeling trip/i);
+  assert.match(body.answer, /what date would you like to go snorkeling/i);
+  assert.doesNotMatch(body.answer, /how many|country code|payment/i);
   assert.deepEqual(body.workflow.missing.sort(), ["contact", "date", "guests", "option"]);
   assert.doesNotMatch(body.answer, /commission|referral|revenue/i);
   assert.deepEqual(body.actions, []);
@@ -1475,18 +1724,23 @@ test("main and room welcome pages make required registration prominent", async (
   assert.match(room, /Upload passport securely/);
   assert.match(room, /All overnight guests are Thai nationals/);
   assert.match(room, /I understand the 500 THB lost-key replacement fee and want to continue/);
-  assert.match(room, />Request spare key<\/button>/);
+  assert.match(room, />Accept 500 THB fee &amp; request spare key<\/button>/);
+  assert.match(room, /id="viewSpareKey"[^>]*>View spare key<\/button>/);
   assert.doesNotMatch(room, /lostKeyConfirmationCode/);
   assert.match(room, /id="openSpareKeyAccess"/);
-  assert.match(room, /Secure after-hours help if you cannot enter your room/);
+  assert.match(room, /Secure 24-hour help if you cannot enter your room/);
+  assert.match(room, /Secure spare-key access is available 24 hours a day during your stay/);
+  assert.doesNotMatch(room, /after-hours spare-key|between 7:30 PM and 10:30 AM/i);
   assert.ok(room.indexOf('id="openSpareKeyAccess"') < room.indexOf('id="spareKeyAccess"'));
   assert.match(room, /id="spareKeyAccess"[^>]*hidden/);
-  assert.match(room, /no Airbnb confirmation code is needed/);
+  assert.doesNotMatch(room, /already verified|team will be notified before|never sent through WhatsApp|webhook|notification gate/i);
   assert.match(room, /src="\/registration-entry\.js"/);
   assert.match(registrationEntry, /\/api\/stay\/verify/);
   assert.match(registrationEntry, /\/api\/stay\/passport-link/);
   assert.match(registrationEntry, /\/api\/stay\/spare-key/);
-  assert.match(registrationEntry, /JSON\.stringify\(\{ feeAccepted: true \}\)/);
+  assert.match(registrationEntry, /JSON\.stringify\(\{ feeAccepted: true, lostKeyRequestToken \}\)/);
+  assert.match(registrationEntry, /\/api\/stay\/spare-key\/view/);
+  assert.match(registrationEntry, /JSON\.stringify\(\{ spareKeyViewToken \}\)/);
   assert.doesNotMatch(registrationEntry, /spareKeySection\.hidden = false;\s*if \(spareKeyForm\)/);
   assert.match(registrationEntry, /spareKeyTrigger\?\.addEventListener\("click", \(event\) =>/);
   assert.doesNotMatch(registrationEntry, /HOUSE_PRIVATE_REGISTRATION_URL/);
@@ -1583,15 +1837,64 @@ test("rendered Concierge spare-key CTA opens the protected fee flow", async () =
   assert.match(registrationEntry, /if \(!data\.accessGranted && pendingPage\) \{[\s\S]*renderSpareKey\(data\)/);
   for (const page of [room, roomAccess]) {
     assert.match(page, /id="lostKeyFeeAccepted"[^>]*required/);
-    assert.match(page, />Request spare key<\/button>/);
+    assert.match(page, />Accept 500 THB fee &amp; request spare key<\/button>/);
+    assert.match(page, /id="spareKeyViewAction" hidden/);
+    assert.match(page, /id="viewSpareKey"[^>]*>View spare key<\/button>/);
     assert.match(page, /id="spareKeyContactHelp" hidden/);
     assert.match(page, />Contact The House Concierge<\/a>/);
     assert.doesNotMatch(page, /lostKeyConfirmationCode/);
+    assert.doesNotMatch(page, /already verified|team will be notified before|never sent through WhatsApp|webhook|notification gate/i);
   }
   assert.match(roomAccess, /id="openSpareKeyAccess"[^>]*hidden/);
   assert.doesNotMatch(room, /id="lostKeyFeeIntroduction"|id="lostKeyFeeConfirmation"/);
   assert.match(registrationEntry, /spareKeyForm\.hidden = true;[\s\S]*spareKeyContactHelp\.hidden = false/);
-  assert.match(registrationEntry, /\["spare_key_already_released", "key_code_rotation_required"\]/);
+  assert.match(registrationEntry, /lost_key_request_used: messages\.keyRequestExpired/);
+  assert.match(registrationEntry, /document\.getElementById\(id\)\?\.addEventListener\("click", \(\) => \{\s*if \(feeCheckbox\) feeCheckbox\.checked = false;\s*closeSpareKeyAccess\(\);/);
+  assert.match(registrationEntry, /function renderSpareKey\(data\) \{[\s\S]*feeCheckbox\.checked = false;[\s\S]*lostKeyRequestToken = String\(data\.lostKeyRequestToken \|\| ""\)/);
+  assert.match(registrationEntry, /lostKeyRequestToken = "";[\s\S]*spareKeyViewToken = String\(data\.spareKeyViewToken \|\| ""\);[\s\S]*spareKeyViewAction\.hidden = false/);
+  assert.match(registrationEntry, /api\("\/api\/stay\/spare-key\/view"/);
+  assert.match(registrationEntry, /JSON\.stringify\(\{ spareKeyViewToken \}\)/);
+  assert.match(registrationEntry, /viewSpareKeyButton\?\.addEventListener\("click"[\s\S]*keyCode\.textContent = data\.keyBoxCode/);
+  assert.doesNotMatch(registrationEntry, /(?:localStorage|sessionStorage).*lostKey|lostKey.*(?:localStorage|sessionStorage)/i);
+});
+
+test("owner dashboard major sections are independently collapsible, persistent and urgent-safe", async () => {
+  const [html, script, styles] = await Promise.all([
+    readFile(new URL("../public/concierge-admin.html", import.meta.url), "utf8"),
+    readFile(new URL("../public/concierge-admin.js", import.meta.url), "utf8"),
+    readFile(new URL("../public/concierge-admin.css", import.meta.url), "utf8")
+  ]);
+  const sections = [...html.matchAll(/<details class="concierge-admin-section" data-admin-section="([^"]+)"( open)?>/g)];
+  assert.deepEqual(sections.map((match) => match[1]), ["stays", "alerts", "maintenance", "passports", "learning", "approved", "recent"]);
+  assert.deepEqual(sections.filter((match) => match[2]).map((match) => match[1]), ["stays", "alerts"]);
+  assert.equal((html.match(/<summary class="concierge-admin-section-head">/g) || []).length, sections.length);
+  assert.equal((html.match(/data-section-count/g) || []).length, sections.length);
+  assert.equal((html.match(/data-section-state/g) || []).length, sections.length);
+  assert.match(html, /data-admin-section="maintenance"[\s\S]*id="maintenanceReports"[\s\S]*<\/details>/);
+  assert.match(html, /data-admin-section="passports"[\s\S]*id="pendingRegistrations"[\s\S]*id="passportUploads"[\s\S]*<\/details>/);
+  assert.match(html, /id="expandAdminSections"[^>]*>Expand all<\/button>/);
+  assert.match(html, /id="collapseAdminSections"[^>]*>Collapse all<\/button>/);
+
+  assert.match(script, /houseConciergeAdminSections:v5\.11\.22/);
+  assert.match(script, /adminSections\.map\(\(section\) => \[section\.dataset\.adminSection, section\.open\]\)/);
+  assert.match(script, /typeof saved\[id\] === "boolean"/);
+  assert.match(script, /section\.addEventListener\("toggle"/);
+  assert.match(script, /summary\?\.setAttribute\("aria-expanded", String\(section\.open\)\)/);
+  assert.match(script, /state\.textContent = section\.open \? "Expanded" : "Collapsed"/);
+  assert.match(script, /if \(urgent\) setAdminSectionOpen\(section, true, false\)/);
+  assert.match(script, /if \(!section\.classList\.contains\("has-urgent"\)\) setAdminSectionOpen\(section, false, false\)/);
+  assert.match(script, /setAdminSectionCount\("maintenance", \(data\.maintenanceReports \|\| \[\]\)\.length\)/);
+  assert.match(script, /setAdminSectionCount\("passports", \(data\.pendingRegistrations \|\| \[\]\)\.length \+ \(data\.passportUploads \|\| \[\]\)\.length\)/);
+  const setter = script.match(/function setAdminSectionOpen\([\s\S]*?\n  \}/)?.[0] || "";
+  assert.match(setter, /section\.open = Boolean\(open\)/);
+  assert.doesNotMatch(setter, /replaceChildren|innerHTML|remove\(/);
+
+  assert.match(styles, /summary:focus-visible/);
+  assert.match(styles, /\.concierge-admin-section-head\{[^}]*min-height:52px/);
+  assert.match(styles, /\.concierge-admin-section-summary\{[^}]*flex-wrap:wrap/);
+  assert.match(styles, /\.concierge-admin-table-wrap\{overflow:auto/);
+  assert.match(styles, /@media\(max-width:760px\)[\s\S]*\.concierge-admin-section-head\{[^}]*flex-direction:column[^}]*min-width:0/);
+  assert.match(styles, /@media\(max-width:760px\)[\s\S]*\.concierge-admin-section-summary\{[^}]*min-width:0/);
 });
 
 test("guest localization supports seven languages and keeps the owner dashboard English", async () => {
@@ -1612,7 +1915,7 @@ test("guest localization supports seven languages and keeps the owner dashboard 
   assert.doesNotMatch(admin, /src="\/i18n\.js"/);
   assert.match(runtime, /exploreContentDeferred/);
   assert.match(runtime, /element\.closest\("\.section,\.footer"\)/);
-  assert.match(runtime, /houseGuideTranslations:v5\.11\.21:/);
+  assert.match(runtime, /houseGuideTranslations:v5\.11\.22:/);
   assert.match(runtime, /MAX_REQUEST_RETRIES = 2/);
   assert.match(runtime, /let flushRunning = false/);
 });
@@ -1650,18 +1953,19 @@ test("critical emergency and registration wording is reviewed in every guest lan
     "Used only for TM30 registration. Your room guide opens after all passports are uploaded or checked in person.",
     "Choice saved. Bring every required original passport to The House. The guide opens after our team completes the check and TM30 registration.",
     "Emergency help remains available without verification.",
-    "After-hours spare-key help",
-    "You can access the spare key for your room between 7:30 PM and 10:30 AM.",
-    "You're already verified for this room — no Airbnb confirmation code is needed.",
-    "If your key has been lost, a 500 THB replacement fee applies. The House team will be notified before the spare-key code is released.",
-    "Your key-box code is never sent through WhatsApp.",
+    "24-hour spare-key help",
+    "Secure spare-key access is available 24 hours a day during your stay.",
+    "If your key has been lost, a 500 THB replacement fee applies. Confirm below if you would like to continue.",
     "Your spare key is ready.",
     "Use the code below to open the key box next to your room door.",
     "Key-box code",
     "Please take the spare key and close the key box again.",
     "If you need any further help, contact The House Concierge.",
     "I understand the 500 THB lost-key replacement fee and want to continue.",
-    "Request spare key",
+    "Accept 500 THB fee & request spare key",
+    "View spare key",
+    "Thank you. Your request has been sent to The House team. You can now securely view the spare-key information below.",
+    "This lost-key request has expired. Refresh the page and explicitly accept the 500 THB fee again.",
     "Contact The House Concierge",
     "Send urgent alert",
     "Urgent alert cancelled. No team message was sent.",
@@ -2087,19 +2391,25 @@ test("alert policy uses Bangkok after-hours and routes only actionable requests"
   assert.equal(isAfterHours(new Date("2027-08-13T03:30:00.000Z")), false);
   assert.equal(isAfterHours(new Date("2026-08-31T05:00:00.000Z")), false);
 
-  const afterHoursKey = classifyConciergeAlert({
+  const nighttimeKeyWithoutFee = classifyConciergeAlert({
     result: { needsHuman: true, intentId: "lost_key", category: "room", handoff: "stay_support" },
     question: "I lost my key",
     room: "7",
     now: new Date("2027-08-12T13:00:00.000Z")
   });
-  assert.equal(afterHoursKey, null);
-  const daytimeKey = classifyConciergeAlert({
+  assert.equal(nighttimeKeyWithoutFee, null);
+  const daytimeKeyWithoutFee = classifyConciergeAlert({
     result: { needsHuman: true, intentId: "lost_key", category: "room", handoff: "stay_support" },
     question: "I lost my key", room: "2", now: new Date("2027-08-12T05:00:00.000Z")
   });
-  assert.equal(daytimeKey.recipientGroup, "lost_key_team");
-  assert.equal(daytimeKey.escalationRequired, false);
+  assert.equal(daytimeKeyWithoutFee, null);
+  const explicitlyAcceptedKey = classifyConciergeAlert({
+    result: { needsHuman: true, intentId: "lost_key", category: "room", handoff: "stay_support", confirmedLostKeyFee: true },
+    question: "I lost my key", room: "2", now: new Date("2027-08-12T05:00:00.000Z")
+  });
+  assert.equal(explicitlyAcceptedKey.recipientGroup, "lost_key_team");
+  assert.equal(explicitlyAcceptedKey.severity, "urgent");
+  assert.equal(explicitlyAcceptedKey.escalationRequired, false);
 
   const diveRecommendation = classifyConciergeAlert({
     result: { needsHuman: true, intentId: "diving_recommendation", category: "booking", handoff: "booking" },
@@ -2484,7 +2794,9 @@ test("a contact collected for one workflow cannot satisfy a different later work
 
   assert.equal(response.status, 200);
   assert.equal(body.handoff, "booking");
-  assert.match(body.answer, /country code/i);
+  assert.match(body.answer, /what kind of snorkeling trip/i);
+  assert.equal(body.workflow.missing.includes("contact"), true);
+  assert.equal(body.workflow.retainPrivateContact, false);
   assert.equal(store.alerts.length, 0);
 });
 
@@ -3274,6 +3586,210 @@ test("after-hours housekeeping records the request once and sets next-morning ex
   assert.deepEqual(result.actions, []);
 });
 
+test("natural routine room and property reports create one protected Su-and-owner service alert", async () => {
+  const cases = [
+    ["There’s a rat in my roof.", "pest"],
+    ["There are ants all over my room.", "pest"],
+    ["There is a spider in the bathroom.", "pest"],
+    ["My bathroom smells like sewage.", "odor"],
+    ["There is a rotten egg smell from the shower.", "odor"],
+    ["My AC smells bad.", "odor"],
+    ["My AC isn’t cold.", "equipment"],
+    ["The fridge isn’t cold.", "equipment"],
+    ["The toilet is blocked.", "plumbing"],
+    ["The shower has no hot water.", "plumbing"],
+    ["The light doesn’t work.", "equipment"],
+    ["The Wi-Fi isn’t working.", "equipment"],
+    ["Water is dripping from the ceiling.", "condition"]
+  ];
+  const originalFetch = globalThis.fetch;
+  try {
+    for (const [question, category] of cases) {
+      const { env, store } = createEnvironment({
+        OPENAI_API_KEY: "test-key-must-not-be-used",
+        WHATSAPP_ACCESS_TOKEN: "meta-test-token",
+        WHATSAPP_PHONE_NUMBER_ID: "1234567890",
+        WHATSAPP_WEBHOOK_VERIFY_TOKEN: "verify-test",
+        META_APP_SECRET: "app-secret-test",
+        WHATSAPP_ALERT_RECIPIENTS: JSON.stringify({
+          support: [{ label: "Su", phone: "+66 64 000 0001" }],
+          emergency: [
+            { label: "Owner 1", phone: "+66 81 000 0002" },
+            { label: "Owner 2", phone: "+66 82 000 0003" }
+          ]
+        })
+      });
+      const outbound = [];
+      globalThis.fetch = async (_url, options) => {
+        outbound.push(JSON.parse(options.body));
+        return new Response(JSON.stringify({ messages: [{ id: `wamid.property-${category}-${outbound.length}` }] }), {
+          status: 200,
+          headers: { "content-type": "application/json" }
+        });
+      };
+      const response = await handleConciergeRequest(guestRequest(question, {
+        sessionId: `session_property_${category}_${crypto.randomUUID()}`
+      }), env);
+      const body = await response.json();
+      assert.equal(response.status, 200, question);
+      assert.equal(body.source, "service-policy", question);
+      assert.equal(body.workflow.type, "property_issue", question);
+      assert.equal(body.workflow.status, "monitoring", question);
+      assert.equal(body.workflow.issueCategory, category, question);
+      assert.equal(body.workflow.notified, true, question);
+      assert.match(body.answer, /Thank you for letting us know.*sent this to The House team.*check it as soon as possible/is, question);
+      assert.doesNotMatch(body.answer, /alert|protected operation|routing|webhook|WhatsApp or phone number/i, question);
+      assert.equal(store.alerts.length, 1, question);
+      assert.equal(store.alerts[0].alertType, "stay_support", question);
+      assert.equal(store.alerts[0].recipientGroup, "support_with_owners", question);
+      assert.equal(outbound.length, 3, question);
+      assert.deepEqual(outbound.map((payload) => payload.to).sort(), ["66640000001", "66810000002", "66820000003"], question);
+      assert.equal(outbound.every((payload) => payload.template.name === "house_service_alert_v3"), true, question);
+    }
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("an added detail for the same ongoing property issue continues naturally without a duplicate alert", async () => {
+  const { env, store } = createEnvironment({
+    OPENAI_API_KEY: "",
+    WHATSAPP_ACCESS_TOKEN: "meta-test-token",
+    WHATSAPP_PHONE_NUMBER_ID: "1234567890",
+    WHATSAPP_WEBHOOK_VERIFY_TOKEN: "verify-test",
+    META_APP_SECRET: "app-secret-test",
+    WHATSAPP_ALERT_RECIPIENTS: JSON.stringify({
+      support: [{ label: "Su", phone: "+66 64 000 0001" }],
+      emergency: [
+        { label: "Owner 1", phone: "+66 81 000 0002" },
+        { label: "Owner 2", phone: "+66 82 000 0003" }
+      ]
+    })
+  });
+  const originalFetch = globalThis.fetch;
+  const outbound = [];
+  globalThis.fetch = async (_url, options) => {
+    outbound.push(JSON.parse(options.body));
+    return new Response(JSON.stringify({ messages: [{ id: `wamid.property-followup-${outbound.length}` }] }), {
+      status: 200,
+      headers: { "content-type": "application/json" }
+    });
+  };
+  try {
+    const first = await handleConciergeRequest(guestRequest("There’s a rat in my roof."), env);
+    const firstBody = await first.json();
+    assert.equal(firstBody.workflow.status, "monitoring");
+    assert.equal(firstBody.workflow.notified, true);
+    assert.equal(store.alerts.length, 1);
+    assert.equal(outbound.length, 3);
+
+    const followup = await handleConciergeRequest(guestRequest("I can hear scratching directly above the bed.", {
+      workflowState: firstBody.workflow
+    }), env);
+    const followupBody = await followup.json();
+    assert.match(followupBody.answer, /already been contacted.*check the issue as soon as possible/i);
+    assert.equal(followupBody.workflow.status, "monitoring");
+    assert.equal(followupBody.workflow.issueCategory, "pest");
+    assert.equal(store.alerts.length, 1);
+    assert.equal(outbound.length, 3);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("one concise odor clarification submits the same property workflow and obvious odors do not over-clarify", async () => {
+  const { env, store } = createEnvironment({
+    OPENAI_API_KEY: "",
+    WHATSAPP_ACCESS_TOKEN: "meta-test-token",
+    WHATSAPP_PHONE_NUMBER_ID: "1234567890",
+    WHATSAPP_WEBHOOK_VERIFY_TOKEN: "verify-test",
+    META_APP_SECRET: "app-secret-test",
+    WHATSAPP_ALERT_RECIPIENTS: JSON.stringify({ support: [{ label: "Su", phone: "+66 64 000 0001" }] })
+  });
+  const originalFetch = globalThis.fetch;
+  let outbound = 0;
+  globalThis.fetch = async () => {
+    outbound += 1;
+    return new Response(JSON.stringify({ messages: [{ id: `wamid.odor-${outbound}` }] }), {
+      status: 200,
+      headers: { "content-type": "application/json" }
+    });
+  };
+  try {
+    const vague = await handleConciergeRequest(guestRequest("There’s a strange smell."), env);
+    const vagueBody = await vague.json();
+    assert.match(vagueBody.answer, /Where does the smell seem to be coming from/i);
+    assert.equal(vagueBody.workflow.status, "collecting");
+    assert.equal(vagueBody.workflow.issueCategory, "odor_clarification");
+    assert.equal(store.alerts.length, 0);
+    assert.equal(outbound, 0);
+
+    const clarified = await handleConciergeRequest(guestRequest("It seems to be coming from the bathroom.", {
+      workflowState: vagueBody.workflow
+    }), env);
+    const clarifiedBody = await clarified.json();
+    assert.equal(clarifiedBody.workflow.status, "monitoring");
+    assert.equal(clarifiedBody.workflow.issueCategory, "odor");
+    assert.equal(store.alerts.length, 1);
+    assert.equal(outbound, 1);
+
+    const obvious = createEnvironment({ OPENAI_API_KEY: "" });
+    const obviousResponse = await handleConciergeRequest(guestRequest("The bathroom smells like sewage."), obvious.env);
+    const obviousBody = await obviousResponse.json();
+    assert.notEqual(obviousBody.intentId, "property_odor_clarification");
+    assert.equal(obvious.store.alerts.length, 1);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("property informational controls remain informational and dirty rooms keep the structured cleaning collector", async () => {
+  for (const question of [
+    "What animals live on Koh Tao?",
+    "Are mosquitoes common?",
+    "How does the AC work?",
+    "What is the Wi-Fi password?"
+  ]) {
+    const { env, store } = createEnvironment({ OPENAI_API_KEY: "" });
+    const response = await handleConciergeRequest(guestRequest(question), env);
+    const body = await response.json();
+    assert.notEqual(body.workflow?.type, "property_issue", question);
+    assert.equal(store.alerts.length, 0, question);
+  }
+
+  const cleaning = createEnvironment({ OPENAI_API_KEY: "" });
+  const cleaningResponse = await handleConciergeRequest(
+    guestRequest("My room is dirty."),
+    cleaning.env,
+    undefined,
+    new Date("2026-08-28T04:00:00.000Z")
+  );
+  const cleaningBody = await cleaningResponse.json();
+  assert.equal(cleaningBody.workflow.type, "cleaning");
+  assert.equal(cleaningBody.workflow.status, "collecting");
+  assert.deepEqual(cleaningBody.workflow.missing, ["preferredTime"]);
+  assert.match(cleaningBody.answer, /What time would be most convenient/i);
+  assert.equal(cleaning.store.alerts.length, 0);
+});
+
+test("dangerous property phrases enter the urgent confirmation workflow without sending automatically", async () => {
+  for (const question of [
+    "I smell burning from the socket.",
+    "There is smoke coming from the AC.",
+    "Water is pouring through the ceiling.",
+    "There is a snake inside my room.",
+    "The ceiling is falling down."
+  ]) {
+    const { env, store } = createEnvironment({ OPENAI_API_KEY: "" });
+    const response = await handleConciergeRequest(guestRequest(question), env);
+    const body = await response.json();
+    assert.equal(body.intentId, "property_emergency", question);
+    assert.equal(body.handoff, "property_emergency", question);
+    assert.ok(body.actions.some((action) => action.action === "confirm_urgent_property"), question);
+    assert.equal(store.alerts.length, 0, question);
+  }
+});
+
 test("fire guidance prioritizes evacuation, Rescue and safe extinguisher use before any House alert", async () => {
   const { env, store } = createEnvironment({ OPENAI_API_KEY: "not-used" });
   const response = await handleConciergeRequest(guestRequest("There is a fire in my room."), env);
@@ -3329,11 +3845,9 @@ test("diving recommendations stay informational while booking starts clean struc
   assert.equal(bookingBody.intentId, "diving_booking_request");
   assert.equal(bookingBody.workflow.status, "collecting");
   assert.deepEqual(bookingBody.workflow.missing.sort(), ["contact", "date", "guests", "option"]);
-  assert.match(bookingBody.answer, /preferred date/i);
-  assert.match(bookingBody.answer, /how many people/i);
-  assert.match(bookingBody.answer, /Fun Diving, Open Water, Advanced Open Water, or another course/i);
-  assert.match(bookingBody.answer, /international country code/i);
-  assert.match(bookingBody.answer, /payment has been received/i);
+  assert.match(bookingBody.answer, /Roctopus Dive/i);
+  assert.match(bookingBody.answer, /what date would you like to go diving/i);
+  assert.doesNotMatch(bookingBody.answer, /how many people|international country code|payment has been received/i);
   assert.equal(bookingBody.actions.some((action) => action.route === "bookingWhatsapp"), false);
   assert.equal(store.alerts.length, 0);
 });
@@ -3573,7 +4087,8 @@ test("supported activity and transport information stays separate from booking i
   assert.equal(naturalFishingBody.workflow.kind, "fishing");
   assert.equal(naturalFishingBody.workflow.status, "collecting");
   assert.deepEqual(naturalFishingBody.workflow.missing.sort(), ["contact", "date", "guests", "option"]);
-  assert.match(naturalFishingBody.answer, /check availability and the current price/i);
+  assert.match(naturalFishingBody.answer, /what date would you like to go fishing/i);
+  assert.doesNotMatch(naturalFishingBody.answer, /how many|country code|payment/i);
   assert.equal(naturalFishing.store.alerts.length, 0);
 
   const direct = createEnvironment({ OPENAI_API_KEY: "" });
@@ -3669,7 +4184,7 @@ test("natural fishing and snorkeling requests enter the protected structured wor
     assert.equal(body.source, "booking-policy");
     assert.equal(body.workflow.kind, "fishing");
     assert.equal(body.workflow.status, "collecting");
-    assert.match(body.answer, /preferred date/i);
+    assert.match(body.answer, /what date would you like to go fishing/i);
     assert.doesNotMatch(body.answer, /^The House can tell you about fishing trips/i);
     assert.equal(production.store.alerts.length, 0);
   } finally {
@@ -3688,6 +4203,209 @@ test("natural fishing and snorkeling requests enter the protected structured wor
   assert.equal(buttonBody.workflow.kind, "fishing");
   assert.equal(buttonBody.workflow.status, "collecting");
   assert.deepEqual(buttonBody.workflow.missing.sort(), ["contact", "date", "guests", "option"]);
+});
+
+test("every supported booking category enters one-question progressive collection from natural intent", async () => {
+  const cases = [
+    ["I wanna go diving.", "diving", "date", /What date would you like to go diving/i],
+    ["I want to go fishing.", "fishing", "date", /What date would you like to go fishing/i],
+    ["I’d like to go snorkeling tomorrow.", "snorkeling", "guests", /How many people will be joining/i],
+    ["Can you arrange a taxi?", "taxi", "date", /What date do you need the taxi/i],
+    ["I need a longtail boat.", "taxi_boat", "date", /What date do you need the taxi boat or longtail boat/i],
+    ["I want to book the ferry.", "ferry", "date", /What date would you like to travel/i],
+    ["I need a motorbike taxi tomorrow.", "motorbike_taxi", "time", /What pickup time would you prefer/i]
+  ];
+  for (const [question, kind, firstMissing, prompt] of cases) {
+    const { env, store } = createEnvironment({ OPENAI_API_KEY: "" });
+    const response = await handleConciergeRequest(
+      guestRequest(question, { sessionId: `session_progressive_${kind}_12345` }),
+      env,
+      undefined,
+      new Date("2026-08-28T03:00:00.000Z")
+    );
+    const body = await response.json();
+    assert.equal(body.source, "booking-policy", question);
+    assert.equal(body.workflow.type, "booking", question);
+    assert.equal(body.workflow.kind, kind, question);
+    assert.equal(body.workflow.status, "collecting", question);
+    assert.equal(body.workflow.missing[0], firstMissing, question);
+    assert.match(body.answer, prompt, question);
+    assert.doesNotMatch(body.answer, /Please provide|number of guests.*option.*contact|date.*how many.*country code|payment has been received/i, question);
+    assert.equal(store.alerts.length, 0, question);
+  }
+});
+
+test("fishing buttons and typed choices update the same preserved progressive state and contact is collected last", async () => {
+  const now = new Date("2026-08-28T03:00:00.000Z");
+  const startQuestion = "I want to go fishing tomorrow with 3 people.";
+
+  const buttonEnvironment = createEnvironment({
+    OPENAI_API_KEY: "",
+    WHATSAPP_ACCESS_TOKEN: "meta-test-token",
+    WHATSAPP_PHONE_NUMBER_ID: "1234567890",
+    WHATSAPP_WEBHOOK_VERIFY_TOKEN: "verify-test",
+    META_APP_SECRET: "app-secret-test",
+    WHATSAPP_ALERT_RECIPIENTS: JSON.stringify({
+      booking: [{ label: "Fah", phone: "+66 96 000 0001" }],
+      emergency: [
+        { label: "Owner 1", phone: "+66 81 000 0002" },
+        { label: "Owner 2", phone: "+66 82 000 0003" }
+      ]
+    })
+  });
+  const originalFetch = globalThis.fetch;
+  const outbound = [];
+  globalThis.fetch = async (_url, options) => {
+    outbound.push(JSON.parse(options.body));
+    return new Response(JSON.stringify({ messages: [{ id: `wamid.progressive-fishing-${outbound.length}` }] }), {
+      status: 200,
+      headers: { "content-type": "application/json" }
+    });
+  };
+  try {
+    const start = await handleConciergeRequest(guestRequest(startQuestion), buttonEnvironment.env, undefined, now);
+    const startBody = await start.json();
+    assert.deepEqual(startBody.workflow.missing, ["option", "contact"]);
+    assert.equal(startBody.workflow.bookingRequest.preferredDate, "29 Aug 2026");
+    assert.equal(startBody.workflow.bookingRequest.guestCount, "3");
+    assert.deepEqual(startBody.actions.map((action) => action.label), ["Sport fishing", "Food fishing", "Relaxed / family", "Not sure"]);
+    assert.equal(buttonEnvironment.store.alerts.length, 0);
+
+    const selected = await handleConciergeRequest(guestRequest(startBody.actions[0].prompt, {
+      workflowState: startBody.workflow
+    }), buttonEnvironment.env, undefined, now);
+    const selectedBody = await selected.json();
+    assert.deepEqual(selectedBody.workflow.missing, ["contact"]);
+    assert.equal(selectedBody.workflow.bookingRequest.preferredDate, "29 Aug 2026");
+    assert.equal(selectedBody.workflow.bookingRequest.guestCount, "3");
+    assert.equal(selectedBody.workflow.bookingRequest.option, "Sport fishing");
+    assert.match(selectedBody.answer, /country code/i);
+    assert.deepEqual(selectedBody.actions, []);
+    assert.equal(buttonEnvironment.store.alerts.length, 0);
+
+    const completed = await handleConciergeRequest(guestRequest("+66 81 234 5678", {
+      workflowState: selectedBody.workflow
+    }), buttonEnvironment.env, undefined, now);
+    const completedBody = await completed.json();
+    assert.equal(completedBody.workflow.status, "submitted");
+    assert.equal(buttonEnvironment.store.alerts.length, 1);
+    assert.equal(buttonEnvironment.store.alerts[0].recipientGroup, "booking_with_owners");
+    assert.equal(outbound.length, 3);
+    assert.match(completedBody.answer, /check availability and the current price/i);
+    assert.match(completedBody.answer, /not confirmed.*payment has been received/i);
+
+    const typedEnvironment = createEnvironment({ OPENAI_API_KEY: "" });
+    const typedStart = await handleConciergeRequest(guestRequest(startQuestion), typedEnvironment.env, undefined, now);
+    const typedStartBody = await typedStart.json();
+    const typed = await handleConciergeRequest(guestRequest("Food fishing", {
+      workflowState: typedStartBody.workflow
+    }), typedEnvironment.env, undefined, now);
+    const typedBody = await typed.json();
+    assert.deepEqual(typedBody.workflow.missing, ["contact"]);
+    assert.equal(typedBody.workflow.bookingRequest.preferredDate, selectedBody.workflow.bookingRequest.preferredDate);
+    assert.equal(typedBody.workflow.bookingRequest.guestCount, selectedBody.workflow.bookingRequest.guestCount);
+    assert.equal(typedBody.workflow.bookingRequest.option, "Food fishing");
+    assert.equal(typedEnvironment.store.alerts.length, 0);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("diving asks only relevant conditional fields and preserves each answer through submission", async () => {
+  const { env, store } = createEnvironment({
+    OPENAI_API_KEY: "",
+    WHATSAPP_ACCESS_TOKEN: "meta-test-token",
+    WHATSAPP_PHONE_NUMBER_ID: "1234567890",
+    WHATSAPP_WEBHOOK_VERIFY_TOKEN: "verify-test",
+    META_APP_SECRET: "app-secret-test",
+    WHATSAPP_ALERT_RECIPIENTS: JSON.stringify({ booking: [{ label: "Fah", phone: "+66 96 000 0001" }] })
+  });
+  const now = new Date("2026-08-28T03:00:00.000Z");
+  const originalFetch = globalThis.fetch;
+  let outbound = 0;
+  globalThis.fetch = async () => {
+    outbound += 1;
+    return new Response(JSON.stringify({ messages: [{ id: `wamid.progressive-diving-${outbound}` }] }), {
+      status: 200,
+      headers: { "content-type": "application/json" }
+    });
+  };
+  try {
+    const first = await handleConciergeRequest(guestRequest("I wanna go diving."), env, undefined, now);
+    const firstBody = await first.json();
+    assert.equal(firstBody.workflow.missing[0], "date");
+    assert.match(firstBody.answer, /recommend Roctopus Dive.*What date/is);
+
+    const date = await handleConciergeRequest(guestRequest("Tomorrow", { workflowState: firstBody.workflow }), env, undefined, now);
+    const dateBody = await date.json();
+    assert.equal(dateBody.workflow.missing[0], "guests");
+    assert.equal(dateBody.workflow.bookingRequest.preferredDate, "29 Aug 2026");
+
+    const guests = await handleConciergeRequest(guestRequest("2", { workflowState: dateBody.workflow }), env, undefined, now);
+    const guestsBody = await guests.json();
+    assert.equal(guestsBody.workflow.missing[0], "option");
+    assert.equal(guestsBody.workflow.bookingRequest.guestCount, "2");
+    assert.deepEqual(guestsBody.actions.map((action) => action.label), ["Fun Diving", "Open Water", "Advanced", "Other"]);
+
+    const course = await handleConciergeRequest(guestRequest(guestsBody.actions[1].prompt, {
+      workflowState: guestsBody.workflow
+    }), env, undefined, now);
+    const courseBody = await course.json();
+    assert.deepEqual(courseBody.workflow.missing, ["contact"]);
+    assert.equal(courseBody.workflow.bookingRequest.option, "Open Water Course");
+    assert.equal(courseBody.workflow.bookingRequest.certificationLevel, "");
+    assert.match(courseBody.answer, /country code/i);
+
+    const submitted = await handleConciergeRequest(guestRequest("+66 81 234 5678", {
+      workflowState: courseBody.workflow
+    }), env, undefined, now);
+    const submittedBody = await submitted.json();
+    assert.equal(submittedBody.workflow.status, "submitted");
+    assert.equal(store.alerts.length, 1);
+    assert.equal(outbound, 1);
+
+    const funEnvironment = createEnvironment({ OPENAI_API_KEY: "" });
+    const fun = await handleConciergeRequest(guestRequest("I want to book Fun Diving tomorrow for 2 divers."), funEnvironment.env, undefined, now);
+    const funBody = await fun.json();
+    assert.deepEqual(funBody.workflow.missing, ["certification", "contact"]);
+    assert.match(funBody.answer, /current diving certification level/i);
+    const certified = await handleConciergeRequest(guestRequest("Advanced Open Water", {
+      workflowState: funBody.workflow
+    }), funEnvironment.env, undefined, now);
+    const certifiedBody = await certified.json();
+    assert.deepEqual(certifiedBody.workflow.missing, ["contact"]);
+    assert.equal(certifiedBody.workflow.bookingRequest.option, "Fun Diving");
+    assert.equal(certifiedBody.workflow.bookingRequest.certificationLevel, "Advanced Open Water");
+    assert.equal(funEnvironment.store.alerts.length, 0);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("taxi-boat direction buttons preserve the supplied route, time, date and passengers", async () => {
+  const { env, store } = createEnvironment({ OPENAI_API_KEY: "" });
+  const now = new Date("2026-08-28T03:00:00.000Z");
+  const response = await handleConciergeRequest(guestRequest(
+    "I need a longtail boat tomorrow at 9 AM from Mae Haad Pier to Mango Bay for 2 people."
+  ), env, undefined, now);
+  const body = await response.json();
+  assert.deepEqual(body.workflow.missing, ["tripType", "contact"]);
+  assert.deepEqual(body.actions.map((action) => action.label), ["One way", "Return"]);
+  assert.equal(body.workflow.bookingRequest.preferredDate, "29 Aug 2026");
+  assert.equal(body.workflow.bookingRequest.pickupTime, "9:00 AM");
+  assert.equal(body.workflow.bookingRequest.pickupLocation, "Mae Haad Pier");
+  assert.equal(body.workflow.bookingRequest.destination, "Mango Bay");
+  assert.equal(body.workflow.bookingRequest.guestCount, "2");
+
+  const selected = await handleConciergeRequest(guestRequest(body.actions[0].prompt, {
+    workflowState: body.workflow
+  }), env, undefined, now);
+  const selectedBody = await selected.json();
+  assert.deepEqual(selectedBody.workflow.missing, ["contact"]);
+  assert.equal(selectedBody.workflow.bookingRequest.tripType, "One-way");
+  assert.equal(selectedBody.workflow.bookingRequest.pickupLocation, "Mae Haad Pier");
+  assert.equal(selectedBody.workflow.bookingRequest.destination, "Mango Bay");
+  assert.equal(store.alerts.length, 0);
 });
 
 test("fishing, snorkeling and transport bookings submit one protected Fah-and-owner alert", async () => {
@@ -4557,10 +5275,16 @@ test("verified guests can report routine and critical room problems with protect
   assert.equal(store.maintenanceReports.length, 3);
 });
 
-test("after-hours spare-key release uses the verified session, confirms the fee and never alerts either code", async () => {
+test("24-hour spare-key release uses the verified session, confirms the current fee and never alerts the code", async () => {
   const { env, store } = createEnvironment({
     SPARE_KEY_CODES: JSON.stringify({ "1": "8642" }),
-    WHATSAPP_ALERT_RECIPIENTS: JSON.stringify({ urgent: [{ label: "Su", phone: "+66 64 000 0001" }] }),
+    WHATSAPP_ALERT_RECIPIENTS: JSON.stringify({
+      support: [{ label: "Su", phone: "+66 64 000 0001" }],
+      emergency: [
+        { label: "Owner 1", phone: "+66 81 000 0002" },
+        { label: "Owner 2", phone: "+66 82 000 0003" }
+      ]
+    }),
     WHATSAPP_ACCESS_TOKEN: "meta-test-token",
     WHATSAPP_PHONE_NUMBER_ID: "1234567890",
     WHATSAPP_WEBHOOK_VERIFY_TOKEN: "verify-test",
@@ -4584,11 +5308,12 @@ test("after-hours spare-key release uses the verified session, confirms the fee 
     headers: { origin: "https://guide.example", cookie, "content-type": "application/json" },
     body: JSON.stringify({ nationality: "thai", allGuestsThai: true })
   }), env, "/api/stay/nationality", null, afterHours);
+  const lostKeyStatus = await currentLostKeyRequest(env, cookie, "1", afterHours);
 
   const noFee = await handleStayGuestRequest(new Request("https://guide.example/api/stay/spare-key", {
     method: "POST",
     headers: { origin: "https://guide.example", cookie, "content-type": "application/json" },
-    body: JSON.stringify({ feeAccepted: false })
+    body: JSON.stringify({ feeAccepted: false, lostKeyRequestToken: lostKeyStatus.lostKeyRequestToken })
   }), env, "/api/stay/spare-key", null, afterHours);
   assert.equal(noFee.status, 400);
   assert.equal((await noFee.json()).error, "fee_acceptance_required");
@@ -4599,17 +5324,25 @@ test("after-hours spare-key release uses the verified session, confirms the fee 
     headers: { "content-type": "application/json" }
   });
   try {
-    const released = await handleStayGuestRequest(new Request("https://guide.example/api/stay/spare-key", {
+    const accepted = await handleStayGuestRequest(new Request("https://guide.example/api/stay/spare-key", {
       method: "POST",
       headers: { origin: "https://guide.example", cookie, "content-type": "application/json" },
-      body: JSON.stringify({ feeAccepted: true })
+      body: JSON.stringify({ feeAccepted: true, lostKeyRequestToken: lostKeyStatus.lostKeyRequestToken })
     }), env, "/api/stay/spare-key", null, afterHours);
+    const acceptedBody = await accepted.json();
+    assert.equal(accepted.status, 200);
+    assert.equal(acceptedBody.teamNotificationSubmitted, true);
+    assert.equal(acceptedBody.canViewSpareKey, true);
+    assert.equal("keyBoxCode" in acceptedBody, false);
+    assert.equal(store.spareKeyEvents[0].feeAccepted, true);
+    assert.equal(store.spareKeyEvents[0].codeReleased, false);
+    assert.equal(store.spareKeyRotations.get("1") === true, false);
+    const released = await viewAuthorizedSpareKey(env, cookie, acceptedBody, afterHours);
     const body = await released.json();
     assert.equal(body.keyBoxCode, "8642");
     assert.equal(body.lostKeyFeeThb, 500);
     assert.equal(body.teamNotificationSubmitted, true);
     assert.equal(released.headers.get("cache-control"), "no-store, max-age=0");
-    assert.equal(store.spareKeyEvents[0].feeAccepted, true);
     assert.equal(store.spareKeyRotations.get("1"), true);
     assert.equal(store.alerts[0].roomVerified, true);
     assert.doesNotMatch(JSON.stringify(store.alerts), /8642/);
@@ -4618,7 +5351,7 @@ test("after-hours spare-key release uses the verified session, confirms the fee 
     const repeated = await handleStayGuestRequest(new Request("https://guide.example/api/stay/spare-key", {
       method: "POST",
       headers: { origin: "https://guide.example", cookie, "content-type": "application/json" },
-      body: JSON.stringify({ feeAccepted: true })
+      body: JSON.stringify({ feeAccepted: true, lostKeyRequestToken: lostKeyStatus.lostKeyRequestToken })
     }), env, "/api/stay/spare-key", null, afterHours);
     assert.equal(repeated.status, 409);
     assert.equal((await repeated.json()).error, "key_code_rotation_required");
@@ -4630,10 +5363,13 @@ test("after-hours spare-key release uses the verified session, confirms the fee 
 test("spare-key release automatically notifies the team and fails safely when WhatsApp submission fails", async () => {
   const { env, store } = createEnvironment({
     SPARE_KEY_CODES: JSON.stringify({ "2": "9753" }),
-    WHATSAPP_ALERT_RECIPIENTS: JSON.stringify({ urgent: [
-      { label: "Su", phone: "+66 64 000 0001" },
-      { label: "Owner", phone: "+66 64 000 0002" }
-    ] }),
+    WHATSAPP_ALERT_RECIPIENTS: JSON.stringify({
+      support: [{ label: "Su", phone: "+66 64 000 0001" }],
+      emergency: [
+        { label: "Owner 1", phone: "+66 81 000 0002" },
+        { label: "Owner 2", phone: "+66 82 000 0003" }
+      ]
+    }),
     WHATSAPP_ACCESS_TOKEN: "meta-test-token",
     WHATSAPP_PHONE_NUMBER_ID: "1234567890",
     WHATSAPP_WEBHOOK_VERIFY_TOKEN: "verify-test",
@@ -4657,6 +5393,7 @@ test("spare-key release automatically notifies the team and fails safely when Wh
     headers: { origin: "https://guide.example", cookie, "content-type": "application/json" },
     body: JSON.stringify({ nationality: "thai", allGuestsThai: true })
   }), env, "/api/stay/nationality", null, afterHours);
+  const lostKeyStatus = await currentLostKeyRequest(env, cookie, "2", afterHours);
 
   const originalFetch = globalThis.fetch;
   let automaticAttempts = 0;
@@ -4671,13 +5408,13 @@ test("spare-key release automatically notifies the team and fails safely when Wh
     const failed = await handleStayGuestRequest(new Request("https://guide.example/api/stay/spare-key", {
       method: "POST",
       headers: { origin: "https://guide.example", cookie, "content-type": "application/json" },
-      body: JSON.stringify({ confirmationCode: "HMKEYFAIL2", feeAccepted: true })
+      body: JSON.stringify({ feeAccepted: true, lostKeyRequestToken: lostKeyStatus.lostKeyRequestToken })
     }), env, "/api/stay/spare-key", null, afterHours);
-    assert.equal(automaticAttempts, 2);
+    assert.equal(automaticAttempts, 3);
     assert.equal(failed.status, 503);
     assert.equal((await failed.json()).error, "team_notification_failed");
     assert.equal(store.spareKeyEvents.length, 0);
-    assert.equal(store.spareKeyRotations.get("2"), false);
+    assert.equal(store.spareKeyRotations.get("2") === true, false);
     assert.doesNotMatch(JSON.stringify(store.alerts), /9753/);
   } finally {
     globalThis.fetch = originalFetch;
@@ -4761,11 +5498,18 @@ test("booking contact is required, kept out of stored records and included only 
   try {
     const first = await handleConciergeRequest(guestRequest("Please book snorkelling tomorrow for 2 guests"), env);
     const firstBody = await first.json();
-    assert.match(firstBody.answer, /country code/);
-    assert.match(firstBody.answer, /trip type/i);
+    assert.match(firstBody.answer, /what kind of snorkeling trip/i);
+    assert.doesNotMatch(firstBody.answer, /country code|payment/i);
     assert.equal(store.alerts.length, 0);
-    await handleConciergeRequest(guestRequest("Private trip, +66 81 234 5678", {
+    const option = await handleConciergeRequest(guestRequest("Private trip", {
       workflowState: firstBody.workflow
+    }), env);
+    const optionBody = await option.json();
+    assert.match(optionBody.answer, /country code/i);
+    assert.deepEqual(optionBody.workflow.missing, ["contact"]);
+    assert.equal(store.alerts.length, 0);
+    await handleConciergeRequest(guestRequest("+66 81 234 5678", {
+      workflowState: optionBody.workflow
     }), env);
     assert.equal(store.alerts.length, 1);
     assert.doesNotMatch(JSON.stringify(store.interactions), /66812345678|81 234 5678/);

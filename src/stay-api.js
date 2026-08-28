@@ -1,4 +1,3 @@
-import { isAfterHours } from "./alert-policy.js";
 import {
   createProtectedOperationsAlert,
   dispatchConciergeAlert,
@@ -23,6 +22,8 @@ const CONFIRMATION_CODE_PATTERN = /^[A-Z0-9]{8,20}$/;
 const SESSION_COOKIE = "house_verified_stay";
 const MAX_SYNC_RECORDS = 250;
 const LOST_KEY_FEE_THB = 500;
+const LOST_KEY_REQUEST_TTL_MS = 15 * 60_000;
+const SPARE_KEY_VIEW_TTL_MS = 15 * 60_000;
 const REGISTRATION_COMPLETE_STATUSES = new Set(["thai_exempt", "passport_complete", "in_person_complete"]);
 const ROOM_DETAILS = Object.freeze({
   "1": { floor: "Upstairs", photo: "photo-06.jpeg", note: "Room 1 is upstairs and marked clearly in the building photo." },
@@ -119,6 +120,100 @@ async function hmac(value, secret) {
   );
   const signature = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(String(value || "")));
   return Array.from(new Uint8Array(signature), (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+function base64UrlText(value) {
+  return base64Url(new TextEncoder().encode(String(value || "")));
+}
+
+function decodeBase64UrlText(value) {
+  const source = String(value || "").replace(/-/g, "+").replace(/_/g, "/");
+  const padded = source.padEnd(Math.ceil(source.length / 4) * 4, "=");
+  try {
+    const binary = atob(padded);
+    return new TextDecoder().decode(Uint8Array.from(binary, (character) => character.charCodeAt(0)));
+  } catch (_error) {
+    return "";
+  }
+}
+
+async function lostKeySessionBinding(session, env) {
+  return (await hmac(
+    `lost-key-binding:${session.id}:${session.reservationId}:${session.room}`,
+    env.STAY_TOKEN_PEPPER
+  )).slice(0, 40);
+}
+
+async function createLostKeyRequestToken(session, env, now = new Date()) {
+  const payload = base64UrlText(JSON.stringify({
+    version: 1,
+    requestId: randomToken().slice(0, 32),
+    binding: await lostKeySessionBinding(session, env),
+    issuedAt: now.getTime(),
+    expiresAt: now.getTime() + LOST_KEY_REQUEST_TTL_MS
+  }));
+  const signature = await hmac(`lost-key-request:${payload}`, env.STAY_TOKEN_PEPPER);
+  return `${payload}.${signature}`;
+}
+
+async function validLostKeyRequestToken(value, session, env, now = new Date()) {
+  const [payload, signature, extra] = String(value || "").split(".");
+  if (extra !== undefined || !/^[A-Za-z0-9_-]{40,400}$/.test(payload || "") || !/^[a-f0-9]{64}$/.test(signature || "")) return false;
+  const expected = await hmac(`lost-key-request:${payload}`, env.STAY_TOKEN_PEPPER);
+  if (!constantTimeEqual(signature, expected)) return false;
+  let decoded;
+  try {
+    decoded = JSON.parse(decodeBase64UrlText(payload));
+  } catch (_error) {
+    return false;
+  }
+  const timestamp = now.getTime();
+  const valid = decoded?.version === 1
+    && /^[A-Za-z0-9_-]{20,50}$/.test(String(decoded.requestId || ""))
+    && constantTimeEqual(decoded.binding, await lostKeySessionBinding(session, env))
+    && Number(decoded.issuedAt) <= timestamp + 30_000
+    && Number(decoded.expiresAt) >= timestamp
+    && Number(decoded.expiresAt) - Number(decoded.issuedAt) === LOST_KEY_REQUEST_TTL_MS;
+  return valid ? decoded : null;
+}
+
+async function createSpareKeyViewToken(session, eventId, requestHash, env, now = new Date()) {
+  const payload = base64UrlText(JSON.stringify({
+    version: 1,
+    eventId,
+    requestHash,
+    binding: await lostKeySessionBinding(session, env),
+    feeAccepted: true,
+    notificationAccepted: true,
+    issuedAt: now.getTime(),
+    expiresAt: now.getTime() + SPARE_KEY_VIEW_TTL_MS
+  }));
+  const signature = await hmac(`spare-key-view:${payload}`, env.STAY_TOKEN_PEPPER);
+  return `${payload}.${signature}`;
+}
+
+async function validSpareKeyViewToken(value, session, env, now = new Date()) {
+  const [payload, signature, extra] = String(value || "").split(".");
+  if (extra !== undefined || !/^[A-Za-z0-9_-]{80,800}$/.test(payload || "") || !/^[a-f0-9]{64}$/.test(signature || "")) return false;
+  const expected = await hmac(`spare-key-view:${payload}`, env.STAY_TOKEN_PEPPER);
+  if (!constantTimeEqual(signature, expected)) return false;
+  let decoded;
+  try {
+    decoded = JSON.parse(decodeBase64UrlText(payload));
+  } catch (_error) {
+    return false;
+  }
+  const timestamp = now.getTime();
+  const valid = decoded?.version === 1
+    && /^key_[A-Za-z0-9-]{20,80}$/.test(String(decoded.eventId || ""))
+    && /^[a-f0-9]{64}$/.test(String(decoded.requestHash || ""))
+    && constantTimeEqual(decoded.binding, await lostKeySessionBinding(session, env))
+    && decoded.feeAccepted === true
+    && decoded.notificationAccepted === true
+    && Number(decoded.issuedAt) <= timestamp + 30_000
+    && Number(decoded.expiresAt) >= timestamp
+    && Number(decoded.expiresAt) - Number(decoded.issuedAt) === SPARE_KEY_VIEW_TTL_MS;
+  return valid ? decoded : null;
 }
 
 function cookies(request) {
@@ -257,7 +352,7 @@ function parseKeyCodes(env) {
 export function stayConfiguration(env) {
   const keyCodes = parseKeyCodes(env);
   const alerts = whatsappAlertConfiguration(env);
-  const urgentNotificationsReady = alerts.configured && Number(alerts.groupCounts?.urgent) > 0;
+  const urgentNotificationsReady = alerts.configured && Number(alerts.groupCounts?.lost_key_team) >= 3;
   return {
     configured: Boolean(env.CONCIERGE_STORE && env.STAY_TOKEN_PEPPER && env.RESERVATION_SYNC_TOKEN),
     reservationSyncConfigured: Boolean(env.RESERVATION_SYNC_TOKEN && env.STAY_TOKEN_PEPPER),
@@ -328,13 +423,14 @@ export async function handleStayGuestRequest(request, env, path, ctx, now = new 
     const registration = await store.getStayRegistrationStatus(session.reservationId);
     const registrationStatus = registration?.status || "not_started";
     const spareKey = await store.getSpareKeyState(session.reservationId, room);
+    const stayIsActive = activeStay(session, now);
+    const spareKeyAvailable = stayIsActive && !spareKey.releasedForReservation && !spareKey.rotationRequired;
     return json({
       verified: true,
       room,
       checkInDate: session.checkInDate,
       checkOutDate: session.checkOutDate,
-      activeStay: activeStay(session, now),
-      afterHours: isAfterHours(now),
+      activeStay: stayIsActive,
       registrationStatus,
       accessGranted: registrationComplete(registrationStatus),
       guestFirstName: session.guestFirstName || "",
@@ -342,8 +438,10 @@ export async function handleStayGuestRequest(request, env, path, ctx, now = new 
       requiredPassports: Number(registration?.requiredPassports) || 0,
       receivedPassports: Number(registration?.receivedPassports) || (registrationStatus === "passport_received" ? 1 : 0),
       lostKeyFeeThb: LOST_KEY_FEE_THB,
+      feeAccepted: false,
       spareKeyReleased: spareKey.releasedForReservation,
-      keyCodeRotationRequired: spareKey.rotationRequired
+      keyCodeRotationRequired: spareKey.rotationRequired,
+      lostKeyRequestToken: spareKeyAvailable ? await createLostKeyRequestToken(session, env, now) : ""
     });
   }
 
@@ -557,22 +655,28 @@ export async function handleStayGuestRequest(request, env, path, ctx, now = new 
     const body = await readJson(request, 2_000);
     if (body?.feeAccepted !== true) return json({ error: "fee_acceptance_required" }, 400);
     if (!activeStay(session, now)) return json({ error: "active_stay_required" }, 403);
-    if (!isAfterHours(now)) return json({ error: "available_after_hours_only" }, 403);
-    const keyCode = parseKeyCodes(env)[session.room] || "";
-    if (!keyCode) return json({ error: "spare_key_not_configured" }, 503);
-    const alertConfiguration = whatsappAlertConfiguration(env);
-    if (!alertConfiguration.configured || Number(alertConfiguration.groupCounts?.lost_key_team) < 1) {
-      return json({ error: "team_notification_unavailable" }, 503);
-    }
     const state = await store.getSpareKeyState(session.reservationId, session.room);
     if (state.rotationRequired) return json({ error: "key_code_rotation_required" }, 409);
     if (state.releasedForReservation) return json({ error: "spare_key_already_released" }, 409);
-
+    const lostKeyRequest = await validLostKeyRequestToken(body?.lostKeyRequestToken, session, env, now);
+    if (!lostKeyRequest) {
+      return json({ error: "lost_key_request_required" }, 400);
+    }
+    const requestHash = await hmac(
+      `lost-key-request-id:${lostKeyRequest.requestId}:${lostKeyRequest.binding}`,
+      env.STAY_TOKEN_PEPPER
+    );
+    if (!parseKeyCodes(env)[session.room]) return json({ error: "spare_key_not_configured" }, 503);
+    const alertConfiguration = whatsappAlertConfiguration(env);
+    if (!alertConfiguration.configured || Number(alertConfiguration.groupCounts?.lost_key_team) < 3) {
+      return json({ error: "team_notification_unavailable" }, 503);
+    }
     const eventId = `key_${crypto.randomUUID()}`;
     const claim = await store.claimSpareKeyRelease({
       id: eventId,
       reservationId: session.reservationId,
       room: session.room,
+      requestHash,
       createdAt: now.toISOString()
     });
     if (!claim?.ok) return json({ error: claim?.error || "spare_key_unavailable" }, 409);
@@ -586,7 +690,7 @@ export async function handleStayGuestRequest(request, env, path, ctx, now = new 
         alertType: "verified_spare_key_release",
         severity: "urgent",
         recipientGroup: "lost_key_team",
-        summary: `Verified guest in Room ${session.room} requested the spare key and confirmed the ${LOST_KEY_FEE_THB} THB lost-key fee. Rotate the key-box code before another automatic release.`,
+        summary: `Verified guest in Room ${session.room} requested the spare key and explicitly accepted the ${LOST_KEY_FEE_THB} THB lost-key fee for this request. Rotate the key-box code before another automatic release.`,
         escalationRequired: false,
         now
       });
@@ -599,14 +703,48 @@ export async function handleStayGuestRequest(request, env, path, ctx, now = new 
       return json({ error: "team_notification_failed" }, 503);
     }
 
-    const finalized = await store.finalizeSpareKeyRelease({
+    const authorized = await store.authorizeSpareKeyView({
       id: eventId,
       reservationId: session.reservationId,
       room: session.room,
+      requestHash,
       alertId: alert?.id || "",
       createdAt: now.toISOString()
     });
-    if (!finalized?.ok) return json({ error: "spare_key_recording_failed" }, 503);
+    if (!authorized?.ok) {
+      await store.cancelSpareKeyClaim(eventId).catch(() => {});
+      return json({ error: "spare_key_authorization_failed" }, 503);
+    }
+    return json({
+      ok: true,
+      room: session.room,
+      lostKeyFeeThb: LOST_KEY_FEE_THB,
+      teamNotificationSubmitted: true,
+      canViewSpareKey: true,
+      spareKeyViewToken: await createSpareKeyViewToken(session, eventId, requestHash, env, now)
+    });
+  }
+
+  if (path === "/api/stay/spare-key/view") {
+    if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405, { allow: "POST" });
+    if (!(await rateAllowed(env, request, "spare-key-view"))) return json({ error: "rate_limited" }, 429);
+    const body = await readJson(request, 2_000);
+    if (!activeStay(session, now)) return json({ error: "active_stay_required" }, 403);
+    const authorization = await validSpareKeyViewToken(body?.spareKeyViewToken, session, env, now);
+    if (!authorization) return json({ error: "lost_key_view_required" }, 400);
+    const state = await store.getSpareKeyState(session.reservationId, session.room);
+    if (state.rotationRequired) return json({ error: "key_code_rotation_required" }, 409);
+    if (state.releasedForReservation) return json({ error: "spare_key_already_released" }, 409);
+    const keyCode = parseKeyCodes(env)[session.room] || "";
+    if (!keyCode) return json({ error: "spare_key_not_configured" }, 503);
+    const finalized = await store.finalizeSpareKeyRelease({
+      id: authorization.eventId,
+      reservationId: session.reservationId,
+      room: session.room,
+      requestHash: authorization.requestHash,
+      createdAt: now.toISOString()
+    });
+    if (!finalized?.ok) return json({ error: finalized?.error || "lost_key_view_required" }, 409);
     return json({
       ok: true,
       room: session.room,

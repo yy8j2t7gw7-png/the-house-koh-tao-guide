@@ -2,6 +2,39 @@
 
 All notable changes to The House – Koh Tao guest guide are recorded here.
 
+## v5.11.22 — Progressive Booking, Property Intelligence & 24/7 Lost-Key Recovery
+
+### Progressive booking
+
+- Replaces multi-field collection responses with a reusable one-question-at-a-time state machine for diving, fishing, snorkeling, taxi, taxi/longtail boat, ferry and motorbike taxi.
+- Preserves valid details already supplied, presents buttons for finite choices, accepts compact guest-count replies only inside the relevant protected workflow and asks for an international reply contact last.
+- Keeps direct natural booking intent and each category's **Book with Us** action in the same state while information and recommendation questions remain non-actionable.
+- Retains Roctopus as the preferred diving recommendation, the conditional diving certification/course gates, Fah-plus-owner routing and the rule that no booking is confirmed before availability and payment.
+
+### Property intelligence
+
+- Adds deterministic recognition for pests/animals, odors, plumbing, equipment/appliances/Wi-Fi, fixtures/furniture, mold/damp and general room condition.
+- Routes routine reports once to Su plus both owners and deduplicates same-session, same-room, same-category detail follow-ups.
+- Asks one clarification for ambiguous odors, keeps dirty-room/bathroom/sheet/disinfection wording in the cleaning workflow and leaves genuine information questions non-actionable.
+- Preserves the explicit urgent-confirmation boundary for fire, dangerous electrical conditions, major leaks/flooding and other serious property hazards; classification alone never sends an alert.
+
+### Secure 24/7 lost-key recovery
+
+- Supersedes the office-hours/after-hours lost-key split. A verified active guest may use the protected self-service flow at 16:00, 23:00 or any other time; normal-hours personal assistance is additive and never a prerequisite.
+- Corrects the inconsistent old workflow in which the daytime Concierge branch could create a generic lost-key alert while the fixed Meta template claimed both after-hours access and accepted fee even though the guest had neither accepted the fee nor received a code action.
+- Starts every new request with `feeAccepted=false` and requires explicit acceptance bound to the current verified stay, room, protected session and short-lived lost-key request instance.
+- Requires at least one accepted Su-or-owner notification before the protected page can display the code. The code remains excluded from Concierge history, WhatsApp/Meta payloads, alerts, logs, diagnostics, source, screenshots and release files.
+- Stores a one-way used-request marker so an accepted request cannot be replayed, even after staff rotate the physical code and clear the room lock.
+- Immediately marks the room as requiring rotation after display and blocks another release until the physical code, encrypted `SPARE_KEY_CODES` secret and authorized admin reset are all completed.
+
+### Owner operations and regression protection
+
+- Makes Active/upcoming stays, alerts, maintenance, passport registration, learning queue, approved knowledge and recent activity independently collapsible with counts, persisted authorized-browser state and accessible 52-pixel controls.
+- Keeps sections containing unresolved urgent or critical work open and visible, and makes the physical key-box rotation requirement explicit.
+- Leaves production Meta template names, languages, component shapes, recipients, secrets, webhook behavior, `WHATSAPP_STAFF_ACTIONS_ENABLED=false`, emergency routing, passport rules and Airbnb synchronization unchanged.
+- Expands the complete regression suite from 129 to 140 tests, including all seven progressive bookings, routine and urgent property cases, 16:00/23:00 lost-key parity, missing/cancelled/stale/cross-room/expired/failed-notification/replay cases, rotation reset and admin collapse semantics.
+
+
 ## v5.11.21 — Cleaning-Time, Natural Booking & Lost-Key Copy Corrections
 
 ### Production fixes

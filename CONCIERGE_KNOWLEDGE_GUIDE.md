@@ -87,7 +87,7 @@ Protected passport entry and spare-key access use the separate deterministic ver
 
 Never store key-box codes, guest identity data, private access tokens, passwords, API credentials or messaging credentials in the knowledge JSON, public files, Git history or release ZIP.
 
-Follow `SECURE_AFTER_HOURS_ACCESS.md` for spare-key access.
+Follow `SECURE_24_HOUR_LOST_KEY_ACCESS.md` for spare-key access. Each new request requires its own explicit 500 THB acceptance; no historical workflow state may authorize release.
 
 Do not place telephone numbers or WhatsApp destinations inside learned answers. Contact actions are generated from protected, deterministic routing configuration.
 

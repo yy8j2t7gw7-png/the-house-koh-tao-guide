@@ -115,7 +115,7 @@ a{color:inherit}
   <a class="card emergency-card" href="/emergency.html"><h3>🚨 Help & Emergency</h3><p>Help & Emergency numbers and medical help.</p></a>
   <a class="card" href="/checkout.html"><h3>👋 Checkout</h3><p>Checkout time, key return and departure reminders.</p></a>
   <a class="card" href="/report-problem.html"><h3>🛠️ Report a Problem</h3><p>Tell us about water, toilet, AC, electricity, TV or another room issue.</p></a>
-  <a class="card spare-key-trigger" id="openSpareKeyAccess" href="#spareKeyAccess" aria-controls="spareKeyAccess" aria-expanded="false"><h3>🔑 Lost key or locked out?</h3><p>Secure after-hours help if you cannot enter your room.</p></a>
+  <a class="card spare-key-trigger" id="openSpareKeyAccess" href="#spareKeyAccess" aria-controls="spareKeyAccess" aria-expanded="false"><h3>🔑 Lost key or locked out?</h3><p>Secure 24-hour help if you cannot enter your room.</p></a>
 </section>
 
 <section class="section">
@@ -126,23 +126,24 @@ a{color:inherit}
 <section class="spare-key-card" id="spareKeyAccess" aria-labelledby="spareKeyTitle" hidden>
   <div class="spare-key-card-heading">
     <div>
-      <span class="stay-access-label">After-hours spare-key help</span>
+      <span class="stay-access-label">24-hour spare-key help</span>
       <h2 id="spareKeyTitle">Lost key or locked out?</h2>
     </div>
     <button class="btn secondary" id="closeSpareKeyAccess" type="button">Back to room guide</button>
   </div>
-  <p>You can access the spare key for your room between 7:30 PM and 10:30 AM.</p>
+  <p>Secure spare-key access is available 24 hours a day during your stay.</p>
   <div class="list compact-list">
     <div class="rule"><strong>🔑 Key box</strong>Next to your room door</div>
   </div>
-  <p>You're already verified for this room — no Airbnb confirmation code is needed.</p>
-  <p>If your key has been lost, a 500 THB replacement fee applies. The House team will be notified before the spare-key code is released.</p>
-  <p>Your key-box code is never sent through WhatsApp.</p>
+  <p>If your key has been lost, a 500 THB replacement fee applies. Confirm below if you would like to continue.</p>
   <p class="stay-access-status" id="spareKeyStatus" role="status" aria-live="assertive" hidden></p>
   <form class="spare-key-form" id="spareKeyForm" hidden>
     <label class="fee-confirmation"><input id="lostKeyFeeAccepted" type="checkbox" required> <span>I understand the 500 THB lost-key replacement fee and want to continue.</span></label>
-    <div class="stay-access-actions"><button class="btn" type="submit">Request spare key</button><button class="btn secondary" id="cancelLostKeyRequest" type="button">Cancel</button></div>
+    <div class="stay-access-actions"><button class="btn" type="submit">Accept 500 THB fee &amp; request spare key</button><button class="btn secondary" id="cancelLostKeyRequest" type="button">Cancel</button></div>
   </form>
+  <div class="stay-access-actions" id="spareKeyViewAction" hidden>
+    <button class="btn" id="viewSpareKey" type="button">View spare key</button>
+  </div>
   <div id="spareKeyContactHelp" hidden>
     <a class="btn" href="#concierge" data-action="contact">Contact The House Concierge</a>
   </div>

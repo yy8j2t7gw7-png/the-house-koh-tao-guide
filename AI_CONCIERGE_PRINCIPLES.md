@@ -83,7 +83,7 @@ General Contact Us actions should open the concierge first. Human WhatsApp and t
 
 ## Action-needed alerts
 
-Human-action requests create a sanitized server-side alert for the correct protected recipient group. Routine support routes to support, explicit booking work routes to booking, after-hours lost keys route to urgent, and medical or serious property incidents route to emergency. A recommendation question by itself is not a booking alert.
+Human-action requests create a sanitized server-side alert for the correct protected recipient group. Routine support routes to Su plus both owners, explicit booking work routes to Fah plus both owners, verified lost-key releases at any time route to Su plus both owners, and confirmed urgent property incidents route to Fah plus both owners without Su. A recommendation question by itself is not a booking alert.
 
 Urgent and critical alerts may escalate if not acknowledged. Recipient telephone numbers remain encrypted server configuration; the operational store uses only labels and salted hashes. Alerts never include passport information, key-box codes or private stay tokens. WhatsApp delivery uses the official Business Platform only when fully configured; otherwise the protected owner console remains available.
 
@@ -109,11 +109,11 @@ The dedicated property-emergency role is intended for 24/7 coverage, but the pub
 
 For an accident or urgent medical situation, offer two immediate call actions in a fixed order: Koh Tao Rescue first because the team knows Koh Tao and local access points, then Thailand's national medical emergency number 1669. Do not replace either action with an ordinary House contact.
 
-## After-hours lost keys
+## 24/7 lost-key recovery
 
-After hours are 19:30–10:30 in Bangkok time. State that a 500 THB replacement fee will be added for a lost key.
+State that a 500 THB replacement fee will be added for a lost key and require explicit acceptance for every current request. Office and housekeeping schedules do not limit the protected self-service flow; during normal service hours a personal-assistance fallback may be offered in addition.
 
-Automated spare-key code delivery must validate the current guest, room, active stay, time window and fee confirmation on the server. The system—not the guest—automatically notifies the protected urgent team and must receive confirmation of WhatsApp API submission before display, then require physical code rotation before another release. Key-box codes must never enter public client files, alerts, operational storage or conversation fallbacks.
+Automated spare-key code delivery must validate the current guest, room, active stay, protected session, single-use request authorization and current-request fee confirmation on the server. The system—not the guest—automatically notifies Su and both owners and must receive confirmation of at least one WhatsApp API submission before protected-page display, then require physical code rotation before another release. Historical acceptance must never carry between requests, days, sessions, stays, rooms or guests. Key-box codes must never enter public client files, Concierge history, alerts, Meta payloads, operational storage, logs, diagnostics, screenshots or conversation fallbacks.
 
 ## Factual discipline
 

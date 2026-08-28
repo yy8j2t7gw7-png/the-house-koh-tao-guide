@@ -6,7 +6,7 @@ Every active room has one permanent guest URL. Guests enter the Airbnb confirmat
 
 - automatic secure passport registration for non-Thai guests;
 - an exemption option when all overnight guests are Thai nationals;
-- protected after-hours spare-key access during the active stay.
+- protected 24/7 spare-key access during the active stay.
 
 The House does not create a guest link for each booking. Room 7 is reserved in the source but is not active or shown to guests.
 
@@ -35,7 +35,7 @@ Add these as **Production secrets** on the existing Worker. Never put the values
 - `RESERVATION_SYNC_TOKEN`: a different new random value. Generate it with the same command.
 - `SPARE_KEY_CODES`: a JSON object containing the current code for every active room, for example `{"1":"ROOM1CODE","2":"ROOM2CODE"}`. Enter the real codes only in Cloudflare.
 
-The official WhatsApp Business Platform alert secrets and the `urgent` recipient group must also be configured before automatic key release will activate. This is deliberate: the system automatically sends the lost-key alert, and a key code is never released unless WhatsApp confirms at least one team-message submission. The guest does not approve this notification.
+The official WhatsApp Business Platform alert secrets and the derived `lost_key_team` recipients (Su and both owners) must also be configured before automatic key release will activate. The system automatically sends the protected lost-key alert, and a key code is never released unless WhatsApp accepts at least one team-message submission. The guest does not approve this notification.
 
 ## 2. Install the automatic reservation synchronizer
 
@@ -78,7 +78,7 @@ Copy the text from `AIRBNB_SCHEDULED_MESSAGES.md`, choosing the matching room. T
 4. Confirm the correct code verifies the stay.
 5. Confirm the passport button opens `/passport-upload#token=...`, not WhatsApp.
 6. Confirm the all-Thai-guests button closes the registration reminder and revokes an unused pending upload link.
-7. Test spare-key release only with a temporary test key-box code and confirmation that the automatically triggered team message was submitted to WhatsApp.
+7. Test spare-key release at both daytime and nighttime only with a temporary test key-box code. Confirm every new request asks for explicit 500 THB acceptance and the automatically triggered Su-and-owner message is accepted before display.
 8. After a test release, change the physical code, update `SPARE_KEY_CODES`, deploy, then confirm rotation in the owner console.
 
 ## Security properties
@@ -86,8 +86,9 @@ Copy the text from `AIRBNB_SCHEDULED_MESSAGES.md`, choosing the matching room. T
 - Confirmation codes are HMAC-hashed immediately and never stored or displayed in readable form.
 - Verification cookies are `Secure`, `HttpOnly` and `SameSite=Strict` and expire at 11:00 AM on checkout day.
 - A room URL alone never grants protected access.
-- Spare-key release is limited to 7:30 PM–10:30 AM Bangkok time and only during the active stay.
-- The guest must explicitly confirm the 500 THB lost-key replacement fee. The system—not the guest—automatically sends the owner/Su notification.
+- Spare-key release is available 24/7 but only during a current verified active stay bound to the room and protected session.
+- Every new request starts without fee acceptance. The guest must explicitly confirm the 500 THB lost-key replacement fee for that request, and the system—not the guest—automatically sends the Su-and-owner notification.
+- The request authorization is short-lived and single-use; acceptance from another request, session, stay, room or guest is never inherited.
 - Key-box codes never enter the AI model, database, Git, logs or WhatsApp alert.
 - Each release blocks the next automatic release until the physical code is rotated and an owner confirms that operation.
 - Passport uploads remain single-use and the R2 14-day deletion rule remains the primary retention safeguard.

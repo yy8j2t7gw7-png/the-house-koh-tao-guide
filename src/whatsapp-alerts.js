@@ -600,7 +600,10 @@ export async function createConciergeAlert({ env, interactionId, sessionId, room
     : null;
   if (policy.alertType === "booking_request" && !bookingSubmission) return null;
   const config = whatsappAlertConfiguration(env);
-  const dedupeKey = await sha256(`${env.CONCIERGE_HASH_SALT || env.META_APP_SECRET || "the-house-alert"}:${sessionId}:${room}:${policy.alertType}:${normalizeDedupeSummary(policy.summary)}`);
+  const dedupeSummary = result.propertyIssueRequest?.category
+    ? `property issue ${String(result.propertyIssueRequest.category).slice(0, 40)}`
+    : policy.summary;
+  const dedupeKey = await sha256(`${env.CONCIERGE_HASH_SALT || env.META_APP_SECRET || "the-house-alert"}:${sessionId}:${room}:${policy.alertType}:${normalizeDedupeSummary(dedupeSummary)}`);
   const escalationDueAt = policy.escalationRequired
     ? new Date(now.getTime() + (config.escalationMinutes * 60_000)).toISOString()
     : "";

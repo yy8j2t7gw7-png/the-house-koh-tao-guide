@@ -26,10 +26,14 @@
   const spareKeyForm = document.getElementById("spareKeyForm");
   const spareKeyStatus = document.getElementById("spareKeyStatus");
   const feeCheckbox = document.getElementById("lostKeyFeeAccepted");
+  const spareKeyViewAction = document.getElementById("spareKeyViewAction");
+  const viewSpareKeyButton = document.getElementById("viewSpareKey");
   const spareKeyContactHelp = document.getElementById("spareKeyContactHelp");
   const keyResult = document.getElementById("spareKeyResult");
   const keyCode = document.getElementById("spareKeyCode");
   const keyLocation = document.getElementById("spareKeyLocation");
+  let lostKeyRequestToken = "";
+  let spareKeyViewToken = "";
 
   const messages = {
     verifying: "Verifying your stay…",
@@ -49,15 +53,16 @@
     nationalityError: "The guest type could not be saved. Please check the information and try again.",
     countError: "Enter the number of non-Thai people who will stay overnight in this room.",
     allGuestsError: "Confirm that the number includes every non-Thai adult and child staying overnight, not only the Airbnb booking guest.",
-    keyDaytime: "Automatic spare-key access is available only after hours, from 7:30 PM until 10:30 AM Bangkok time. During the day, please ask the concierge for help.",
     keyNotActive: "Spare-key access starts at check-in and ends at 11:00 AM on checkout day.",
     keyAlreadyReleased: "A spare key has already been provided for this stay. For security, another code cannot be released automatically. Please contact The House Concierge and we will help you.",
     keyRotation: "Another spare-key code cannot be released until the key box has been reset. Please contact The House Concierge and we will help you.",
-    keyUnavailable: "Automatic spare-key access is not available right now. Please contact the concierge for urgent help.",
+    keyUnavailable: "Secure spare-key access is not available right now. Please contact the concierge for urgent help.",
+    keyRequestExpired: "This lost-key request has expired. Refresh the page and explicitly accept the 500 THB fee again.",
     keyConfirmFee: "Please confirm the 500 THB lost-key replacement fee before continuing.",
     keyRateLimited: "Too many confirmation attempts. Please wait a minute before trying again.",
     keyReleasing: "Notifying The House team and preparing your spare-key access…",
-    keyReady: "Your spare key is ready.",
+    keyReady: "Thank you. Your request has been sent to The House team. You can now securely view the spare-key information below.",
+    keyDisplayed: "Your spare key is ready.",
     copied: "Code copied.",
     copy: "Copy code"
   };
@@ -127,10 +132,14 @@
     if (!spareKeySection) return;
     if (spareKeyTrigger) spareKeyTrigger.hidden = false;
     if (spareKeyForm) spareKeyForm.hidden = true;
+    if (spareKeyViewAction) spareKeyViewAction.hidden = true;
     if (spareKeyContactHelp) spareKeyContactHelp.hidden = true;
+    if (keyResult) keyResult.hidden = true;
+    if (keyCode) keyCode.textContent = "";
     if (feeCheckbox) feeCheckbox.checked = false;
+    lostKeyRequestToken = String(data.lostKeyRequestToken || "");
+    spareKeyViewToken = "";
     if (!data.activeStay) setStatus(spareKeyStatus, messages.keyNotActive, "attention");
-    else if (!data.afterHours) setStatus(spareKeyStatus, messages.keyDaytime, "attention");
     else if (data.keyCodeRotationRequired) {
       setStatus(spareKeyStatus, messages.keyRotation, "error");
       if (spareKeyContactHelp) spareKeyContactHelp.hidden = false;
@@ -285,20 +294,51 @@
     setBusy(submit, true);
     setStatus(spareKeyStatus, messages.keyReleasing, "working");
     try {
-      const data = await api("/api/stay/spare-key", { method: "POST", body: JSON.stringify({ feeAccepted: true }) });
+      const data = await api("/api/stay/spare-key", {
+        method: "POST",
+        body: JSON.stringify({ feeAccepted: true, lostKeyRequestToken })
+      });
+      lostKeyRequestToken = "";
+      spareKeyViewToken = String(data.spareKeyViewToken || "");
+      if (!data.canViewSpareKey || !spareKeyViewToken) throw Object.assign(new Error("spare_key_authorization_failed"), { code: "spare_key_authorization_failed" });
+      if (feeCheckbox) feeCheckbox.checked = false;
       spareKeyForm.hidden = true;
-      keyCode.textContent = data.keyBoxCode;
-      keyLocation.textContent = data.location;
-      keyResult.hidden = false;
+      if (spareKeyViewAction) spareKeyViewAction.hidden = false;
       setStatus(spareKeyStatus, messages.keyReady, "success");
     } catch (error) {
-      const lookup = { rate_limited: messages.keyRateLimited, fee_acceptance_required: messages.keyConfirmFee, active_stay_required: messages.keyNotActive, available_after_hours_only: messages.keyDaytime, spare_key_already_released: messages.keyAlreadyReleased, key_code_rotation_required: messages.keyRotation };
+      const lookup = { rate_limited: messages.keyRateLimited, fee_acceptance_required: messages.keyConfirmFee, lost_key_request_required: messages.keyRequestExpired, lost_key_request_used: messages.keyRequestExpired, active_stay_required: messages.keyNotActive, spare_key_already_released: messages.keyAlreadyReleased, key_code_rotation_required: messages.keyRotation };
       setStatus(spareKeyStatus, lookup[error.code] || messages.keyUnavailable, "error");
       if (["spare_key_already_released", "key_code_rotation_required"].includes(error.code)) {
         spareKeyForm.hidden = true;
         if (spareKeyContactHelp) spareKeyContactHelp.hidden = false;
       } else {
         setBusy(submit, false);
+      }
+    }
+  });
+
+  viewSpareKeyButton?.addEventListener("click", async () => {
+    if (!spareKeyViewToken) return setStatus(spareKeyStatus, messages.keyRequestExpired, "error");
+    setBusy(viewSpareKeyButton, true);
+    try {
+      const data = await api("/api/stay/spare-key/view", {
+        method: "POST",
+        body: JSON.stringify({ spareKeyViewToken })
+      });
+      spareKeyViewToken = "";
+      if (spareKeyViewAction) spareKeyViewAction.hidden = true;
+      keyCode.textContent = data.keyBoxCode;
+      keyLocation.textContent = data.location;
+      keyResult.hidden = false;
+      setStatus(spareKeyStatus, messages.keyDisplayed, "success");
+    } catch (error) {
+      const lookup = { rate_limited: messages.keyRateLimited, lost_key_view_required: messages.keyRequestExpired, claim_not_found: messages.keyRequestExpired, active_stay_required: messages.keyNotActive, spare_key_already_released: messages.keyAlreadyReleased, key_code_rotation_required: messages.keyRotation };
+      setStatus(spareKeyStatus, lookup[error.code] || messages.keyUnavailable, "error");
+      if (["spare_key_already_released", "key_code_rotation_required"].includes(error.code)) {
+        if (spareKeyViewAction) spareKeyViewAction.hidden = true;
+        if (spareKeyContactHelp) spareKeyContactHelp.hidden = false;
+      } else {
+        setBusy(viewSpareKeyButton, false);
       }
     }
   });

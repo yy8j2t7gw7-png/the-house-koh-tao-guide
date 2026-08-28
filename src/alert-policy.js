@@ -147,11 +147,14 @@ export function classifyConciergeAlert({ result, question, room, now = new Date(
     || result.intentId === "property_emergency") return null;
 
   if (result.intentId === "lost_key") {
-    if (base.afterHours && !result.confirmedLostKeyFee) return null;
+    // A lost-key staff notification may state that the replacement fee was
+    // accepted only when the current protected request carries explicit proof.
+    // Ordinary Concierge wording can never satisfy this boundary.
+    if (!result.confirmedLostKeyFee) return null;
     return {
       ...base,
       alertType: "lost_key",
-      severity: base.afterHours ? "urgent" : "attention",
+      severity: "urgent",
       recipientGroup: "lost_key_team",
       escalationRequired: false
     };
@@ -167,7 +170,7 @@ export function classifyConciergeAlert({ result, question, room, now = new Date(
     };
   }
 
-  if (result.handoff === "stay_support" && (result.housekeepingRequest || staySupportNeedsAttention(question))) {
+  if (result.handoff === "stay_support" && (result.housekeepingRequest || result.propertyIssueRequest || staySupportNeedsAttention(question))) {
     return {
       ...base,
       alertType: "stay_support",

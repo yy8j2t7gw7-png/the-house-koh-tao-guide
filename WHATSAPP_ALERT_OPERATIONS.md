@@ -2,19 +2,21 @@
 
 ## Purpose
 
-v5.11.21 provides a protected server-side staff-alert channel through the official Meta WhatsApp Business Platform. Guests continue to use the website Concierge. Recipient telephone numbers, access tokens and app secrets stay in encrypted Cloudflare secrets and never appear in public files, Git or release archives.
+v5.11.22 provides a protected server-side staff-alert channel through the official Meta WhatsApp Business Platform. Guests continue to use the website Concierge. Recipient telephone numbers, access tokens and app secrets stay in encrypted Cloudflare secrets and never appear in public files, Git or release archives.
 
 Routing is role based:
 
 - routine stay requests and actionable luggage requests route to Su plus both owners through derived `support_with_owners`;
 - House-arranged booking requests route to Fah plus both owners through derived `booking_with_owners`;
-- verified office-hours lost-key alerts and after-hours spare-key releases notify Su plus both owners through derived `lost_key_team` and do not use generic service or escalation routing;
+- verified 24/7 lost-key releases notify Su plus both owners through derived `lost_key_team` and do not use generic service or escalation routing;
 - explicitly confirmed urgent or critical property incidents notify Fah plus both owners, without Su, through derived `urgent_response`;
 - unacknowledged urgent or critical property alerts route to the configured future on-call `escalation` group after 10 minutes, with the owners as the current safe fallback.
 
 Every luggage alert is independently validated at the final server-side creation boundary. That boundary refuses storage and WhatsApp delivery unless the individual request contains arrival/departure context, requested time, bag count and a usable international contact. Template fields come from this validated structure, so a newly created luggage alert must never contain `Not provided` for a required field.
 
 Every structured booking alert is also validated at the final server-side creation boundary. Diving retains its preferred date, diver count, recognised experience/course choice, conditional certification or named-course detail and usable international contact. Fishing and snorkeling require date, guest count and trip style; taxi and motorbike taxi require date, time, pickup, destination and passenger count; taxi/longtail boat additionally requires one-way or return; ferry requires date, origin, destination and traveler count, with time accepted when supplied. Every category requires a usable international contact. Complete requests route through `booking_with_owners`; recommendation-only questions create no alert. The guest never receives a personal Fah WhatsApp action.
+
+Routine property reports for pests/animals, odors, plumbing, equipment, fixtures, mold/damp and room condition route through `support_with_owners`. The report is deduplicated by protected session, verified room, alert type and normalized property category, so a detail follow-up updates the conversation without sending a second alert. Dirty-room, bathroom, sheet or disinfection requests use the cleaning workflow instead. Potential fire, dangerous electrical, major leak/flooding or other critical property incidents remain behind the guest's explicit **Send urgent alert** boundary and route through `urgent_response` only after confirmation.
 
 A recommendation question alone does not create a booking alert. The guest must ask to book, reserve, arrange or check availability. A luggage-information question remains informational. An actionable luggage request enters a deterministic collection workflow and creates an alert only after arrival/departure context, requested time, bag count and a usable international reply contact are all available. Identical alerts from the same session are deduplicated for five minutes.
 
@@ -29,7 +31,7 @@ Medical, personal-safety and critical-property classifications never create an a
 - A verified guest reply number may be added only to the transient urgent delivery payload; it is not stored in the alert record.
 - Actionable booking and luggage requests require a usable contact number. Routine towels, soap, toilet-paper and room-cleaning requests from a verified room do not. When a contact is required, it is added only to the transient protected delivery payload and never to visible chat, browser history, AI context, interaction, alert or application logs. Immediate visible redaction applies to every request type. Genuine urgent incidents are not blocked if no number is available.
 - A displayed room number is guest-selected context unless the alert explicitly says the stay is verified.
-- Automatic spare-key release remains separate and fail closed: a current verified room-bound session, the 19:30–10:30 Bangkok window, deliberate 500 THB fee acceptance and at least one accepted protected team notification are all required. The guest does not approve the staff notification.
+- Automatic spare-key release remains separate, available 24/7 and fail closed: a current verified room-bound active-stay session, a short-lived single-use request bound to that session/stay/room, deliberate 500 THB fee acceptance for the current request and at least one accepted protected team notification are all required. The guest does not approve the staff notification. No old acceptance may be inherited.
 - Alert records and delivery metadata are removed after 30 days.
 - The platform does not send automated outbound messages to Koh Tao Rescue, 1669, police, hospitals or clinics. Guest-facing emergency call actions remain direct.
 
@@ -46,7 +48,7 @@ The current Utility templates are Active in WhatsApp Manager as generic English 
 | Verified lost key | `house_lost_key_alert_v3` | `en` | reference, room, Bangkok date/time |
 | Staff status | `house_alert_status_v1` | `en` | reference, room, human-readable request, safe actor label, `ACKNOWLEDGED`/`RESOLVED` |
 
-Luggage and booking templates have no dedicated reply-number variable. A validated international contact is therefore appended only to the transient protected notes parameter as `Guest reply: …`; it does not enter ordinary chat, alert, dashboard or log storage. The lost-key template is constructed only after the existing verified-stay, after-hours and explicit-fee gates and never receives the key-box code.
+Luggage and booking templates have no dedicated reply-number variable. A validated international contact is therefore appended only to the transient protected notes parameter as `Guest reply: …`; it does not enter ordinary chat, alert, dashboard or log storage. The lost-key template is constructed only after the verified active-stay, current-request and explicit-fee gates and never receives the key-box code.
 
 The previous five v1 names remain mapped in code solely as a deliberate rollback capability. Those older templates retain their approved English (US) translation (`en_US`). Do not switch production back without a separately authorized rollback decision. An unknown name, wrong purpose or wrong parameter count fails closed before the Graph API call.
 
@@ -138,7 +140,7 @@ WHATSAPP_ALERT_ESCALATION_MINUTES=10
 
 `WHATSAPP_ALERT_TEMPLATE_LANGUAGE` remains present for compatibility and does not need a Cloudflare change for v5.11.17. Every mapped production or rollback template now uses the language attached to its immutable schema entry.
 
-The optional action templates are intentionally absent from `wrangler.jsonc`, so deploying v5.11.21 cannot activate unapproved Meta definitions. After all five intended templates are Active, configure these exact non-secret variables and then enable the gate in a separate authorized activation release:
+The optional action templates are intentionally absent from `wrangler.jsonc`, so deploying v5.11.22 cannot activate unapproved Meta definitions. After all five intended templates are Active, configure these exact non-secret variables and then enable the gate in a separate authorized activation release:
 
 ```text
 WHATSAPP_SERVICE_ACTION_TEMPLATE_NAME=house_service_alert_actions_v2
@@ -153,16 +155,19 @@ If the flag is false, missing or any required action-template mapping is absent,
 
 Review Meta's supported Graph API versions before changing the version. The Worker checks once per minute for overdue escalations.
 
-## v5.11.21 deployment and changed-only verification
+## v5.11.22 deployment and changed-function verification
 
-Deploy the verified v5.11.21 bundle to the existing Worker without changing the six production template mappings, secrets, recipients, webhook settings, `SPARE_KEY_CODES` or `WHATSAPP_STAFF_ACTIONS_ENABLED=false` state.
+Deploy the verified v5.11.22 bundle to the existing Worker without changing the six production template mappings, secrets, recipients, webhook settings, `SPARE_KEY_CODES` or `WHATSAPP_STAFF_ACTIONS_ENABLED=false` state.
 
-Smoke-test only the functions changed in this release:
+Smoke-test the changed functions with non-sensitive data:
 
-1. At 15:33 Bangkok time from a verified room, send **my room is dirty**, then **2pm**, then **4pm**. Confirm 2:00 PM stays pending with no delivery and the correction produces exactly one service alert containing only 4:00 PM.
-2. Send **I wanna go fishing** and confirm structured fishing collection starts immediately. Ask **What fishing trips do you offer?**, then press **Book with Us** and confirm that action enters the same structured state without an informational pseudo-step.
-3. During office hours from a verified active stay, send **I lost my key**. Confirm one dedicated lost-key alert and the response: “Thank you. I’ve notified The House team about your lost key. Someone from the team will assist you as soon as possible.” Confirm the reply exposes no implementation terminology.
+1. Start each of the seven supported booking categories directly and through **Book with Us**. Confirm only one missing question appears at a time, supplied fields persist, contact is last and one completed request creates one Fah-plus-owner alert.
+2. Submit one routine pest or plumbing report and a same-category detail follow-up. Confirm one Su-plus-owner alert only. Confirm a dirty-room request uses cleaning, an ambiguous odor asks one clarification and a serious electrical/fire/water phrase exposes the urgent confirmation action without sending automatically.
+3. At 16:00 Bangkok time from a verified active stay, send **I lost my key**. Confirm the guest is asked to accept 500 THB, no code is available and no staff payload claims acceptance. Accept once; confirm at least one Su-or-owner delivery is accepted before **View spare key** becomes available, then confirm display engages the rotation lock.
+4. Repeat the same test at 23:00 and confirm identical self-service behavior. A normal-hours **Call Us** fallback may also appear but must not block self-service.
+5. Confirm cancellation, missing acceptance and simulated notification failure expose no code. Confirm a new request/session, another stay or another room starts with no accepted fee, an expired request fails and an already used request cannot be replayed after rotation.
+6. In the owner console, verify each operational section collapses independently, the state persists in the authorized browser and unresolved urgent/critical work remains open and visibly counted.
 
 Quick-action activation is a separate post-approval change. Follow `META_STAFF_QUICK_ACTIONS_v5.11.20.md` only after every intended template is Active; never map service v1.
 
-If configuration is incomplete, alerts remain visible in the protected owner console and ordinary Concierge use continues. Automatic spare-key release remains unavailable by design.
+If configuration is incomplete, alerts remain visible in the protected owner console and ordinary Concierge use continues. Automatic spare-key release fails closed by design.

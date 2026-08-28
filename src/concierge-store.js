@@ -248,13 +248,13 @@ export class ConciergeStore extends DurableObject {
           event_type TEXT NOT NULL,
           fee_accepted INTEGER NOT NULL DEFAULT 0,
           code_released INTEGER NOT NULL DEFAULT 0,
+          request_hash TEXT NOT NULL DEFAULT '',
           alert_id TEXT NOT NULL DEFAULT '',
           created_at TEXT NOT NULL
         );
         CREATE INDEX IF NOT EXISTS spare_key_events_reservation
           ON spare_key_events(reservation_id, created_at);
-        CREATE UNIQUE INDEX IF NOT EXISTS spare_key_events_single_claim
-          ON spare_key_events(reservation_id);
+        DROP INDEX IF EXISTS spare_key_events_single_claim;
 
         CREATE TABLE IF NOT EXISTS spare_key_room_state (
           room TEXT PRIMARY KEY,
@@ -270,6 +270,14 @@ export class ConciergeStore extends DurableObject {
       } catch (_error) {
         // Existing deployments already have the column after the first v5.11.5 initialization.
       }
+      try {
+        this.ctx.storage.sql.exec("ALTER TABLE spare_key_events ADD COLUMN request_hash TEXT NOT NULL DEFAULT ''");
+      } catch (_error) {
+        // Fresh databases and upgraded deployments already have this release-bound request column.
+      }
+      this.ctx.storage.sql.exec(
+        "CREATE UNIQUE INDEX IF NOT EXISTS spare_key_events_request ON spare_key_events(request_hash) WHERE request_hash <> ''"
+      );
     });
   }
 
@@ -1149,7 +1157,7 @@ export class ConciergeStore extends DurableObject {
       cleanText(room, 4)
     ))[0] || null;
     return {
-      releasedForReservation: Boolean(event),
+      releasedForReservation: Boolean(event) && Boolean(roomState?.rotationRequired),
       rotationRequired: Boolean(roomState?.rotationRequired),
       lastReleasedAt: roomState?.lastReleasedAt || "",
       lastReservationId: roomState?.lastReservationId || ""
@@ -1195,41 +1203,67 @@ export class ConciergeStore extends DurableObject {
   async claimSpareKeyRelease(record) {
     const reservationId = cleanText(record.reservationId, 100);
     const room = cleanText(record.room, 4);
+    const requestHash = cleanText(record.requestHash, 100);
+    if (!requestHash) return { ok: false, error: "lost_key_request_required" };
+    const usedRequest = rows(this.ctx.storage.sql.exec(
+      "SELECT id FROM spare_key_events WHERE request_hash = ? LIMIT 1",
+      requestHash
+    ))[0];
+    if (usedRequest) return { ok: false, error: "lost_key_request_used" };
     const roomState = rows(this.ctx.storage.sql.exec(
       "SELECT rotation_required AS rotationRequired FROM spare_key_room_state WHERE room = ? LIMIT 1",
       room
     ))[0];
     if (Boolean(roomState?.rotationRequired)) return { ok: false, error: "key_code_rotation_required" };
-    const existing = rows(this.ctx.storage.sql.exec(
-      "SELECT id FROM spare_key_events WHERE reservation_id = ? LIMIT 1",
-      reservationId
-    ))[0];
-    if (existing) return { ok: false, error: "spare_key_already_released" };
     const now = cleanText(record.createdAt, 40) || new Date().toISOString();
+    // A fresh explicitly accepted request supersedes an abandoned, undisplayed
+    // request for the same room. Keep the old request hash as a permanent used
+    // marker so its historical acceptance can never authorize a later release.
+    this.ctx.storage.sql.exec(
+      `UPDATE spare_key_events SET event_type = 'superseded'
+       WHERE room = ? AND code_released = 0
+         AND event_type IN ('notification_pending', 'notification_accepted')`,
+      room
+    );
     this.ctx.storage.sql.exec(
       `INSERT INTO spare_key_events
-       (id, reservation_id, room, event_type, fee_accepted, code_released, alert_id, created_at)
-       VALUES (?, ?, ?, 'notification_pending', 1, 0, '', ?)`,
+       (id, reservation_id, room, event_type, fee_accepted, code_released, request_hash, alert_id, created_at)
+       VALUES (?, ?, ?, 'notification_pending', 1, 0, ?, '', ?)`,
       cleanText(record.id, 100),
       reservationId,
       room,
-      now
-    );
-    this.ctx.storage.sql.exec(
-      `INSERT INTO spare_key_room_state
-       (room, rotation_required, last_released_at, last_reservation_id,
-        rotation_confirmed_at, updated_at)
-       VALUES (?, 1, '', ?, '', ?)
-       ON CONFLICT(room) DO UPDATE SET
-         rotation_required = 1,
-         last_reservation_id = excluded.last_reservation_id,
-         rotation_confirmed_at = '',
-         updated_at = excluded.updated_at`,
-      room,
-      reservationId,
+      requestHash,
       now
     );
     return { ok: true };
+  }
+
+  async authorizeSpareKeyView(record) {
+    const eventId = cleanText(record.id, 100);
+    const reservationId = cleanText(record.reservationId, 100);
+    const room = cleanText(record.room, 4);
+    const requestHash = cleanText(record.requestHash, 100);
+    this.ctx.storage.sql.exec(
+      `UPDATE spare_key_events
+       SET event_type = 'notification_accepted', alert_id = ?
+       WHERE id = ? AND reservation_id = ? AND room = ? AND request_hash = ?
+         AND event_type = 'notification_pending' AND code_released = 0`,
+      cleanText(record.alertId, 100),
+      eventId,
+      reservationId,
+      room,
+      requestHash
+    );
+    const authorized = rows(this.ctx.storage.sql.exec(
+      `SELECT id FROM spare_key_events
+       WHERE id = ? AND reservation_id = ? AND room = ? AND request_hash = ?
+         AND event_type = 'notification_accepted' AND code_released = 0 LIMIT 1`,
+      eventId,
+      reservationId,
+      room,
+      requestHash
+    ))[0];
+    return { ok: Boolean(authorized) };
   }
 
   async finalizeSpareKeyRelease(record) {
@@ -1237,19 +1271,26 @@ export class ConciergeStore extends DurableObject {
     const eventId = cleanText(record.id, 100);
     const reservationId = cleanText(record.reservationId, 100);
     const room = cleanText(record.room, 4);
+    const requestHash = cleanText(record.requestHash, 100);
+    const roomState = rows(this.ctx.storage.sql.exec(
+      "SELECT rotation_required AS rotationRequired FROM spare_key_room_state WHERE room = ? LIMIT 1",
+      room
+    ))[0];
+    if (Boolean(roomState?.rotationRequired)) return { ok: false, error: "key_code_rotation_required" };
     const claim = rows(this.ctx.storage.sql.exec(
       `SELECT id FROM spare_key_events
-       WHERE id = ? AND reservation_id = ? AND room = ? AND code_released = 0 LIMIT 1`,
+       WHERE id = ? AND reservation_id = ? AND room = ? AND request_hash = ?
+         AND event_type = 'notification_accepted' AND code_released = 0 LIMIT 1`,
       eventId,
       reservationId,
-      room
+      room,
+      requestHash
     ))[0];
     if (!claim) return { ok: false, error: "claim_not_found" };
     this.ctx.storage.sql.exec(
       `UPDATE spare_key_events
-       SET event_type = 'verified_after_hours_release', code_released = 1, alert_id = ?
+       SET event_type = 'verified_spare_key_release', code_released = 1
        WHERE id = ?`,
-      cleanText(record.alertId, 100),
       eventId
     );
     this.ctx.storage.sql.exec(
@@ -1272,24 +1313,10 @@ export class ConciergeStore extends DurableObject {
   }
 
   async cancelSpareKeyClaim(id) {
-    const claim = rows(this.ctx.storage.sql.exec(
-      "SELECT room, reservation_id AS reservationId FROM spare_key_events WHERE id = ? AND code_released = 0 LIMIT 1",
-      cleanText(id, 100)
-    ))[0];
     this.ctx.storage.sql.exec(
       "DELETE FROM spare_key_events WHERE id = ? AND code_released = 0",
       cleanText(id, 100)
     );
-    if (claim) {
-      this.ctx.storage.sql.exec(
-        `UPDATE spare_key_room_state
-         SET rotation_required = 0, last_reservation_id = '', updated_at = ?
-         WHERE room = ? AND last_reservation_id = ?`,
-        new Date().toISOString(),
-        cleanText(claim.room, 4),
-        cleanText(claim.reservationId, 100)
-      );
-    }
     return { ok: true };
   }
 

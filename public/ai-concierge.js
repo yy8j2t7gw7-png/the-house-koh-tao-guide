@@ -551,8 +551,16 @@
   function requiresProtectedServer(question) {
     if (activeWorkflowState) return true;
     const source = String(question || "");
+    const normalized = source.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
     const impliedLuggageRequest = /\b(?:arrival|arriving|departure|departing)\b/i.test(source)
       && /\b(?:\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten)\s*(?:bags?|suitcases?|pieces?|luggage\s+items?)\b/i.test(source);
+    const propertyInformationControl = /\b(?:what animals live|animals (?:are|is) (?:there|common)|are mosquitoes common|how does (?:the )?(?:ac|air con|air conditioner) work|what is (?:the )?wifi password)\b/.test(normalized);
+    const propertyIssue = !propertyInformationControl && (
+      /\b(?:rats?|mice|mouse|cockroaches?|roaches?|ants?|spiders?|termites?|fleas?|bed ?bugs?|bees?|wasps?)\b.{0,80}\b(?:in|inside|under|above|behind|all over|everywhere|nest|problem|infestation|room|bathroom|roof|ceiling)\b/.test(normalized)
+      || /\b(?:scratching|droppings|animal nest|strange smell|weird smell|unusual smell|sewage smell|rotten egg smell|musty smell|mold smell|mould smell)\b/.test(normalized)
+      || /\b(?:bathroom|toilet|shower|drain|sink|tap|faucet|pipe|ac|air con|air conditioner|fan|fridge|refrigerator|tv|light|socket|outlet|wifi|internet|bed|chair|desk|curtain|door|window|lock|furniture)\b.{0,65}\b(?:smells?|stinks?|leak|leaking|drip|dripping|blocked|clogged|overflowing|not cold|isn t cold|not working|doesn t work|isn t working|broken|damaged|stuck|loose|no hot water|no water|low water pressure)\b/.test(normalized)
+      || /\b(?:burning smell|smell(?:s|ing)? (?:like )?burning|smoke (?:is )?(?:coming )?from|water (?:is )?pouring|ceiling (?:is )?(?:falling down|collapsing|caving in)|snake)\b/.test(normalized)
+    );
     return /(?:\+|00)?\d[\d ()-]{6,20}\d/.test(source)
       || impliedLuggageRequest
       || /\b(?:luggage|baggage|store\s+(?:my|our)?\s*bags?|room\s+cleaning|clean\s+(?:my|our|the)\s+room)\b/i.test(source)
@@ -560,7 +568,8 @@
       || /\b(?:i\s+(?:have\s+)?lost\s+(?:my|the)\s+(?:room\s+)?key|(?:my|the)\s+(?:room\s+)?key\s+(?:is\s+)?(?:lost|missing)|cannot\s+find\s+(?:my|the)\s+(?:room\s+)?key|can['’]?t\s+find\s+(?:my|the)\s+(?:room\s+)?key|locked\s+out|need\s+(?:a\s+)?replacement\s+key)\b/i.test(source)
       || /(?:^\s*(?:please\s+)?(?:book|reserve|arrange)\b|\b(?:please\s+(?:book|reserve|arrange)|can\s+you\s+(?:book|reserve|arrange)|could\s+you\s+(?:book|reserve|arrange)|help\s+me\s+(?:book|reserve|arrange)|i\s+(?:want|wanna|need|would\s+like)\s+(?:you\s+)?(?:to\s+)?(?:book|reserve|arrange)|book\s+(?:me|us)|make\s+(?:a\s+)?(?:booking|reservation))\b)/i.test(source)
       || /(?:\b(?:i\s+(?:need|want|would\s+like)|can\s+(?:i|we)\s+(?:get|have)|get\s+me|send\s+me)\s+(?:a\s+)?(?:taxi(?:\s+boat)?|longtail\s+boat|motorbike\s+taxi|ferry\s+tickets?)\b|^\s*(?:taxi(?:\s+boat)?|longtail(?:\s+boat)?|motorbike\s+taxi|ferry(?:\s+tickets?)?)\b(?=[\s\S]*\b(?:today|tomorrow|next\s+(?:mon|tues|wednes|thurs|fri|satur|sun)day|in\s+\d{1,3}\s+days?|from|to|at\s+\d)))/i.test(source)
-      || /(?:\b(?:i|we)\s+(?:(?:want|need|plan)\s+to|would\s+like\s+to|wanna)\s+(?:(?:go|book|arrange)\s+)?(?:fishing|snorkel(?:ing|ling)?)\b|\b(?:i|we)['’]d\s+like\s+to\s+(?:(?:go|book|arrange)\s+)?(?:fishing|snorkel(?:ing|ling)?)\b|\b(?:i|we)\s+(?:want|need|would\s+like)\s+(?:a\s+)?(?:fishing|snorkel(?:ing|ling)?)\s+(?:trip|tour)\b|\b(?:take\s+(?:me|us)|can\s+you\s+take\s+(?:me|us)|help\s+(?:me|us)\s+(?:go\s+)?)\s*(?:fishing|snorkel(?:ing|ling)?)\b)/i.test(source);
+      || /(?:\b(?:i|we)\s+(?:(?:want|need|plan)\s+to|would\s+like\s+to|wanna)\s+(?:(?:go|book|arrange)\s+)?(?:(?:scuba\s+)?div(?:e|ing)|fishing|snorkel(?:ing|ling)?)\b|\b(?:i|we)['’]d\s+like\s+to\s+(?:(?:go|book|arrange)\s+)?(?:(?:scuba\s+)?div(?:e|ing)|fishing|snorkel(?:ing|ling)?)\b|\b(?:i|we)\s+(?:want|need|would\s+like)\s+(?:a\s+)?(?:diving|fishing|snorkel(?:ing|ling)?)\s+(?:trip|tour)\b|\b(?:take\s+(?:me|us)|can\s+you\s+take\s+(?:me|us)|help\s+(?:me|us)\s+(?:go\s+)?)\s*(?:(?:scuba\s+)?div(?:e|ing)|fishing|snorkel(?:ing|ling)?)\b)/i.test(source)
+      || propertyIssue;
   }
 
   function deliverAnswer(result, question) {
@@ -568,6 +577,7 @@
     const privateContactWorkflow = result.workflow?.type === "luggage"
       || result.workflow?.type === "booking";
     activeWorkflowState = result.workflow?.status === "collecting"
+      || (result.workflow?.type === "property_issue" && result.workflow?.status === "monitoring")
       ? result.workflow
       : null;
     if (privateContactWorkflow

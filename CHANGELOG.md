@@ -2,6 +2,15 @@
 
 All notable changes to The House – Koh Tao guest guide are recorded here.
 
+## v5.11.34 — Mobile Room 11 Crop Hotfix
+
+### Real-iPhone framing correction
+
+- Keeps the approved Room 11 horizontal focal point at `72%` and moves only the mobile vertical focal point from `58%` to `100%`, aligning the image to its bottom edge so the marked Room 11 entrance is fully visible.
+- Applies only inside the existing `@media(max-width:760px)` rule. Tablet and desktop Room imagery are unchanged.
+- Keeps the 232 px mobile Room hero height, left-side overlay, Finding Room sequence and v5.11.33 stable AI Concierge exactly as approved.
+- No operational, Admin Dashboard, WhatsApp, booking, lost-key, passport, stay or Airbnb behavior changes.
+
 ## v5.11.33 — Stable Mobile AI Concierge
 
 ### Calm fixed launcher

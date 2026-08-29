@@ -2647,7 +2647,7 @@ test("guest localization supports seven languages and keeps the owner dashboard 
   assert.doesNotMatch(admin, /src="\/i18n\.js"/);
   assert.match(runtime, /exploreContentDeferred/);
   assert.match(runtime, /element\.closest\("\.section,\.footer"\)/);
-  assert.match(runtime, /houseGuideTranslations:v5\.11\.33:/);
+  assert.match(runtime, /houseGuideTranslations:v5\.11\.34:/);
   assert.match(runtime, /MAX_REQUEST_RETRIES = 2/);
   assert.match(runtime, /let flushRunning = false/);
 });
@@ -4817,8 +4817,8 @@ test("agency-specific beginner and continuing courses pass the structured diving
   }
 });
 
-test("the bundled v5.11.33 catalog preserves current PADI, SSI and RAID pathways", () => {
-  assert.equal(divingCourses.updatedForRelease, "5.11.33");
+test("the bundled v5.11.34 catalog preserves current PADI, SSI and RAID pathways", () => {
+  assert.equal(divingCourses.updatedForRelease, "5.11.34");
   assert.deepEqual(divingCourses.houseRecommendation, {
     agency: "RAID",
     reason: "focus on dive safety and buoyancy control",
@@ -8802,7 +8802,7 @@ test("v5.11.33 launcher is removed from the open chat surface and restored on cl
   assert.match(script, /function closePanel\(\)[\s\S]*launcher\.hidden = false;[\s\S]*launcher\.removeAttribute\("aria-hidden"\);[\s\S]*launcher\.setAttribute\("aria-expanded", "false"\);/);
 });
 
-test("v5.11.33 preserves the v5.11.32 Room 11 marked-entrance crop", async () => {
+test("v5.11.34 moves only the mobile Room 11 crop downward while preserving desktop", async () => {
   const [styles, roomApp, roomData] = await Promise.all([
     readFile(new URL("../public/design-system.css", import.meta.url), "utf8"),
     readFile(new URL("../public/room-app.js", import.meta.url), "utf8"),
@@ -8812,8 +8812,12 @@ test("v5.11.33 preserves the v5.11.32 Room 11 marked-entrance crop", async () =>
   assert.match(roomApp, /document\.body\.dataset\.roomNumber = room/);
   assert.match(styles, /\.room-guide-page \.hero\{min-height:232px;height:232px\}/);
   assert.match(styles, /\.room-guide-page \.hero img\{height:232px;object-position:50% 54%\}/);
-  assert.match(styles, /\.room-guide-page\[data-room-number="11"\] \.hero img\{object-position:72% 58%\}/);
+  assert.match(styles, /\.room-guide-page\[data-room-number="11"\] \.hero img\{object-position:72% 100%\}/);
   assert.match(styles, /\.room-guide-page\[data-room-number="11"\] \.hero-copy\{right:auto;left:18px;max-width:54%\}/);
+  const mobileRoomBlock = styles.match(/@media\(max-width:760px\)\{([\s\S]*?)\n\}/)?.[1] || "";
+  assert.match(mobileRoomBlock, /\.room-guide-page\[data-room-number="11"\] \.hero img\{object-position:72% 100%\}/);
+  const outsideMobileRoomBlock = styles.replace(/@media\(max-width:760px\)\{[\s\S]*?\n\}/, "");
+  assert.doesNotMatch(outsideMobileRoomBlock, /data-room-number="11"[^}]*object-position:72% 100%/);
   assert.doesNotMatch(styles, /\.room-guide-page \.hero\{min-height:208px;height:208px\}/);
   assert.match(roomData, /"11": \{[\s\S]*"photo": "photo-07\.jpeg"[\s\S]*"note": "Room 11 is downstairs and marked clearly in the building photo\."/);
 });

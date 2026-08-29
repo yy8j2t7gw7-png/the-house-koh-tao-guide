@@ -163,9 +163,9 @@ If the flag is false, missing or any required action-template mapping is absent,
 
 Review Meta's supported Graph API versions before changing the version. The Worker checks once per minute for overdue escalations.
 
-## v5.11.35 activation / v5.11.36 preservation verification
+## v5.11.35 activation / v5.11.37 preservation verification
 
-v5.11.36 preserves the verified v5.11.35 Meta configuration without changing secrets, recipients, webhook settings, routes, BODY counts/order or `SPARE_KEY_CODES`. The action-template names and `WHATSAPP_STAFF_ACTIONS_ENABLED=true` remain exactly as activated in v5.11.35.
+v5.11.37 preserves the verified v5.11.35 Meta production configuration without changing secrets, recipients, webhook settings, routes, BODY counts/order or `SPARE_KEY_CODES`. The currently active action-template names and `WHATSAPP_STAFF_ACTIONS_ENABLED=true` remain exactly as activated in v5.11.35. Five newer human-friendly replacements (`house_service_alert_actions_v3`, `house_booking_alert_actions_v2`, `house_luggage_alert_actions_v2`, `house_urgent_alert_actions_v2`, `house_lost_key_alert_actions_v2`) are under Meta review and must not be mapped until all five are Active and a separate activation release is explicitly authorized.
 
 Run one non-sensitive alert of each action-template kind:
 

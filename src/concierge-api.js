@@ -40,7 +40,7 @@ import {
   specialtyChoiceLabels
 } from "./diving-catalog.js";
 
-const RELEASE = "5.11.36";
+const RELEASE = "5.11.37";
 const ROOM_OPTIONS = new Set(["1", "2", "3", "4", "5", "6", "8", "9", "10", "11"]);
 const MAX_HISTORY_ITEMS = 10;
 const MAX_QUESTION_LENGTH = 800;
@@ -188,20 +188,25 @@ const DIVING_COURSE_REFERENCE = /(?:\b(?:padi|ssi|raid)\b[^.?!]{0,80}\b(?:scuba\
 const ACTIONABLE_STRUCTURED_BOOKING = /(?:^\s*(?:please\s+)?(?:book|reserve|arrange)\b|\b(?:please\s+(?:book|reserve|arrange)|can\s+you\s+(?:book|reserve|arrange)|could\s+you\s+(?:book|reserve|arrange)|help\s+me\s+(?:book|reserve|arrange)|i\s+(?:want|wanna|need|would\s+like)\s+(?:you\s+)?(?:to\s+)?(?:book|reserve|arrange)|book\s+(?:me|us)|make\s+(?:a\s+)?(?:booking|reservation))\b)/i;
 const DIRECT_TRANSPORT_BOOKING = /(?:\b(?:i\s+(?:need|want|would\s+like)|can\s+(?:i|we)\s+(?:get|have)|get\s+me|send\s+me)\s+(?:a\s+)?(?:taxi(?:\s+boat)?|longtail\s+boat|motorbike\s+taxi|ferry\s+tickets?)\b|^\s*(?:taxi(?:\s+boat)?|longtail(?:\s+boat)?|motorbike\s+taxi|ferry(?:\s+tickets?)?)\b(?=[\s\S]*\b(?:today|tomorrow|next\s+(?:mon|tues|wednes|thurs|fri|satur|sun)day|in\s+\d{1,3}\s+days?|from|to|at\s+\d)))/i;
 const DIRECT_ACTIVITY_BOOKING = /(?:\b(?:i|we)\s+(?:(?:want|need|plan)\s+to|would\s+like\s+to|wanna)\s+(?:(?:go|book|arrange)\s+)?(?:(?:scuba\s+)?div(?:e|ing)|fishing|snorkel(?:ing|ling)?)\b|\b(?:i|we)['’]d\s+like\s+to\s+(?:(?:go|book|arrange)\s+)?(?:(?:scuba\s+)?div(?:e|ing)|fishing|snorkel(?:ing|ling)?)\b|\b(?:i|we)\s+(?:want|need|would\s+like)\s+(?:a\s+)?(?:diving|fishing|snorkel(?:ing|ling)?)\s+(?:trip|tour)\b|\b(?:take\s+(?:me|us)|can\s+you\s+take\s+(?:me|us)|help\s+(?:me|us)\s+(?:go\s+)?)\s*(?:(?:scuba\s+)?div(?:e|ing)|fishing|snorkel(?:ing|ling)?)\b)/i;
+const DIVING_LEARNING_REQUEST = /\b(?:i|we)\s+(?:(?:want|need|plan)\s+to|would\s+like\s+to|wanna)\s+learn(?:\s+how)?\s+(?:to\s+)?div(?:e|ing)\b/i;
 const SUPPORTED_BOOKING_KINDS = new Set(["diving", "fishing", "snorkeling", "taxi", "taxi_boat", "ferry", "motorbike_taxi"]);
 const PROPERTY_ISSUE_CATEGORIES = new Set(["pest", "odor", "plumbing", "equipment", "fixture", "condition", "odor_clarification"]);
 const HOUSEKEEPING_ITEM_REQUEST = /\b(?:toilet\s+paper|soap|(?:(?:new|fresh|clean)\s+)?towels?|room\s+cleaning|clean\s+(?:my|our|the)\s+room|housekeeping)\b/i;
 const HOUSEKEEPING_REQUEST_ACTION = /\b(?:can\s+(?:i|we)\s+(?:have|get)|please\s+(?:bring|send|provide|clean)|can\s+you\s+(?:bring|send|provide|clean)|could\s+you\s+(?:bring|send|provide|clean)|i\s+(?:need|want|would\s+like)|(?:bring|send|provide)\s+(?:me\s+)?|clean\s+(?:my|our|the)\s+room)\b|\b(?:toilet\s+paper|soap|towels?)\s+please\b/i;
 const HOUSEKEEPING_SUPPLY_MISSING = /\b(?:there\s+(?:is|are)\s+no\s+(?:toilet\s+paper|soap|towels?)|(?:we|i)\s+(?:do\s+not|don['’]?t)\s+have\s+(?:any\s+)?(?:toilet\s+paper|soap|towels?)|our\s+room\s+(?:(?:does\s+not|doesn['’]?t)\s+have\s+(?:any\s+)?|has\s+no\s+)(?:toilet\s+paper|soap|towels?)|(?:no|missing)\s+(?:toilet\s+paper|soap|towels?)|(?:toilet\s+paper|soap|towels?)\s+(?:are\s+|is\s+)?missing|(?:we(?:['’]?re|\s+are)|i(?:['’]?m|\s+am))\s+(?:out|all\s+out)\s+of\s+(?:toilet\s+paper|soap|towels?))\b/i;
 const DIRTY_ROOM_CLEANING_REQUEST = /\b(?:(?:my|our|the)\s+(?:room|bathroom)\s+(?:(?:is|feels|looks|seems)\s+(?:(?:really|very|quite|so)\s+)?(?:dirty|messy|unclean)|needs?\s+(?:a\s+)?clean(?:ing)?)|(?:my|our|the)\s+(?:sheets?|bedding|bed\s*linen)\s+(?:(?:are|is|look|looks|seem|seems)\s+)?(?:dirty|stained|unclean)|(?:dirty|stained|unclean)\s+(?:sheets?|bedding|bed\s*linen)|(?:my|our|the)\s+(?:room|bathroom)\s+needs?\s+(?:cleaning|disinfect(?:ing|ion)))\b/i;
+const STAINED_LINEN_REQUEST = /\b(?:there\s+(?:is|are)\s+(?:a\s+)?stains?\s+on\s+(?:(?:my|our|the)\s+)?(?:bed\s+)?(?:sheets?|bedding|bed\s*linen)|(?:(?:my|our|the)\s+)?(?:bed\s+)?(?:sheets?|bedding|bed\s*linen)\s+(?:has|have)\s+(?:a\s+)?stains?|stains?\s+on\s+(?:(?:my|our|the)\s+)?(?:bed\s+)?(?:sheets?|bedding|bed\s*linen))\b/i;
 const LOST_KEY_REQUEST = /\b(?:(?:(?:i|we)\s+(?:have\s+)?)?lost\s+(?:(?:my|our|the|a)\s+)?(?:room\s+)?key|(?:(?:my|our|the)\s+)?(?:room\s+)?key\s+(?:is\s+)?(?:lost|missing)|(?:cannot|can['’]?t|unable\s+to)\s+find\s+(?:(?:my|our|the)\s+)?(?:room\s+)?key|(?:(?:i(?:['’]?m|\s+am)?|we(?:['’]?re|\s+are)?)\s+)?locked\s+out|(?:cannot|can['’]?t|unable\s+to)\s+(?:get|go)\s+(?:back\s+)?into\s+(?:my|our|the)\s+room|(?:(?:i|we)\s+)?forgot\s+(?:(?:my|our|the)\s+)?(?:room\s+)?key|(?:(?:i|we)\s+)?need\s+(?:a\s+)?(?:spare|replacement)\s+key|where\s+is\s+(?:(?:my|our|the)\s+)?spare\s+key)\b/i;
-const GENERIC_HUMAN_CONTACT_REQUEST = /^(?:(?:please|hello|hi)\s+)?(?:i\s+(?:(?:need|want|would\s+like)\s+to|wanna)\s+(?:talk|speak)\s+(?:to|with)\s+(?:a\s+)?(?:human|person|someone|staff|(?:the\s+)?team|reception)|i\s+(?:(?:need|want|would\s+like)\s+to|wanna)\s+call\s+(?:you|(?:a\s+)?(?:human|person)|someone|staff|(?:the\s+)?team|reception)|(?:can|could)\s+i\s+(?:(?:talk|speak)\s+(?:to|with)|call)\s+(?:a\s+)?(?:you|human|person|someone|staff|(?:the\s+)?team|reception)|(?:talk|speak)\s+(?:to|with)\s+(?:a\s+)?(?:human|person|someone|staff|(?:the\s+)?team|reception)|contact\s+(?:the\s+)?(?:team|staff|reception)|(?:human|person|staff|reception)\s+please|i\s+need\s+(?:a\s+)?(?:human|person)|call\s+(?:the\s+)?(?:team|staff|reception))(?:\s+please)?$/;
+const GENERIC_HUMAN_CONTACT_REQUEST = /^(?:(?:please|hello|hi)\s+)?(?:i\s+(?:(?:need|want|would\s+like)\s+to|wanna)\s+(?:talk|speak)\s+(?:to|with)\s+(?:a\s+)?(?:human|person|someone|staff|(?:the\s+)?team|reception|housekeeper)|i\s+(?:(?:need|want|would\s+like)\s+to|wanna)\s+call\s+(?:you|(?:a\s+)?(?:human|person)|someone|staff|(?:the\s+)?team|reception|(?:the\s+)?housekeeper)|(?:can|could)\s+i\s+(?:(?:talk|speak)\s+(?:to|with)|call)\s+(?:a\s+)?(?:you|human|person|someone|staff|(?:the\s+)?team|reception|(?:the\s+)?housekeeper)|(?:talk|speak)\s+(?:to|with)\s+(?:a\s+)?(?:human|person|someone|staff|(?:the\s+)?team|reception|housekeeper)|contact\s+(?:the\s+)?(?:team|staff|reception|housekeeper)|(?:human|person|staff|reception|housekeeper)\s+please|i\s+need\s+(?:a\s+)?(?:human|person)|call\s+(?:the\s+)?(?:team|staff|reception|housekeeper))(?:\s+please)?$/;
 const PROPERTY_HUMAN_CONTACT_REQUEST = /^(?:(?:please\s+)?(?:call|contact)\s+(?:the\s+)?(?:hotel|house|property)|(?:can|could)\s+i\s+(?:call|contact)\s+(?:the\s+)?(?:hotel|house|property))(?:\s+please)?$/;
-const HUMAN_CONTACT_REFERENCE = /\b(?:human|person|someone|staff|team|reception|call|talk|speak|contact)\b/;
-const PERSISTENT_HUMAN_CONTACT_REQUEST = /^(?:i\s+)?(?:still|really)\s+(?:need|want|would\s+like)\s+(?:(?:a\s+)?(?:human|person|someone|staff|team|reception)|(?:to\s+)?(?:talk|speak)\s+(?:to|with)\s+(?:a\s+)?(?:human|person|someone|staff|team|reception))(?:\s+please)?$/;
+const SPECIFIC_STAFF_CONTACT_REQUEST = /^(?:(?:please\s+)?(?:can|could|may)\s+i\s+(?:call|contact|talk\s+to|speak\s+to)\s+(?:the\s+)?(?:housekeeper|su)|please\s+let\s+me\s+(?:call|contact|talk\s+to|speak\s+to)\s+(?:the\s+)?(?:housekeeper|su)|(?:please\s+)?(?:call|contact|talk\s+to|speak\s+to)\s+(?:the\s+)?(?:housekeeper|su)|please\s+call\s+for\s+me)$/;
+const STRONG_HUMAN_CONTACT_REQUEST = /^(?:(?:i\s+)?(?:urgently|really)\s+(?:need|want|would\s+like)\s+(?:(?:a\s+)?(?:human|person|someone|staff|team|reception|housekeeper)|(?:to\s+)?(?:talk|speak)\s+(?:to|with)\s+(?:a\s+)?(?:human|person|someone|staff|team|reception|housekeeper))|i\s+(?:need|want|would\s+like)\s+to\s+personally\s+(?:talk|speak)\s+(?:to|with)\s+(?:them|(?:a\s+)?(?:human|person|someone|staff|team|reception|housekeeper)))(?:\s+please)?$/;
+const HUMAN_CONTACT_REFERENCE = /\b(?:human|person|someone|staff|team|reception|housekeeper|su|call|talk|speak|contact)\b/;
+const PERSISTENT_HUMAN_CONTACT_REQUEST = /^(?:i\s+)?(?:still|really)\s+(?:need|want|would\s+like)\s+(?:(?:a\s+)?(?:human|person|someone|staff|team|reception|housekeeper)|(?:to\s+)?(?:talk|speak)\s+(?:to|with)\s+(?:a\s+)?(?:human|person|someone|staff|team|reception|housekeeper))(?:\s+please)?$/;
 const LOCAL_INFORMATION_TOPIC = /\b(?:beach|bay|swim|snorkel|sunset|restaurant|dinner|lunch|breakfast|brunch|food|seafood|thai\s+food|bar|nightlife|drink|cocktail|cafe|coffee|bakery|shop|shopping|supermarket|pharmacy|atm|bank|laundry|viewpoint|hike|hiking|activity|activities|things\s+to\s+do|island|koh\s+tao|mae\s+haad|sairee|transport|taxi|ferry|scooter|directions?|distance|how\s+far)\w*\b/i;
 const INFORMATION_REQUEST_FORM = /^(?:how|what|where|which|when|why|is|are|do|does|can\s+i\s+find|could\s+you\s+(?:tell|recommend)|tell\s+me|recommend|suggest|any|good|best)\b|\b(?:how\s+far|nearby|close\s+to|recommend(?:ation)?|good\s+for|best\s+for|worth\s+visit)\b/i;
 const SUPPLY_INFORMATION_REQUEST = /\b(?:how\s+often|where\s+(?:are|is)|do\s+you\s+(?:provide|change|replace)|when\s+(?:are|do)|what\s+is\s+the\s+(?:towel|soap|toilet\s+paper))\b[^.?!]*(?:toilet\s+paper|soap|towels?|housekeeping)/i;
+const WIFI_PASSWORD_INFORMATION_REQUEST = /\b(?:(?:wifi|wi\s*fi|internet)\b[^.?!]{0,40}\bpassword|password\b[^.?!]{0,40}\b(?:wifi|wi\s*fi|internet))\b/i;
 const GENERIC_URGENT_WORDS = new Set([
   "a", "am", "an", "and", "bad", "emergency", "happened", "has", "have", "help", "i", "in", "is", "it",
   "my", "need", "please", "problem", "really", "room", "serious", "something", "the", "there", "urgent", "very",
@@ -524,12 +529,32 @@ function isFireEmergencyMessage(question) {
   return /\b(?:fire (?:in|inside|at) (?:my |the |our )?(?:room|bathroom|property|house|building)|(?:my |the |our )?(?:room|bathroom|property|house|building) is on fire|there is (?:a )?fire|flames? (?:in|inside|coming from) (?:my |the |our )?(?:room|property|house|building))\b/.test(normalized);
 }
 
+function recentFireEmergencyContext(history = []) {
+  return history.slice(-6).some((item) => {
+    const content = String(item?.content || "");
+    if (item?.role === "user" && (isFireEmergencyMessage(content) || /\b(?:fire|smoke|flames?)\b/i.test(content))) return true;
+    return item?.role === "assistant" && /\b(?:fire extinguisher|Koh Tao Rescue|real fire|leave the room or building)\b/i.test(content);
+  });
+}
+
+function isFireContinuationMessage(question) {
+  const normalized = normalizeText(question);
+  return /^(?:there is )?(?:more|still) (?:smoke|fire|flames?)(?: now)?$/.test(normalized)
+    || /^(?:the )?fire (?:is )?(?:getting|becoming) (?:worse|bigger|stronger)$/.test(normalized)
+    || /^(?:it is|it s) (?:getting )?worse$/.test(normalized);
+}
+
+function contextualSafetyResult(question, history = []) {
+  if (!recentFireEmergencyContext(history) || !isFireContinuationMessage(question)) return null;
+  return safetyResultForQuestion("There is a fire in my room.");
+}
+
 function housekeepingItem(question) {
   const source = String(question || "");
   if (/\btoilet\s+paper\b/i.test(source)) return { id: "toilet_paper", label: "toilet paper", delivery: "bring toilet paper to your room" };
   if (/\bsoap\b/i.test(source)) return { id: "soap", label: "soap", delivery: "bring soap to your room" };
   if (/\b(?:(?:new|fresh|clean)\s+)?towels?\b|\btowel\s+(?:change|replacement)\b/i.test(source)) return { id: "fresh_towels", label: "fresh towels", delivery: "bring fresh towels to your room" };
-  if (/\b(?:room\s+cleaning|clean\s+(?:my|our|the)\s+room|housekeeping)\b/i.test(source) || DIRTY_ROOM_CLEANING_REQUEST.test(source)) {
+  if (/\b(?:room\s+cleaning|clean\s+(?:my|our|the)\s+room|housekeeping)\b/i.test(source) || DIRTY_ROOM_CLEANING_REQUEST.test(source) || STAINED_LINEN_REQUEST.test(source)) {
     return { id: "room_cleaning", label: "room cleaning", delivery: "arrange room cleaning" };
   }
   return null;
@@ -540,6 +565,24 @@ function isActionableHousekeepingSupply(question) {
   return HOUSEKEEPING_REQUEST_ACTION.test(source) || HOUSEKEEPING_SUPPLY_MISSING.test(source);
 }
 
+function isWifiPasswordInformationRequest(question) {
+  return WIFI_PASSWORD_INFORMATION_REQUEST.test(normalizeText(question));
+}
+
+function wifiPasswordKnowledgeResult(question, knowledge) {
+  if (!isWifiPasswordInformationRequest(question)) return null;
+  const intent = (knowledge?.intents || []).find((entry) => entry?.id === "wifi");
+  if (!intent?.answer) return null;
+  return deterministicResult({
+    matched: true,
+    intentId: intent.id,
+    category: intent.category || "room",
+    confidence: 1,
+    answer: intent.answer,
+    actions: intent.actions || []
+  }, "approved");
+}
+
 function isIndependentCurrentTurnInformation(question) {
   const source = String(question || "").trim();
   if (!source) return false;
@@ -547,14 +590,16 @@ function isIndependentCurrentTurnInformation(question) {
     || isActionableStructuredBooking(source)
     || isActionableLuggageMessage(source)
     || DIRTY_ROOM_CLEANING_REQUEST.test(source)
+    || STAINED_LINEN_REQUEST.test(source)
     || HOUSEKEEPING_SUPPLY_MISSING.test(source)
     || (HOUSEKEEPING_ITEM_REQUEST.test(source) && HOUSEKEEPING_REQUEST_ACTION.test(source))) return false;
-  if (SUPPLY_INFORMATION_REQUEST.test(source)) return true;
+  if (SUPPLY_INFORMATION_REQUEST.test(source) || isWifiPasswordInformationRequest(source)) return true;
   return LOCAL_INFORMATION_TOPIC.test(source) && INFORMATION_REQUEST_FORM.test(source);
 }
 
 function isActionableCleaningRequest(question) {
   return DIRTY_ROOM_CLEANING_REQUEST.test(String(question || ""))
+    || STAINED_LINEN_REQUEST.test(String(question || ""))
     || (HOUSEKEEPING_ITEM_REQUEST.test(String(question || "")) && HOUSEKEEPING_REQUEST_ACTION.test(String(question || "")));
 }
 
@@ -1091,11 +1136,18 @@ function activeLostKeyFeeWorkflow(workflowState) {
   return workflowState?.type === "lost_key" && workflowState.status === "awaiting_fee_acceptance";
 }
 
+function isPersistentHumanContactRequest(question) {
+  const normalized = normalizeText(question);
+  return PERSISTENT_HUMAN_CONTACT_REQUEST.test(normalized)
+    || STRONG_HUMAN_CONTACT_REQUEST.test(normalized)
+    || SPECIFIC_STAFF_CONTACT_REQUEST.test(normalized);
+}
+
 function isGenericHumanContactRequest(question) {
   const normalized = normalizeText(question);
   return GENERIC_HUMAN_CONTACT_REQUEST.test(normalized)
     || PROPERTY_HUMAN_CONTACT_REQUEST.test(normalized)
-    || PERSISTENT_HUMAN_CONTACT_REQUEST.test(normalized);
+    || isPersistentHumanContactRequest(normalized);
 }
 
 function priorGenericHumanRequest(history = []) {
@@ -1106,11 +1158,11 @@ function genericHumanContactResult(question, workflowState, history = [], now = 
   if (!isGenericHumanContactRequest(question)) return null;
   const serviceOpen = housekeepingAvailability(now).open;
   const lostKeyFeePending = activeLostKeyFeeWorkflow(workflowState);
-  const repeatedRequest = PERSISTENT_HUMAN_CONTACT_REQUEST.test(normalizeText(question))
+  const repeatedRequest = isPersistentHumanContactRequest(question)
     || priorGenericHumanRequest(history);
   const answer = serviceOpen
     ? repeatedRequest
-      ? "I understand that you still need to speak with a person. Please use the human contact options below."
+      ? "Of course. You can contact Su directly using the options below."
       : lostKeyFeePending
         ? "I can continue helping with the secure spare-key process here. What do you need help with?"
         : "Of course. Tell me what you need help with, and I’ll try to resolve it here first."
@@ -1142,7 +1194,7 @@ function bookingKindFromText(value) {
   if (/\bferr(?:y|ies)(?:\s+tickets?)?\b/i.test(source)) return "ferry";
   if (/\b(?:fish(?:ing)?\s+trip|sport\s+fishing|food\s+fishing|go\s+fishing|fishing)\b/i.test(source)) return "fishing";
   if (/\b(?:snorkel|snorkeling|snorkelling)\b/i.test(source)) return "snorkeling";
-  if (/\b(?:dive|diving|scuba|open\s+water|advanced\s+open\s+water)\b/i.test(source) || DIVING_COURSE_REFERENCE.test(source)) return "diving";
+  if (/\b(?:dive|diving|scuba|open\s+water|advanced\s+open\s+water)\b/i.test(source) || DIVING_COURSE_REFERENCE.test(source) || fullDivingProviderName(source)) return "diving";
   if (/\btaxi\b/i.test(source)) return "taxi";
   return "";
 }
@@ -1175,7 +1227,9 @@ function isActionableStructuredBooking(value) {
   const source = String(value || "");
   return ACTIONABLE_STRUCTURED_BOOKING.test(source)
     || DIRECT_TRANSPORT_BOOKING.test(source)
-    || DIRECT_ACTIVITY_BOOKING.test(source);
+    || DIRECT_ACTIVITY_BOOKING.test(source)
+    || DIVING_LEARNING_REQUEST.test(source)
+    || isActionableDivingBooking(source);
 }
 
 function isExplicitBookingRetry(value) {
@@ -1265,7 +1319,12 @@ function isSnorkelingInformationRequest(question) {
 
 function isActionableDivingBooking(value) {
   const source = String(value || "");
+  const provider = fullDivingProviderName(source);
+  const providerBookingIntent = Boolean(provider
+    && /\b(?:can|could|would|may|want|wanna|prefer|choose|go|book|arrange|with|through|at)\b/i.test(source));
   return ACTIONABLE_DIVING_BOOKING.test(source)
+    || DIVING_LEARNING_REQUEST.test(source)
+    || providerBookingIntent
     || (DIRECT_ACTIVITY_BOOKING.test(source) && bookingKindFromText(source) === "diving")
     || (ACTIONABLE_STRUCTURED_BOOKING.test(source) && DIVING_COURSE_REFERENCE.test(source));
 }
@@ -1381,22 +1440,38 @@ function divingRequestedCourseText(value) {
     .trim();
 }
 
-function preferredBookingProvider(kind, value) {
-  if (kind !== "diving") return "";
+function canonicalDivingProvider(provider) {
+  const clean = String(provider || "").trim();
+  if (!clean) return "";
+  const canonical = {
+    "french kiss diver": "French Kiss Divers",
+    "french kiss divers": "French Kiss Divers",
+    "roctopus dive": "Roctopus Dive",
+    "master diver": "Master Divers",
+    "master divers": "Master Divers"
+  }[clean.toLowerCase()];
+  return canonical || clean;
+}
+
+function fullDivingProviderName(value) {
   const source = cleanWorkflowValue(value, 180);
   const candidates = [...source.matchAll(/\b([A-Za-z&'’.-]+(?:\s+[A-Za-z&'’.-]+){0,4}\s+(?:Divers?|Dive(?:\s+(?:Center|Centre|School))?))\b/gi)]
     .map((match) => match[1]
-      .replace(/^(?:(?:or|and|but|instead|rather|can|could|would|we|i|to|go|at|via|through|with|the|use|choose|prefer|please)\s+)+/i, "")
+      .replace(/^(?:(?:or|and|but|instead|rather|can|could|would|may|we|i|to|go|at|via|through|with|the|use|choose|prefer|please)\s+)+/i, "")
       .trim())
     .filter(Boolean);
   const provider = candidates.at(-1) || "";
   if (!provider || provider.split(/\s+/).length > 5) return "";
-  const canonical = {
-    "french kiss divers": "French Kiss Divers",
-    "roctopus dive": "Roctopus Dive",
-    "master divers": "Master Divers"
-  }[provider.toLowerCase()];
-  return canonical || provider;
+  return canonicalDivingProvider(provider);
+}
+
+function preferredBookingProvider(kind, value) {
+  if (kind !== "diving") return "";
+  const source = cleanWorkflowValue(value, 180);
+  const fullProvider = fullDivingProviderName(source);
+  if (fullProvider) return fullProvider;
+  if (/\bfrench\s+kiss\b/i.test(source)) return "French Kiss Divers";
+  return "";
 }
 
 function bookingSideContext(kind, value) {
@@ -3125,7 +3200,7 @@ export async function handleConciergeRequest(request, env, ctx, now = new Date()
       ], source: "confirmed-operation", language
     });
   }
-  const classifiedSafetyResult = safetyResultForQuestion(question);
+  const classifiedSafetyResult = safetyResultForQuestion(question) || contextualSafetyResult(question, history);
   const lostKeyResult = classifiedSafetyResult ? null : lostKeyPolicyResult(question, access, room, now);
   const humanContactResult = classifiedSafetyResult || lostKeyResult
     ? null
@@ -3219,6 +3294,7 @@ export async function handleConciergeRequest(request, env, ctx, now = new Date()
   }
 
   const effectiveKnowledge = mergeApprovedKnowledge(knowledge, approvedKnowledge);
+  const wifiPasswordResult = wifiPasswordKnowledgeResult(question, effectiveKnowledge);
   const independentInformationRequest = isIndependentCurrentTurnInformation(question);
   const informationDetour = Boolean(independentInformationRequest && workflowState);
   const cleaningPolicy = safetyResult || lostKeyResult || independentInformationRequest
@@ -3233,7 +3309,7 @@ export async function handleConciergeRequest(request, env, ctx, now = new Date()
     || (workflowState?.type === "booking" && workflowState.status === "collecting" && !independentInformationRequest)
     ? null
     : supportedBookingInformationResult(question);
-  const directPolicyResult = safetyResult || lostKeyResult || cleaningPolicy.result || servicePolicyResult || propertyPolicy.result || roomPolicyResult || bookingInformationResult;
+  const directPolicyResult = safetyResult || lostKeyResult || wifiPasswordResult || cleaningPolicy.result || servicePolicyResult || propertyPolicy.result || roomPolicyResult || bookingInformationResult;
   const criticalPropertyMatch = safetyResult?.intentId === "property_emergency"
     ? matchKnowledge("major water leak", effectiveKnowledge, 0.44)
     : null;

@@ -826,7 +826,7 @@ test("generic human requests are AI-first, then expose routine contacts only aft
   }), env, undefined, saturday1500);
   const persistentBody = await persistent.json();
   assert.equal(persistentBody.intentId, "generic_human_contact");
-  assert.match(persistentBody.answer, /still need to speak with a person/i);
+  assert.match(persistentBody.answer, /contact Su directly/i);
   assert.equal(persistentBody.actions.some((action) => action.route === "houseWhatsapp"), true);
   assert.equal(persistentBody.actions.some((action) => action.route === "houseCall"), true);
 
@@ -2908,7 +2908,7 @@ test("guest localization supports seven languages and keeps the owner dashboard 
   assert.doesNotMatch(admin, /src="\/i18n\.js"/);
   assert.match(runtime, /exploreContentDeferred/);
   assert.match(runtime, /element\.closest\("\.section,\.footer"\)/);
-  assert.match(runtime, /houseGuideTranslations:v5\.11\.36:/);
+  assert.match(runtime, /houseGuideTranslations:v5\.11\.37:/);
   assert.match(runtime, /MAX_REQUEST_RETRIES = 2/);
   assert.match(runtime, /let flushRunning = false/);
 });
@@ -4928,6 +4928,54 @@ test("one concise odor clarification submits the same property workflow and obvi
   }
 });
 
+test("Wi-Fi password stays visible from approved knowledge and bypasses numeric-contact redaction", async () => {
+  const { env, store } = createEnvironment({ OPENAI_API_KEY: "configured-but-should-not-be-used" });
+  const originalFetch = globalThis.fetch;
+  let modelCalls = 0;
+  globalThis.fetch = async (...args) => {
+    if (String(args[0]).includes("api.openai.com")) modelCalls += 1;
+    throw new Error("The Wi-Fi password path must not call the model.");
+  };
+  try {
+    const response = await handleConciergeRequest(guestRequest("What is the Wi-Fi password?", {
+      history: [
+        { role: "user", content: "Can you tell me about check-in?" },
+        { role: "assistant", content: "Check-in starts at 2 PM and I can help with that." }
+      ]
+    }), env);
+    const body = await response.json();
+    assert.equal(response.status, 200);
+    assert.equal(body.intentId, "wifi");
+    assert.equal(body.source, "approved");
+    assert.match(body.answer, /The Wi-Fi network is .The House./i);
+    assert.match(body.answer, /123456789!/);
+    assert.doesNotMatch(body.answer, /\[number removed\]|\[contact supplied privately\]/i);
+    assert.equal(modelCalls, 0);
+    assert.equal(store.alerts.length, 0);
+
+    const pendingCleaning = {
+      type: "cleaning",
+      status: "collecting",
+      missing: ["preferredTime"],
+      cleaningRequest: { preferredTime: "", requestedDate: "", notes: "stained sheet" }
+    };
+    const detourResponse = await handleConciergeRequest(guestRequest("Where is the Wi-Fi password?", {
+      workflowState: pendingCleaning,
+      history: [{ role: "assistant", content: "What time would be most convenient for cleaning?" }]
+    }), env);
+    const detourBody = await detourResponse.json();
+    assert.equal(detourBody.intentId, "wifi");
+    assert.match(detourBody.answer, /123456789!/);
+    assert.equal(detourBody.workflow?.type, "cleaning");
+    assert.equal(detourBody.workflow?.status, "collecting");
+    assert.deepEqual(detourBody.workflow?.missing, ["preferredTime"]);
+    assert.equal(modelCalls, 0);
+    assert.equal(store.alerts.length, 0);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("property informational controls remain informational and dirty rooms keep the structured cleaning collector", async () => {
   for (const question of [
     "What animals live on Koh Tao?",
@@ -5147,8 +5195,8 @@ test("agency-specific beginner and continuing courses pass the structured diving
   }
 });
 
-test("the bundled v5.11.36 catalog preserves current PADI, SSI and RAID pathways", () => {
-  assert.equal(divingCourses.updatedForRelease, "5.11.36");
+test("the bundled v5.11.37 catalog preserves current PADI, SSI and RAID pathways", () => {
+  assert.equal(divingCourses.updatedForRelease, "5.11.37");
   assert.deepEqual(divingCourses.houseRecommendation, {
     agency: "RAID",
     reason: "focus on dive safety and buoyancy control",
@@ -9037,6 +9085,203 @@ test("unauthorized or invalid WhatsApp status commands cannot change alerts or s
   } finally {
     globalThis.fetch = originalFetch;
   }
+});
+
+
+
+test("strong human and housekeeper contact requests expose Su directly during open hours but remain closed after hours", async () => {
+  const { env, store } = createEnvironment({ OPENAI_API_KEY: "not-used" });
+  const openNow = new Date("2026-08-29T08:00:00.000Z"); // Saturday 15:00 Bangkok
+  const closedNow = new Date("2026-08-31T08:00:00.000Z"); // Monday 15:00 Bangkok
+  const phrases = [
+    "I urgently need to talk to a human",
+    "I need to personally talk to them",
+    "I really need to speak to someone",
+    "please call for me",
+    "please let me call the housekeeper",
+    "can I call the housekeeper"
+  ];
+
+  for (const question of phrases) {
+    const response = await handleConciergeRequest(guestRequest(question), env, undefined, openNow);
+    const body = await response.json();
+    assert.equal(body.intentId, "generic_human_contact", question);
+    assert.equal(body.source, "human-contact-policy", question);
+    assert.match(body.answer, /contact Su directly/i, question);
+    assert.equal(body.actions.some((action) => action.route === "houseWhatsapp"), true, question);
+    assert.equal(body.actions.some((action) => action.route === "houseCall"), true, question);
+    assert.equal(store.alerts.length, 0, question);
+  }
+
+  const closed = await handleConciergeRequest(guestRequest("can I call the housekeeper"), env, undefined, closedNow);
+  const closedBody = await closed.json();
+  assert.equal(closedBody.intentId, "generic_human_contact");
+  assert.equal(closedBody.actions.some((action) => action.route === "houseWhatsapp"), false);
+  assert.equal(closedBody.actions.some((action) => action.route === "houseCall"), false);
+  assert.equal(closedBody.actions.some((action) => action.href === "/emergency.html"), true);
+});
+
+test("fire cancellation cannot contaminate a later housekeeper-contact turn while genuine smoke continuation stays safety-first", async () => {
+  const { env, store } = createEnvironment({ OPENAI_API_KEY: "not-used" });
+  const openNow = new Date("2026-08-29T08:00:00.000Z");
+
+  const fire = await handleConciergeRequest(guestRequest("I have fire in my room"), env, undefined, openNow);
+  const fireBody = await fire.json();
+  assert.equal(fireBody.intentId, "fire_emergency");
+  assert.equal(store.alerts.length, 0);
+
+  const cancelledHistory = [
+    { role: "user", content: "I have fire in my room" },
+    { role: "assistant", content: fireBody.answer },
+    { role: "assistant", content: "Okay — I haven’t contacted The House team." }
+  ];
+
+  const contact = await handleConciergeRequest(guestRequest("can I call the housekeeper", { history: cancelledHistory }), env, undefined, openNow);
+  const contactBody = await contact.json();
+  assert.equal(contactBody.intentId, "generic_human_contact");
+  assert.notEqual(contactBody.intentId, "property_emergency");
+  assert.match(contactBody.answer, /contact Su directly/i);
+  assert.equal(contactBody.actions.some((action) => action.route === "houseWhatsapp"), true);
+  assert.equal(contactBody.actions.some((action) => action.route === "houseCall"), true);
+  assert.equal(contactBody.actions.some((action) => action.action === "confirm_urgent_property"), false);
+  assert.equal(store.alerts.length, 0);
+
+  const continuation = await handleConciergeRequest(guestRequest("there is more smoke now", { history: cancelledHistory }), env, undefined, openNow);
+  const continuationBody = await continuation.json();
+  assert.equal(continuationBody.intentId, "fire_emergency");
+  assert.equal(continuationBody.actions[0].route, "rescueCall");
+  assert.equal(continuationBody.actions.some((action) => action.action === "confirm_urgent_property"), true);
+  assert.equal(store.alerts.length, 0);
+});
+
+test("natural stained-bed-sheet wording enters cleaning collection and now submits exactly one service alert", async () => {
+  const { env, store } = createEnvironment({
+    OPENAI_API_KEY: "",
+    WHATSAPP_ACCESS_TOKEN: "meta-test-token",
+    WHATSAPP_PHONE_NUMBER_ID: "1234567890",
+    WHATSAPP_ALERT_RECIPIENTS: JSON.stringify({
+      support: [{ label: "Su", phone: "+66 64 000 0001" }],
+      emergency: [
+        { label: "Owner 1", phone: "+66 81 000 0002" },
+        { label: "Owner 2", phone: "+66 82 000 0003" }
+      ]
+    })
+  });
+  const openTuesday = new Date("2026-08-25T04:00:00.000Z");
+
+  for (const phrase of [
+    "there is a stain on the sheet",
+    "my bed sheet has a stain",
+    "the sheets have stains",
+    "my bedding is stained"
+  ]) {
+    const variant = await handleConciergeRequest(guestRequest(phrase), env, undefined, openTuesday);
+    const variantBody = await variant.json();
+    assert.equal(variantBody.intentId, "housekeeping_room_cleaning", phrase);
+    assert.equal(variantBody.workflow.type, "cleaning", phrase);
+    assert.deepEqual(variantBody.workflow.missing, ["preferredTime"], phrase);
+    assert.equal(store.alerts.length, 0, phrase);
+  }
+
+  const pending = await handleConciergeRequest(guestRequest("there is a stain on my bed sheet"), env, undefined, openTuesday);
+  const pendingBody = await pending.json();
+  assert.equal(pendingBody.intentId, "housekeeping_room_cleaning");
+  assert.equal(pendingBody.workflow.type, "cleaning");
+  assert.equal(pendingBody.workflow.status, "collecting");
+  assert.deepEqual(pendingBody.workflow.missing, ["preferredTime"]);
+  assert.match(pendingBody.answer, /What time would be most convenient/i);
+  assert.equal(store.alerts.length, 0);
+
+  const originalFetch = globalThis.fetch;
+  const outbound = [];
+  globalThis.fetch = async (_url, options) => {
+    outbound.push(JSON.parse(options.body));
+    return new Response(JSON.stringify({ messages: [{ id: `wamid.stain-${outbound.length}` }] }), {
+      status: 200,
+      headers: { "content-type": "application/json" }
+    });
+  };
+  try {
+    const completed = await handleConciergeRequest(guestRequest("now", {
+      workflowState: pendingBody.workflow,
+      history: [
+        { role: "user", content: "there is a stain on my bed sheet" },
+        { role: "assistant", content: pendingBody.answer }
+      ]
+    }), env, undefined, openTuesday);
+    const completedBody = await completed.json();
+    assert.equal(completedBody.intentId, "housekeeping_room_cleaning");
+    assert.equal(completedBody.workflow.status, "submitted");
+    assert.match(completedBody.answer, /preferred time of Now/i);
+    assert.doesNotMatch(completedBody.answer, /support handoff|contact (?:our )?support/i);
+    assert.equal(store.alerts.length, 1);
+    assert.equal(store.alerts[0].recipientGroup, "support_with_owners");
+    assert.equal(outbound.length, 3);
+
+    const unrelated = await handleConciergeRequest(guestRequest("which beach is best for snorkeling", {
+      workflowState: completedBody.workflow,
+      history: [
+        { role: "user", content: "there is a stain on my bed sheet" },
+        { role: "assistant", content: pendingBody.answer },
+        { role: "user", content: "now" },
+        { role: "assistant", content: completedBody.answer }
+      ]
+    }), env, undefined, openTuesday);
+    const unrelatedBody = await unrelated.json();
+    assert.notEqual(unrelatedBody.intentId, "room_cleaning");
+    assert.match(unrelatedBody.answer, /Ao Leuk|Shark Bay|Hin Wong|Mango Bay|snorkel/i);
+    assert.equal(store.alerts.length, 1);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("diving learning and standalone named-provider turns preserve French Kiss Divers preference without promising availability", async () => {
+  const { env, store } = createEnvironment({ OPENAI_API_KEY: "" });
+  const now = new Date("2026-08-29T08:00:00.000Z");
+
+  const start = await handleConciergeRequest(guestRequest("I wanna learn diving"), env, undefined, now);
+  const startBody = await start.json();
+  assert.equal(startBody.intentId, "diving_booking_request");
+  assert.equal(startBody.workflow.type, "booking");
+  assert.equal(startBody.workflow.bookingRequest.kind, "diving");
+  assert.equal(startBody.workflow.status, "collecting");
+  assert.equal(store.alerts.length, 0);
+
+  const shortPreference = await handleConciergeRequest(guestRequest("I wanna go with French kiss", {
+    workflowState: startBody.workflow,
+    history: [
+      { role: "user", content: "I wanna learn diving" },
+      { role: "assistant", content: startBody.answer }
+    ]
+  }), env, undefined, now);
+  const shortPreferenceBody = await shortPreference.json();
+  assert.equal(shortPreferenceBody.workflow.bookingRequest.preferredProvider, "French Kiss Divers");
+  assert.match(shortPreferenceBody.answer, /French Kiss Divers.*check whether that can be arranged/i);
+  assert.doesNotMatch(shortPreferenceBody.answer, /French Kiss Divers (?:is|has been) (?:available|confirmed|booked)/i);
+  assert.equal(store.alerts.length, 0);
+
+  const namedAfterContext = await handleConciergeRequest(guestRequest("can I go with French Kiss Divers?", {
+    workflowState: startBody.workflow,
+    history: [
+      { role: "user", content: "I wanna learn diving" },
+      { role: "assistant", content: startBody.answer }
+    ]
+  }), env, undefined, now);
+  const namedAfterContextBody = await namedAfterContext.json();
+  assert.equal(namedAfterContextBody.workflow.bookingRequest.preferredProvider, "French Kiss Divers");
+  assert.match(namedAfterContextBody.answer, /French Kiss Divers/i);
+  assert.doesNotMatch(namedAfterContextBody.answer, /French Kiss Divers (?:is|has been) (?:available|confirmed|booked)/i);
+
+  const standalone = await handleConciergeRequest(guestRequest("can I go with French Kiss Divers?"), env, undefined, now);
+  const standaloneBody = await standalone.json();
+  assert.equal(standaloneBody.intentId, "diving_booking_request");
+  assert.equal(standaloneBody.workflow.type, "booking");
+  assert.equal(standaloneBody.workflow.bookingRequest.kind, "diving");
+  assert.equal(standaloneBody.workflow.bookingRequest.preferredProvider, "French Kiss Divers");
+  assert.match(standaloneBody.answer, /French Kiss Divers.*check whether that can be arranged/i);
+  assert.doesNotMatch(standaloneBody.answer, /French Kiss Divers (?:is|has been) (?:available|confirmed|booked)/i);
+  assert.equal(store.alerts.length, 0);
 });
 
 test("desktop Concierge expands the conversation while mobile keeps its polished sheet layout", async () => {

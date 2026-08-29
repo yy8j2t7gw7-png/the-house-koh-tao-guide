@@ -1,4 +1,4 @@
-# Guest Guide Platform with AI Concierge — The House v5.11.36
+# Guest Guide Platform with AI Concierge — The House v5.11.37
 
 The House – Koh Tao guest guide is a production-oriented, mobile-first digital guest guide and concierge platform. It combines property information, curated island guidance, structured place and activity data, and centralized contact and booking routes.
 
@@ -17,6 +17,16 @@ The House – Koh Tao guest guide is a production-oriented, mobile-first digital
 - Model-powered, room-aware AI Concierge with controlled learning
 
 The Activities module contains 49 structured profiles covering diving, freediving, snorkelling, boat trips, beach experiences, kayaking, paddleboarding, hiking, viewpoints, climbing, yoga, Muay Thai, massage, cooking, wildlife, photography, night activities and rainy-day options.
+
+## v5.11.37 release focus
+
+- Fixes five real production gaps found after v5.11.36: strong/direct human or housekeeper contact now reaches Su with routine **Contact Us / Call Us** options during service hours; cancelled fire context cannot contaminate a later unrelated contact request; natural stained-bed-sheet wording enters and completes the deterministic cleaning workflow; French Kiss Divers preference is preserved even when it is expressed before an established diving collector; and authorized Wi-Fi-password questions no longer lose the numeric password to generic contact-number redaction.
+- Keeps the first ordinary generic human request AI-first, but treats clear persistence or explicit staff-contact wording such as **I urgently need to talk to a human**, **please let me call the housekeeper** and **can I call the housekeeper** as sufficient for direct in-hours Su contact. Monday/closed-hours routine-contact suppression remains unchanged.
+- Adds targeted emergency-history isolation: a new staff-contact turn is authoritative after a cancelled fire alert, while genuine continuation such as **there is more smoke now** remains fire-safety-first.
+- Recognizes natural stained-linen forms including **there is a stain on my bed sheet**, **my bed sheet has a stain** and **the sheets have stains**; **now/ASAP** continues the same cleaning request and produces exactly one normal service alert to Su plus both owners.
+- Treats **I wanna learn diving** as structured diving context and recognizes explicit named-provider questions such as **can I go with French Kiss Divers?**. The preference is acknowledged and retained without promising availability or replacing it with the default Roctopus/RAID recommendation.
+- Keeps authorized Wi-Fi-password questions on deterministic approved knowledge so the numeric password is shown exactly instead of **[number removed]**; the generic contact/privacy sanitizer remains unchanged for model output and stored diagnostic excerpts.
+- Preserves the v5.11.36 snorkeling correction and every existing Meta, House Maps, Explore-disabled guide, Room 11/mobile UI, lost-key, emergency, luggage, passport, Airbnb, Admin and security boundary. The complete **196-test** suite passes with zero failures. The five newer human-friendly Meta templates remain under review and are **not activated** by this release.
 
 ## v5.11.36 release focus
 

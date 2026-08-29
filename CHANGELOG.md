@@ -2,6 +2,30 @@
 
 All notable changes to The House – Koh Tao guest guide are recorded here.
 
+## v5.11.37 — Current-Turn Routing and Wi-Fi Regression Fix
+
+### Production regressions
+
+- Fixes the real Room 6 sequence where **I urgently need to talk to a human**, **I need to personally talk to them**, **please call for me** and **can I call the housekeeper** could fall through to generic model handoff wording instead of the established in-hours Su contact actions.
+- Fixes cancelled fire history contaminating a later unrelated **can I call the housekeeper** turn and recreating the urgent-property confirmation. Genuine fire continuation such as **there is more smoke now** remains safety-first.
+- Fixes natural linen wording such as **there is a stain on my bed sheet** missing the cleaning collector, which previously caused the next **now** reply to fall through to a generic support handoff instead of submitting the same request.
+- Restores French Kiss Divers preference handling for the production path **I wanna learn diving** → **I wanna go with French kiss**, and for standalone **can I go with French Kiss Divers?**.
+- Fixes verified Wi-Fi-password answers displaying **[number removed]** when the approved numeric password was routed through generic model/contact sanitization.
+
+### Narrow corrective routing
+
+- Expands deterministic human/staff-contact recognition and treats clear persistence or an explicit Su/housekeeper request as enough to expose the existing `houseWhatsapp` and `houseCall` actions during service hours. The first ordinary generic human request remains AI-first; Monday/closed-hours routine contact remains suppressed.
+- Adds targeted recent-fire continuation handling rather than passing stale emergency transcript context into unrelated turns.
+- Extends the existing cleaning classifier for natural stained sheet/bedding forms and keeps `now` / `ASAP` on the same collecting workflow until exactly one `support_with_owners` alert is accepted.
+- Treats learning-to-dive and explicit full dive-provider wording as structured diving context. French Kiss Divers is canonicalized and retained as `preferredProvider` without any availability promise.
+- Routes Wi-Fi-password questions directly through the approved `wifi` intent after guest access, preserving pending ordinary workflows while leaving the generic privacy sanitizer intact.
+
+### Regression and preservation
+
+- Adds five production regression contracts and expands the complete suite from 191 to **196 tests**, all passing.
+- Preserves v5.11.36 snorkeling authority, all currently active Meta template mappings, recipients/webhooks/secrets, `EXPLORE_ENABLED=false`, House Maps, Room 11/mobile UI, lost-key security, emergency confirmation, luggage, passport, Airbnb and Admin behavior.
+- The five newer human-friendly Meta replacement templates remain under review and are not activated in this release.
+
 ## v5.11.36 — Snorkeling Recommendation Production Fix
 
 ### Production regression

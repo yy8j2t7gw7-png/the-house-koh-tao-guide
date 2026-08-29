@@ -1,6 +1,6 @@
 # Product Roadmap
 
-Baseline: v5.11.36
+Baseline: v5.11.37
 
 ## Completed
 
@@ -201,8 +201,11 @@ Guests may continue using ordinary WhatsApp handoffs. Automated internal alerts 
 - [x] Implement and package v5.11.35 with current-turn topic switching, internal local-guide retrieval, direct missing-supply alerts, Concierge-first routine contacts and reviewed Meta quick-action activation.
 - [x] Retest the existing House Google Maps universal link on mobile and retain it; withdraw the proposed device-specific URL split.
 - [x] Implement and package v5.11.36 directly from deployed v5.11.35 to correct the snorkeling welcome collision and make approved snorkeling records deterministic.
-- [ ] Deploy v5.11.36 and smoke-test the exact production phrasings in `RELEASE_NOTES_v5.11.36.md`.
+- [x] Deploy v5.11.36 and smoke-test its production paths; the follow-up testing exposed the four current-turn routing gaps plus the verified Wi-Fi-password redaction failure corrected in v5.11.37 before push.
 - [x] Deploy v5.11.35 and run the affected-behavior production smoke test; real production testing exposed the snorkeling welcome/learning-gap regression now corrected in v5.11.36.
+- [x] Implement and package v5.11.37 directly from deployed v5.11.36 to fix lower-friction Su contact, emergency-history topic switching, natural stained-linen collection, named dive-provider preference and deterministic authorized Wi-Fi-password delivery.
+- [ ] Deploy v5.11.37 and run the exact production smoke test in `RELEASE_NOTES_v5.11.37.md`.
+- [ ] Keep the five newer human-friendly Meta templates untouched while under review; activate them only after all five are Active in a separate explicitly authorized release.
 - [x] Add `STAY_TOKEN_PEPPER` and `RESERVATION_SYNC_TOKEN` Worker secrets
 - [x] Add protected `SPARE_KEY_CODES` Worker secret before activating automatic spare-key release
 - [x] Install and authorize the included Airbnb Google Apps Script synchronizer

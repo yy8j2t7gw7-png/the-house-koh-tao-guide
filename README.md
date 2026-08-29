@@ -1,4 +1,4 @@
-# Guest Guide Platform with AI Concierge — The House v5.11.30
+# Guest Guide Platform with AI Concierge — The House v5.11.31
 
 The House – Koh Tao guest guide is a production-oriented, mobile-first digital guest guide and concierge platform. It combines property information, curated island guidance, structured place and activity data, and centralized contact and booking routes.
 
@@ -17,6 +17,15 @@ The House – Koh Tao guest guide is a production-oriented, mobile-first digital
 - Model-powered, room-aware AI Concierge with controlled learning
 
 The Activities module contains 49 structured profiles covering diving, freediving, snorkelling, boat trips, beach experiences, kayaking, paddleboarding, hiking, viewpoints, climbing, yoga, Muay Thai, massage, cooking, wildlife, photography, night activities and rainy-day options.
+
+## v5.11.31 release focus
+
+- Replaces the desktop-style mobile Concierge pill with a 58×58 px House-green control below 768 px, retaining the sparkle identity, an exact **Open Concierge** accessible name, focus support and reduced-motion behavior.
+- Positions the mobile launcher 12 px plus the right/bottom iPhone safe-area insets and adds modest page-bottom clearance so verification, emergency, Room, stay-help and footer content can scroll fully clear.
+- Removes the independently fixed mobile language pill. The compact language control is now owned by the approved sticky header beside **Menu** and opens the existing selector inside that menu.
+- Tightens the mobile Room hierarchy without changing desktop: Room navigation-card vertical padding is reduced 18.75%, the Room-location hero is reduced from 246 px to 208 px (15.45%), and introductory/section spacing is modestly denser.
+- Separates verified-stay wording from TM30 registration and retains the passport-retention statement as a second sentence. The stay-help action now renders **Open Concierge** while preserving its existing Concierge route.
+- Adds one focused presentation contract; the complete 179-test suite passes with zero failures. Concierge routing, contact hours, lost-key security, bookings, alerts, passport processing, stay verification, Airbnb synchronization and owner operations are unchanged.
 
 ## v5.11.30 release focus
 

@@ -24,6 +24,7 @@
 }
 .ai-concierge-launcher:hover{transform:translateY(-2px);background:#234f45;box-shadow:0 16px 36px rgba(24,59,52,.27)}
 .ai-concierge-launcher.is-visible{opacity:1;visibility:visible;pointer-events:auto;transform:translateY(0)}
+.ai-concierge-launcher-icon{font-size:18px;line-height:1}
 
 .ai-concierge-backdrop{
   position:fixed;
@@ -174,7 +175,6 @@ body.ai-concierge-ready .float-wa[data-link="houseWhatsapp"]{display:none}
 }
 
 @media(max-width:640px){
-  .ai-concierge-launcher{right:10px;bottom:max(10px,env(safe-area-inset-bottom))}
   .ai-concierge-panel{left:0;right:0;bottom:0;width:100%;height:min(88dvh,760px);max-height:88dvh;border-radius:22px 22px 0 0;transform:translateY(100%);transform-origin:bottom center}
   .ai-concierge-panel.is-open{transform:translateY(0)}
   .ai-concierge-drag-handle{display:block}
@@ -188,6 +188,23 @@ body.ai-concierge-ready .float-wa[data-link="houseWhatsapp"]{display:none}
   .ai-concierge-messages{flex:1;min-height:118px;max-height:none}
   .ai-concierge-bubble{max-width:94%;font-size:14px;line-height:1.56}
   .ai-concierge-input-row{position:sticky;bottom:0;background:#fffdf9}
+}
+
+@media(max-width:767px){
+  body.ai-concierge-ready{padding-bottom:calc(76px + env(safe-area-inset-bottom))}
+  .ai-concierge-launcher{
+    right:calc(12px + env(safe-area-inset-right));
+    bottom:calc(12px + env(safe-area-inset-bottom));
+    justify-content:center;
+    width:58px;
+    min-width:58px;
+    height:58px;
+    min-height:58px;
+    padding:0;
+    border-radius:18px;
+  }
+  .ai-concierge-launcher-icon{font-size:23px}
+  .ai-concierge-launcher-label{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 }
 
 @media(max-width:340px){

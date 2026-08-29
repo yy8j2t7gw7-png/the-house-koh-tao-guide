@@ -305,9 +305,10 @@
   const launcher = document.createElement("button");
   launcher.className = "ai-concierge-launcher";
   launcher.type = "button";
+  launcher.setAttribute("aria-label", "Open Concierge");
   launcher.setAttribute("aria-expanded", "false");
   launcher.setAttribute("aria-controls", "aiConciergePanel");
-  launcher.innerHTML = `<span aria-hidden="true">✦</span><span>${cfg.buttonLabel}</span>`;
+  launcher.innerHTML = `<span class="ai-concierge-launcher-icon" aria-hidden="true">✦</span><span class="ai-concierge-launcher-label">${cfg.buttonLabel}</span>`;
 
   const backdrop = document.createElement("div");
   backdrop.className = "ai-concierge-backdrop";

@@ -2302,8 +2302,9 @@ test("main and room welcome pages make required registration prominent", async (
   assert.match(home, /Required guest registration/);
   assert.match(home, /Complete your guest registration/);
   assert.match(home, /Passport information is required for non-Thai overnight guests\. Thai guests are exempt\./);
+  assert.match(home, /TM30 Immigration/);
+  assert.match(room, /required TM30 guest registration/);
   [home, room].forEach((html) => {
-    assert.match(html, /TM30 Immigration/);
     assert.match(html, /automatically deleted 14 days after upload/);
     assert.doesNotMatch(html, /data-concierge-prompt="I need my secure passport registration link\."/);
     assert.doesNotMatch(html, /href="\/passport-upload(?:\.html)?"/);
@@ -2614,14 +2615,15 @@ test("guest localization supports seven languages and keeps the owner dashboard 
     assert.match(runtime, new RegExp(`code: "${code.replace("-", "\\-")}"`));
   }
   assert.match(runtime, /\.language-switcher/);
-  assert.match(runtime, /\.language-floating-button/);
+  assert.match(runtime, /\.language-header-button/);
+  assert.doesNotMatch(runtime, /\.language-floating-button/);
   assert.match(runtime, /\.ai-concierge-message\.is-guest/);
   assert.match(guideApp, /src = "\/i18n\.js"/);
   assert.match(passport, /src="\/i18n\.js"/);
   assert.doesNotMatch(admin, /src="\/i18n\.js"/);
   assert.match(runtime, /exploreContentDeferred/);
   assert.match(runtime, /element\.closest\("\.section,\.footer"\)/);
-  assert.match(runtime, /houseGuideTranslations:v5\.11\.30:/);
+  assert.match(runtime, /houseGuideTranslations:v5\.11\.31:/);
   assert.match(runtime, /MAX_REQUEST_RETRIES = 2/);
   assert.match(runtime, /let flushRunning = false/);
 });
@@ -4791,8 +4793,8 @@ test("agency-specific beginner and continuing courses pass the structured diving
   }
 });
 
-test("the bundled v5.11.30 catalog preserves current PADI, SSI and RAID pathways", () => {
-  assert.equal(divingCourses.updatedForRelease, "5.11.30");
+test("the bundled v5.11.31 catalog preserves current PADI, SSI and RAID pathways", () => {
+  assert.equal(divingCourses.updatedForRelease, "5.11.31");
   assert.deepEqual(divingCourses.houseRecommendation, {
     agency: "RAID",
     reason: "focus on dive safety and buoyancy control",
@@ -8716,6 +8718,41 @@ test("v5.11.28 landing and room hierarchy use safe imagery, exact guidance and a
     const html = await readFile(page, "utf8");
     assert.doesNotMatch(html, /budget-friendly/i, `${page.pathname} retains the obsolete footer wording`);
   }
+});
+
+test("v5.11.31 mobile controls stay compact, header-bound, safe-area aware and wording-consistent", async () => {
+  const [styles, conciergeStyles, conciergeScript, i18n, room, canonicalRoom, actionRuntime] = await Promise.all([
+    readFile(new URL("../public/design-system.css", import.meta.url), "utf8"),
+    readFile(new URL("../public/ai-concierge.css", import.meta.url), "utf8"),
+    readFile(new URL("../public/ai-concierge.js", import.meta.url), "utf8"),
+    readFile(new URL("../public/i18n.js", import.meta.url), "utf8"),
+    readFile(new URL("../public/room.html", import.meta.url), "utf8"),
+    readFile(new URL("../public/modules/house/room.html", import.meta.url), "utf8"),
+    readFile(new URL("../public/platform-action-runtime.js", import.meta.url), "utf8")
+  ]);
+
+  assert.equal(room, canonicalRoom);
+  assert.match(conciergeScript, /launcher\.setAttribute\("aria-label", "Open Concierge"\)/);
+  assert.match(conciergeStyles, /@media\(max-width:767px\)[\s\S]*width:58px[\s\S]*height:58px/);
+  assert.match(conciergeStyles, /right:calc\(12px \+ env\(safe-area-inset-right\)\)/);
+  assert.match(conciergeStyles, /bottom:calc\(12px \+ env\(safe-area-inset-bottom\)\)/);
+  assert.match(conciergeStyles, /body\.ai-concierge-ready\{padding-bottom:calc\(76px \+ env\(safe-area-inset-bottom\)\)\}/);
+  assert.match(conciergeStyles, /\.ai-concierge-launcher-label\{[^}]*width:1px[^}]*clip:rect\(0,0,0,0\)/);
+
+  assert.match(i18n, /function addHeaderLanguageButton\(\)/);
+  assert.match(i18n, /topbar\.insertBefore\(button, nav\)/);
+  assert.doesNotMatch(i18n, /addAlwaysVisibleLanguageButton|document\.body\.appendChild\(button\)|language-floating-button/);
+  assert.match(styles, /\.language-header-button\{display:none\}/);
+  assert.match(styles, /@media\(max-width:760px\)[\s\S]*\.language-header-button\{position:static/);
+  assert.doesNotMatch(styles, /\.language-header-button\{[^}]*position:(?:fixed|sticky)/);
+
+  assert.match(styles, /\.room-guide-page \.hero\{min-height:208px;height:208px\}/);
+  assert.match(styles, /\.room-guide-page \.grid>\.card\{padding:13px 15px\}/);
+  assert.match(room, /Your stay is verified\. Non-Thai overnight guests must also complete the required TM30 guest registration\./);
+  assert.match(room, /Passport images are automatically deleted 14 days after upload, or sooner after processing\./);
+  assert.doesNotMatch(room, /Guest access is active after the required TM30 Immigration registration/);
+  assert.match(room, /data-action="contact" data-action-label="Open Concierge">Open Concierge<\/a>/);
+  assert.match(actionRuntime, /const requestedLabel = element\.getAttribute\("data-action-label"\)/);
 });
 
 test("v5.11.28 owner operations styles distinguish lifecycle, diagnostics and narrow tables", async () => {

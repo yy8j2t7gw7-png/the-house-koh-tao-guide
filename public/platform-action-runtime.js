@@ -49,7 +49,10 @@
     if (!(element instanceof Element) || !element.matches("a,button")) return;
 
     const action = inferAction(element);
-    const label = localizedLabel(action);
+    const requestedLabel = element.getAttribute("data-action-label") || "";
+    const label = requestedLabel
+      ? (window.HOUSE_I18N?.t(requestedLabel) || requestedLabel)
+      : localizedLabel(action);
     if (!action || !label) return;
 
     // Only write attributes/text when they actually differ. This prevents
@@ -93,6 +96,6 @@
     childList: true,
     subtree: true,
     attributes: true,
-    attributeFilter: ["href", "data-link", "data-action"]
+    attributeFilter: ["href", "data-link", "data-action", "data-action-label"]
   });
 })();

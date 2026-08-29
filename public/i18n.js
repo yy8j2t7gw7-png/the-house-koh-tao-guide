@@ -2,7 +2,7 @@
   if (window.HOUSE_I18N) return;
 
   const STORAGE_KEY = "houseGuideLanguage";
-  const CACHE_PREFIX = "houseGuideTranslations:v5.11.30:";
+  const CACHE_PREFIX = "houseGuideTranslations:v5.11.31:";
   const MAX_REQUEST_RETRIES = 2;
   const languages = Object.freeze([
     { code: "en", label: "English" },
@@ -320,6 +320,8 @@
   add("Access your room guide", "เข้าถึงคู่มือห้องพักของคุณ", "访问您的客房指南", "Откройте путеводитель по номеру", "Zimmerführer öffnen", "Accédez au guide de votre chambre", "Accede a la guía de tu habitación");
   add("Open your personal Room link from Airbnb to verify your stay and access your private guest information.", "เปิดลิงก์ห้องพักส่วนตัวจาก Airbnb เพื่อยืนยันการเข้าพักและเข้าถึงข้อมูลส่วนตัวสำหรับผู้เข้าพัก", "打开 Airbnb 提供的专属客房链接，以验证住宿并访问私人住客信息。", "Откройте личную ссылку на номер из Airbnb, чтобы подтвердить проживание и получить доступ к частной информации для гостя.", "Öffnen Sie Ihren persönlichen Zimmerlink von Airbnb, um Ihren Aufenthalt zu verifizieren und Ihre privaten Gästeinformationen aufzurufen.", "Ouvrez le lien personnel de votre chambre depuis Airbnb pour vérifier votre séjour et accéder à vos informations privées.", "Abre el enlace personal de tu habitación desde Airbnb para verificar tu estancia y acceder a tu información privada.");
   add("Open Concierge", "เปิดคอนเซียร์จ", "打开礼宾服务", "Открыть консьержа", "Concierge öffnen", "Ouvrir la conciergerie", "Abrir Concierge");
+  add("Your stay is verified. Non-Thai overnight guests must also complete the required TM30 guest registration.", "ยืนยันการเข้าพักของคุณแล้ว ผู้เข้าพักค้างคืนที่ไม่ใช่ชาวไทยต้องดำเนินการลงทะเบียนผู้เข้าพัก TM30 ที่กำหนดให้เสร็จสิ้นด้วย", "您的住宿已验证。非泰国籍过夜住客还必须完成规定的 TM30 住客登记。", "Ваше проживание подтверждено. Иностранные гости, остающиеся на ночь, также должны пройти обязательную регистрацию TM30.", "Ihr Aufenthalt ist verifiziert. Nicht-thailändische Übernachtungsgäste müssen zusätzlich die vorgeschriebene TM30-Gästeregistrierung abschließen.", "Votre séjour est vérifié. Les clients non thaïlandais passant la nuit doivent également effectuer l’enregistrement obligatoire TM30.", "Tu estancia está verificada. Los huéspedes no tailandeses que pasen la noche también deben completar el registro obligatorio TM30.");
+  add("Passport images are automatically deleted 14 days after upload, or sooner after processing.", "รูปภาพหนังสือเดินทางจะถูกลบโดยอัตโนมัติ 14 วันหลังจากอัปโหลด หรือเร็วกว่านั้นหลังการดำเนินการ", "护照图片会在上传 14 天后自动删除，或在处理完成后提前删除。", "Изображения паспортов автоматически удаляются через 14 дней после загрузки или раньше после обработки.", "Passbilder werden 14 Tage nach dem Upload oder bereits früher nach der Bearbeitung automatisch gelöscht.", "Les images de passeport sont supprimées automatiquement 14 jours après l’importation, ou plus tôt après traitement.", "Las imágenes de los pasaportes se eliminan automáticamente 14 días después de subirlas o antes tras su procesamiento.");
   add("Open Google Maps", "เปิด Google Maps", "打开 Google 地图", "Открыть Google Карты", "Google Maps öffnen", "Ouvrir Google Maps", "Abrir Google Maps");
   add("Open the Concierge for help with your stay and contact the team when needed.", "เปิดคอนเซียร์จเพื่อขอความช่วยเหลือเกี่ยวกับการเข้าพักและติดต่อทีมเมื่อจำเป็น", "打开礼宾服务获取住宿帮助，并在需要时联系团队。", "Откройте консьержа, чтобы получить помощь во время проживания и при необходимости связаться с командой.", "Öffnen Sie den Concierge, um Hilfe zu Ihrem Aufenthalt zu erhalten und bei Bedarf das Team zu kontaktieren.", "Ouvrez la conciergerie pour obtenir de l’aide pendant votre séjour et contacter l’équipe si nécessaire.", "Abre el Concierge para obtener ayuda durante tu estancia y contactar con el equipo cuando sea necesario.");
   add("Your private room guide", "คู่มือห้องพักส่วนตัวของคุณ", "您的私人客房指南", "Ваш частный путеводитель по номеру", "Ihr privater Zimmerführer", "Le guide privé de votre chambre", "La guía privada de tu habitación");
@@ -667,24 +669,25 @@
     topbar.insertBefore(toggle, nav);
   }
 
-  function addAlwaysVisibleLanguageButton() {
+  function addHeaderLanguageButton() {
     const select = document.querySelector(".language-switcher select");
-    if (!select || document.querySelector(".language-floating-button")) return;
+    const topbar = document.querySelector(".topbar");
+    const nav = topbar?.querySelector(".nav");
+    if (!select || !topbar || !nav || topbar.querySelector(".language-header-button")) return;
     const button = document.createElement("button");
-    button.className = "language-floating-button";
+    button.className = "language-header-button";
     button.type = "button";
     button.dataset.i18nSkip = "true";
     button.setAttribute("aria-label", format("Choose language"));
     button.innerHTML = `<span aria-hidden="true">🌐</span><span>${languages.find((item) => item.code === language)?.label || "English"}</span>`;
     button.addEventListener("click", () => {
-      const topbar = document.querySelector(".topbar");
-      topbar?.classList.add("is-nav-open");
-      topbar?.querySelector(".mobile-nav-toggle")?.setAttribute("aria-expanded", "true");
+      topbar.classList.add("is-nav-open");
+      topbar.querySelector(".mobile-nav-toggle")?.setAttribute("aria-expanded", "true");
       select.focus();
       if (typeof select.showPicker === "function") select.showPicker();
       else select.click();
     });
-    document.body.appendChild(button);
+    topbar.insertBefore(button, nav);
   }
 
   function addLegalFooter() {
@@ -718,7 +721,7 @@
   function start() {
     addMobileNavigation();
     addSelector();
-    addAlwaysVisibleLanguageButton();
+    addHeaderLanguageButton();
     addLegalFooter();
     if (language !== "en") {
       processRoot(document.body);

@@ -2,6 +2,27 @@
 
 All notable changes to The House – Koh Tao guest guide are recorded here.
 
+## v5.11.31 — Mobile UX Polish & Wording Consistency
+
+### Mobile floating-control correction
+
+- Replaces the full **✦ Concierge** pill with a compact 58×58 px launcher below 768 px. The button remains House green, keeps visible focus and reduced-motion support, exceeds the 44 px touch target and has the exact accessible name **Open Concierge**.
+- Uses `calc(12px + env(safe-area-inset-right))` and `calc(12px + env(safe-area-inset-bottom))` for launcher placement, plus `76px + env(safe-area-inset-bottom)` of page-bottom clearance. Important content can therefore scroll beyond the persistent control without a large empty spacer.
+- Removes the body-level fixed language control that could float over cards and photography. The compact language button is now inserted into the existing sticky `.topbar`, beside **Menu**, and opens the unchanged selector inside the navigation menu.
+
+### Mobile Room refinement
+
+- Reduces mobile section spacing, introductory heading rhythm and Room card density while preserving readable type, comfortable touch targets and the desktop/tablet presentation.
+- Reduces Room navigation-card vertical padding from 16 px to 13 px (18.75%) and the Room-location hero from 246 px to 208 px (15.45%), retaining the approved Room 11 image and adjusted focal position.
+- Corrects the verified copy to **Your stay is verified. Non-Thai overnight guests must also complete the required TM30 guest registration.** The passport-image deletion statement remains a separate paragraph.
+- Preserves the stay-help route but prevents the shared action-label runtime from rewriting **Open Concierge** to **Contact Us**.
+
+### Regression and scope
+
+- Adds one lightweight presentation contract for launcher accessibility/size/safe areas, header-bound language access, mobile Room spacing, verified wording, exact root/module mirrors and the CTA label override.
+- Expands the complete suite from 178 to 179 tests with zero failures.
+- Changes no Concierge intent, contact-hours, lost-key, booking, diving, cleaning, luggage, maintenance, WhatsApp, emergency, passport, stay, Airbnb, admin or alert-lifecycle logic.
+
 ## v5.11.30 — Generic Human Context Isolation & Routine Contact Gate
 
 ### Confirmed production causes

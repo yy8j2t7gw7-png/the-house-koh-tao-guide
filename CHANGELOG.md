@@ -2,6 +2,25 @@
 
 All notable changes to The House – Koh Tao guest guide are recorded here.
 
+## v5.11.36 — Snorkeling Recommendation Production Fix
+
+### Production regression
+
+- Fixes the exact live failures **which beach is good for snorkeling** / **which beach is best for snorkeling** returning the generic welcome and **is there good snorkeling** returning a false missing-recommendation response.
+- The first failure came from the generic knowledge matcher scoring the short `hi` welcome trigger as a substring inside **which**; v5.11.35 then accepted that high-confidence deterministic match before local-guide retrieval.
+- The second failure came from trusting a syntactically valid model response even when retrieved approved snorkeling records were present; deterministic project fallback previously ran only when the model call failed.
+
+### Corrective routing
+
+- Independent local-information turns now reject only the erroneous deterministic `welcome` collision, preserving all other exact deterministic House/local facts.
+- Independent snorkeling-information turns with retrieved approved records are answered directly from project knowledge and do not call the model. Actionable snorkeling bookings remain unchanged and continue through the structured booking collector.
+- Project-record reasons prefer concise `bestKnownFor` text for non-beach records so guest answers do not expose internal editorial wording when a clean approved description exists.
+
+### Regression and preservation
+
+- Adds the three production phrasings as a model-bypass regression and expands the complete suite from 190 to **191 tests**, all passing.
+- No Meta mapping, recipient, secret, webhook, BODY schema, House Maps, Explore, Room 11, contact-hours, lost-key, emergency, luggage, booking, passport, Airbnb or Admin behavior changes.
+
 ## v5.11.35 — Smarter Concierge and Local Guide Integration
 
 ### Current-message routing and local knowledge

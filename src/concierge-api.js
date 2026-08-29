@@ -40,7 +40,7 @@ import {
   specialtyChoiceLabels
 } from "./diving-catalog.js";
 
-const RELEASE = "5.11.35";
+const RELEASE = "5.11.36";
 const ROOM_OPTIONS = new Set(["1", "2", "3", "4", "5", "6", "8", "9", "10", "11"]);
 const MAX_HISTORY_ITEMS = 10;
 const MAX_QUESTION_LENGTH = 800;
@@ -1212,7 +1212,9 @@ function supportedBookingInformationResult(question) {
 }
 
 function conciseProjectReason(record) {
-  const source = String(record?.recommendation || record?.summary || record?.bestKnownFor || record?.perfectFor || "")
+  const source = String(record?.sourceType === "beach"
+    ? (record?.recommendation || record?.bestKnownFor || record?.summary || record?.perfectFor || "")
+    : (record?.bestKnownFor || record?.summary || record?.recommendation || record?.perfectFor || ""))
     .replace(/\*\*/g, "")
     .replace(/\s+/g, " ")
     .trim();
@@ -1255,6 +1257,10 @@ function projectKnowledgeResult(question, projectKnowledge = []) {
     suppressDefaultActions: true,
     source: "project-knowledge"
   };
+}
+
+function isSnorkelingInformationRequest(question) {
+  return /\bsnorkel(?:ing|ling)?\w*\b/i.test(String(question || ""));
 }
 
 function isActionableDivingBooking(value) {
@@ -3242,17 +3248,22 @@ export async function handleConciergeRequest(request, env, ctx, now = new Date()
   let result;
   if (directPolicyResult) {
     result = directPolicyResult;
-  } else if (contextualMatch || shouldUseDeterministic(match, history)) {
+  } else if (contextualMatch || (shouldUseDeterministic(match, history)
+    && !(independentInformationRequest && match?.intentId === "welcome"))) {
     result = deterministicResult(match);
   } else if (env.OPENAI_API_KEY) {
     let projectKnowledge = [];
     try {
       projectKnowledge = await retrieveApprovedProjectKnowledge(request, env, question);
-      const modelHistory = independentInformationRequest ? [] : history;
-      result = {
-        ...(await callOpenAI({ env, question, history: modelHistory, knowledge, approvedKnowledge, projectKnowledge, room, language })),
-        source: "ai"
-      };
+      if (independentInformationRequest && isSnorkelingInformationRequest(question) && projectKnowledge.length) {
+        result = projectKnowledgeResult(question, projectKnowledge);
+      } else {
+        const modelHistory = independentInformationRequest ? [] : history;
+        result = {
+          ...(await callOpenAI({ env, question, history: modelHistory, knowledge, approvedKnowledge, projectKnowledge, room, language })),
+          source: "ai"
+        };
+      }
     } catch (_error) {
       result = independentInformationRequest ? projectKnowledgeResult(question, projectKnowledge) : null;
       if (!result) {

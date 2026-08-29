@@ -2404,6 +2404,53 @@ test("snorkeling recommendations stay informational and use approved local recor
   assert.equal(store.alerts.length, 0);
 });
 
+test("production snorkeling phrasings bypass the welcome collision and never depend on model compliance", async () => {
+  const { env, store } = createEnvironment({ EXPLORE_ENABLED: "false", OPENAI_API_KEY: "test-key" });
+  const originalFetch = globalThis.fetch;
+  let modelCalls = 0;
+  globalThis.fetch = async (input, init) => {
+    if (String(input).includes("api.openai.com")) {
+      modelCalls += 1;
+      return new Response(JSON.stringify({
+        output: [{ type: "message", content: [{ type: "output_text", text: JSON.stringify({
+          answer: "I do not have a confirmed snorkeling-location recommendation in the approved information.",
+          intent_id: "fallback",
+          category: "fallback",
+          confidence: 0.2,
+          needs_human: true,
+          handoff: "stay_support",
+          learning_gap: true,
+          learning_reason: "missing_fact"
+        }) }] }]
+      }), { status: 200, headers: { "content-type": "application/json" } });
+    }
+    return originalFetch(input, init);
+  };
+  try {
+    for (const question of [
+      "which beach is good for snorkeling",
+      "which beach is best for snorkeling",
+      "is there good snorkeling"
+    ]) {
+      const response = await handleConciergeRequest(guestRequest(question), env);
+      const body = await response.json();
+      assert.equal(response.status, 200, question);
+      assert.equal(body.source, "project-knowledge", question);
+      assert.notEqual(body.intentId, "welcome", question);
+      assert.equal(body.learningGap, false, question);
+      assert.equal(body.needsHuman, false, question);
+      assert.equal(body.handoff, "none", question);
+      assert.match(body.answer, /Ao Leuk|Shark Bay|Hin Wong|Mango Bay/i, question);
+      assert.doesNotMatch(body.answer, /I can help with check-in|do not have a confirmed|AI Concierge should not quote/i, question);
+      assert.equal(body.workflow, null, question);
+    }
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+  assert.equal(modelCalls, 0);
+  assert.equal(store.alerts.length, 0);
+});
+
 test("concierge loading state uses animated dots without visible status wording", async () => {
   const script = await readFile(new URL("../public/ai-concierge.js", import.meta.url), "utf8");
   const styles = await readFile(new URL("../public/ai-concierge.css", import.meta.url), "utf8");
@@ -2861,7 +2908,7 @@ test("guest localization supports seven languages and keeps the owner dashboard 
   assert.doesNotMatch(admin, /src="\/i18n\.js"/);
   assert.match(runtime, /exploreContentDeferred/);
   assert.match(runtime, /element\.closest\("\.section,\.footer"\)/);
-  assert.match(runtime, /houseGuideTranslations:v5\.11\.35:/);
+  assert.match(runtime, /houseGuideTranslations:v5\.11\.36:/);
   assert.match(runtime, /MAX_REQUEST_RETRIES = 2/);
   assert.match(runtime, /let flushRunning = false/);
 });
@@ -5100,8 +5147,8 @@ test("agency-specific beginner and continuing courses pass the structured diving
   }
 });
 
-test("the bundled v5.11.35 catalog preserves current PADI, SSI and RAID pathways", () => {
-  assert.equal(divingCourses.updatedForRelease, "5.11.35");
+test("the bundled v5.11.36 catalog preserves current PADI, SSI and RAID pathways", () => {
+  assert.equal(divingCourses.updatedForRelease, "5.11.36");
   assert.deepEqual(divingCourses.houseRecommendation, {
     agency: "RAID",
     reason: "focus on dive safety and buoyancy control",

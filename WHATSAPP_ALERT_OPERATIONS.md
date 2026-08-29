@@ -163,9 +163,9 @@ If the flag is false, missing or any required action-template mapping is absent,
 
 Review Meta's supported Graph API versions before changing the version. The Worker checks once per minute for overdue escalations.
 
-## v5.11.35 deployment and changed-function verification
+## v5.11.35 activation / v5.11.36 preservation verification
 
-Deploy the verified v5.11.35 bundle to the existing Worker without changing secrets, recipients, webhook settings, routes, BODY counts/order or `SPARE_KEY_CODES`. The action-template names and `WHATSAPP_STAFF_ACTIONS_ENABLED=true` are the only intentional Meta configuration change.
+v5.11.36 preserves the verified v5.11.35 Meta configuration without changing secrets, recipients, webhook settings, routes, BODY counts/order or `SPARE_KEY_CODES`. The action-template names and `WHATSAPP_STAFF_ACTIONS_ENABLED=true` remain exactly as activated in v5.11.35.
 
 Run one non-sensitive alert of each action-template kind:
 

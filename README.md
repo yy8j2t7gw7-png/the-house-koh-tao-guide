@@ -1,4 +1,4 @@
-# Guest Guide Platform with AI Concierge — The House v5.11.35
+# Guest Guide Platform with AI Concierge — The House v5.11.36
 
 The House – Koh Tao guest guide is a production-oriented, mobile-first digital guest guide and concierge platform. It combines property information, curated island guidance, structured place and activity data, and centralized contact and booking routes.
 
@@ -17,6 +17,14 @@ The House – Koh Tao guest guide is a production-oriented, mobile-first digital
 - Model-powered, room-aware AI Concierge with controlled learning
 
 The Activities module contains 49 structured profiles covering diving, freediving, snorkelling, boat trips, beach experiences, kayaking, paddleboarding, hiking, viewpoints, climbing, yoga, Muay Thai, massage, cooking, wildlife, photography, night activities and rainy-day options.
+
+## v5.11.36 release focus
+
+- Fixes the production snorkeling regression from v5.11.35. Phrases such as **which beach is good for snorkeling**, **which beach is best for snorkeling** and **is there good snorkeling** now return approved Koh Tao snorkeling records instead of the generic Concierge welcome or a false learning-gap handoff.
+- Prevents an independent local-information question from accepting the `welcome` intent when the short **hi** trigger appears only as a substring inside another word such as **which**. Other high-confidence deterministic House/local facts remain unchanged.
+- Makes approved snorkeling retrieval authoritative once relevant records exist: these information-only snorkeling questions are answered from `public/data/activities.json` / `public/data/beaches.json` without depending on model compliance, while actionable snorkeling booking requests still enter the protected structured booking collector.
+- Improves deterministic guest-facing snorkeling reasons by preferring concise `bestKnownFor` text for activity records, avoiding internal editorial/verification wording where a clean approved reason exists.
+- Preserves every v5.11.35 Meta action mapping, House Maps decision, local-guide integration, AI-first contact rule, missing-supply route, Room 11 crop, stable mobile Concierge, lost-key, emergency, booking, luggage, passport, Airbnb, Admin and security boundary. The complete **191-test** suite passes with zero failures.
 
 ## v5.11.35 release focus
 

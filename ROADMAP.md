@@ -1,6 +1,6 @@
 # Product Roadmap
 
-Baseline: v5.11.35
+Baseline: v5.11.36
 
 ## Completed
 
@@ -200,7 +200,9 @@ Guests may continue using ordinary WhatsApp handoffs. Automated internal alerts 
 - [x] Confirm all five intended quick-action templates are reviewed and Active in Meta; never map the buttonless service v1 template.
 - [x] Implement and package v5.11.35 with current-turn topic switching, internal local-guide retrieval, direct missing-supply alerts, Concierge-first routine contacts and reviewed Meta quick-action activation.
 - [x] Retest the existing House Google Maps universal link on mobile and retain it; withdraw the proposed device-specific URL split.
-- [ ] Deploy v5.11.35 and run the affected-behavior production smoke test in `RELEASE_NOTES_v5.11.35.md`.
+- [x] Implement and package v5.11.36 directly from deployed v5.11.35 to correct the snorkeling welcome collision and make approved snorkeling records deterministic.
+- [ ] Deploy v5.11.36 and smoke-test the exact production phrasings in `RELEASE_NOTES_v5.11.36.md`.
+- [x] Deploy v5.11.35 and run the affected-behavior production smoke test; real production testing exposed the snorkeling welcome/learning-gap regression now corrected in v5.11.36.
 - [x] Add `STAY_TOKEN_PEPPER` and `RESERVATION_SYNC_TOKEN` Worker secrets
 - [x] Add protected `SPARE_KEY_CODES` Worker secret before activating automatic spare-key release
 - [x] Install and authorize the included Airbnb Google Apps Script synchronizer

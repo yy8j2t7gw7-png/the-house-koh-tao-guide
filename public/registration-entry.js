@@ -104,6 +104,15 @@
   }
 
   function showRegistration(data) {
+    window.dispatchEvent(new CustomEvent("house:stay-access-updated", {
+      detail: {
+        ...data,
+        verified: true,
+        conciergeAccess: "verified",
+        registrationIncomplete: data.accessGranted !== true,
+        room
+      }
+    }));
     if (verificationFields) verificationFields.hidden = true;
     setStatus(verificationStatus, messages.verified, "success");
     if (data.guestType === "foreign" || ["passport_pending", "passport_complete", "in_person_pending", "in_person_complete"].includes(data.registrationStatus)) {

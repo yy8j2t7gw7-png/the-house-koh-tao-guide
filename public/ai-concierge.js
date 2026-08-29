@@ -1,4 +1,4 @@
-(function () {
+(async function () {
   const cfg = window.AI_CONCIERGE_CONFIG;
   if (!cfg || !cfg.enabled) return;
 
@@ -6,14 +6,36 @@
   const currentPage = /^\/room\/(?:\d+)\/?$/.test(pagePath)
     ? "room.html"
     : (pagePath.split("/").filter(Boolean).pop() || "index.html");
-  const guestAccessMode = document.body.dataset.guestAccess || (currentPage === "emergency.html" ? "public" : "granted");
-  const isPublicAccess = guestAccessMode !== "granted";
+  const pageAccessMode = document.body.dataset.guestAccess || (currentPage === "emergency.html" ? "public" : "granted");
 
   const contacts = window.HOUSE_GUIDE || {};
   const roomOptions = (cfg.roomOptions || ["1", "2", "3", "4", "5", "6", "8", "9", "10", "11"]).map(String);
   const pagePrompts = cfg.pagePrompts?.[currentPage] || cfg.defaultPrompts || [];
-  const availableQuickActions = isPublicAccess ? (cfg.publicQuickActions || []) : (cfg.quickActions || []);
   const lostKeyRequest = /\b(?:(?:(?:i|we)\s+(?:have\s+)?)?lost\s+(?:(?:my|our|the|a)\s+)?(?:room\s+)?key|(?:(?:my|our|the)\s+)?(?:room\s+)?key\s+(?:is\s+)?(?:lost|missing)|(?:cannot|can['’]?t|unable\s+to)\s+find\s+(?:(?:my|our|the)\s+)?(?:room\s+)?key|(?:(?:i(?:['’]?m|\s+am)?|we(?:['’]?re|\s+are)?)\s+)?locked\s+out|(?:cannot|can['’]?t|unable\s+to)\s+(?:get|go)\s+(?:back\s+)?into\s+(?:my|our|the)\s+room|(?:(?:i|we)\s+)?forgot\s+(?:(?:my|our|the)\s+)?(?:room\s+)?key|(?:(?:i|we)\s+)?need\s+(?:a\s+)?(?:spare|replacement)\s+key|where\s+is\s+(?:(?:my|our|the)\s+)?spare\s+key)\b/i;
+  const genericHumanContactRequest = /^(?:(?:please|hello|hi)\s+)?(?:i\s+(?:need|want|would\s+like)\s+to\s+(?:talk|speak)\s+(?:to|with)\s+(?:a\s+)?(?:human|person|someone|staff|the\s+team|reception)|i\s+(?:(?:need|want|would\s+like)\s+to|wanna)\s+call\s+(?:you|(?:a\s+)?human|(?:a\s+)?person|someone|staff|the\s+team|reception)|(?:can|could)\s+i\s+(?:(?:talk|speak)\s+(?:to|with)|call)\s+(?:you|(?:a\s+)?human|(?:a\s+)?person|someone|staff|the\s+team|reception)|human\s+please|i\s+need\s+(?:a\s+)?(?:human|person)|contact\s+the\s+team|talk\s+to\s+the\s+team|speak\s+to\s+reception|call\s+the\s+team)(?:\s+please)?$/;
+
+  function routineServiceOpen(date = new Date()) {
+    const parts = new Intl.DateTimeFormat("en-GB", {
+      timeZone: "Asia/Bangkok",
+      weekday: "long",
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23"
+    }).formatToParts(date);
+    const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+    const minutes = (Number(values.hour) * 60) + Number(values.minute);
+    return values.weekday !== "Monday" && minutes >= (10 * 60 + 30) && minutes < (19 * 60 + 30);
+  }
+
+  function normalizeIntentText(value) {
+    return String(value || "")
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^\p{L}\p{N}]+/gu, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
 
   function safeStorage(storage, operation, key, value) {
     try {
@@ -66,6 +88,40 @@
   }
 
   let selectedRoom = initialRoom();
+
+  function deriveConciergeAccessState(status = null, statusKnown = false) {
+    const verified = statusKnown
+      ? Boolean(status?.conciergeAccess === "verified"
+        && status?.verified
+        && roomOptions.includes(String(status.room || "")))
+      : pageAccessMode === "granted";
+    return {
+      verified,
+      registrationIncomplete: Boolean(verified && statusKnown && status?.registrationIncomplete === true),
+      registrationStatus: verified ? String(status?.registrationStatus || "not_started") : "not_started"
+    };
+  }
+
+  async function loadConciergeAccessState() {
+    try {
+      const response = await fetch("/api/stay/status", {
+        credentials: "same-origin",
+        headers: { accept: "application/json" }
+      });
+      if (!response.ok) return deriveConciergeAccessState();
+      const status = await response.json().catch(() => ({}));
+      if (status.verified && roomOptions.includes(String(status.room || ""))) {
+        selectedRoom = String(status.room);
+        safeStorage(window.localStorage, "set", "houseRoom", selectedRoom);
+      }
+      return deriveConciergeAccessState(status, true);
+    } catch (_error) {
+      return deriveConciergeAccessState();
+    }
+  }
+
+  let conciergeAccessState = await loadConciergeAccessState();
+  let isPublicAccess = !conciergeAccessState.verified;
   const sessionStorageKey = "houseConciergeSessionId";
   const historyStorageKey = "houseConciergeHistory";
   const historyLimit = Number.isFinite(cfg.historyLimit) ? cfg.historyLimit : 10;
@@ -169,6 +225,9 @@
       };
     }
     if (action.route === "bookingCall") action = { ...action, route: "houseCall" };
+    const routineHouseCall = action.route === "houseCall";
+    const genericHumanContact = genericHumanContactRequest.test(normalizeIntentText(question));
+    if (!routineServiceOpen() && (routineHouseCall || (genericHumanContact && action.route === "houseWhatsapp"))) return null;
     if (action.type === "server_action" || action.type === "dismiss") {
       return { ...action, label: interpolate(localizedLabel, context), question: redactPrivateContact(question) };
     }
@@ -211,7 +270,8 @@
       label: interpolate(localizedLabel, context),
       href,
       style: action.style || "",
-      external: /^https?:/i.test(href)
+      external: /^https?:/i.test(href),
+      routineHouseCall
     };
   }
 
@@ -257,31 +317,34 @@
   panel.id = "aiConciergePanel";
   panel.setAttribute("aria-label", "AI Concierge");
 
-  const quickActionsHtml = availableQuickActions.map((action) => {
-    if (action.type === "registration" && selectedRoom) {
-      return `<a class="ai-concierge-action" href="/room/${selectedRoom}#verifiedStayAccess">
-        <span aria-hidden="true">${action.icon}</span><span>${action.label}</span>
-      </a>`;
-    }
-    if (action.type === "spare-key" && selectedRoom) {
-      return `<a class="ai-concierge-action" href="/room/${selectedRoom}#spareKeyAccess" data-spare-key-access="true">
-        <span aria-hidden="true">${action.icon}</span><span>${action.label}</span>
-      </a>`;
-    }
-    if (action.type === "link") {
-      return `<a class="ai-concierge-action" href="${action.href}">
-        <span aria-hidden="true">${action.icon}</span><span>${action.label}</span>
-      </a>`;
-    }
-    if (action.type === "prompt") {
-      return `<button class="ai-concierge-action" type="button" data-quick-prompt="${action.prompt.replace(/"/g, "&quot;")}">
+  function quickActionsMarkup() {
+    const availableQuickActions = isPublicAccess ? (cfg.publicQuickActions || []) : (cfg.quickActions || []);
+    return availableQuickActions.map((action) => {
+      if (action.type === "registration" && selectedRoom) {
+        return `<a class="ai-concierge-action" href="/room/${selectedRoom}#verifiedStayAccess">
+          <span aria-hidden="true">${action.icon}</span><span>${action.label}</span>
+        </a>`;
+      }
+      if (action.type === "spare-key" && selectedRoom) {
+        return `<a class="ai-concierge-action" href="/room/${selectedRoom}#spareKeyAccess" data-spare-key-access="true">
+          <span aria-hidden="true">${action.icon}</span><span>${action.label}</span>
+        </a>`;
+      }
+      if (action.type === "link") {
+        return `<a class="ai-concierge-action" href="${action.href}">
+          <span aria-hidden="true">${action.icon}</span><span>${action.label}</span>
+        </a>`;
+      }
+      if (action.type === "prompt") {
+        return `<button class="ai-concierge-action" type="button" data-quick-prompt="${action.prompt.replace(/"/g, "&quot;")}">
+          <span aria-hidden="true">${action.icon}</span><span>${action.label}</span>
+        </button>`;
+      }
+      return `<button class="ai-concierge-action" type="button" data-concierge-action="${action.type}">
         <span aria-hidden="true">${action.icon}</span><span>${action.label}</span>
       </button>`;
-    }
-    return `<button class="ai-concierge-action" type="button" data-concierge-action="${action.type}">
-      <span aria-hidden="true">${action.icon}</span><span>${action.label}</span>
-    </button>`;
-  }).join("");
+    }).join("");
+  }
 
   const promptHtml = pagePrompts.length
     ? `<div class="ai-concierge-context">
@@ -291,8 +354,6 @@
          ).join("")}
        </div>`
     : "";
-  const serviceHoursHtml = isPublicAccess ? "" : `<p class="ai-concierge-service-hours">Housekeeping &amp; service hours: Tuesday–Sunday, 10:30 AM–7:30 PM. Housekeeping is unavailable on Mondays.</p>`;
-
   const roomButtons = roomOptions.map((room) =>
     `<button type="button" data-select-room="${room}">Room ${room}</button>`
   ).join("");
@@ -313,8 +374,9 @@
         <h3>${cfg.welcomeTitle}</h3>
         <p>${cfg.welcomeText}</p>
       </div>
-      <div class="ai-concierge-actions">${quickActionsHtml}</div>
-      ${serviceHoursHtml}
+      <p class="ai-concierge-registration-status" role="status" ${conciergeAccessState.registrationIncomplete ? "" : "hidden"}>Registration incomplete</p>
+      <div class="ai-concierge-actions">${quickActionsMarkup()}</div>
+      <p class="ai-concierge-service-hours" ${isPublicAccess ? "hidden" : ""}>Housekeeping &amp; service hours: Tuesday–Sunday, 10:30 AM–7:30 PM. Housekeeping is unavailable on Mondays.</p>
       ${promptHtml}
       <div class="ai-concierge-room-selector" ${selectedRoom ? "hidden" : ""}>
         <div class="ai-concierge-room-selector-head">
@@ -346,6 +408,9 @@
   const messages = panel.querySelector(".ai-concierge-messages");
   const roomContext = panel.querySelector(".ai-concierge-room-context");
   const roomSelector = panel.querySelector(".ai-concierge-room-selector");
+  const quickActionsContainer = panel.querySelector(".ai-concierge-actions");
+  const registrationReminder = panel.querySelector(".ai-concierge-registration-status");
+  const serviceHours = panel.querySelector(".ai-concierge-service-hours");
 
   function appendMessage(role, text, actions = [], question = "", metadata = {}) {
     const message = document.createElement("article");
@@ -380,6 +445,7 @@
         } else {
           link.dataset.action = "conciergeHandoff";
           link.dataset.conciergeHumanHandoff = "true";
+          if (action.routineHouseCall) link.dataset.routineHouseCall = "true";
           if (action.href === "#house-emergency-call") link.dataset.houseEmergencyCall = "true";
         }
         if (action.external) {
@@ -426,6 +492,25 @@
     roomContext.textContent = selectedRoom ? `Room ${selectedRoom}` : "Set your room";
   }
 
+  function applyConciergeAccessState(nextState) {
+    conciergeAccessState = nextState;
+    isPublicAccess = !nextState.verified;
+    panel.dataset.stayAccess = nextState.verified ? "verified" : "unverified";
+    quickActionsContainer.innerHTML = quickActionsMarkup();
+    registrationReminder.textContent = window.HOUSE_I18N?.t("Registration incomplete") || "Registration incomplete";
+    registrationReminder.hidden = !nextState.registrationIncomplete;
+    serviceHours.hidden = isPublicAccess;
+    updateRoomContext();
+    if (selectedRoom) roomSelector.hidden = true;
+    window.HOUSE_I18N?.localize?.(quickActionsContainer);
+  }
+
+  async function refreshConciergeAccessState() {
+    applyConciergeAccessState(await loadConciergeAccessState());
+  }
+
+  applyConciergeAccessState(conciergeAccessState);
+
   function openRoomSelector() {
     roomSelector.hidden = false;
     roomSelector.scrollIntoView({ block: "nearest", behavior: "smooth" });
@@ -441,6 +526,7 @@
     safeStorage(window.localStorage, "set", "houseRoom", room);
     updateRoomContext();
     closeRoomSelector();
+    refreshConciergeAccessState();
     appendMessage("concierge", `Thank you. I’ll use Room ${room} for this conversation.`);
     if (pendingAnswer) {
       appendMessage(
@@ -572,6 +658,7 @@
       || /\b(?:burning smell|smell(?:s|ing)? (?:like )?burning|smoke (?:is )?(?:coming )?from|water (?:is )?pouring|ceiling (?:is )?(?:falling down|collapsing|caving in)|snake)\b/.test(normalized)
     );
     return isExplicitBookingRetry(source)
+      || genericHumanContactRequest.test(normalized)
       || /(?:\+|00)?\d[\d ()-]{6,20}\d/.test(source)
       || impliedLuggageRequest
       || /\b(?:luggage|baggage|store\s+(?:my|our)?\s*bags?|room\s+cleaning|clean\s+(?:my|our|the)\s+room)\b/i.test(source)
@@ -689,7 +776,12 @@
   window.setTimeout(() => launcher.classList.add("is-visible"), appearanceDelay);
 
   launcher.addEventListener("click", () => {
-    panel.classList.contains("is-open") ? closePanel() : openPanel();
+    if (panel.classList.contains("is-open")) {
+      closePanel();
+      return;
+    }
+    openPanel();
+    refreshConciergeAccessState();
   });
   closeButton.addEventListener("click", closePanel);
   backdrop.addEventListener("click", closePanel);
@@ -697,6 +789,19 @@
   panel.querySelector("[data-close-room-selector]").addEventListener("click", closeRoomSelector);
 
   panel.addEventListener("click", (event) => {
+    const possibleRoutineHandoff = event.target.closest('a[data-concierge-human-handoff="true"]');
+    const routineCall = event.target.closest("[data-routine-house-call]")
+      || (possibleRoutineHandoff?.getAttribute("href") === routeMap().houseCall ? possibleRoutineHandoff : null);
+    if (routineCall && !routineServiceOpen()) {
+      event.preventDefault();
+      routineCall.closest(".ai-concierge-message-actions")?.remove();
+      appendMessage(
+        "concierge",
+        "Our team is currently outside normal service hours. I can continue helping you here. If this is urgent, please use Emergency help.",
+        [{ label: "Emergency help", type: "link", href: "/emergency.html" }]
+      );
+      return;
+    }
     const emergencyCall = event.target.closest("[data-house-emergency-call]");
     if (emergencyCall) {
       event.preventDefault();
@@ -816,6 +921,16 @@
     openPanel({ askRoom: Boolean(event.detail?.askRoom) });
     if (event.detail?.prompt) submitQuestion(event.detail.prompt);
   });
+
+  window.addEventListener("house:stay-access-updated", (event) => {
+    const status = event.detail || {};
+    if (status.verified && roomOptions.includes(String(status.room || ""))) {
+      selectedRoom = String(status.room);
+      safeStorage(window.localStorage, "set", "houseRoom", selectedRoom);
+    }
+    applyConciergeAccessState(deriveConciergeAccessState(status, true));
+  });
+  window.addEventListener("pageshow", refreshConciergeAccessState);
 
   const resetDrag = () => {
     dragStartY = null;

@@ -86,6 +86,7 @@ body.ai-concierge-ready .float-wa[data-link="houseWhatsapp"]{display:none}
 .ai-concierge-welcome{margin-bottom:14px;color:#183b34}
 .ai-concierge-welcome h3{margin:0 0 5px;font-size:19px;line-height:1.25}
 .ai-concierge-welcome p{margin:0;color:#64756f;font-size:14px;line-height:1.52}
+.ai-concierge-registration-status{margin:0 0 10px;padding:8px 10px;border:1px solid #dfcfa9;border-radius:10px;background:#fff9e9;color:#6d5724;font-size:12px;font-weight:800;line-height:1.35}
 .ai-concierge-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
 .ai-concierge-action{
   display:flex;

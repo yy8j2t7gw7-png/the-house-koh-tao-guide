@@ -745,6 +745,134 @@ test("a repeated lost-key synonym while fee acceptance is pending preserves the 
   assert.equal(store.alertDeliveries.length, 0);
 });
 
+test("generic human and call requests obey Bangkok routine-contact hours without creating an alert", async () => {
+  const { env, store } = createEnvironment();
+  const saturday0017 = new Date("2026-08-28T17:17:00.000Z");
+  const saturday1500 = new Date("2026-08-29T08:00:00.000Z");
+  const monday1500 = new Date("2026-08-31T08:00:00.000Z");
+  const phrases = [
+    "I need to talk to a human",
+    "can I speak to someone",
+    "I want to speak to someone",
+    "human please",
+    "can I talk to staff",
+    "I need a person",
+    "contact the team",
+    "talk to the team",
+    "speak to reception",
+    "I wanna call you",
+    "can I call someone?",
+    "call the team"
+  ];
+
+  for (const phrase of phrases) {
+    const response = await handleConciergeRequest(guestRequest(phrase), env, undefined, saturday0017);
+    const body = await response.json();
+    assert.equal(body.intentId, "generic_human_contact", phrase);
+    assert.equal(body.source, "human-contact-policy", phrase);
+    assert.equal(body.needsHuman, false, phrase);
+    assert.match(body.answer, /outside normal service hours/i, phrase);
+    assert.equal(body.actions.some((action) => action.route === "houseCall"), false, phrase);
+    assert.equal(body.actions.some((action) => action.route === "houseWhatsapp"), false, phrase);
+    assert.equal(body.actions.some((action) => action.href === "/emergency.html"), true, phrase);
+  }
+
+  const open = await handleConciergeRequest(guestRequest("I wanna call you"), env, undefined, saturday1500);
+  const openBody = await open.json();
+  assert.equal(openBody.intentId, "generic_human_contact");
+  assert.match(openBody.answer, /contact The House team/i);
+  assert.equal(openBody.actions.some((action) => action.route === "houseWhatsapp"), true);
+  assert.equal(openBody.actions.some((action) => action.route === "houseCall"), true);
+
+  const monday = await handleConciergeRequest(guestRequest("I wanna call you"), env, undefined, monday1500);
+  const mondayBody = await monday.json();
+  assert.match(mondayBody.answer, /outside normal service hours/i);
+  assert.equal(mondayBody.actions.some((action) => action.route === "houseCall"), false);
+  assert.equal(mondayBody.actions.some((action) => action.route === "houseWhatsapp"), false);
+  assert.equal(mondayBody.actions.some((action) => action.href === "/emergency.html"), true);
+  assert.equal(store.alerts.length, 0);
+  assert.equal(store.alertDeliveries.length, 0);
+});
+
+test("inactive historical topics cannot contaminate a new generic call request", async () => {
+  const { env, store } = createEnvironment();
+  const openHours = new Date("2026-08-29T08:00:00.000Z");
+  const closedHours = new Date("2026-08-28T17:17:00.000Z");
+  const histories = [
+    ["I lost my key", "There is a 500 THB replacement fee.", "cancel", "Okay, the lost-key request was cancelled."],
+    ["I want to book diving", "Which diving option would you prefer?", "cancel", "The diving request was cancelled."],
+    ["Please clean my room", "What time would be most convenient?", "cancel", "The cleaning request was cancelled."],
+    ["My AC is not cold", "I sent the AC problem to the team.", "thanks", "You’re welcome."],
+    ["I need luggage storage", "How many bags?", "cancel", "The luggage request was cancelled."],
+    ["Where is the hospital?", "Use Emergency help for current medical danger.", "thanks", "You’re welcome."]
+  ];
+  for (const items of histories) {
+    const history = items.map((content, index) => ({ role: index % 2 ? "assistant" : "user", content }));
+    const response = await handleConciergeRequest(
+      guestRequest("I wanna call you", { history }),
+      env,
+      undefined,
+      openHours
+    );
+    const body = await response.json();
+    assert.equal(body.intentId, "generic_human_contact");
+    assert.equal(body.source, "human-contact-policy");
+    assert.match(body.answer, /^Of course\./);
+    assert.doesNotMatch(body.answer, /500 THB|spare key|lost key|diving|cleaning|\bAC\b|luggage|Rescue|1669/i);
+    assert.equal(body.actions.some((action) => action.route === "houseCall"), true);
+
+    const closedResponse = await handleConciergeRequest(
+      guestRequest("I wanna call you", { history }),
+      env,
+      undefined,
+      closedHours
+    );
+    const closedBody = await closedResponse.json();
+    assert.equal(closedBody.intentId, "generic_human_contact");
+    assert.equal(closedBody.source, "human-contact-policy");
+    assert.match(closedBody.answer, /outside normal service hours/i);
+    assert.doesNotMatch(closedBody.answer, /500 THB|spare key|lost key|diving|cleaning|\bAC\b|luggage|Rescue|1669/i);
+    assert.equal(closedBody.actions.some((action) => action.route === "houseCall"), false);
+    assert.equal(closedBody.actions.some((action) => action.href === "/emergency.html"), true);
+  }
+  assert.equal(store.alerts.length, 0);
+});
+
+test("an active lost-key fee prompt is acknowledged without acceptance, alert or after-hours routine calling", async () => {
+  const { env, store } = createEnvironment();
+  const history = [
+    { role: "user", content: "I lost my key" },
+    { role: "assistant", content: "I can help you access the spare key. There is a 500 THB replacement fee for a lost key. Would you like to continue?" }
+  ];
+  const open = await handleConciergeRequest(
+    guestRequest("I need to talk to a human", { history }),
+    env,
+    undefined,
+    new Date("2026-08-29T08:00:00.000Z")
+  );
+  const openBody = await open.json();
+  assert.equal(openBody.intentId, "generic_human_contact");
+  assert.match(openBody.answer, /continue helping with the spare-key process/i);
+  assert.equal(openBody.actions.some((action) => action.route === "houseCall"), true);
+
+  const closed = await handleConciergeRequest(
+    guestRequest("I wanna call you", { history }),
+    env,
+    undefined,
+    new Date("2026-08-28T17:17:00.000Z")
+  );
+  const closedBody = await closed.json();
+  assert.equal(closedBody.intentId, "generic_human_contact");
+  assert.match(closedBody.answer, /continue helping with the spare-key process/i);
+  assert.match(closedBody.answer, /outside normal service hours/i);
+  assert.equal(closedBody.actions.some((action) => action.route === "houseCall"), false);
+  assert.equal(closedBody.actions.some((action) => action.route === "houseWhatsapp"), false);
+  assert.equal(closedBody.actions.some((action) => action.href === "/emergency.html"), true);
+  assert.equal(store.alerts.length, 0);
+  assert.equal(store.alertDeliveries.length, 0);
+  assert.equal(store.spareKeyEvents.length, 0);
+});
+
 test("an unverified lost-key request sends no alert and exposes no spare-key path", async () => {
   const { env, store } = createEnvironment({
     GUEST_ACCESS_ENFORCEMENT: "true",
@@ -2112,13 +2240,104 @@ test("main and room welcome pages make required registration prominent", async (
   assert.equal(house, canonicalHouse);
 });
 
+test("Concierge stay access stays verified while registration remains an independent UI status", async () => {
+  const now = new Date("2026-08-29T08:00:00.000Z");
+  const { env, store } = createEnvironment({ GUEST_ACCESS_ENFORCEMENT: "true" });
+  const statusRequest = (cookie = "", roomQuery = "") => handleStayGuestRequest(new Request(
+    `https://guide.example/api/stay/status${roomQuery}`,
+    { headers: { origin: "https://guide.example", ...(cookie ? { cookie } : {}) } }
+  ), env, "/api/stay/status", null, now);
+
+  const unverified = await statusRequest();
+  const unverifiedBody = await unverified.json();
+  assert.equal(unverifiedBody.verified, false);
+  assert.equal(unverifiedBody.conciergeAccess, "unverified");
+  assert.equal(unverifiedBody.registrationIncomplete, false);
+
+  const cookie = await syncAndVerifyStay(env, { now });
+  const verified = await statusRequest(cookie);
+  const verifiedBody = await verified.json();
+  assert.equal(verifiedBody.room, "11");
+  assert.equal(verifiedBody.activeStay, true);
+  assert.equal(verifiedBody.verified, true);
+  assert.equal(verifiedBody.conciergeAccess, "verified");
+  assert.equal(verifiedBody.registrationStatus, "not_started");
+  assert.equal(verifiedBody.accessGranted, false);
+  assert.equal(verifiedBody.registrationIncomplete, true);
+
+  await markForeignRegistrationPending(env, cookie, 2, now);
+  const pending = await statusRequest(cookie, "?room=11");
+  const pendingBody = await pending.json();
+  assert.equal(pendingBody.conciergeAccess, "verified");
+  assert.equal(pendingBody.registrationStatus, "passport_pending");
+  assert.equal(pendingBody.accessGranted, false);
+  assert.equal(pendingBody.registrationIncomplete, true);
+
+  const reservationId = store.stayReservations[0].id;
+  store.registrationStatuses.set(reservationId, {
+    status: "passport_complete", guestType: "foreign", requiredPassports: 2, receivedPassports: 2
+  });
+  const complete = await statusRequest(cookie);
+  const completeBody = await complete.json();
+  assert.equal(completeBody.conciergeAccess, "verified");
+  assert.equal(completeBody.accessGranted, true);
+  assert.equal(completeBody.registrationIncomplete, false);
+
+  store.registrationStatuses.set(reservationId, {
+    status: "thai_exempt", guestType: "thai", requiredPassports: 0, receivedPassports: 0
+  });
+  const thai = await statusRequest(cookie);
+  const thaiBody = await thai.json();
+  assert.equal(thaiBody.conciergeAccess, "verified");
+  assert.equal(thaiBody.guestType, "thai");
+  assert.equal(thaiBody.accessGranted, true);
+  assert.equal(thaiBody.registrationIncomplete, false);
+});
+
+test("Concierge room header, menu and registration reminder refresh from one authoritative stay status", async () => {
+  const [script, registrationEntry, config] = await Promise.all([
+    readFile(new URL("../public/ai-concierge.js", import.meta.url), "utf8"),
+    readFile(new URL("../public/registration-entry.js", import.meta.url), "utf8"),
+    readFile(new URL("../public/ai-concierge-config.js", import.meta.url), "utf8")
+  ]);
+  assert.match(script, /await fetch\("\/api\/stay\/status"/);
+  assert.match(script, /status\?\.conciergeAccess === "verified"/);
+  assert.match(script, /registrationIncomplete: Boolean\(verified && statusKnown && status\?\.registrationIncomplete === true\)/);
+  assert.match(script, /const availableQuickActions = isPublicAccess \? \(cfg\.publicQuickActions \|\| \[\]\) : \(cfg\.quickActions \|\| \[\]\)/);
+  assert.match(script, /panel\.dataset\.stayAccess = nextState\.verified \? "verified" : "unverified"/);
+  assert.match(script, /registrationReminder\.hidden = !nextState\.registrationIncomplete/);
+  assert.match(script, /selectedRoom = String\(status\.room\);[\s\S]*updateRoomContext\(\)/);
+  assert.match(script, /launcher\.addEventListener\("click"[\s\S]*refreshConciergeAccessState\(\)/);
+  assert.match(script, /window\.addEventListener\("pageshow", refreshConciergeAccessState\)/);
+  assert.match(script, /window\.addEventListener\("house:stay-access-updated"/);
+  assert.match(registrationEntry, /conciergeAccess: "verified"/);
+  assert.match(registrationEntry, /registrationIncomplete: data\.accessGranted !== true/);
+  assert.match(config, /"label": "Guest registration"/);
+  assert.match(config, /"label": "Complete guest access"/);
+  assert.ok(config.indexOf('"quickActions"') < config.indexOf('"publicQuickActions"'));
+});
+
 test("concierge initializes safely and keeps public support buttons concierge-first", async () => {
   const script = await readFile(new URL("../public/ai-concierge.js", import.meta.url), "utf8");
   const pageDeclaration = script.indexOf("const currentPage =");
-  const accessDeclaration = script.indexOf("const guestAccessMode =");
+  const accessDeclaration = script.indexOf("const pageAccessMode =");
   assert.ok(pageDeclaration >= 0 && accessDeclaration > pageDeclaration);
   assert.match(script, /\[data-link="houseWhatsapp"\],\[data-link="houseCall"\]/);
   assert.match(script, /event\.preventDefault\(\);\s*openPanel\(\{ askRoom: true \}\)/);
+});
+
+test("browser action rendering and click handling independently hard-gate routine calls by Bangkok service hours", async () => {
+  const script = await readFile(new URL("../public/ai-concierge.js", import.meta.url), "utf8");
+  assert.match(script, /function routineServiceOpen\(date = new Date\(\)\)/);
+  assert.match(script, /timeZone: "Asia\/Bangkok"/);
+  assert.match(script, /values\.weekday !== "Monday"/);
+  assert.match(script, /minutes >= \(10 \* 60 \+ 30\) && minutes < \(19 \* 60 \+ 30\)/);
+  assert.match(script, /if \(!routineServiceOpen\(\) && \(routineHouseCall \|\| \(genericHumanContact && action\.route === "houseWhatsapp"\)\)\) return null/);
+  assert.match(script, /link\.dataset\.routineHouseCall = "true"/);
+  assert.match(script, /possibleRoutineHandoff\?\.getAttribute\("href"\) === routeMap\(\)\.houseCall/);
+  assert.match(script, /if \(routineCall && !routineServiceOpen\(\)\) \{[\s\S]*event\.preventDefault\(\);[\s\S]*outside normal service hours[\s\S]*Emergency help/);
+  assert.ok(script.indexOf("if (routineCall && !routineServiceOpen())") < script.indexOf('const emergencyCall = event.target.closest("[data-house-emergency-call]")'));
+  assert.match(script, /genericHumanContactRequest\.test\(normalized\)/);
 });
 
 test("browser protected workflows keep supplied contacts out of ordinary session history", async () => {
@@ -2292,7 +2511,7 @@ test("guest localization supports seven languages and keeps the owner dashboard 
   assert.doesNotMatch(admin, /src="\/i18n\.js"/);
   assert.match(runtime, /exploreContentDeferred/);
   assert.match(runtime, /element\.closest\("\.section,\.footer"\)/);
-  assert.match(runtime, /houseGuideTranslations:v5\.11\.28:/);
+  assert.match(runtime, /houseGuideTranslations:v5\.11\.29:/);
   assert.match(runtime, /MAX_REQUEST_RETRIES = 2/);
   assert.match(runtime, /let flushRunning = false/);
 });
@@ -3314,6 +3533,43 @@ test("model responses use structured output and deterministic handoff actions", 
     assert.match(capturedRequest.instructions, /Room 6/);
     assert.match(capturedRequest.instructions, /Never reveal, invent, request or infer a key-box code/);
     assert.equal(store.interactions.length, 1);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("final server action policy removes a model-derived routine Call Us action after hours", async () => {
+  const { env } = createEnvironment({ OPENAI_API_KEY: "test-key" });
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => new Response(JSON.stringify({
+    output: [{
+      type: "message",
+      content: [{
+        type: "output_text",
+        text: JSON.stringify({
+          answer: "A member of the team can help with that.",
+          intent_id: "unusual_support_request",
+          category: "stay-support",
+          confidence: 0.8,
+          needs_human: true,
+          handoff: "stay_support",
+          learning_gap: false,
+          learning_reason: "none"
+        })
+      }]
+    }]
+  }), { status: 200, headers: { "content-type": "application/json" } });
+  try {
+    const response = await handleConciergeRequest(
+      guestRequest("Could a team member advise me about an unusual personal request?"),
+      env,
+      undefined,
+      new Date("2026-08-28T17:17:00.000Z")
+    );
+    const body = await response.json();
+    assert.equal(body.source, "ai");
+    assert.equal(body.actions.some((action) => action.route === "houseCall"), false);
+    assert.equal(body.actions.some((action) => action.route === "propertyEmergencyCall"), false);
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -4424,8 +4680,8 @@ test("agency-specific beginner and continuing courses pass the structured diving
   }
 });
 
-test("the bundled v5.11.28 catalog preserves current PADI, SSI and RAID pathways", () => {
-  assert.equal(divingCourses.updatedForRelease, "5.11.28");
+test("the bundled v5.11.29 catalog preserves current PADI, SSI and RAID pathways", () => {
+  assert.equal(divingCourses.updatedForRelease, "5.11.29");
   assert.deepEqual(divingCourses.houseRecommendation, {
     agency: "RAID",
     reason: "focus on dive safety and buoyancy control",
@@ -7083,7 +7339,7 @@ test("owners resolve then remove maintenance reports with private-photo cleanup 
   assert.equal(reloaded.maintenanceReports.some((item) => item.id === targetId), false);
   assert.equal(reloaded.maintenanceReports.some((item) => item.id === unrelatedId), true);
   assert.deepEqual(store.adminAudit.map((item) => item.action), ["maintenance_report_resolved", "maintenance_report_removed"]);
-  assert.equal(store.adminAudit.every((item) => /28 Aug 2026, \d{2}:\d{2}/.test(item.bangkokTime)), true);
+  assert.equal(store.adminAudit.every((item) => item.bangkokTime === formatBangkokAlertTime(new Date(item.createdAt))), true);
   assert.doesNotMatch(JSON.stringify(store.adminAudit), /66812345678|81 234 5678|private-owner-cleanup|meta|token/i);
 
   const adminHtml = await readFile(new URL("../public/concierge-admin.html", import.meta.url), "utf8");
@@ -7199,7 +7455,7 @@ test("diagnostic dismissal changes visibility only and clearing remains limited 
     "whatsapp_diagnostic_dismissed",
     "whatsapp_alert_diagnostics_cleared"
   ]);
-  assert.equal(store.adminAudit.every((item) => /28 Aug 2026, \d{2}:\d{2}/.test(item.bangkokTime)), true);
+  assert.equal(store.adminAudit.every((item) => item.bangkokTime === formatBangkokAlertTime(new Date(item.createdAt))), true);
   assert.doesNotMatch(JSON.stringify(store.adminAudit), /66812345678|81 234 5678|9753|wamid|132018|token/i);
 
   const adminScript = await readFile(new URL("../public/concierge-admin.js", import.meta.url), "utf8");

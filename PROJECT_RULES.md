@@ -155,7 +155,7 @@ Public interface rules:
 
 ## Current baseline
 
-Current release: v5.11.28 (focused public landing/room hierarchy and wording refinement plus deterministic lost-key/lockout synonym precedence, while preserving the v5.11.27 responsive visual system, the v5.11.26 RAID-and-Roctopus recommendation policy and every protected fee, notification, code-display, rotation, privacy and delivery safeguard).
+Current release: v5.11.29 (verified-stay and registration-state separation plus deterministic, current-message-only human-contact routing and a server/render/click hard gate for routine **Call Us** outside Tuesday–Sunday 10:30–19:30 Bangkok time; the v5.11.28 responsive presentation, 24/7 protected lost-key access, RAID-and-Roctopus recommendation policy and every fee, notification, code-display, rotation, privacy and delivery safeguard remain authoritative).
 
 Explore is intentionally disabled in the live v5.11.6 release. Do not delete its pages, structured records or media. Restore it only after the planned Explore rebuild and review by changing the protected deployment feature variable. Do not expose internal Explore detail paths in live concierge answers while the feature remains disabled; use approved external actions where supplied.
 

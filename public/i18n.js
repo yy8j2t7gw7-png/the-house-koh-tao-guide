@@ -2,7 +2,7 @@
   if (window.HOUSE_I18N) return;
 
   const STORAGE_KEY = "houseGuideLanguage";
-  const CACHE_PREFIX = "houseGuideTranslations:v5.11.28:";
+  const CACHE_PREFIX = "houseGuideTranslations:v5.11.29:";
   const MAX_REQUEST_RETRIES = 2;
   const languages = Object.freeze([
     { code: "en", label: "English" },
@@ -148,12 +148,14 @@
   add("Contact Us", "ติดต่อเรา", "联系我们", "Связаться с нами", "Kontakt aufnehmen", "Nous contacter", "Contáctanos");
   add("Book with Us", "จองกับเรา", "通过我们预订", "Забронировать через нас", "Bei uns buchen", "Réserver avec nous", "Reserva con nosotros");
   add("Call Us", "โทรหาเรา", "致电我们", "Позвонить нам", "Uns anrufen", "Nous appeler", "Llámanos");
+  add("Emergency help", "ความช่วยเหลือฉุกเฉิน", "紧急帮助", "Экстренная помощь", "Nothilfe", "Aide d’urgence", "Ayuda de emergencia");
   add("Call", "โทร", "致电", "Позвонить", "Anrufen", "Appeler", "Llamar");
   add("Open Map", "เปิดแผนที่", "打开地图", "Открыть карту", "Karte öffnen", "Ouvrir la carte", "Abrir mapa");
   add("Visit Website", "เยี่ยมชมเว็บไซต์", "访问网站", "Открыть сайт", "Website besuchen", "Visiter le site", "Visitar sitio web");
   add("Discover →", "ดูเพิ่มเติม →", "查看详情 →", "Подробнее →", "Entdecken →", "Découvrir →", "Descubrir →");
   add("View details", "ดูรายละเอียด", "查看详情", "Подробнее", "Details ansehen", "Voir les détails", "Ver detalles");
   add("Guest registration", "ลงทะเบียนผู้เข้าพัก", "住客登记", "Регистрация гостя", "Gästeregistrierung", "Enregistrement client", "Registro de huéspedes");
+  add("Registration incomplete", "การลงทะเบียนยังไม่เสร็จสมบูรณ์", "登记未完成", "Регистрация не завершена", "Registrierung unvollständig", "Enregistrement incomplet", "Registro incompleto");
   add("Concierge", "คอนเซียร์จ", "礼宾服务", "Консьерж", "Concierge", "Conciergerie", "Conserjería");
   add("AI Concierge", "AI คอนเซียร์จ", "AI 礼宾服务", "AI-консьерж", "AI-Concierge", "Conciergerie IA", "Conserjería con IA");
   add("Concierge is thinking", "คอนเซียร์จกำลังประมวลผล", "礼宾服务正在思考", "Консьерж готовит ответ", "Der Concierge bereitet eine Antwort vor", "La conciergerie prépare une réponse", "La conserjería está preparando una respuesta");

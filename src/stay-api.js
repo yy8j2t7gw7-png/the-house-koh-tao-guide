@@ -416,10 +416,18 @@ export async function handleStayGuestRequest(request, env, path, ctx, now = new 
 
   if (path === "/api/stay/status") {
     if (request.method !== "GET") return json({ error: "method_not_allowed" }, 405, { allow: "GET" });
-    const room = new URL(request.url).searchParams.get("room") || "";
-    if (!ACTIVE_ROOMS.has(room)) return json({ error: room === "7" ? "room_not_active" : "invalid_room" }, 400);
+    const requestedRoom = new URL(request.url).searchParams.get("room") || "";
+    if (requestedRoom && !ACTIVE_ROOMS.has(requestedRoom)) return json({ error: requestedRoom === "7" ? "room_not_active" : "invalid_room" }, 400);
     const session = await verifiedSession(request, env, store, now);
-    if (!session || session.room !== room) return json({ verified: false, room });
+    if (!session || (requestedRoom && session.room !== requestedRoom)) {
+      return json({
+        verified: false,
+        conciergeAccess: "unverified",
+        registrationIncomplete: false,
+        room: requestedRoom
+      });
+    }
+    const room = session.room;
     const registration = await store.getStayRegistrationStatus(session.reservationId);
     const registrationStatus = registration?.status || "not_started";
     const spareKey = await store.getSpareKeyState(session.reservationId, room);
@@ -427,12 +435,14 @@ export async function handleStayGuestRequest(request, env, path, ctx, now = new 
     const spareKeyAvailable = stayIsActive && !spareKey.releasedForReservation && !spareKey.rotationRequired;
     return json({
       verified: true,
+      conciergeAccess: "verified",
       room,
       checkInDate: session.checkInDate,
       checkOutDate: session.checkOutDate,
       activeStay: stayIsActive,
       registrationStatus,
       accessGranted: registrationComplete(registrationStatus),
+      registrationIncomplete: !registrationComplete(registrationStatus),
       guestFirstName: session.guestFirstName || "",
       guestType: registration?.guestType || (registrationStatus === "thai_exempt" ? "thai" : ""),
       requiredPassports: Number(registration?.requiredPassports) || 0,

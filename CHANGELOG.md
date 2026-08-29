@@ -2,6 +2,27 @@
 
 All notable changes to The House – Koh Tao guest guide are recorded here.
 
+## v5.11.29 — Verified-State Consistency & Human Handoff Routing
+
+### Authoritative stay and registration state
+
+- Separates verified active-stay authorization from passport/registration completion in both the stay-status API and Concierge UI.
+- Derives the displayed room, verified quick menu and registration reminder from the same protected `/api/stay/status` session response. A verified guest with incomplete registration keeps the normal room menu and sees a non-blocking **Registration incomplete** reminder instead of **Complete guest access**.
+- Refreshes that authoritative state after verification, Concierge reopen, page restoration and ordinary navigation without adding unsafe client-side authorization persistence. Thai-exempt and registration-complete stays show the verified menu without an incorrect passport reminder.
+
+### Deterministic human contact and hard call gate
+
+- Routes topic-neutral human/contact phrases from the current message before history-aware knowledge or model handling, preventing completed or inactive lost-key, booking, cleaning, maintenance, luggage and medical context from contaminating the answer.
+- Applies routine House contact hours deterministically in Bangkok time: Tuesday–Sunday, 10:30–19:30; Monday closed. Open-hours requests receive the established safe contact actions, while closed-hours requests keep Concierge help and the separate **Emergency help** route without a routine **Call Us** action.
+- Suppresses routine `houseCall` at the final server action boundary even when earlier/model metadata requests it. The browser repeats the time check while rendering and blocks stale/cached routine call links on click, so an after-hours generic request cannot call Su.
+- Allows an immediately active lost-key fee prompt to be acknowledged without accepting the fee, creating an alert or exposing a code. Historical lost-key context is ignored, and the existing protected 24/7 lost-key flow remains independent of routine service hours.
+
+### Regression and scope
+
+- Adds seven regressions covering the verified/registration state matrix, Room-header/menu refresh consistency, 12 generic contact phrases, deterministic Saturday/Monday hours, stale-topic isolation, active lost-key handling and server/browser call-action enforcement.
+- Expands the complete suite from 169 to 176 tests with zero failures.
+- Preserves the approved v5.11.28 visual system and every booking, mixed-diver, Meta, retry, property, cleaning, luggage, emergency, passport, maintenance, diagnostics, Airbnb and lost-key security boundary.
+
 ## v5.11.28 — Visual Hierarchy, Wording & Lost-Key Intent Consistency
 
 ### Public guest refinement

@@ -1,4 +1,4 @@
-# Guest Guide Platform with AI Concierge — The House v5.11.28
+# Guest Guide Platform with AI Concierge — The House v5.11.29
 
 The House – Koh Tao guest guide is a production-oriented, mobile-first digital guest guide and concierge platform. It combines property information, curated island guidance, structured place and activity data, and centralized contact and booking routes.
 
@@ -17,6 +17,16 @@ The House – Koh Tao guest guide is a production-oriented, mobile-first digital
 - Model-powered, room-aware AI Concierge with controlled learning
 
 The Activities module contains 49 structured profiles covering diving, freediving, snorkelling, boat trips, beach experiences, kayaking, paddleboarding, hiking, viewpoints, climbing, yoga, Muay Thai, massage, cooking, wildlife, photography, night activities and rainy-day options.
+
+## v5.11.29 release focus
+
+- Separates protected active-stay verification from passport/registration completion. A verified Room guest always receives the verified Concierge menu; incomplete registration appears only as a non-blocking reminder.
+- Resolves the room identity, verified menu and registration reminder from the same session-bound `/api/stay/status` response and refreshes it after verification, reopening, navigation restoration and refresh.
+- Handles generic human-contact requests from the current message before history-aware routing, so inactive lost-key, booking, cleaning, maintenance, luggage and medical topics cannot leak into a neutral request.
+- Enforces routine human contact at Tuesday–Sunday 10:30–19:30 Bangkok time, with Monday closed. Closed-hours responses retain Concierge and Emergency help but cannot render or invoke the routine **Call Us** route.
+- Applies the Call Us restriction at the final server action boundary, browser rendering boundary and stale-link click boundary independently of generated wording or metadata.
+- Keeps the protected lost-key self-service process available 24/7 and preserves every fee-acceptance, accepted-notification, protected-display and rotation-lock safeguard.
+- Adds seven focused regressions; the complete 176-test suite passes with zero failures. The approved v5.11.28 visuals, Explore switch and disabled optional staff quick actions are unchanged.
 
 ## v5.11.28 release focus
 

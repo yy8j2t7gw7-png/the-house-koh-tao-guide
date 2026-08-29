@@ -12,7 +12,7 @@ import {
 } from "./concierge-core.js";
 import { handlePassportAdminRequest } from "./passport-api.js";
 import { handleMaintenanceAdminRequest } from "./maintenance-api.js";
-import { housekeepingAvailability, isAfterHours, parseBangkokRequestedDate } from "./alert-policy.js";
+import { housekeepingAvailability, parseBangkokRequestedDate } from "./alert-policy.js";
 import { retrieveApprovedProjectKnowledge } from "./project-knowledge.js";
 import { LANGUAGE_NAMES, translateApprovedTexts, validLanguage } from "./i18n-api.js";
 import {
@@ -40,7 +40,7 @@ import {
   specialtyChoiceLabels
 } from "./diving-catalog.js";
 
-const RELEASE = "5.11.28";
+const RELEASE = "5.11.29";
 const ROOM_OPTIONS = new Set(["1", "2", "3", "4", "5", "6", "8", "9", "10", "11"]);
 const MAX_HISTORY_ITEMS = 10;
 const MAX_QUESTION_LENGTH = 800;
@@ -194,6 +194,7 @@ const HOUSEKEEPING_ITEM_REQUEST = /\b(?:toilet\s+paper|soap|(?:(?:new|fresh|clea
 const HOUSEKEEPING_REQUEST_ACTION = /\b(?:can\s+(?:i|we)\s+(?:have|get)|please\s+(?:bring|send|provide|clean)|can\s+you\s+(?:bring|send|provide|clean)|could\s+you\s+(?:bring|send|provide|clean)|i\s+(?:need|want|would\s+like)|(?:bring|send|provide)\s+(?:me\s+)?|clean\s+(?:my|our|the)\s+room)\b|\b(?:toilet\s+paper|soap|towels?)\s+please\b/i;
 const DIRTY_ROOM_CLEANING_REQUEST = /\b(?:(?:my|our|the)\s+(?:room|bathroom)\s+(?:(?:is|feels|looks|seems)\s+(?:(?:really|very|quite|so)\s+)?(?:dirty|messy|unclean)|needs?\s+(?:a\s+)?clean(?:ing)?)|(?:my|our|the)\s+(?:sheets?|bedding|bed\s*linen)\s+(?:(?:are|is|look|looks|seem|seems)\s+)?(?:dirty|stained|unclean)|(?:dirty|stained|unclean)\s+(?:sheets?|bedding|bed\s*linen)|(?:my|our|the)\s+(?:room|bathroom)\s+needs?\s+(?:cleaning|disinfect(?:ing|ion)))\b/i;
 const LOST_KEY_REQUEST = /\b(?:(?:(?:i|we)\s+(?:have\s+)?)?lost\s+(?:(?:my|our|the|a)\s+)?(?:room\s+)?key|(?:(?:my|our|the)\s+)?(?:room\s+)?key\s+(?:is\s+)?(?:lost|missing)|(?:cannot|can['’]?t|unable\s+to)\s+find\s+(?:(?:my|our|the)\s+)?(?:room\s+)?key|(?:(?:i(?:['’]?m|\s+am)?|we(?:['’]?re|\s+are)?)\s+)?locked\s+out|(?:cannot|can['’]?t|unable\s+to)\s+(?:get|go)\s+(?:back\s+)?into\s+(?:my|our|the)\s+room|(?:(?:i|we)\s+)?forgot\s+(?:(?:my|our|the)\s+)?(?:room\s+)?key|(?:(?:i|we)\s+)?need\s+(?:a\s+)?(?:spare|replacement)\s+key|where\s+is\s+(?:(?:my|our|the)\s+)?spare\s+key)\b/i;
+const GENERIC_HUMAN_CONTACT_REQUEST = /^(?:(?:please|hello|hi)\s+)?(?:i\s+(?:need|want|would\s+like)\s+to\s+(?:talk|speak)\s+(?:to|with)\s+(?:a\s+)?(?:human|person|someone|staff|the\s+team|reception)|i\s+(?:(?:need|want|would\s+like)\s+to|wanna)\s+call\s+(?:you|(?:a\s+)?human|(?:a\s+)?person|someone|staff|the\s+team|reception)|(?:can|could)\s+i\s+(?:(?:talk|speak)\s+(?:to|with)|call)\s+(?:you|(?:a\s+)?human|(?:a\s+)?person|someone|staff|the\s+team|reception)|human\s+please|i\s+need\s+(?:a\s+)?(?:human|person)|contact\s+the\s+team|talk\s+to\s+the\s+team|speak\s+to\s+reception|call\s+the\s+team)(?:\s+please)?$/;
 const GENERIC_URGENT_WORDS = new Set([
   "a", "am", "an", "and", "bad", "emergency", "happened", "has", "have", "help", "i", "in", "is", "it",
   "my", "need", "please", "problem", "really", "room", "serious", "something", "the", "there", "urgent", "very",
@@ -527,14 +528,13 @@ function isActionableCleaningRequest(question) {
     || (HOUSEKEEPING_ITEM_REQUEST.test(String(question || "")) && HOUSEKEEPING_REQUEST_ACTION.test(String(question || "")));
 }
 
-function applyHousekeepingCallAvailability(result, question, now = new Date()) {
-  const routineHousekeeping = Boolean(result?.housekeepingRequest)
-    || /\b(?:housekeeping|room\s+cleaning|clean\s+(?:my|our|the)\s+room|towels?|toilet\s+paper|soap|bed\s*linen|bedsheets?|pillows?|blankets?|room\s+supplies|amenities|rubbish|trash|bins?)\b/i
-      .test(`${question} ${result?.intentId || ""}`);
-  if (!routineHousekeeping || housekeepingAvailability(now).open) return result;
+function applyRoutineContactAvailability(result, question, now = new Date()) {
+  if (housekeepingAvailability(now).open) return result;
+  const genericHumanContact = GENERIC_HUMAN_CONTACT_REQUEST.test(normalizeText(question));
   return {
     ...result,
-    actions: (result.actions || []).filter((action) => action?.route !== "houseCall")
+    actions: (result.actions || []).filter((action) => action?.route !== "houseCall"
+      && !(genericHumanContact && action?.route === "houseWhatsapp"))
   };
 }
 
@@ -1039,10 +1039,48 @@ function lostKeyPolicyResult(question, access, room, now = new Date()) {
     learningGap: false, learningReason: "none",
     actions: [
       { label: "Continue securely", type: "spare-key" },
-      ...(!isAfterHours(now) ? [{ label: "Call Us", type: "route", route: "houseCall" }] : [])
+      ...(housekeepingAvailability(now).open ? [{ label: "Call Us", type: "route", route: "houseCall" }] : [])
     ],
     suppressDefaultActions: true,
     source: "lost-key-policy"
+  };
+}
+
+function activeLostKeyFeePrompt(history) {
+  const previousGuest = history.at(-2);
+  const previousConcierge = history.at(-1);
+  return previousGuest?.role === "user"
+    && previousConcierge?.role === "assistant"
+    && LOST_KEY_REQUEST.test(previousGuest.content)
+    && /\b500\s+THB\s+replacement\s+fee\b/i.test(previousConcierge.content)
+    && /\bWould you like to continue\b/i.test(previousConcierge.content);
+}
+
+function genericHumanContactResult(question, history, now = new Date()) {
+  if (!GENERIC_HUMAN_CONTACT_REQUEST.test(normalizeText(question))) return null;
+  const serviceOpen = housekeepingAvailability(now).open;
+  const lostKeyFeePending = activeLostKeyFeePrompt(history);
+  const answer = serviceOpen
+    ? lostKeyFeePending
+      ? "I can continue helping with the spare-key process here, or you can contact The House team below."
+      : "Of course. You can contact The House team using the options below."
+    : lostKeyFeePending
+      ? "I can continue helping with the spare-key process here. Our team is currently outside normal service hours. If this is an emergency, please use Emergency help."
+      : "Our team is currently outside normal service hours. I can continue helping you here. If this is urgent, please use Emergency help.";
+  return {
+    answer,
+    intentId: "generic_human_contact",
+    category: "concierge",
+    confidence: 1,
+    needsHuman: false,
+    handoff: "none",
+    learningGap: false,
+    learningReason: "none",
+    actions: serviceOpen
+      ? actionsForHandoff("stay_support")
+      : [{ label: "Emergency help", type: "link", href: "/emergency.html" }],
+    suppressDefaultActions: true,
+    source: "human-contact-policy"
   };
 }
 
@@ -2978,14 +3016,16 @@ export async function handleConciergeRequest(request, env, ctx, now = new Date()
       || (urgentClarificationActive && !hasMeaningfulIncidentDescription(question)));
   const safetyResult = classifiedSafetyResult || (needsUrgentClarification ? urgentClarificationResult(room) : null);
   const lostKeyResult = safetyResult ? null : lostKeyPolicyResult(question, access, room, now);
-  let publicResult = access.accessGranted || (lostKeyResult && access.verified)
+  const humanContactResult = safetyResult || lostKeyResult ? null : genericHumanContactResult(question, history, now);
+  let earlyPolicyResult = humanContactResult || (access.accessGranted || (lostKeyResult && access.verified)
     ? null
-    : (lostKeyResult || publicAccessResult(question, access, room, safetyResult));
-  if (publicResult) {
+    : (lostKeyResult || publicAccessResult(question, access, room, safetyResult)));
+  if (earlyPolicyResult) {
+    earlyPolicyResult = applyRoutineContactAvailability(earlyPolicyResult, question, now);
     if (language !== "en") {
       try {
-        const [translatedAnswer] = await translateApprovedTexts(env, language, [publicResult.answer]);
-        publicResult = { ...publicResult, answer: translatedAnswer };
+        const [translatedAnswer] = await translateApprovedTexts(env, language, [earlyPolicyResult.answer]);
+        earlyPolicyResult = { ...earlyPolicyResult, answer: translatedAnswer };
       } catch (_error) {
         // The approved English access message remains available.
       }
@@ -2998,21 +3038,21 @@ export async function handleConciergeRequest(request, env, ctx, now = new Date()
       room,
       roomVerified: access.verified,
       question,
-      result: publicResult
+      result: earlyPolicyResult
     });
     return json({
-      answer: publicResult.answer,
-      intentId: publicResult.intentId,
-      category: publicResult.category,
-      confidence: publicResult.confidence,
-      needsHuman: publicResult.needsHuman,
-      handoff: publicResult.handoff,
-      learningGap: publicResult.learningGap,
-      actions: publicResult.actions,
-      source: publicResult.source,
+      answer: earlyPolicyResult.answer,
+      intentId: earlyPolicyResult.intentId,
+      category: earlyPolicyResult.category,
+      confidence: earlyPolicyResult.confidence,
+      needsHuman: earlyPolicyResult.needsHuman,
+      handoff: earlyPolicyResult.handoff,
+      learningGap: earlyPolicyResult.learningGap,
+      actions: earlyPolicyResult.actions,
+      source: earlyPolicyResult.source,
       language,
       interactionId: recorded.interactionId,
-      workflow: publicResult.intentId === "urgent_clarification"
+      workflow: earlyPolicyResult.intentId === "urgent_clarification"
         ? { type: "urgent_clarification", status: "collecting" }
         : null
     });
@@ -3108,7 +3148,7 @@ export async function handleConciergeRequest(request, env, ctx, now = new Date()
   result = finalizeResult(result, question);
   result = applyLiveFeaturePolicy(result, env);
   result = applyEmergencyConfirmationPolicy(result);
-  result = applyHousekeepingCallAvailability(result, question, now);
+  result = applyRoutineContactAvailability(result, question, now);
 
   const directWorkflow = result.intentId === "urgent_clarification"
     ? { type: "urgent_clarification", status: "collecting" }
@@ -3318,6 +3358,7 @@ export async function handleConciergeRequest(request, env, ctx, now = new Date()
       actions: [{ label: "Call Us", type: "route", route: "houseCall" }]
     };
   }
+  result = applyRoutineContactAvailability(result, question, now);
   if (language !== "en" && result.source !== "ai") {
     try {
       const [translatedAnswer] = await translateApprovedTexts(env, language, [result.answer]);

@@ -53,6 +53,30 @@ import {
   validDivingGroup
 } from "../src/diving-catalog.js";
 
+
+const OPAQUE_TEST_FIELD_NAMES = new Set([
+  "id",
+  "alertId",
+  "deliveryId",
+  "interactionId",
+  "reservationId",
+  "requestHash",
+  "dedupeKey",
+  "recipientHash",
+  "providerMessageId",
+  "traceId"
+]);
+
+function withoutOpaqueTestIdentifiers(value) {
+  if (Array.isArray(value)) return value.map(withoutOpaqueTestIdentifiers);
+  if (!value || typeof value !== "object") return value;
+  return Object.fromEntries(
+    Object.entries(value)
+      .filter(([key]) => !OPAQUE_TEST_FIELD_NAMES.has(key))
+      .map(([key, nested]) => [key, withoutOpaqueTestIdentifiers(nested)])
+  );
+}
+
 function createStore() {
   return {
     interactions: [],
@@ -1017,7 +1041,7 @@ test("an unverified lost-key request sends no alert and exposes no spare-key pat
     assert.equal(body.actions.some((action) => action.type === "spare-key"), false);
     assert.equal(store.alerts.length, 0);
     assert.equal(sends, 0);
-    assert.doesNotMatch(JSON.stringify({ body, interactions: store.interactions }), /9753/);
+    assert.doesNotMatch(JSON.stringify(withoutOpaqueTestIdentifiers({ body, interactions: store.interactions })), /9753/);
     const forged = await createConciergeAlert({
       env,
       interactionId: "int_unverified_lost_key_boundary",
@@ -1120,7 +1144,7 @@ test("a verified daytime lost-key request asks for this request’s fee acceptan
     assert.equal(releaseBody.keyBoxCode, "9753");
     assert.equal(store.spareKeyEvents[0].codeReleased, true);
     assert.equal(store.spareKeyRotations.get("11"), true);
-    assert.doesNotMatch(JSON.stringify({ body, outbound, alerts: store.alerts, interactions: store.interactions }), /9753/);
+    assert.doesNotMatch(JSON.stringify(withoutOpaqueTestIdentifiers({ body, outbound, alerts: store.alerts, interactions: store.interactions })), /9753/);
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -1241,13 +1265,13 @@ test("nighttime lost-key release matches the same passport-independent, request-
     assert.equal(outbound.length, 6);
     assert.equal(store.alerts.length, 2);
     assert.deepEqual(store.alerts.map((alert) => alert.room).sort(), ["10", "11"]);
-    assert.doesNotMatch(JSON.stringify({
+    assert.doesNotMatch(JSON.stringify(withoutOpaqueTestIdentifiers({
       outbound,
       alerts: store.alerts,
       deliveries: store.alertDeliveries,
       diagnostics: store.whatsappDiagnostics || [],
       events: store.spareKeyEvents
-    }), /8642|9753/);
+    })), /8642|9753/);
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -1531,7 +1555,7 @@ test("protected owner reset distinguishes controlled tests from physical rotatio
       "rotation_cleared_physical",
       "rotation_cleared_controlled_test"
     ]);
-    assert.doesNotMatch(JSON.stringify({ events: store.spareKeyEvents, activity: operations.rotationActivity }), /9753|5319/);
+    assert.doesNotMatch(JSON.stringify(withoutOpaqueTestIdentifiers({ events: store.spareKeyEvents, activity: operations.rotationActivity })), /9753|5319/);
     assert.equal(outbound.length, 6);
   } finally {
     globalThis.fetch = originalFetch;
@@ -2623,7 +2647,7 @@ test("guest localization supports seven languages and keeps the owner dashboard 
   assert.doesNotMatch(admin, /src="\/i18n\.js"/);
   assert.match(runtime, /exploreContentDeferred/);
   assert.match(runtime, /element\.closest\("\.section,\.footer"\)/);
-  assert.match(runtime, /houseGuideTranslations:v5\.11\.32:/);
+  assert.match(runtime, /houseGuideTranslations:v5\.11\.33:/);
   assert.match(runtime, /MAX_REQUEST_RETRIES = 2/);
   assert.match(runtime, /let flushRunning = false/);
 });
@@ -4793,8 +4817,8 @@ test("agency-specific beginner and continuing courses pass the structured diving
   }
 });
 
-test("the bundled v5.11.32 catalog preserves current PADI, SSI and RAID pathways", () => {
-  assert.equal(divingCourses.updatedForRelease, "5.11.32");
+test("the bundled v5.11.33 catalog preserves current PADI, SSI and RAID pathways", () => {
+  assert.equal(divingCourses.updatedForRelease, "5.11.33");
   assert.deepEqual(divingCourses.houseRecommendation, {
     agency: "RAID",
     reason: "focus on dive safety and buoyancy control",
@@ -7653,7 +7677,7 @@ test("24-hour spare-key release uses the verified session, confirms the current 
     assert.equal(released.headers.get("cache-control"), "no-store, max-age=0");
     assert.equal(store.spareKeyRotations.get("1"), true);
     assert.equal(store.alerts[0].roomVerified, true);
-    assert.doesNotMatch(JSON.stringify(store.alerts), /8642/);
+    assert.doesNotMatch(JSON.stringify(withoutOpaqueTestIdentifiers(store.alerts)), /8642/);
     assert.doesNotMatch(JSON.stringify(store.alerts), /HMKEY12345/);
 
     const repeated = await handleStayGuestRequest(new Request("https://guide.example/api/stay/spare-key", {
@@ -7723,7 +7747,7 @@ test("spare-key release automatically notifies the team and fails safely when Wh
     assert.equal((await failed.json()).error, "team_notification_failed");
     assert.equal(store.spareKeyEvents.length, 0);
     assert.equal(store.spareKeyRotations.get("2") === true, false);
-    assert.doesNotMatch(JSON.stringify(store.alerts), /9753/);
+    assert.doesNotMatch(JSON.stringify(withoutOpaqueTestIdentifiers(store.alerts)), /9753/);
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -8745,7 +8769,7 @@ test("v5.11.31 header, mobile spacing, wording and CTA corrections remain intact
   assert.match(actionRuntime, /const requestedLabel = element\.getAttribute\("data-action-label"\)/);
 });
 
-test("v5.11.32 mobile AI Concierge uses stable expanded, scroll-collapsed and collision-shifted states", async () => {
+test("v5.11.33 mobile AI Concierge is a stable identifiable pill with no scroll or collision movement", async () => {
   const [styles, script] = await Promise.all([
     readFile(new URL("../public/ai-concierge.css", import.meta.url), "utf8"),
     readFile(new URL("../public/ai-concierge.js", import.meta.url), "utf8")
@@ -8755,33 +8779,30 @@ test("v5.11.32 mobile AI Concierge uses stable expanded, scroll-collapsed and co
   assert.match(script, /ai-concierge-launcher-icon is-desktop" aria-hidden="true">✦/);
   assert.match(script, /ai-concierge-launcher-icon is-mobile" aria-hidden="true">💬/);
   assert.match(script, /ai-concierge-launcher-label is-mobile">AI Concierge/);
-  assert.match(script, /expandedWidth: 148/);
-  assert.match(script, /compactSize: 52/);
-  assert.match(script, /collisionThrottleMs: 90/);
-  assert.match(script, /downwardDebounceMs: 650/);
-  assert.match(script, /upwardDebounceMs: 220/);
-  assert.match(script, /function rectanglesOverlap\(/);
-  assert.match(script, /function nearestSafeLauncherTop\(/);
-  assert.match(script, /getBoundingClientRect\(\)/);
-  assert.match(script, /window\.requestAnimationFrame\(evaluateMobileLauncher\)/);
-  assert.match(script, /window\.addEventListener\("scroll", handleMobileLauncherScroll, \{ passive: true \}\)/);
-  assert.match(script, /new ResizeObserver\(\(\) => scheduleMobileLauncherLayout\(\)\)/);
-  assert.match(script, /"a\[href\]"[\s\S]*"button"[\s\S]*"input:not\(\[type='hidden'\]\)"[\s\S]*"textarea"[\s\S]*"select"/);
-  assert.match(script, /launcher\.dataset\.mobileState = compact \? "compact" : "expanded"/);
-  assert.match(script, /--ai-concierge-lift/);
+  assert.doesNotMatch(script, /mobileLauncherLayout|handleMobileLauncherScroll|nearestSafeLauncherTop|rectanglesOverlap|overlapArea|scheduleMobileLauncherLayout|ResizeObserver|--ai-concierge-lift/);
+  assert.doesNotMatch(script, /window\.addEventListener\("scroll",[^\n]*Launcher/);
 
   assert.match(styles, /@media\(max-width:767px\)[\s\S]*width:148px[\s\S]*height:52px/);
   assert.match(styles, /right:calc\(12px \+ env\(safe-area-inset-right\)\)/);
-  assert.match(styles, /bottom:calc\(12px \+ env\(safe-area-inset-bottom\) \+ var\(--ai-concierge-lift\)\)/);
+  assert.match(styles, /bottom:calc\(12px \+ env\(safe-area-inset-bottom\)\)/);
+  assert.match(styles, /body\.ai-concierge-ready\{padding-bottom:calc\(72px \+ env\(safe-area-inset-bottom\)\)\}/);
   assert.match(styles, /\.ai-concierge-launcher-icon\.is-desktop,\.ai-concierge-launcher-label\.is-desktop\{display:none\}/);
   assert.match(styles, /\.ai-concierge-launcher-icon\.is-mobile\{display:grid;font-size:20px\}/);
-  assert.match(styles, /\.ai-concierge-launcher\.is-compact\{width:52px;min-width:52px;gap:0;padding:0\}/);
-  assert.match(styles, /\.ai-concierge-launcher\.is-compact \.ai-concierge-launcher-label\.is-mobile\{max-width:0;opacity:0\}/);
-  assert.doesNotMatch(styles, /\.ai-concierge-launcher-label\{[^}]*clip:rect/);
-  assert.match(styles, /@media\(prefers-reduced-motion:reduce\)[\s\S]*\.ai-concierge-launcher\{transition-duration:\.01ms\}/);
+  assert.doesNotMatch(styles, /is-compact|is-collision-shifted|--ai-concierge-lift/);
 });
 
-test("v5.11.32 Room 11 mobile hero restores the marked entrance with a room-specific crop", async () => {
+test("v5.11.33 launcher is removed from the open chat surface and restored on close", async () => {
+  const [styles, script] = await Promise.all([
+    readFile(new URL("../public/ai-concierge.css", import.meta.url), "utf8"),
+    readFile(new URL("../public/ai-concierge.js", import.meta.url), "utf8")
+  ]);
+
+  assert.match(styles, /\.ai-concierge-launcher\[hidden\]\{display:none\}/);
+  assert.match(script, /function openPanel\(options = \{\}\)[\s\S]*launcher\.setAttribute\("aria-expanded", "true"\);[\s\S]*launcher\.hidden = true;[\s\S]*launcher\.setAttribute\("aria-hidden", "true"\);/);
+  assert.match(script, /function closePanel\(\)[\s\S]*launcher\.hidden = false;[\s\S]*launcher\.removeAttribute\("aria-hidden"\);[\s\S]*launcher\.setAttribute\("aria-expanded", "false"\);/);
+});
+
+test("v5.11.33 preserves the v5.11.32 Room 11 marked-entrance crop", async () => {
   const [styles, roomApp, roomData] = await Promise.all([
     readFile(new URL("../public/design-system.css", import.meta.url), "utf8"),
     readFile(new URL("../public/room-app.js", import.meta.url), "utf8"),

@@ -2,6 +2,24 @@
 
 All notable changes to The House – Koh Tao guest guide are recorded here.
 
+## v5.11.33 — Stable Mobile AI Concierge
+
+### Calm fixed launcher
+
+- Restores a stable 148×52 px **💬 AI Concierge** mobile pill at the bottom-right with iPhone safe-area offsets and modest page-bottom clearance.
+- Removes the v5.11.32 scroll collapse, collision scan, hysteresis, vertical-lift and launcher-specific resize/layout controller so the control no longer jumps while the guest reads the page.
+- Keeps desktop **✦ Concierge** unchanged.
+
+### Open-chat visibility
+
+- Hides the floating launcher completely while the existing Concierge panel is open and restores it on close. The existing panel, conversation state, focus management and operational routing are unchanged.
+
+### Preserved Room 11 crop and scope
+
+- Preserves the v5.11.32 232 px Room 11-specific `72% 58%` marked-entrance crop and the approved Finding Room sequence.
+- Includes no Admin Dashboard diagnostics change; the owner confirmed no code change was required there.
+- Replaces the rejected smart-launcher regression contract and adds an open-panel visibility contract. The complete suite contains 182 tests and must pass with zero failures.
+
 ## v5.11.32 — Smart Mobile AI Concierge Bubble & Room 11 Hero Crop
 
 ### Stable mobile launcher states

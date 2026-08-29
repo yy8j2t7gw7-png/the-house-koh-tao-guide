@@ -1,6 +1,6 @@
 # Product Roadmap
 
-Baseline: v5.11.32
+Baseline: v5.11.33
 
 ## Completed
 
@@ -186,7 +186,9 @@ Guests may continue using ordinary WhatsApp handoffs. Automated internal alerts 
 - [x] Implement and package v5.11.31 mobile UX polish directly from deployed v5.11.30 without changing operational logic.
 - [x] Deploy v5.11.31 and use its real-device launcher/Room 11 crop regressions to define v5.11.32.
 - [x] Implement and package v5.11.32 smart mobile Concierge states and Room 11 hero crop without changing operational logic.
-- [ ] Deploy v5.11.32 and run the focused real-iPhone smoke check in `DEVELOPMENT_HANDOFF_v5.11.32.md`.
+- [x] Deploy v5.11.32 and use its real-iPhone movement/duplicate-launcher findings to define v5.11.33.
+- [x] Implement and package v5.11.33 stable mobile Concierge behavior while preserving the Room 11 crop and all operational logic.
+- [ ] Deploy v5.11.33 and run the focused real-iPhone smoke check in `DEVELOPMENT_HANDOFF_v5.11.33.md`.
 - [ ] Submit and obtain Meta approval for the five optional quick-action templates documented in `META_STAFF_QUICK_ACTIONS_v5.11.20.md`; never map the buttonless service v1 template and enable only after every intended template is Active.
 - [x] Add `STAY_TOKEN_PEPPER` and `RESERVATION_SYNC_TOKEN` Worker secrets
 - [x] Add protected `SPARE_KEY_CODES` Worker secret before activating automatic spare-key release

@@ -1,4 +1,4 @@
-# Guest Guide Platform with AI Concierge — The House v5.11.32
+# Guest Guide Platform with AI Concierge — The House v5.11.33
 
 The House – Koh Tao guest guide is a production-oriented, mobile-first digital guest guide and concierge platform. It combines property information, curated island guidance, structured place and activity data, and centralized contact and booking routes.
 
@@ -18,14 +18,14 @@ The House – Koh Tao guest guide is a production-oriented, mobile-first digital
 
 The Activities module contains 49 structured profiles covering diving, freediving, snorkelling, boat trips, beach experiences, kayaking, paddleboarding, hiking, viewpoints, climbing, yoga, Muay Thai, massage, cooking, wildlife, photography, night activities and rainy-day options.
 
-## v5.11.32 release focus
+## v5.11.33 release focus
 
-- Replaces the anonymous normal mobile sparkle square with a clear 148×52 px **💬 AI Concierge** pill below 768 px, while preserving the approved desktop **✦ Concierge** pill and the exact accessible name **Open AI Concierge**.
-- Collapses the mobile pill to a 52×52 px chat bubble after six cumulative pixels of downward scrolling, waits 650 ms after downward movement or 220 ms after upward movement before re-expanding, and uses a larger release gap to prevent nervous state changes.
-- Throttles collision checks to at most once every 90 ms. Visible links, buttons, form controls, navigation cards and footer actions are measured together; a colliding full pill collapses, and a colliding compact bubble moves upward to the nearest right-aligned safe position.
-- Retains right/bottom iPhone safe-area positioning and modest page clearance. The v5.11.31 header-owned language control remains non-floating.
-- Restores the Room mobile hero to 232 px and applies a Room 11-specific `72% 58%` focal position. The overlay stays on the left, clear of the actual marked lower-right Room 11 entrance.
-- Adds two presentation/behavior contracts; the complete 181-test suite passes with zero failures. No Concierge, contact-hours, lost-key, booking, alert, passport, stay, Airbnb or owner-operations rule changed.
+- Returns the mobile Concierge to a calm, fixed **148×52 px 💬 AI Concierge** bottom-right pill below 768 px; it no longer collapses, lifts or moves while scrolling.
+- Removes the v5.11.32 launcher-specific scroll threshold, collision geometry, hysteresis, vertical lift and ResizeObserver controller, reducing visual motion and runtime layout work.
+- Hides the launcher completely while the Concierge panel is open and restores it when the panel closes, while preserving the existing panel, focus management, conversation state and `aria-expanded` behavior.
+- Preserves the v5.11.32 Room 11 232 px marked-entrance crop, v5.11.31 header-owned language access, verified/TM30 wording and **Open Concierge** CTA.
+- Includes no Admin Dashboard diagnostics change; the owner confirmed the observed diagnostics behavior was expected.
+- The complete 182-test suite is required to pass with zero failures. No operational Concierge, WhatsApp, booking, lost-key, passport, stay, Airbnb or admin behavior changes.
 
 ## v5.11.31 release focus
 

@@ -1,4 +1,4 @@
-# Guest Guide Platform with AI Concierge — The House v5.11.29
+# Guest Guide Platform with AI Concierge — The House v5.11.30
 
 The House – Koh Tao guest guide is a production-oriented, mobile-first digital guest guide and concierge platform. It combines property information, curated island guidance, structured place and activity data, and centralized contact and booking routes.
 
@@ -17,6 +17,15 @@ The House – Koh Tao guest guide is a production-oriented, mobile-first digital
 - Model-powered, room-aware AI Concierge with controlled learning
 
 The Activities module contains 49 structured profiles covering diving, freediving, snorkelling, boat trips, beach experiences, kayaking, paddleboarding, hiking, viewpoints, climbing, yoga, Muay Thai, massage, cooking, wildlife, photography, night activities and rainy-day options.
+
+## v5.11.30 release focus
+
+- Recognizes the exact production phrase **I wanna talk to a human** and the full approved neutral human/contact phrase set as a deterministic current-message intent before transcript-aware knowledge, pending clarification or model routing.
+- Replaces the v5.11.29 transcript-shape inference for a pending lost-key fee prompt with explicit, non-authorizing `lost_key/awaiting_fee_acceptance` workflow state. Historical lost-key text alone can no longer define a new generic human request.
+- Treats both `houseWhatsapp` (**Contact Us**) and `houseCall` (**Call Us**) as routine House contact. The final server action policy suppresses both whenever Bangkok service is closed, regardless of upstream intent or model metadata.
+- Applies the same independent gate while rendering browser actions and when an old or cached routine contact link is clicked. Emergency routes remain separate and available.
+- Keeps topic-specific current lost-key human requests in the protected 24/7 spare-key process while obeying routine contact hours; no fee is accepted, alert sent or code authorized by conversational workflow state.
+- Adds two focused regressions and strengthens the v5.11.29 coverage; the complete 178-test suite passes with zero failures. The verified Room menu, registration-state separation, approved visual system and all booking, Meta and lost-key security controls are unchanged.
 
 ## v5.11.29 release focus
 

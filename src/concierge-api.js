@@ -40,7 +40,7 @@ import {
   specialtyChoiceLabels
 } from "./diving-catalog.js";
 
-const RELEASE = "5.11.29";
+const RELEASE = "5.11.30";
 const ROOM_OPTIONS = new Set(["1", "2", "3", "4", "5", "6", "8", "9", "10", "11"]);
 const MAX_HISTORY_ITEMS = 10;
 const MAX_QUESTION_LENGTH = 800;
@@ -194,7 +194,8 @@ const HOUSEKEEPING_ITEM_REQUEST = /\b(?:toilet\s+paper|soap|(?:(?:new|fresh|clea
 const HOUSEKEEPING_REQUEST_ACTION = /\b(?:can\s+(?:i|we)\s+(?:have|get)|please\s+(?:bring|send|provide|clean)|can\s+you\s+(?:bring|send|provide|clean)|could\s+you\s+(?:bring|send|provide|clean)|i\s+(?:need|want|would\s+like)|(?:bring|send|provide)\s+(?:me\s+)?|clean\s+(?:my|our|the)\s+room)\b|\b(?:toilet\s+paper|soap|towels?)\s+please\b/i;
 const DIRTY_ROOM_CLEANING_REQUEST = /\b(?:(?:my|our|the)\s+(?:room|bathroom)\s+(?:(?:is|feels|looks|seems)\s+(?:(?:really|very|quite|so)\s+)?(?:dirty|messy|unclean)|needs?\s+(?:a\s+)?clean(?:ing)?)|(?:my|our|the)\s+(?:sheets?|bedding|bed\s*linen)\s+(?:(?:are|is|look|looks|seem|seems)\s+)?(?:dirty|stained|unclean)|(?:dirty|stained|unclean)\s+(?:sheets?|bedding|bed\s*linen)|(?:my|our|the)\s+(?:room|bathroom)\s+needs?\s+(?:cleaning|disinfect(?:ing|ion)))\b/i;
 const LOST_KEY_REQUEST = /\b(?:(?:(?:i|we)\s+(?:have\s+)?)?lost\s+(?:(?:my|our|the|a)\s+)?(?:room\s+)?key|(?:(?:my|our|the)\s+)?(?:room\s+)?key\s+(?:is\s+)?(?:lost|missing)|(?:cannot|can['’]?t|unable\s+to)\s+find\s+(?:(?:my|our|the)\s+)?(?:room\s+)?key|(?:(?:i(?:['’]?m|\s+am)?|we(?:['’]?re|\s+are)?)\s+)?locked\s+out|(?:cannot|can['’]?t|unable\s+to)\s+(?:get|go)\s+(?:back\s+)?into\s+(?:my|our|the)\s+room|(?:(?:i|we)\s+)?forgot\s+(?:(?:my|our|the)\s+)?(?:room\s+)?key|(?:(?:i|we)\s+)?need\s+(?:a\s+)?(?:spare|replacement)\s+key|where\s+is\s+(?:(?:my|our|the)\s+)?spare\s+key)\b/i;
-const GENERIC_HUMAN_CONTACT_REQUEST = /^(?:(?:please|hello|hi)\s+)?(?:i\s+(?:need|want|would\s+like)\s+to\s+(?:talk|speak)\s+(?:to|with)\s+(?:a\s+)?(?:human|person|someone|staff|the\s+team|reception)|i\s+(?:(?:need|want|would\s+like)\s+to|wanna)\s+call\s+(?:you|(?:a\s+)?human|(?:a\s+)?person|someone|staff|the\s+team|reception)|(?:can|could)\s+i\s+(?:(?:talk|speak)\s+(?:to|with)|call)\s+(?:you|(?:a\s+)?human|(?:a\s+)?person|someone|staff|the\s+team|reception)|human\s+please|i\s+need\s+(?:a\s+)?(?:human|person)|contact\s+the\s+team|talk\s+to\s+the\s+team|speak\s+to\s+reception|call\s+the\s+team)(?:\s+please)?$/;
+const GENERIC_HUMAN_CONTACT_REQUEST = /^(?:(?:please|hello|hi)\s+)?(?:i\s+(?:(?:need|want|would\s+like)\s+to|wanna)\s+(?:talk|speak)\s+(?:to|with)\s+(?:a\s+)?(?:human|person|someone|staff|(?:the\s+)?team|reception)|i\s+(?:(?:need|want|would\s+like)\s+to|wanna)\s+call\s+(?:you|(?:a\s+)?(?:human|person)|someone|staff|(?:the\s+)?team|reception)|(?:can|could)\s+i\s+(?:(?:talk|speak)\s+(?:to|with)|call)\s+(?:a\s+)?(?:you|human|person|someone|staff|(?:the\s+)?team|reception)|(?:talk|speak)\s+(?:to|with)\s+(?:a\s+)?(?:human|person|someone|staff|(?:the\s+)?team|reception)|contact\s+(?:the\s+)?(?:team|staff|reception)|(?:human|person|staff|reception)\s+please|i\s+need\s+(?:a\s+)?(?:human|person)|call\s+(?:the\s+)?(?:team|staff|reception))(?:\s+please)?$/;
+const HUMAN_CONTACT_REFERENCE = /\b(?:human|person|someone|staff|team|reception|call|talk|speak|contact)\b/;
 const GENERIC_URGENT_WORDS = new Set([
   "a", "am", "an", "and", "bad", "emergency", "happened", "has", "have", "help", "i", "in", "is", "it",
   "my", "need", "please", "problem", "really", "room", "serious", "something", "the", "there", "urgent", "very",
@@ -273,6 +274,11 @@ function cleanDivingGroups(value) {
 
 function cleanWorkflowState(value) {
   if (!value) return null;
+  if (value.type === "lost_key") {
+    return value.status === "awaiting_fee_acceptance"
+      ? { type: "lost_key", status: "awaiting_fee_acceptance" }
+      : null;
+  }
   if (value.type === "property_issue") {
     if (!["collecting", "monitoring"].includes(value.status) || !PROPERTY_ISSUE_CATEGORIES.has(value.issueCategory)) return null;
     return {
@@ -528,13 +534,11 @@ function isActionableCleaningRequest(question) {
     || (HOUSEKEEPING_ITEM_REQUEST.test(String(question || "")) && HOUSEKEEPING_REQUEST_ACTION.test(String(question || "")));
 }
 
-function applyRoutineContactAvailability(result, question, now = new Date()) {
+function applyRoutineContactAvailability(result, _question, now = new Date()) {
   if (housekeepingAvailability(now).open) return result;
-  const genericHumanContact = GENERIC_HUMAN_CONTACT_REQUEST.test(normalizeText(question));
   return {
     ...result,
-    actions: (result.actions || []).filter((action) => action?.route !== "houseCall"
-      && !(genericHumanContact && action?.route === "houseWhatsapp"))
+    actions: (result.actions || []).filter((action) => !["houseCall", "houseWhatsapp"].includes(action?.route))
   };
 }
 
@@ -1032,34 +1036,41 @@ function lostKeyPolicyResult(question, access, room, now = new Date()) {
       source: "lost-key-policy"
     };
   }
+  const serviceOpen = housekeepingAvailability(now).open;
+  const topicSpecificHumanRequest = HUMAN_CONTACT_REFERENCE.test(normalizeText(question));
   return {
-    answer: "I can help you access the spare key. There is a 500 THB replacement fee for a lost key. Would you like to continue?",
+    answer: topicSpecificHumanRequest
+      ? serviceOpen
+        ? "I can continue helping with the secure spare-key process here, or you can contact The House team below. There is a 500 THB replacement fee for a lost key. Would you like to continue?"
+        : "Our team is currently outside normal service hours. I can continue helping with the secure spare-key process here. There is a 500 THB replacement fee for a lost key. Would you like to continue? If this is urgent, please use Emergency help."
+      : "I can help you access the spare key. There is a 500 THB replacement fee for a lost key. Would you like to continue?",
     intentId: "lost_key",
     category: "room", confidence: 1, needsHuman: false, handoff: "none",
     learningGap: false, learningReason: "none",
     actions: [
       { label: "Continue securely", type: "spare-key" },
-      ...(housekeepingAvailability(now).open ? [{ label: "Call Us", type: "route", route: "houseCall" }] : [])
+      ...(serviceOpen
+        ? topicSpecificHumanRequest
+          ? actionsForHandoff("stay_support")
+          : [{ label: "Call Us", type: "route", route: "houseCall" }]
+        : topicSpecificHumanRequest
+          ? [{ label: "Emergency help", type: "link", href: "/emergency.html" }]
+          : [])
     ],
+    workflow: { type: "lost_key", status: "awaiting_fee_acceptance" },
     suppressDefaultActions: true,
     source: "lost-key-policy"
   };
 }
 
-function activeLostKeyFeePrompt(history) {
-  const previousGuest = history.at(-2);
-  const previousConcierge = history.at(-1);
-  return previousGuest?.role === "user"
-    && previousConcierge?.role === "assistant"
-    && LOST_KEY_REQUEST.test(previousGuest.content)
-    && /\b500\s+THB\s+replacement\s+fee\b/i.test(previousConcierge.content)
-    && /\bWould you like to continue\b/i.test(previousConcierge.content);
+function activeLostKeyFeeWorkflow(workflowState) {
+  return workflowState?.type === "lost_key" && workflowState.status === "awaiting_fee_acceptance";
 }
 
-function genericHumanContactResult(question, history, now = new Date()) {
+function genericHumanContactResult(question, workflowState, now = new Date()) {
   if (!GENERIC_HUMAN_CONTACT_REQUEST.test(normalizeText(question))) return null;
   const serviceOpen = housekeepingAvailability(now).open;
-  const lostKeyFeePending = activeLostKeyFeePrompt(history);
+  const lostKeyFeePending = activeLostKeyFeeWorkflow(workflowState);
   const answer = serviceOpen
     ? lostKeyFeePending
       ? "I can continue helping with the spare-key process here, or you can contact The House team below."
@@ -1079,6 +1090,7 @@ function genericHumanContactResult(question, history, now = new Date()) {
     actions: serviceOpen
       ? actionsForHandoff("stay_support")
       : [{ label: "Emergency help", type: "link", href: "/emergency.html" }],
+    workflow: workflowState || null,
     suppressDefaultActions: true,
     source: "human-contact-policy"
   };
@@ -3010,13 +3022,16 @@ export async function handleConciergeRequest(request, env, ctx, now = new Date()
     });
   }
   const classifiedSafetyResult = safetyResultForQuestion(question);
-  const urgentClarificationActive = activeUrgentClarification(history, workflowState);
+  const lostKeyResult = classifiedSafetyResult ? null : lostKeyPolicyResult(question, access, room, now);
+  const humanContactResult = classifiedSafetyResult || lostKeyResult
+    ? null
+    : genericHumanContactResult(question, workflowState, now);
+  const urgentClarificationActive = humanContactResult ? false : activeUrgentClarification(history, workflowState);
   const needsUrgentClarification = !classifiedSafetyResult
+    && !humanContactResult
     && (isVagueUrgentMessage(question)
       || (urgentClarificationActive && !hasMeaningfulIncidentDescription(question)));
   const safetyResult = classifiedSafetyResult || (needsUrgentClarification ? urgentClarificationResult(room) : null);
-  const lostKeyResult = safetyResult ? null : lostKeyPolicyResult(question, access, room, now);
-  const humanContactResult = safetyResult || lostKeyResult ? null : genericHumanContactResult(question, history, now);
   let earlyPolicyResult = humanContactResult || (access.accessGranted || (lostKeyResult && access.verified)
     ? null
     : (lostKeyResult || publicAccessResult(question, access, room, safetyResult)));
@@ -3052,9 +3067,9 @@ export async function handleConciergeRequest(request, env, ctx, now = new Date()
       source: earlyPolicyResult.source,
       language,
       interactionId: recorded.interactionId,
-      workflow: earlyPolicyResult.intentId === "urgent_clarification"
+      workflow: earlyPolicyResult.workflow || (earlyPolicyResult.intentId === "urgent_clarification"
         ? { type: "urgent_clarification", status: "collecting" }
-        : null
+        : null)
     });
   }
 
@@ -3205,7 +3220,7 @@ export async function handleConciergeRequest(request, env, ctx, now = new Date()
     ? { handled: false, result, alertQuestion: question, workflow: null }
     : applyLuggageRequestPolicy(result, question, history, replyContactForTurn, workflowState, now);
   let workflowPolicy = lostKeyResult
-    ? { result, alertQuestion: question, workflow: null }
+    ? { result, alertQuestion: question, workflow: lostKeyResult.workflow || null }
     : cleaningPolicy.handled
     ? { result, alertQuestion: cleaningPolicy.alertQuestion, workflow: directWorkflow }
     : propertyPolicy.handled

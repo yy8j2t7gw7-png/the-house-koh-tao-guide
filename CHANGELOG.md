@@ -2,6 +2,27 @@
 
 All notable changes to The House – Koh Tao guest guide are recorded here.
 
+## v5.11.30 — Generic Human Context Isolation & Routine Contact Gate
+
+### Confirmed production causes
+
+- Fixes the exact Saturday 08:20 production phrase **I wanna talk to a human**. The v5.11.29 anchored matcher supported `wanna` for calling but not for talking/speaking, so that phrase bypassed deterministic routing and reached transcript-aware model handling, where old lost-key text supplied the wrong topic.
+- Removes transcript adjacency as evidence that a lost-key fee workflow is active. The server and browser now retain only explicit, non-authorizing `lost_key/awaiting_fee_acceptance` state; historical conversation text alone cannot change a later neutral human request.
+- Fixes closed-hours **Contact Us** exposure. v5.11.29 suppressed `houseCall` unconditionally but suppressed `houseWhatsapp` only when the generic-human matcher succeeded. A missed phrase therefore left the routine WhatsApp handoff visible.
+
+### Routing and action enforcement
+
+- Expands the deterministic current-message matcher to all approved human, staff, team, reception and call variants and evaluates it before pending urgent clarification, approved knowledge and model routing. Current explicit safety and lost-key intent retain their higher-priority policies.
+- Treats `houseWhatsapp` and `houseCall` as the same routine House-contact class. Both are removed by the final server action policy outside Tuesday–Sunday 10:30–19:30 Bangkok time, including actions requested by model metadata.
+- Independently suppresses both routes during browser action resolution and blocks old or cached links at click time. Emergency routes remain separate.
+- Allows a current message that explicitly names both human contact and a lost key to acknowledge the topic while continuing the protected 24/7 flow and obeying human-contact hours. No conversational state accepts the fee, creates an alert, sends a notification or authorizes a spare-key code.
+
+### Regression and scope
+
+- Adds two tests and strengthens existing v5.11.29 matrices for the exact production phrase, stale lost-key/diving/cleaning/luggage/AC/maintenance/medical history, Saturday 08:20, Saturday 15:00, Monday 15:00, explicit pending lost-key state, topic-specific lost-key requests and server/render/click suppression of both routine contact routes.
+- Expands the complete suite from 176 to 178 tests with zero failures.
+- Preserves the verified Room 11 menu, registration-state separation, passport reminder behavior, approved visuals, all bookings and WhatsApp behavior, emergency routing and every protected 24/7 lost-key security boundary.
+
 ## v5.11.29 — Verified-State Consistency & Human Handoff Routing
 
 ### Authoritative stay and registration state

@@ -1,6 +1,6 @@
 # Product Roadmap
 
-Baseline: v5.11.29
+Baseline: v5.11.30
 
 ## Completed
 
@@ -180,7 +180,9 @@ Guests may continue using ordinary WhatsApp handoffs. Automated internal alerts 
 - [x] Implement and package v5.11.28 public hierarchy/wording refinement plus the authorized deterministic lost-key synonym correction.
 - [x] Deploy v5.11.28 and use production verification/menu and human-handoff observations to define the narrow v5.11.29 consistency patch.
 - [x] Implement and package v5.11.29 with independent stay/registration state plus deterministic human-contact hours and server/render/click routine-call enforcement.
-- [ ] Deploy v5.11.29 and run the concise smoke check in `DEVELOPMENT_HANDOFF_v5.11.29.md`.
+- [x] Deploy v5.11.29 and use the exact **I wanna talk to a human** production failure plus exposed closed-hours **Contact Us** action to define v5.11.30.
+- [x] Implement and package v5.11.30 with a current-message-only generic human route, explicit lost-key pending state and unconditional routine Contact/Call gates at server, render and click boundaries.
+- [ ] Deploy v5.11.30 and run the concise smoke check in `DEVELOPMENT_HANDOFF_v5.11.30.md`.
 - [ ] Submit and obtain Meta approval for the five optional quick-action templates documented in `META_STAFF_QUICK_ACTIONS_v5.11.20.md`; never map the buttonless service v1 template and enable only after every intended template is Active.
 - [x] Add `STAY_TOKEN_PEPPER` and `RESERVATION_SYNC_TOKEN` Worker secrets
 - [x] Add protected `SPARE_KEY_CODES` Worker secret before activating automatic spare-key release

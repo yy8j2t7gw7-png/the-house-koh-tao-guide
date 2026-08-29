@@ -747,26 +747,32 @@ test("a repeated lost-key synonym while fee acceptance is pending preserves the 
 
 test("generic human and call requests obey Bangkok routine-contact hours without creating an alert", async () => {
   const { env, store } = createEnvironment();
-  const saturday0017 = new Date("2026-08-28T17:17:00.000Z");
+  const saturday0820 = new Date("2026-08-29T01:20:00.000Z");
   const saturday1500 = new Date("2026-08-29T08:00:00.000Z");
   const monday1500 = new Date("2026-08-31T08:00:00.000Z");
   const phrases = [
+    "I wanna talk to a human",
+    "I want to talk to a human",
     "I need to talk to a human",
     "can I speak to someone",
+    "can I talk to someone",
     "I want to speak to someone",
     "human please",
     "can I talk to staff",
+    "speak to staff",
+    "talk to staff",
     "I need a person",
     "contact the team",
     "talk to the team",
     "speak to reception",
+    "reception please",
     "I wanna call you",
     "can I call someone?",
     "call the team"
   ];
 
   for (const phrase of phrases) {
-    const response = await handleConciergeRequest(guestRequest(phrase), env, undefined, saturday0017);
+    const response = await handleConciergeRequest(guestRequest(phrase), env, undefined, saturday0820);
     const body = await response.json();
     assert.equal(body.intentId, "generic_human_contact", phrase);
     assert.equal(body.source, "human-contact-policy", phrase);
@@ -794,22 +800,23 @@ test("generic human and call requests obey Bangkok routine-contact hours without
   assert.equal(store.alertDeliveries.length, 0);
 });
 
-test("inactive historical topics cannot contaminate a new generic call request", async () => {
+test("inactive historical topics cannot contaminate the production generic-human phrase", async () => {
   const { env, store } = createEnvironment();
   const openHours = new Date("2026-08-29T08:00:00.000Z");
-  const closedHours = new Date("2026-08-28T17:17:00.000Z");
+  const closedHours = new Date("2026-08-29T01:20:00.000Z");
   const histories = [
     ["I lost my key", "There is a 500 THB replacement fee.", "cancel", "Okay, the lost-key request was cancelled."],
     ["I want to book diving", "Which diving option would you prefer?", "cancel", "The diving request was cancelled."],
     ["Please clean my room", "What time would be most convenient?", "cancel", "The cleaning request was cancelled."],
     ["My AC is not cold", "I sent the AC problem to the team.", "thanks", "You’re welcome."],
+    ["The window lock is broken", "I recorded the maintenance request.", "thanks", "You’re welcome."],
     ["I need luggage storage", "How many bags?", "cancel", "The luggage request was cancelled."],
     ["Where is the hospital?", "Use Emergency help for current medical danger.", "thanks", "You’re welcome."]
   ];
   for (const items of histories) {
     const history = items.map((content, index) => ({ role: index % 2 ? "assistant" : "user", content }));
     const response = await handleConciergeRequest(
-      guestRequest("I wanna call you", { history }),
+      guestRequest("I wanna talk to a human", { history }),
       env,
       undefined,
       openHours
@@ -818,11 +825,12 @@ test("inactive historical topics cannot contaminate a new generic call request",
     assert.equal(body.intentId, "generic_human_contact");
     assert.equal(body.source, "human-contact-policy");
     assert.match(body.answer, /^Of course\./);
-    assert.doesNotMatch(body.answer, /500 THB|spare key|lost key|diving|cleaning|\bAC\b|luggage|Rescue|1669/i);
+    assert.doesNotMatch(body.answer, /500 THB|spare key|lost key|diving|cleaning|\bAC\b|maintenance|window|luggage|Rescue|1669/i);
+    assert.equal(body.actions.some((action) => action.route === "houseWhatsapp"), true);
     assert.equal(body.actions.some((action) => action.route === "houseCall"), true);
 
     const closedResponse = await handleConciergeRequest(
-      guestRequest("I wanna call you", { history }),
+      guestRequest("I wanna talk to a human", { history }),
       env,
       undefined,
       closedHours
@@ -831,21 +839,30 @@ test("inactive historical topics cannot contaminate a new generic call request",
     assert.equal(closedBody.intentId, "generic_human_contact");
     assert.equal(closedBody.source, "human-contact-policy");
     assert.match(closedBody.answer, /outside normal service hours/i);
-    assert.doesNotMatch(closedBody.answer, /500 THB|spare key|lost key|diving|cleaning|\bAC\b|luggage|Rescue|1669/i);
+    assert.doesNotMatch(closedBody.answer, /500 THB|spare key|lost key|diving|cleaning|\bAC\b|maintenance|window|luggage|Rescue|1669/i);
+    assert.equal(closedBody.actions.some((action) => action.route === "houseWhatsapp"), false);
     assert.equal(closedBody.actions.some((action) => action.route === "houseCall"), false);
     assert.equal(closedBody.actions.some((action) => action.href === "/emergency.html"), true);
   }
   assert.equal(store.alerts.length, 0);
 });
 
-test("an active lost-key fee prompt is acknowledged without acceptance, alert or after-hours routine calling", async () => {
+test("only explicit lost-key workflow state may influence a generic human request", async () => {
   const { env, store } = createEnvironment();
+  const first = await handleConciergeRequest(
+    guestRequest("I lost my key"),
+    env,
+    undefined,
+    new Date("2026-08-29T08:00:00.000Z")
+  );
+  const firstBody = await first.json();
+  assert.deepEqual(firstBody.workflow, { type: "lost_key", status: "awaiting_fee_acceptance" });
   const history = [
     { role: "user", content: "I lost my key" },
-    { role: "assistant", content: "I can help you access the spare key. There is a 500 THB replacement fee for a lost key. Would you like to continue?" }
+    { role: "assistant", content: firstBody.answer }
   ];
   const open = await handleConciergeRequest(
-    guestRequest("I need to talk to a human", { history }),
+    guestRequest("I wanna talk to a human", { history, workflowState: firstBody.workflow }),
     env,
     undefined,
     new Date("2026-08-29T08:00:00.000Z")
@@ -853,13 +870,15 @@ test("an active lost-key fee prompt is acknowledged without acceptance, alert or
   const openBody = await open.json();
   assert.equal(openBody.intentId, "generic_human_contact");
   assert.match(openBody.answer, /continue helping with the spare-key process/i);
+  assert.deepEqual(openBody.workflow, firstBody.workflow);
+  assert.equal(openBody.actions.some((action) => action.route === "houseWhatsapp"), true);
   assert.equal(openBody.actions.some((action) => action.route === "houseCall"), true);
 
   const closed = await handleConciergeRequest(
-    guestRequest("I wanna call you", { history }),
+    guestRequest("I wanna talk to a human", { history, workflowState: firstBody.workflow }),
     env,
     undefined,
-    new Date("2026-08-28T17:17:00.000Z")
+    new Date("2026-08-29T01:20:00.000Z")
   );
   const closedBody = await closed.json();
   assert.equal(closedBody.intentId, "generic_human_contact");
@@ -868,9 +887,97 @@ test("an active lost-key fee prompt is acknowledged without acceptance, alert or
   assert.equal(closedBody.actions.some((action) => action.route === "houseCall"), false);
   assert.equal(closedBody.actions.some((action) => action.route === "houseWhatsapp"), false);
   assert.equal(closedBody.actions.some((action) => action.href === "/emergency.html"), true);
+
+  const transcriptOnly = await handleConciergeRequest(
+    guestRequest("I wanna talk to a human", { history }),
+    env,
+    undefined,
+    new Date("2026-08-29T01:20:00.000Z")
+  );
+  const transcriptOnlyBody = await transcriptOnly.json();
+  assert.equal(transcriptOnlyBody.intentId, "generic_human_contact");
+  assert.doesNotMatch(transcriptOnlyBody.answer, /lost key|spare-key|500 THB/i);
+  assert.equal(transcriptOnlyBody.workflow, null);
   assert.equal(store.alerts.length, 0);
   assert.equal(store.alertDeliveries.length, 0);
   assert.equal(store.spareKeyEvents.length, 0);
+});
+
+test("the exact production generic-human phrase bypasses stale LLM context before interpretation", async () => {
+  const { env } = createEnvironment({ OPENAI_API_KEY: "test-key" });
+  const originalFetch = globalThis.fetch;
+  let modelCalls = 0;
+  globalThis.fetch = async () => {
+    modelCalls += 1;
+    return new Response(JSON.stringify({
+      output: [{
+        type: "message",
+        content: [{
+          type: "output_text",
+          text: JSON.stringify({
+            answer: "I’ll direct you to The House support team about your lost key. A 500 THB replacement fee applies.",
+            intent_id: "lost_key",
+            category: "room",
+            confidence: 0.9,
+            needs_human: true,
+            handoff: "stay_support",
+            learning_gap: false,
+            learning_reason: "none"
+          })
+        }]
+      }]
+    }), { status: 200, headers: { "content-type": "application/json" } });
+  };
+  try {
+    const response = await handleConciergeRequest(guestRequest("I wanna talk to a human", {
+      history: [
+        { role: "user", content: "I lost my key" },
+        { role: "assistant", content: "There is a 500 THB replacement fee." }
+      ]
+    }), env, undefined, new Date("2026-08-29T01:20:00.000Z"));
+    const body = await response.json();
+    assert.equal(modelCalls, 0);
+    assert.equal(body.intentId, "generic_human_contact");
+    assert.equal(body.source, "human-contact-policy");
+    assert.match(body.answer, /outside normal service hours/i);
+    assert.doesNotMatch(body.answer, /lost key|spare-key|500 THB/i);
+    assert.equal(body.actions.some((action) => ["houseWhatsapp", "houseCall"].includes(action.route)), false);
+    assert.equal(body.actions.some((action) => action.href === "/emergency.html"), true);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("a current topic-specific lost-key human request keeps 24-hour self-service but obeys contact hours", async () => {
+  const { env, store } = createEnvironment();
+  const closed = await handleConciergeRequest(
+    guestRequest("I need to talk to someone about my lost key"),
+    env,
+    undefined,
+    new Date("2026-08-29T01:20:00.000Z")
+  );
+  const closedBody = await closed.json();
+  assert.equal(closedBody.intentId, "lost_key");
+  assert.match(closedBody.answer, /outside normal service hours/i);
+  assert.match(closedBody.answer, /secure spare-key process/i);
+  assert.match(closedBody.answer, /500 THB replacement fee/i);
+  assert.equal(closedBody.actions.some((action) => action.type === "spare-key"), true);
+  assert.equal(closedBody.actions.some((action) => ["houseWhatsapp", "houseCall"].includes(action.route)), false);
+  assert.equal(closedBody.actions.some((action) => action.href === "/emergency.html"), true);
+  assert.deepEqual(closedBody.workflow, { type: "lost_key", status: "awaiting_fee_acceptance" });
+
+  const open = await handleConciergeRequest(
+    guestRequest("I need to talk to someone about my lost key"),
+    env,
+    undefined,
+    new Date("2026-08-29T08:00:00.000Z")
+  );
+  const openBody = await open.json();
+  assert.equal(openBody.intentId, "lost_key");
+  assert.equal(openBody.actions.some((action) => action.route === "houseWhatsapp"), true);
+  assert.equal(openBody.actions.some((action) => action.route === "houseCall"), true);
+  assert.equal(store.alerts.length, 0);
+  assert.equal(store.alertDeliveries.length, 0);
 });
 
 test("an unverified lost-key request sends no alert and exposes no spare-key path", async () => {
@@ -2326,17 +2433,19 @@ test("concierge initializes safely and keeps public support buttons concierge-fi
   assert.match(script, /event\.preventDefault\(\);\s*openPanel\(\{ askRoom: true \}\)/);
 });
 
-test("browser action rendering and click handling independently hard-gate routine calls by Bangkok service hours", async () => {
+test("browser action rendering and click handling independently hard-gate both routine contacts by Bangkok service hours", async () => {
   const script = await readFile(new URL("../public/ai-concierge.js", import.meta.url), "utf8");
   assert.match(script, /function routineServiceOpen\(date = new Date\(\)\)/);
   assert.match(script, /timeZone: "Asia\/Bangkok"/);
   assert.match(script, /values\.weekday !== "Monday"/);
   assert.match(script, /minutes >= \(10 \* 60 \+ 30\) && minutes < \(19 \* 60 \+ 30\)/);
-  assert.match(script, /if \(!routineServiceOpen\(\) && \(routineHouseCall \|\| \(genericHumanContact && action\.route === "houseWhatsapp"\)\)\) return null/);
+  assert.match(script, /const routineHouseContact = \["houseCall", "houseWhatsapp"\]\.includes\(action\.route\)/);
+  assert.match(script, /if \(!routineServiceOpen\(\) && routineHouseContact\) return null/);
+  assert.match(script, /link\.dataset\.routineHouseContact = "true"/);
   assert.match(script, /link\.dataset\.routineHouseCall = "true"/);
-  assert.match(script, /possibleRoutineHandoff\?\.getAttribute\("href"\) === routeMap\(\)\.houseCall/);
-  assert.match(script, /if \(routineCall && !routineServiceOpen\(\)\) \{[\s\S]*event\.preventDefault\(\);[\s\S]*outside normal service hours[\s\S]*Emergency help/);
-  assert.ok(script.indexOf("if (routineCall && !routineServiceOpen())") < script.indexOf('const emergencyCall = event.target.closest("[data-house-emergency-call]")'));
+  assert.match(script, /\[routeMap\(\)\.houseCall, routeMap\(\)\.houseWhatsapp\]\.includes\(routineContactHref\)/);
+  assert.match(script, /if \(routineContact && !routineServiceOpen\(\)\) \{[\s\S]*event\.preventDefault\(\);[\s\S]*outside normal service hours[\s\S]*Emergency help/);
+  assert.ok(script.indexOf("if (routineContact && !routineServiceOpen())") < script.indexOf('const emergencyCall = event.target.closest("[data-house-emergency-call]")'));
   assert.match(script, /genericHumanContactRequest\.test\(normalized\)/);
 });
 
@@ -2349,7 +2458,8 @@ test("browser protected workflows keep supplied contacts out of ordinary session
   assert.match(script, /workflowState: activeWorkflowState/);
   assert.match(script, /const activePrivateWorkflow = result\.workflow\?\.status === "collecting"/);
   assert.match(script, /result\.workflow\?\.status === "delivery_failed"/);
-  assert.match(script, /activeWorkflowState = activePrivateWorkflow/);
+  assert.match(script, /result\.workflow\?\.type === "lost_key" && result\.workflow\?\.status === "awaiting_fee_acceptance"/);
+  assert.match(script, /activeWorkflowState = activeWorkflow \? result\.workflow : null/);
   assert.match(script, /result\.workflow\?\.type === "luggage"/);
   assert.match(script, /dataset\.serverQuestion = redactPrivateContact/);
   assert.doesNotMatch(script, /houseConciergeHistory[^\n]{0,200}privateWorkflowContact/);
@@ -2511,7 +2621,7 @@ test("guest localization supports seven languages and keeps the owner dashboard 
   assert.doesNotMatch(admin, /src="\/i18n\.js"/);
   assert.match(runtime, /exploreContentDeferred/);
   assert.match(runtime, /element\.closest\("\.section,\.footer"\)/);
-  assert.match(runtime, /houseGuideTranslations:v5\.11\.29:/);
+  assert.match(runtime, /houseGuideTranslations:v5\.11\.30:/);
   assert.match(runtime, /MAX_REQUEST_RETRIES = 2/);
   assert.match(runtime, /let flushRunning = false/);
 });
@@ -3538,7 +3648,7 @@ test("model responses use structured output and deterministic handoff actions", 
   }
 });
 
-test("final server action policy removes a model-derived routine Call Us action after hours", async () => {
+test("final server action policy removes model-derived routine Contact Us and Call Us actions after hours", async () => {
   const { env } = createEnvironment({ OPENAI_API_KEY: "test-key" });
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async () => new Response(JSON.stringify({
@@ -3568,6 +3678,7 @@ test("final server action policy removes a model-derived routine Call Us action 
     );
     const body = await response.json();
     assert.equal(body.source, "ai");
+    assert.equal(body.actions.some((action) => action.route === "houseWhatsapp"), false);
     assert.equal(body.actions.some((action) => action.route === "houseCall"), false);
     assert.equal(body.actions.some((action) => action.route === "propertyEmergencyCall"), false);
   } finally {
@@ -4680,8 +4791,8 @@ test("agency-specific beginner and continuing courses pass the structured diving
   }
 });
 
-test("the bundled v5.11.29 catalog preserves current PADI, SSI and RAID pathways", () => {
-  assert.equal(divingCourses.updatedForRelease, "5.11.29");
+test("the bundled v5.11.30 catalog preserves current PADI, SSI and RAID pathways", () => {
+  assert.equal(divingCourses.updatedForRelease, "5.11.30");
   assert.deepEqual(divingCourses.houseRecommendation, {
     agency: "RAID",
     reason: "focus on dive safety and buoyancy control",
@@ -6486,7 +6597,12 @@ test("owner-approved knowledge becomes active without a new deployment", async (
     intentId: "borrow_umbrella",
     category: "stay-support"
   }];
-  const response = await handleConciergeRequest(guestRequest("Can I borrow a blue umbrella?"), env);
+  const response = await handleConciergeRequest(
+    guestRequest("Can I borrow a blue umbrella?"),
+    env,
+    undefined,
+    new Date("2026-08-29T08:00:00.000Z")
+  );
   const body = await response.json();
   assert.equal(body.intentId, "borrow_umbrella");
   assert.equal(body.source, "approved");

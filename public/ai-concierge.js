@@ -12,7 +12,7 @@
   const roomOptions = (cfg.roomOptions || ["1", "2", "3", "4", "5", "6", "8", "9", "10", "11"]).map(String);
   const pagePrompts = cfg.pagePrompts?.[currentPage] || cfg.defaultPrompts || [];
   const lostKeyRequest = /\b(?:(?:(?:i|we)\s+(?:have\s+)?)?lost\s+(?:(?:my|our|the|a)\s+)?(?:room\s+)?key|(?:(?:my|our|the)\s+)?(?:room\s+)?key\s+(?:is\s+)?(?:lost|missing)|(?:cannot|can['’]?t|unable\s+to)\s+find\s+(?:(?:my|our|the)\s+)?(?:room\s+)?key|(?:(?:i(?:['’]?m|\s+am)?|we(?:['’]?re|\s+are)?)\s+)?locked\s+out|(?:cannot|can['’]?t|unable\s+to)\s+(?:get|go)\s+(?:back\s+)?into\s+(?:my|our|the)\s+room|(?:(?:i|we)\s+)?forgot\s+(?:(?:my|our|the)\s+)?(?:room\s+)?key|(?:(?:i|we)\s+)?need\s+(?:a\s+)?(?:spare|replacement)\s+key|where\s+is\s+(?:(?:my|our|the)\s+)?spare\s+key)\b/i;
-  const genericHumanContactRequest = /^(?:(?:please|hello|hi)\s+)?(?:i\s+(?:need|want|would\s+like)\s+to\s+(?:talk|speak)\s+(?:to|with)\s+(?:a\s+)?(?:human|person|someone|staff|the\s+team|reception)|i\s+(?:(?:need|want|would\s+like)\s+to|wanna)\s+call\s+(?:you|(?:a\s+)?human|(?:a\s+)?person|someone|staff|the\s+team|reception)|(?:can|could)\s+i\s+(?:(?:talk|speak)\s+(?:to|with)|call)\s+(?:you|(?:a\s+)?human|(?:a\s+)?person|someone|staff|the\s+team|reception)|human\s+please|i\s+need\s+(?:a\s+)?(?:human|person)|contact\s+the\s+team|talk\s+to\s+the\s+team|speak\s+to\s+reception|call\s+the\s+team)(?:\s+please)?$/;
+  const genericHumanContactRequest = /^(?:(?:please|hello|hi)\s+)?(?:i\s+(?:(?:need|want|would\s+like)\s+to|wanna)\s+(?:talk|speak)\s+(?:to|with)\s+(?:a\s+)?(?:human|person|someone|staff|(?:the\s+)?team|reception)|i\s+(?:(?:need|want|would\s+like)\s+to|wanna)\s+call\s+(?:you|(?:a\s+)?(?:human|person)|someone|staff|(?:the\s+)?team|reception)|(?:can|could)\s+i\s+(?:(?:talk|speak)\s+(?:to|with)|call)\s+(?:a\s+)?(?:you|human|person|someone|staff|(?:the\s+)?team|reception)|(?:talk|speak)\s+(?:to|with)\s+(?:a\s+)?(?:human|person|someone|staff|(?:the\s+)?team|reception)|contact\s+(?:the\s+)?(?:team|staff|reception)|(?:human|person|staff|reception)\s+please|i\s+need\s+(?:a\s+)?(?:human|person)|call\s+(?:the\s+)?(?:team|staff|reception))(?:\s+please)?$/;
 
   function routineServiceOpen(date = new Date()) {
     const parts = new Intl.DateTimeFormat("en-GB", {
@@ -226,8 +226,8 @@
     }
     if (action.route === "bookingCall") action = { ...action, route: "houseCall" };
     const routineHouseCall = action.route === "houseCall";
-    const genericHumanContact = genericHumanContactRequest.test(normalizeIntentText(question));
-    if (!routineServiceOpen() && (routineHouseCall || (genericHumanContact && action.route === "houseWhatsapp"))) return null;
+    const routineHouseContact = ["houseCall", "houseWhatsapp"].includes(action.route);
+    if (!routineServiceOpen() && routineHouseContact) return null;
     if (action.type === "server_action" || action.type === "dismiss") {
       return { ...action, label: interpolate(localizedLabel, context), question: redactPrivateContact(question) };
     }
@@ -271,7 +271,8 @@
       href,
       style: action.style || "",
       external: /^https?:/i.test(href),
-      routineHouseCall
+      routineHouseCall,
+      routineHouseContact
     };
   }
 
@@ -445,6 +446,7 @@
         } else {
           link.dataset.action = "conciergeHandoff";
           link.dataset.conciergeHumanHandoff = "true";
+          if (action.routineHouseContact) link.dataset.routineHouseContact = "true";
           if (action.routineHouseCall) link.dataset.routineHouseCall = "true";
           if (action.href === "#house-emergency-call") link.dataset.houseEmergencyCall = "true";
         }
@@ -676,10 +678,10 @@
       || result.workflow?.type === "booking";
     const activePrivateWorkflow = result.workflow?.status === "collecting"
       || (result.workflow?.type === "booking" && result.workflow?.status === "delivery_failed");
-    activeWorkflowState = activePrivateWorkflow
+    const activeWorkflow = activePrivateWorkflow
       || (result.workflow?.type === "property_issue" && result.workflow?.status === "monitoring")
-      ? result.workflow
-      : null;
+      || (result.workflow?.type === "lost_key" && result.workflow?.status === "awaiting_fee_acceptance");
+    activeWorkflowState = activeWorkflow ? result.workflow : null;
     if (privateContactWorkflow
       && activePrivateWorkflow
       && result.workflow.retainPrivateContact) {
@@ -790,11 +792,12 @@
 
   panel.addEventListener("click", (event) => {
     const possibleRoutineHandoff = event.target.closest('a[data-concierge-human-handoff="true"]');
-    const routineCall = event.target.closest("[data-routine-house-call]")
-      || (possibleRoutineHandoff?.getAttribute("href") === routeMap().houseCall ? possibleRoutineHandoff : null);
-    if (routineCall && !routineServiceOpen()) {
+    const routineContactHref = possibleRoutineHandoff?.getAttribute("href") || "";
+    const routineContact = event.target.closest("[data-routine-house-contact],[data-routine-house-call]")
+      || ([routeMap().houseCall, routeMap().houseWhatsapp].includes(routineContactHref) ? possibleRoutineHandoff : null);
+    if (routineContact && !routineServiceOpen()) {
       event.preventDefault();
-      routineCall.closest(".ai-concierge-message-actions")?.remove();
+      routineContact.closest(".ai-concierge-message-actions")?.remove();
       appendMessage(
         "concierge",
         "Our team is currently outside normal service hours. I can continue helping you here. If this is urgent, please use Emergency help.",

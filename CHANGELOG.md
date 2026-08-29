@@ -2,6 +2,13 @@
 
 All notable changes to The House – Koh Tao guest guide are recorded here.
 
+## v5.11.38 — Guest-Facing House Contact Wording
+
+- Replaced the persistent human-handoff phrase **contact Su directly** with **contact The House team directly**.
+- Preserved the routine-contact window exactly: Tuesday–Sunday 10:30–19:30 Bangkok time; Monday and after-hours remain closed.
+- Added assertions that guest-facing handoff copy does not expose the staff name Su and that strong contact requests at Saturday 20:00 expose no routine call/WhatsApp actions.
+- Preserved all v5.11.37 fixes and current Meta template mappings.
+
 ## v5.11.37 — Current-Turn Routing and Wi-Fi Regression Fix
 
 ### Production regressions

@@ -826,7 +826,8 @@ test("generic human requests are AI-first, then expose routine contacts only aft
   }), env, undefined, saturday1500);
   const persistentBody = await persistent.json();
   assert.equal(persistentBody.intentId, "generic_human_contact");
-  assert.match(persistentBody.answer, /contact Su directly/i);
+  assert.match(persistentBody.answer, /contact The House team directly/i);
+  assert.doesNotMatch(persistentBody.answer, /\bSu\b/i);
   assert.equal(persistentBody.actions.some((action) => action.route === "houseWhatsapp"), true);
   assert.equal(persistentBody.actions.some((action) => action.route === "houseCall"), true);
 
@@ -2908,7 +2909,7 @@ test("guest localization supports seven languages and keeps the owner dashboard 
   assert.doesNotMatch(admin, /src="\/i18n\.js"/);
   assert.match(runtime, /exploreContentDeferred/);
   assert.match(runtime, /element\.closest\("\.section,\.footer"\)/);
-  assert.match(runtime, /houseGuideTranslations:v5\.11\.37:/);
+  assert.match(runtime, /houseGuideTranslations:v5\.11\.38:/);
   assert.match(runtime, /MAX_REQUEST_RETRIES = 2/);
   assert.match(runtime, /let flushRunning = false/);
 });
@@ -9089,7 +9090,7 @@ test("unauthorized or invalid WhatsApp status commands cannot change alerts or s
 
 
 
-test("strong human and housekeeper contact requests expose Su directly during open hours but remain closed after hours", async () => {
+test("strong human and housekeeper contact requests expose The House team only during service hours", async () => {
   const { env, store } = createEnvironment({ OPENAI_API_KEY: "not-used" });
   const openNow = new Date("2026-08-29T08:00:00.000Z"); // Saturday 15:00 Bangkok
   const closedNow = new Date("2026-08-31T08:00:00.000Z"); // Monday 15:00 Bangkok
@@ -9107,7 +9108,8 @@ test("strong human and housekeeper contact requests expose Su directly during op
     const body = await response.json();
     assert.equal(body.intentId, "generic_human_contact", question);
     assert.equal(body.source, "human-contact-policy", question);
-    assert.match(body.answer, /contact Su directly/i, question);
+    assert.match(body.answer, /contact The House team directly/i, question);
+    assert.doesNotMatch(body.answer, /\bSu\b/i, question);
     assert.equal(body.actions.some((action) => action.route === "houseWhatsapp"), true, question);
     assert.equal(body.actions.some((action) => action.route === "houseCall"), true, question);
     assert.equal(store.alerts.length, 0, question);
@@ -9116,9 +9118,22 @@ test("strong human and housekeeper contact requests expose Su directly during op
   const closed = await handleConciergeRequest(guestRequest("can I call the housekeeper"), env, undefined, closedNow);
   const closedBody = await closed.json();
   assert.equal(closedBody.intentId, "generic_human_contact");
+  assert.doesNotMatch(closedBody.answer, /contact The House team directly/i);
+  assert.doesNotMatch(closedBody.answer, /\bSu\b/i);
   assert.equal(closedBody.actions.some((action) => action.route === "houseWhatsapp"), false);
   assert.equal(closedBody.actions.some((action) => action.route === "houseCall"), false);
   assert.equal(closedBody.actions.some((action) => action.href === "/emergency.html"), true);
+
+  const saturdayAfterHours = new Date("2026-08-29T13:00:00.000Z"); // Saturday 20:00 Bangkok
+  const afterHours = await handleConciergeRequest(guestRequest("I urgently need to talk to a human"), env, undefined, saturdayAfterHours);
+  const afterHoursBody = await afterHours.json();
+  assert.equal(afterHoursBody.intentId, "generic_human_contact");
+  assert.match(afterHoursBody.answer, /outside normal service hours/i);
+  assert.doesNotMatch(afterHoursBody.answer, /contact The House team directly/i);
+  assert.doesNotMatch(afterHoursBody.answer, /\bSu\b/i);
+  assert.equal(afterHoursBody.actions.some((action) => action.route === "houseWhatsapp"), false);
+  assert.equal(afterHoursBody.actions.some((action) => action.route === "houseCall"), false);
+  assert.equal(afterHoursBody.actions.some((action) => action.href === "/emergency.html"), true);
 });
 
 test("fire cancellation cannot contaminate a later housekeeper-contact turn while genuine smoke continuation stays safety-first", async () => {
@@ -9140,7 +9155,8 @@ test("fire cancellation cannot contaminate a later housekeeper-contact turn whil
   const contactBody = await contact.json();
   assert.equal(contactBody.intentId, "generic_human_contact");
   assert.notEqual(contactBody.intentId, "property_emergency");
-  assert.match(contactBody.answer, /contact Su directly/i);
+  assert.match(contactBody.answer, /contact The House team directly/i);
+  assert.doesNotMatch(contactBody.answer, /\bSu\b/i);
   assert.equal(contactBody.actions.some((action) => action.route === "houseWhatsapp"), true);
   assert.equal(contactBody.actions.some((action) => action.route === "houseCall"), true);
   assert.equal(contactBody.actions.some((action) => action.action === "confirm_urgent_property"), false);

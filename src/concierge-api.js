@@ -40,7 +40,7 @@ import {
   specialtyChoiceLabels
 } from "./diving-catalog.js";
 
-const RELEASE = "5.11.37";
+const RELEASE = "5.11.38";
 const ROOM_OPTIONS = new Set(["1", "2", "3", "4", "5", "6", "8", "9", "10", "11"]);
 const MAX_HISTORY_ITEMS = 10;
 const MAX_QUESTION_LENGTH = 800;
@@ -1162,7 +1162,7 @@ function genericHumanContactResult(question, workflowState, history = [], now = 
     || priorGenericHumanRequest(history);
   const answer = serviceOpen
     ? repeatedRequest
-      ? "Of course. You can contact Su directly using the options below."
+      ? "Of course. You can contact The House team directly using the options below."
       : lostKeyFeePending
         ? "I can continue helping with the secure spare-key process here. What do you need help with?"
         : "Of course. Tell me what you need help with, and I’ll try to resolve it here first."

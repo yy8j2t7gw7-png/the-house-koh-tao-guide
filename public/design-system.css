@@ -401,8 +401,10 @@ html:not(.explore-enabled) a.card[href="/explore.html"]{display:none!important}
   .room-guide-intro h1{margin:3px 0 6px;font-size:clamp(28px,8.5vw,34px)}
   .room-guide-intro .section-intro{line-height:1.5}
   .room-guide-intro .small{margin-top:5px;line-height:1.45}
-  .room-guide-page .hero{min-height:208px;height:208px}
-  .room-guide-page .hero img{height:208px;object-position:50% 56%}
+  .room-guide-page .hero{min-height:232px;height:232px}
+  .room-guide-page .hero img{height:232px;object-position:50% 54%}
+  .room-guide-page[data-room-number="11"] .hero img{object-position:72% 58%}
+  .room-guide-page[data-room-number="11"] .hero-copy{right:auto;left:18px;max-width:54%}
   .room-guide-page .grid>.card{padding:13px 15px}
   .room-guide-page .grid>.card p{font-size:15px;line-height:1.42}
   .registration-facts{grid-template-columns:1fr}

@@ -1,4 +1,4 @@
-# Guest Guide Platform with AI Concierge — The House v5.11.31
+# Guest Guide Platform with AI Concierge — The House v5.11.32
 
 The House – Koh Tao guest guide is a production-oriented, mobile-first digital guest guide and concierge platform. It combines property information, curated island guidance, structured place and activity data, and centralized contact and booking routes.
 
@@ -17,6 +17,15 @@ The House – Koh Tao guest guide is a production-oriented, mobile-first digital
 - Model-powered, room-aware AI Concierge with controlled learning
 
 The Activities module contains 49 structured profiles covering diving, freediving, snorkelling, boat trips, beach experiences, kayaking, paddleboarding, hiking, viewpoints, climbing, yoga, Muay Thai, massage, cooking, wildlife, photography, night activities and rainy-day options.
+
+## v5.11.32 release focus
+
+- Replaces the anonymous normal mobile sparkle square with a clear 148×52 px **💬 AI Concierge** pill below 768 px, while preserving the approved desktop **✦ Concierge** pill and the exact accessible name **Open AI Concierge**.
+- Collapses the mobile pill to a 52×52 px chat bubble after six cumulative pixels of downward scrolling, waits 650 ms after downward movement or 220 ms after upward movement before re-expanding, and uses a larger release gap to prevent nervous state changes.
+- Throttles collision checks to at most once every 90 ms. Visible links, buttons, form controls, navigation cards and footer actions are measured together; a colliding full pill collapses, and a colliding compact bubble moves upward to the nearest right-aligned safe position.
+- Retains right/bottom iPhone safe-area positioning and modest page clearance. The v5.11.31 header-owned language control remains non-floating.
+- Restores the Room mobile hero to 232 px and applies a Room 11-specific `72% 58%` focal position. The overlay stays on the left, clear of the actual marked lower-right Room 11 entrance.
+- Adds two presentation/behavior contracts; the complete 181-test suite passes with zero failures. No Concierge, contact-hours, lost-key, booking, alert, passport, stay, Airbnb or owner-operations rule changed.
 
 ## v5.11.31 release focus
 

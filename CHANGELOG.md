@@ -2,6 +2,26 @@
 
 All notable changes to The House – Koh Tao guest guide are recorded here.
 
+## v5.11.32 — Smart Mobile AI Concierge Bubble & Room 11 Hero Crop
+
+### Stable mobile launcher states
+
+- Keeps the floating Concierge concept but makes its idle mobile state immediately identifiable: a 148×52 px House-green **💬 AI Concierge** pill with the accessible name **Open AI Concierge**. Desktop retains the approved v5.11.31 **✦ Concierge** presentation.
+- Collapses the mobile pill to a 52×52 px chat bubble after six cumulative pixels of downward movement. A 650 ms downward-stop debounce prevents premature expansion; upward movement uses a shorter 220 ms debounce. A 16 px release margin versus a 10 px collision margin supplies state hysteresis.
+- Measures visible actionable controls with `getBoundingClientRect()` through a request-animation-frame scheduler throttled to 90 ms. Full-pill collisions force compact mode. Compact collisions are resolved by testing right-aligned vertical candidates and moving to the nearest safe position, with a minimum position below the sticky header.
+- Preserves the 12 px plus iPhone right/bottom safe-area margins, 72 px plus bottom-safe-area page clearance, visible focus, 52 px touch target and reduced-motion behavior. Language access remains header-owned and non-floating.
+
+### Room 11 functional crop
+
+- Restores the mobile Room hero from 208 px to a moderate 232 px.
+- Marks the current Room number on the already protected Room page and applies Room 11-specific `object-position: 72% 58%` to the approved `photo-07.jpeg` source.
+- Constrains the Room 11 overlay to the left 54% of the hero, keeping the actual lower-right marked Room 11 entrance visible at all requested phone widths. The separate Finding Room 11 sequence is unchanged.
+
+### Regression and scope
+
+- Adds two presentation/behavior tests and updates the v5.11.31 preservation contract; the complete suite expands from 179 to 181 tests with zero failures.
+- Changes no Concierge routing/state, service hours, routine-contact gate, emergency, lost-key, spare-key, booking/diving, cleaning, luggage, maintenance, WhatsApp, passport, stay, Airbnb, admin or alert-lifecycle logic.
+
 ## v5.11.31 — Mobile UX Polish & Wording Consistency
 
 ### Mobile floating-control correction

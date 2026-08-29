@@ -4,6 +4,7 @@
   const titleElement = document.getElementById("roomTitle");
   const noteElement = document.getElementById("roomNote");
   if (!room || !titleElement || !noteElement) return;
+  document.body.dataset.roomNumber = room;
 
   try {
     const response = await fetch(`/api/stay/room-content?room=${encodeURIComponent(room)}`, {

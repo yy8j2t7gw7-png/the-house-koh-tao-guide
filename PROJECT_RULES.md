@@ -155,7 +155,7 @@ Public interface rules:
 
 ## Current baseline
 
-Current release: v5.11.31 (mobile presentation refinement only: a compact safe-area-aware Concierge launcher below 768 px, header-owned mobile language access, denser Room spacing, a 208 px mobile Room-location hero, accurate verified-stay/TM30 wording and an **Open Concierge** stay-help label. v5.11.30 deterministic generic-human routing and routine Contact/Call gates, v5.11.29 verified-stay/registration separation, 24/7 protected lost-key access, RAID-and-Roctopus recommendation policy and every fee, notification, code-display, rotation, privacy and delivery safeguard remain authoritative).
+Current release: v5.11.32 (presentation-only: a 148×52 px identifiable mobile **AI Concierge** pill, 52 px scroll/collision bubble, throttled right-aligned collision avoidance, safe-area placement and a 232 px Room hero with a Room 11-specific marked-entrance crop. v5.11.31 header-owned language access, denser Room spacing, verified/TM30 wording and **Open Concierge** label remain authoritative. v5.11.30 generic-human routing and routine Contact/Call gates, 24/7 protected lost-key access, RAID-and-Roctopus policy and every fee, notification, code-display, rotation, privacy and delivery safeguard are unchanged).
 
 Explore is intentionally disabled in the live v5.11.6 release. Do not delete its pages, structured records or media. Restore it only after the planned Explore rebuild and review by changing the protected deployment feature variable. Do not expose internal Explore detail paths in live concierge answers while the feature remains disabled; use approved external actions where supplied.
 

@@ -2623,7 +2623,7 @@ test("guest localization supports seven languages and keeps the owner dashboard 
   assert.doesNotMatch(admin, /src="\/i18n\.js"/);
   assert.match(runtime, /exploreContentDeferred/);
   assert.match(runtime, /element\.closest\("\.section,\.footer"\)/);
-  assert.match(runtime, /houseGuideTranslations:v5\.11\.31:/);
+  assert.match(runtime, /houseGuideTranslations:v5\.11\.32:/);
   assert.match(runtime, /MAX_REQUEST_RETRIES = 2/);
   assert.match(runtime, /let flushRunning = false/);
 });
@@ -4793,8 +4793,8 @@ test("agency-specific beginner and continuing courses pass the structured diving
   }
 });
 
-test("the bundled v5.11.31 catalog preserves current PADI, SSI and RAID pathways", () => {
-  assert.equal(divingCourses.updatedForRelease, "5.11.31");
+test("the bundled v5.11.32 catalog preserves current PADI, SSI and RAID pathways", () => {
+  assert.equal(divingCourses.updatedForRelease, "5.11.32");
   assert.deepEqual(divingCourses.houseRecommendation, {
     agency: "RAID",
     reason: "focus on dive safety and buoyancy control",
@@ -8720,11 +8720,9 @@ test("v5.11.28 landing and room hierarchy use safe imagery, exact guidance and a
   }
 });
 
-test("v5.11.31 mobile controls stay compact, header-bound, safe-area aware and wording-consistent", async () => {
-  const [styles, conciergeStyles, conciergeScript, i18n, room, canonicalRoom, actionRuntime] = await Promise.all([
+test("v5.11.31 header, mobile spacing, wording and CTA corrections remain intact", async () => {
+  const [styles, i18n, room, canonicalRoom, actionRuntime] = await Promise.all([
     readFile(new URL("../public/design-system.css", import.meta.url), "utf8"),
-    readFile(new URL("../public/ai-concierge.css", import.meta.url), "utf8"),
-    readFile(new URL("../public/ai-concierge.js", import.meta.url), "utf8"),
     readFile(new URL("../public/i18n.js", import.meta.url), "utf8"),
     readFile(new URL("../public/room.html", import.meta.url), "utf8"),
     readFile(new URL("../public/modules/house/room.html", import.meta.url), "utf8"),
@@ -8732,13 +8730,6 @@ test("v5.11.31 mobile controls stay compact, header-bound, safe-area aware and w
   ]);
 
   assert.equal(room, canonicalRoom);
-  assert.match(conciergeScript, /launcher\.setAttribute\("aria-label", "Open Concierge"\)/);
-  assert.match(conciergeStyles, /@media\(max-width:767px\)[\s\S]*width:58px[\s\S]*height:58px/);
-  assert.match(conciergeStyles, /right:calc\(12px \+ env\(safe-area-inset-right\)\)/);
-  assert.match(conciergeStyles, /bottom:calc\(12px \+ env\(safe-area-inset-bottom\)\)/);
-  assert.match(conciergeStyles, /body\.ai-concierge-ready\{padding-bottom:calc\(76px \+ env\(safe-area-inset-bottom\)\)\}/);
-  assert.match(conciergeStyles, /\.ai-concierge-launcher-label\{[^}]*width:1px[^}]*clip:rect\(0,0,0,0\)/);
-
   assert.match(i18n, /function addHeaderLanguageButton\(\)/);
   assert.match(i18n, /topbar\.insertBefore\(button, nav\)/);
   assert.doesNotMatch(i18n, /addAlwaysVisibleLanguageButton|document\.body\.appendChild\(button\)|language-floating-button/);
@@ -8746,13 +8737,64 @@ test("v5.11.31 mobile controls stay compact, header-bound, safe-area aware and w
   assert.match(styles, /@media\(max-width:760px\)[\s\S]*\.language-header-button\{position:static/);
   assert.doesNotMatch(styles, /\.language-header-button\{[^}]*position:(?:fixed|sticky)/);
 
-  assert.match(styles, /\.room-guide-page \.hero\{min-height:208px;height:208px\}/);
   assert.match(styles, /\.room-guide-page \.grid>\.card\{padding:13px 15px\}/);
   assert.match(room, /Your stay is verified\. Non-Thai overnight guests must also complete the required TM30 guest registration\./);
   assert.match(room, /Passport images are automatically deleted 14 days after upload, or sooner after processing\./);
   assert.doesNotMatch(room, /Guest access is active after the required TM30 Immigration registration/);
   assert.match(room, /data-action="contact" data-action-label="Open Concierge">Open Concierge<\/a>/);
   assert.match(actionRuntime, /const requestedLabel = element\.getAttribute\("data-action-label"\)/);
+});
+
+test("v5.11.32 mobile AI Concierge uses stable expanded, scroll-collapsed and collision-shifted states", async () => {
+  const [styles, script] = await Promise.all([
+    readFile(new URL("../public/ai-concierge.css", import.meta.url), "utf8"),
+    readFile(new URL("../public/ai-concierge.js", import.meta.url), "utf8")
+  ]);
+
+  assert.match(script, /launcher\.setAttribute\("aria-label", "Open AI Concierge"\)/);
+  assert.match(script, /ai-concierge-launcher-icon is-desktop" aria-hidden="true">✦/);
+  assert.match(script, /ai-concierge-launcher-icon is-mobile" aria-hidden="true">💬/);
+  assert.match(script, /ai-concierge-launcher-label is-mobile">AI Concierge/);
+  assert.match(script, /expandedWidth: 148/);
+  assert.match(script, /compactSize: 52/);
+  assert.match(script, /collisionThrottleMs: 90/);
+  assert.match(script, /downwardDebounceMs: 650/);
+  assert.match(script, /upwardDebounceMs: 220/);
+  assert.match(script, /function rectanglesOverlap\(/);
+  assert.match(script, /function nearestSafeLauncherTop\(/);
+  assert.match(script, /getBoundingClientRect\(\)/);
+  assert.match(script, /window\.requestAnimationFrame\(evaluateMobileLauncher\)/);
+  assert.match(script, /window\.addEventListener\("scroll", handleMobileLauncherScroll, \{ passive: true \}\)/);
+  assert.match(script, /new ResizeObserver\(\(\) => scheduleMobileLauncherLayout\(\)\)/);
+  assert.match(script, /"a\[href\]"[\s\S]*"button"[\s\S]*"input:not\(\[type='hidden'\]\)"[\s\S]*"textarea"[\s\S]*"select"/);
+  assert.match(script, /launcher\.dataset\.mobileState = compact \? "compact" : "expanded"/);
+  assert.match(script, /--ai-concierge-lift/);
+
+  assert.match(styles, /@media\(max-width:767px\)[\s\S]*width:148px[\s\S]*height:52px/);
+  assert.match(styles, /right:calc\(12px \+ env\(safe-area-inset-right\)\)/);
+  assert.match(styles, /bottom:calc\(12px \+ env\(safe-area-inset-bottom\) \+ var\(--ai-concierge-lift\)\)/);
+  assert.match(styles, /\.ai-concierge-launcher-icon\.is-desktop,\.ai-concierge-launcher-label\.is-desktop\{display:none\}/);
+  assert.match(styles, /\.ai-concierge-launcher-icon\.is-mobile\{display:grid;font-size:20px\}/);
+  assert.match(styles, /\.ai-concierge-launcher\.is-compact\{width:52px;min-width:52px;gap:0;padding:0\}/);
+  assert.match(styles, /\.ai-concierge-launcher\.is-compact \.ai-concierge-launcher-label\.is-mobile\{max-width:0;opacity:0\}/);
+  assert.doesNotMatch(styles, /\.ai-concierge-launcher-label\{[^}]*clip:rect/);
+  assert.match(styles, /@media\(prefers-reduced-motion:reduce\)[\s\S]*\.ai-concierge-launcher\{transition-duration:\.01ms\}/);
+});
+
+test("v5.11.32 Room 11 mobile hero restores the marked entrance with a room-specific crop", async () => {
+  const [styles, roomApp, roomData] = await Promise.all([
+    readFile(new URL("../public/design-system.css", import.meta.url), "utf8"),
+    readFile(new URL("../public/room-app.js", import.meta.url), "utf8"),
+    readFile(new URL("../public/room-data.js", import.meta.url), "utf8")
+  ]);
+
+  assert.match(roomApp, /document\.body\.dataset\.roomNumber = room/);
+  assert.match(styles, /\.room-guide-page \.hero\{min-height:232px;height:232px\}/);
+  assert.match(styles, /\.room-guide-page \.hero img\{height:232px;object-position:50% 54%\}/);
+  assert.match(styles, /\.room-guide-page\[data-room-number="11"\] \.hero img\{object-position:72% 58%\}/);
+  assert.match(styles, /\.room-guide-page\[data-room-number="11"\] \.hero-copy\{right:auto;left:18px;max-width:54%\}/);
+  assert.doesNotMatch(styles, /\.room-guide-page \.hero\{min-height:208px;height:208px\}/);
+  assert.match(roomData, /"11": \{[\s\S]*"photo": "photo-07\.jpeg"[\s\S]*"note": "Room 11 is downstairs and marked clearly in the building photo\."/);
 });
 
 test("v5.11.28 owner operations styles distinguish lifecycle, diagnostics and narrow tables", async () => {

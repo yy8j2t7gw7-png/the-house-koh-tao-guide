@@ -305,10 +305,10 @@
   const launcher = document.createElement("button");
   launcher.className = "ai-concierge-launcher";
   launcher.type = "button";
-  launcher.setAttribute("aria-label", "Open Concierge");
+  launcher.setAttribute("aria-label", "Open AI Concierge");
   launcher.setAttribute("aria-expanded", "false");
   launcher.setAttribute("aria-controls", "aiConciergePanel");
-  launcher.innerHTML = `<span class="ai-concierge-launcher-icon" aria-hidden="true">✦</span><span class="ai-concierge-launcher-label">${cfg.buttonLabel}</span>`;
+  launcher.innerHTML = `<span class="ai-concierge-launcher-icon is-desktop" aria-hidden="true">✦</span><span class="ai-concierge-launcher-icon is-mobile" aria-hidden="true">💬</span><span class="ai-concierge-launcher-label is-desktop">${cfg.buttonLabel}</span><span class="ai-concierge-launcher-label is-mobile">AI Concierge</span>`;
 
   const backdrop = document.createElement("div");
   backdrop.className = "ai-concierge-backdrop";
@@ -413,6 +413,265 @@
   const quickActionsContainer = panel.querySelector(".ai-concierge-actions");
   const registrationReminder = panel.querySelector(".ai-concierge-registration-status");
   const serviceHours = panel.querySelector(".ai-concierge-service-hours");
+
+  const mobileLauncherMedia = window.matchMedia("(max-width: 767px)");
+  const mobileLauncherLayout = Object.freeze({
+    expandedWidth: 148,
+    compactSize: 52,
+    collisionGap: 10,
+    releaseGap: 16,
+    scrollDelta: 6,
+    collisionThrottleMs: 90,
+    downwardDebounceMs: 650,
+    upwardDebounceMs: 220
+  });
+  const importantControlSelector = [
+    "a[href]",
+    "button",
+    "input:not([type='hidden'])",
+    "textarea",
+    "select",
+    "summary",
+    "[role='button']",
+    "[tabindex]:not([tabindex='-1'])"
+  ].join(",");
+  let launcherLastScrollY = window.scrollY;
+  let launcherHoldCompact = false;
+  let launcherScrollStopTimer = 0;
+  let launcherCollisionTimer = 0;
+  let launcherLayoutFrame = 0;
+  let launcherLastLayoutAt = 0;
+  let launcherLift = 0;
+  let launcherBaseBottom = null;
+  let launcherResizeObserver = null;
+  let launcherScrollDirection = 0;
+  let launcherScrollDistance = 0;
+
+  function rectanglesOverlap(first, second, gap = 0) {
+    return first.left < second.right + gap
+      && first.right > second.left - gap
+      && first.top < second.bottom + gap
+      && first.bottom > second.top - gap;
+  }
+
+  function overlapArea(first, second, gap = 0) {
+    const width = Math.max(0, Math.min(first.right, second.right + gap) - Math.max(first.left, second.left - gap));
+    const height = Math.max(0, Math.min(first.bottom, second.bottom + gap) - Math.max(first.top, second.top - gap));
+    return width * height;
+  }
+
+  function visibleImportantControlRects(viewportHeight) {
+    return [...document.querySelectorAll(importantControlSelector)]
+      .filter((element) => element !== launcher
+        && !launcher.contains(element)
+        && !panel.contains(element)
+        && !backdrop.contains(element)
+        && !element.closest(".topbar")
+        && !element.hidden
+        && element.getAttribute("aria-hidden") !== "true")
+      .map((element) => element.getBoundingClientRect())
+      .filter((rect) => rect.width > 0
+        && rect.height > 0
+        && rect.bottom > 0
+        && rect.top < viewportHeight);
+  }
+
+  function mobileLauncherMinimumTop(viewportHeight) {
+    const topbar = document.querySelector(".topbar");
+    const topbarRect = topbar?.getBoundingClientRect();
+    const belowHeader = topbarRect
+      && topbarRect.bottom > 0
+      && topbarRect.top < viewportHeight
+      ? topbarRect.bottom + mobileLauncherLayout.collisionGap
+      : mobileLauncherLayout.collisionGap;
+    return Math.min(belowHeader, viewportHeight - mobileLauncherLayout.compactSize - mobileLauncherLayout.collisionGap);
+  }
+
+  function nearestSafeLauncherTop(baseRect, controlRects, minimumTop) {
+    const size = mobileLauncherLayout.compactSize;
+    const gap = mobileLauncherLayout.collisionGap;
+    const horizontallyRelevant = controlRects.filter((rect) =>
+      baseRect.left < rect.right + gap && baseRect.right > rect.left - gap
+    );
+    const candidates = [
+      baseRect.top,
+      minimumTop,
+      ...horizontallyRelevant.map((rect) => rect.top - gap - size)
+    ]
+      .map((top) => Math.max(minimumTop, Math.min(baseRect.top, top)))
+      .filter((top, index, values) => values.indexOf(top) === index)
+      .sort((first, second) => second - first);
+
+    const candidateRect = (top) => ({
+      left: baseRect.left,
+      right: baseRect.right,
+      top,
+      bottom: top + size
+    });
+    const safeTop = candidates.find((top) =>
+      horizontallyRelevant.every((rect) => !rectanglesOverlap(candidateRect(top), rect, gap))
+    );
+    if (Number.isFinite(safeTop)) return safeTop;
+
+    return candidates.reduce((bestTop, top) => {
+      const score = horizontallyRelevant.reduce(
+        (total, rect) => total + overlapArea(candidateRect(top), rect, gap),
+        0
+      );
+      const bestScore = horizontallyRelevant.reduce(
+        (total, rect) => total + overlapArea(candidateRect(bestTop), rect, gap),
+        0
+      );
+      return score < bestScore ? top : bestTop;
+    }, candidates[0] ?? baseRect.top);
+  }
+
+  function setMobileLauncherState(compact, collision, lift) {
+    launcher.classList.toggle("is-compact", compact);
+    launcher.classList.toggle("is-collision-shifted", lift > 0);
+    launcher.dataset.mobileState = compact ? "compact" : "expanded";
+    launcher.dataset.collision = collision ? "true" : "false";
+    if (launcherLift !== lift) {
+      launcherLift = lift;
+      launcher.style.setProperty("--ai-concierge-lift", `${lift}px`);
+    }
+  }
+
+  function resetMobileLauncherState() {
+    launcherHoldCompact = false;
+    launcherLift = 0;
+    launcherBaseBottom = null;
+    launcher.classList.remove("is-compact", "is-collision-shifted");
+    launcher.style.removeProperty("--ai-concierge-lift");
+    launcher.dataset.mobileState = "desktop";
+    launcher.dataset.collision = "false";
+  }
+
+  function evaluateMobileLauncher() {
+    launcherLayoutFrame = 0;
+    launcherLastLayoutAt = window.performance.now();
+    if (!mobileLauncherMedia.matches) {
+      resetMobileLauncherState();
+      return;
+    }
+
+    const viewportHeight = document.documentElement.clientHeight || window.innerHeight;
+    const currentRect = launcher.getBoundingClientRect();
+    if (!currentRect.width || !currentRect.height) return;
+    if (launcherLift === 0 || launcherBaseBottom === null) launcherBaseBottom = currentRect.bottom;
+
+    const right = currentRect.right;
+    const baseBottom = launcherBaseBottom;
+    const size = mobileLauncherLayout.compactSize;
+    const expandedRect = {
+      left: right - mobileLauncherLayout.expandedWidth,
+      right,
+      top: baseBottom - size,
+      bottom: baseBottom
+    };
+    const compactRect = {
+      left: right - size,
+      right,
+      top: baseBottom - size,
+      bottom: baseBottom
+    };
+    const controlRects = visibleImportantControlRects(viewportHeight);
+    const collisionGap = launcher.classList.contains("is-compact")
+      ? mobileLauncherLayout.releaseGap
+      : mobileLauncherLayout.collisionGap;
+    const expandedCollision = controlRects.some((rect) => rectanglesOverlap(expandedRect, rect, collisionGap));
+    const compactCollision = controlRects.some((rect) => rectanglesOverlap(compactRect, rect, mobileLauncherLayout.collisionGap));
+    const compact = launcherHoldCompact || expandedCollision;
+    const safeTop = compact && compactCollision
+      ? nearestSafeLauncherTop(compactRect, controlRects, mobileLauncherMinimumTop(viewportHeight))
+      : compactRect.top;
+    const lift = Math.max(0, Math.round(compactRect.top - safeTop));
+    setMobileLauncherState(compact, expandedCollision || compactCollision, lift);
+  }
+
+  function scheduleMobileLauncherLayout(immediate = false) {
+    if (!mobileLauncherMedia.matches) {
+      resetMobileLauncherState();
+      return;
+    }
+    if (immediate && launcherCollisionTimer) {
+      window.clearTimeout(launcherCollisionTimer);
+      launcherCollisionTimer = 0;
+    }
+    const elapsed = window.performance.now() - launcherLastLayoutAt;
+    const delay = immediate ? 0 : Math.max(0, mobileLauncherLayout.collisionThrottleMs - elapsed);
+    if (delay > 0) {
+      if (!launcherCollisionTimer) {
+        launcherCollisionTimer = window.setTimeout(() => {
+          launcherCollisionTimer = 0;
+          scheduleMobileLauncherLayout(true);
+        }, delay);
+      }
+      return;
+    }
+    if (launcherLayoutFrame) return;
+    launcherLayoutFrame = window.requestAnimationFrame(evaluateMobileLauncher);
+  }
+
+  function handleMobileLauncherScroll() {
+    if (!mobileLauncherMedia.matches) return;
+    const nextScrollY = window.scrollY;
+    const delta = nextScrollY - launcherLastScrollY;
+    launcherLastScrollY = nextScrollY;
+    const direction = Math.sign(delta);
+    if (direction && direction !== launcherScrollDirection) {
+      launcherScrollDirection = direction;
+      launcherScrollDistance = 0;
+    }
+    launcherScrollDistance += Math.abs(delta);
+    let debounce = 0;
+
+    if (direction > 0 && launcherScrollDistance >= mobileLauncherLayout.scrollDelta) {
+      launcherHoldCompact = true;
+      launcher.classList.add("is-compact");
+      launcher.dataset.mobileState = "compact";
+      debounce = mobileLauncherLayout.downwardDebounceMs;
+    } else if (direction > 0 && launcher.classList.contains("is-compact")) {
+      launcherHoldCompact = true;
+      debounce = mobileLauncherLayout.downwardDebounceMs;
+    } else if (direction < 0 && launcher.classList.contains("is-compact")) {
+      launcherHoldCompact = true;
+      debounce = mobileLauncherLayout.upwardDebounceMs;
+    }
+
+    scheduleMobileLauncherLayout();
+    if (!debounce) return;
+    window.clearTimeout(launcherScrollStopTimer);
+    launcherScrollStopTimer = window.setTimeout(() => {
+      launcherHoldCompact = false;
+      launcherScrollDirection = 0;
+      launcherScrollDistance = 0;
+      scheduleMobileLauncherLayout(true);
+    }, debounce);
+  }
+
+  function resetMobileLauncherGeometry() {
+    launcherLift = 0;
+    launcherBaseBottom = null;
+    launcher.style.setProperty("--ai-concierge-lift", "0px");
+    scheduleMobileLauncherLayout(true);
+  }
+
+  launcher.dataset.mobileState = mobileLauncherMedia.matches ? "expanded" : "desktop";
+  launcher.dataset.collision = "false";
+  window.addEventListener("scroll", handleMobileLauncherScroll, { passive: true });
+  window.addEventListener("resize", resetMobileLauncherGeometry, { passive: true });
+  window.visualViewport?.addEventListener("resize", resetMobileLauncherGeometry, { passive: true });
+  if (typeof mobileLauncherMedia.addEventListener === "function") {
+    mobileLauncherMedia.addEventListener("change", resetMobileLauncherGeometry);
+  } else {
+    mobileLauncherMedia.addListener(resetMobileLauncherGeometry);
+  }
+  if (typeof ResizeObserver === "function") {
+    launcherResizeObserver = new ResizeObserver(() => scheduleMobileLauncherLayout());
+    launcherResizeObserver.observe(document.body);
+  }
+  document.fonts?.ready.then(() => scheduleMobileLauncherLayout(true));
 
   function appendMessage(role, text, actions = [], question = "", metadata = {}) {
     const message = document.createElement("article");
@@ -776,7 +1035,10 @@
   if (!isPublicAccess) loadEngine().catch(() => {});
 
   const appearanceDelay = Number.isFinite(cfg.appearanceDelayMs) ? cfg.appearanceDelayMs : 1200;
-  window.setTimeout(() => launcher.classList.add("is-visible"), appearanceDelay);
+  window.setTimeout(() => {
+    launcher.classList.add("is-visible");
+    scheduleMobileLauncherLayout(true);
+  }, appearanceDelay);
 
   launcher.addEventListener("click", () => {
     if (panel.classList.contains("is-open")) {

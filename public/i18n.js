@@ -2,7 +2,7 @@
   if (window.HOUSE_I18N) return;
 
   const STORAGE_KEY = "houseGuideLanguage";
-  const CACHE_PREFIX = "houseGuideTranslations:v5.11.34:";
+  const CACHE_PREFIX = "houseGuideTranslations:v5.11.35:";
   const MAX_REQUEST_RETRIES = 2;
   const languages = Object.freeze([
     { code: "en", label: "English" },

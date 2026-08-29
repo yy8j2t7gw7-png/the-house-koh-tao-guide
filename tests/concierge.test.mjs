@@ -67,8 +67,11 @@ const OPAQUE_TEST_FIELD_NAMES = new Set([
   "traceId"
 ]);
 
+const OPAQUE_TEST_VALUE_PATTERN = /^[a-z][a-z0-9-]*_[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 function withoutOpaqueTestIdentifiers(value) {
   if (Array.isArray(value)) return value.map(withoutOpaqueTestIdentifiers);
+  if (typeof value === "string" && OPAQUE_TEST_VALUE_PATTERN.test(value)) return "[opaque-test-id]";
   if (!value || typeof value !== "object") return value;
   return Object.fromEntries(
     Object.entries(value)
@@ -769,7 +772,7 @@ test("a repeated lost-key synonym while fee acceptance is pending preserves the 
   assert.equal(store.alertDeliveries.length, 0);
 });
 
-test("generic human and call requests obey Bangkok routine-contact hours without creating an alert", async () => {
+test("generic human requests are AI-first, then expose routine contacts only after persistence during open hours", async () => {
   const { env, store } = createEnvironment();
   const saturday0820 = new Date("2026-08-29T01:20:00.000Z");
   const saturday1500 = new Date("2026-08-29T08:00:00.000Z");
@@ -792,7 +795,8 @@ test("generic human and call requests obey Bangkok routine-contact hours without
     "reception please",
     "I wanna call you",
     "can I call someone?",
-    "call the team"
+    "call the team",
+    "call the hotel"
   ];
 
   for (const phrase of phrases) {
@@ -810,9 +814,21 @@ test("generic human and call requests obey Bangkok routine-contact hours without
   const open = await handleConciergeRequest(guestRequest("I wanna call you"), env, undefined, saturday1500);
   const openBody = await open.json();
   assert.equal(openBody.intentId, "generic_human_contact");
-  assert.match(openBody.answer, /contact The House team/i);
-  assert.equal(openBody.actions.some((action) => action.route === "houseWhatsapp"), true);
-  assert.equal(openBody.actions.some((action) => action.route === "houseCall"), true);
+  assert.match(openBody.answer, /what you need help with/i);
+  assert.equal(openBody.actions.some((action) => action.route === "houseWhatsapp"), false);
+  assert.equal(openBody.actions.some((action) => action.route === "houseCall"), false);
+
+  const persistent = await handleConciergeRequest(guestRequest("I still need a human", {
+    history: [
+      { role: "user", content: "I wanna call you" },
+      { role: "assistant", content: openBody.answer }
+    ]
+  }), env, undefined, saturday1500);
+  const persistentBody = await persistent.json();
+  assert.equal(persistentBody.intentId, "generic_human_contact");
+  assert.match(persistentBody.answer, /still need to speak with a person/i);
+  assert.equal(persistentBody.actions.some((action) => action.route === "houseWhatsapp"), true);
+  assert.equal(persistentBody.actions.some((action) => action.route === "houseCall"), true);
 
   const monday = await handleConciergeRequest(guestRequest("I wanna call you"), env, undefined, monday1500);
   const mondayBody = await monday.json();
@@ -850,8 +866,8 @@ test("inactive historical topics cannot contaminate the production generic-human
     assert.equal(body.source, "human-contact-policy");
     assert.match(body.answer, /^Of course\./);
     assert.doesNotMatch(body.answer, /500 THB|spare key|lost key|diving|cleaning|\bAC\b|maintenance|window|luggage|Rescue|1669/i);
-    assert.equal(body.actions.some((action) => action.route === "houseWhatsapp"), true);
-    assert.equal(body.actions.some((action) => action.route === "houseCall"), true);
+    assert.equal(body.actions.some((action) => action.route === "houseWhatsapp"), false);
+    assert.equal(body.actions.some((action) => action.route === "houseCall"), false);
 
     const closedResponse = await handleConciergeRequest(
       guestRequest("I wanna talk to a human", { history }),
@@ -893,10 +909,10 @@ test("only explicit lost-key workflow state may influence a generic human reques
   );
   const openBody = await open.json();
   assert.equal(openBody.intentId, "generic_human_contact");
-  assert.match(openBody.answer, /continue helping with the spare-key process/i);
+  assert.match(openBody.answer, /continue helping with the secure spare-key process/i);
   assert.deepEqual(openBody.workflow, firstBody.workflow);
-  assert.equal(openBody.actions.some((action) => action.route === "houseWhatsapp"), true);
-  assert.equal(openBody.actions.some((action) => action.route === "houseCall"), true);
+  assert.equal(openBody.actions.some((action) => action.route === "houseWhatsapp"), false);
+  assert.equal(openBody.actions.some((action) => action.route === "houseCall"), false);
 
   const closed = await handleConciergeRequest(
     guestRequest("I wanna talk to a human", { history, workflowState: firstBody.workflow }),
@@ -906,7 +922,7 @@ test("only explicit lost-key workflow state may influence a generic human reques
   );
   const closedBody = await closed.json();
   assert.equal(closedBody.intentId, "generic_human_contact");
-  assert.match(closedBody.answer, /continue helping with the spare-key process/i);
+  assert.match(closedBody.answer, /continue helping with the secure spare-key process/i);
   assert.match(closedBody.answer, /outside normal service hours/i);
   assert.equal(closedBody.actions.some((action) => action.route === "houseCall"), false);
   assert.equal(closedBody.actions.some((action) => action.route === "houseWhatsapp"), false);
@@ -2190,6 +2206,204 @@ test("retrieval connects the AI to approved activity, bar and island records", a
   assert.equal("publicPath" in sunsetRecords[0], false);
 });
 
+test("Explore-disabled Concierge retrieval ranks approved beaches, dining, cafés and Bamboo intelligently", async () => {
+  const { env } = createEnvironment({ EXPLORE_ENABLED: "false", OPENAI_API_KEY: "" });
+  const request = guestRequest("approved local-guide retrieval");
+
+  const generalBars = await retrieveApprovedProjectKnowledge(request, env, "Where should we go for drinks?");
+  assert.equal(generalBars[0].name, "Bamboo Beach Bar");
+  assert.equal(generalBars[0].preferredByTheHouse, true);
+
+  const quietBeaches = await retrieveApprovedProjectKnowledge(request, env, "Recommend a quiet beach.");
+  assert.equal(quietBeaches[0].sourceType, "beach");
+  assert.match(quietBeaches[0].name, /Beach|Bay/i);
+
+  const beachOverview = await retrieveApprovedProjectKnowledge(request, env, "What beaches are around Koh Tao?");
+  assert.equal(beachOverview.slice(0, 3).every((record) => record.sourceType === "beach"), true);
+
+  const thaiFood = await retrieveApprovedProjectKnowledge(request, env, "Recommend Thai food.");
+  assert.equal(thaiFood[0].sourceType, "restaurant");
+  assert.match(thaiFood[0].name, /Tukta|Long Thai/i);
+
+  const workCafe = await retrieveApprovedProjectKnowledge(request, env, "Where can I get coffee and work on my laptop?");
+  assert.equal(workCafe[0].sourceType, "cafe");
+  assert.equal(workCafe[0].name, "Blacktip Café & Workspace");
+  assert.match(JSON.stringify(workCafe[0]), /remoteWork|airConditioning/);
+
+  const snorkeling = await retrieveApprovedProjectKnowledge(request, env, "What are good snorkeling spots?");
+  assert.equal(snorkeling[0].sourceType, "activity");
+  assert.match(snorkeling[0].name, /Snorkelling/i);
+
+  const specificBar = await handleConciergeRequest(
+    guestRequest("Where can I get food and cocktails at the same place?"),
+    env
+  );
+  const specificBarBody = await specificBar.json();
+  assert.equal(specificBarBody.source, "project-knowledge");
+  assert.doesNotMatch(specificBarBody.answer.split("\n")[0], /Bamboo Beach Bar/);
+  assert.match(specificBarBody.answer, /Choppers Sports Bar|Natural High Bar|Victor’s Bar/i);
+});
+
+test("House beach proximity answers are exact, concise and operationally inert", async () => {
+  const { env, store } = createEnvironment({ EXPLORE_ENABLED: "false", OPENAI_API_KEY: "" });
+  const closest = await handleConciergeRequest(guestRequest("How far is the beach from the house?"), env);
+  const closestBody = await closest.json();
+  assert.equal(closestBody.intentId, "closest_beach_from_house");
+  assert.match(closestBody.answer, /Mae Haad Beach/i);
+  assert.match(closestBody.answer, /around 200 metres/i);
+  assert.match(closestBody.answer, /very short walk/i);
+  assert.deepEqual(closestBody.actions, []);
+
+  const sairee = await handleConciergeRequest(guestRequest("How far is Sairee Beach?"), env);
+  const saireeBody = await sairee.json();
+  assert.equal(saireeBody.intentId, "sairee_beach_distance");
+  assert.match(saireeBody.answer, /roughly a 20-minute walk/i);
+  assert.match(saireeBody.answer, /scooter or taxi is faster/i);
+  assert.deepEqual(saireeBody.actions, []);
+  assert.equal(store.alerts.length, 0);
+});
+
+test("a local-information detour answers directly and preserves a pending cleaning workflow for resumption", async () => {
+  const now = new Date("2026-08-25T04:00:00.000Z");
+  const { env, store } = createEnvironment({
+    EXPLORE_ENABLED: "false",
+    OPENAI_API_KEY: "",
+    WHATSAPP_ACCESS_TOKEN: "meta-test-token",
+    WHATSAPP_PHONE_NUMBER_ID: "1234567890",
+    WHATSAPP_ALERT_RECIPIENTS: JSON.stringify({
+      support: [{ label: "Su", phone: "+66 64 000 0001" }],
+      emergency: [
+        { label: "Owner 1", phone: "+66 81 000 0002" },
+        { label: "Owner 2", phone: "+66 82 000 0003" }
+      ]
+    })
+  });
+  const pending = await handleConciergeRequest(guestRequest("Please clean my room."), env, undefined, now);
+  const pendingBody = await pending.json();
+  assert.equal(pendingBody.workflow.status, "collecting");
+
+  const detour = await handleConciergeRequest(guestRequest("How far is the beach from the house?", {
+    workflowState: pendingBody.workflow,
+    history: [
+      { role: "user", content: "Please clean my room." },
+      { role: "assistant", content: pendingBody.answer }
+    ]
+  }), env, undefined, now);
+  const detourBody = await detour.json();
+  assert.match(detourBody.answer, /Mae Haad Beach.*200 metres/is);
+  assert.doesNotMatch(detourBody.answer, /clean|housekeeping|preferred time/i);
+  assert.deepEqual(detourBody.workflow, pendingBody.workflow);
+  assert.equal(store.alerts.length, 0);
+
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => new Response(JSON.stringify({ messages: [{ id: "wamid.cleaning-after-detour" }] }), {
+    status: 200,
+    headers: { "content-type": "application/json" }
+  });
+  try {
+    const resumed = await handleConciergeRequest(guestRequest("3:00 PM", {
+      workflowState: detourBody.workflow,
+      history: [
+        { role: "user", content: "Please clean my room." },
+        { role: "assistant", content: pendingBody.answer },
+        { role: "user", content: "How far is the beach from the house?" },
+        { role: "assistant", content: detourBody.answer }
+      ]
+    }), env, undefined, now);
+    const resumedBody = await resumed.json();
+    assert.equal(resumedBody.workflow.status, "submitted");
+    assert.match(resumedBody.answer, /preferred time of 3:00 PM/i);
+    assert.equal(store.alerts.length, 1);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("a dinner detour ignores stale booking transcript context while retaining the pending booking", async () => {
+  const now = new Date("2026-08-29T08:00:00.000Z");
+  const { env, store } = createEnvironment({ EXPLORE_ENABLED: "false", OPENAI_API_KEY: "test-key" });
+  const pending = await handleConciergeRequest(guestRequest("I want to book a snorkeling trip."), env, undefined, now);
+  const pendingBody = await pending.json();
+  assert.equal(pendingBody.workflow.type, "booking");
+  assert.equal(pendingBody.workflow.status, "collecting");
+
+  const originalFetch = globalThis.fetch;
+  let capturedRequest;
+  globalThis.fetch = async (_url, options) => {
+    capturedRequest = JSON.parse(options.body);
+    return new Response(JSON.stringify({
+      output: [{
+        type: "message",
+        content: [{
+          type: "output_text",
+          text: JSON.stringify({
+            answer: "The Gallery Restaurant is a strong dinner option from The House’s approved local guide.",
+            intent_id: "restaurant_recommendation",
+            category: "concierge",
+            confidence: 0.92,
+            needs_human: false,
+            handoff: "none",
+            learning_gap: false,
+            learning_reason: "none"
+          })
+        }]
+      }]
+    }), { status: 200, headers: { "content-type": "application/json" } });
+  };
+  let detourBody;
+  try {
+    const detour = await handleConciergeRequest(guestRequest("Where is good for dinner?", {
+      workflowState: pendingBody.workflow,
+      history: [
+        { role: "user", content: "I want to book a snorkeling trip." },
+        { role: "assistant", content: pendingBody.answer }
+      ]
+    }), env, undefined, now);
+    detourBody = await detour.json();
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+  assert.equal(detourBody.intentId, "restaurant_recommendation");
+  assert.doesNotMatch(detourBody.answer, /snorkel|booking|how many|what date/i);
+  assert.equal(detourBody.workflow.type, pendingBody.workflow.type);
+  assert.equal(detourBody.workflow.kind, pendingBody.workflow.kind);
+  assert.equal(detourBody.workflow.status, pendingBody.workflow.status);
+  assert.deepEqual(detourBody.workflow.missing, pendingBody.workflow.missing);
+  assert.equal(detourBody.workflow.bookingRequest.activity, pendingBody.workflow.bookingRequest.activity);
+  assert.equal(detourBody.workflow.bookingRequest.preferredDate, pendingBody.workflow.bookingRequest.preferredDate);
+  assert.deepEqual(capturedRequest.input, [{ role: "user", content: "Where is good for dinner?" }]);
+  assert.match(capturedRequest.instructions, /"sourceType":"restaurant"/);
+  assert.equal(store.alerts.length, 0);
+
+  const resumed = await handleConciergeRequest(guestRequest("tomorrow", {
+    workflowState: detourBody.workflow,
+    history: [
+      { role: "user", content: "I want to book a snorkeling trip." },
+      { role: "assistant", content: pendingBody.answer },
+      { role: "user", content: "Where is good for dinner?" },
+      { role: "assistant", content: detourBody.answer }
+    ]
+  }), env, undefined, now);
+  const resumedBody = await resumed.json();
+  assert.equal(resumedBody.workflow.type, "booking");
+  assert.equal(resumedBody.workflow.status, "collecting");
+  assert.equal(resumedBody.workflow.missing.includes("preferredDate"), false);
+  assert.equal(store.alerts.length, 0);
+});
+
+test("snorkeling recommendations stay informational and use approved local records", async () => {
+  const { env, store } = createEnvironment({ EXPLORE_ENABLED: "false", OPENAI_API_KEY: "" });
+  for (const question of ["What are good snorkeling spots?", "Recommend a beach for snorkeling."]) {
+    const response = await handleConciergeRequest(guestRequest(question), env);
+    const body = await response.json();
+    assert.equal(body.needsHuman, false, question);
+    assert.equal(body.handoff, "none", question);
+    assert.match(body.answer, /Snorkelling|Bay|Ao Leuk|Hin Wong|Shark Bay/i, question);
+    assert.equal(body.workflow, null, question);
+  }
+  assert.equal(store.alerts.length, 0);
+});
+
 test("concierge loading state uses animated dots without visible status wording", async () => {
   const script = await readFile(new URL("../public/ai-concierge.js", import.meta.url), "utf8");
   const styles = await readFile(new URL("../public/ai-concierge.css", import.meta.url), "utf8");
@@ -2647,7 +2861,7 @@ test("guest localization supports seven languages and keeps the owner dashboard 
   assert.doesNotMatch(admin, /src="\/i18n\.js"/);
   assert.match(runtime, /exploreContentDeferred/);
   assert.match(runtime, /element\.closest\("\.section,\.footer"\)/);
-  assert.match(runtime, /houseGuideTranslations:v5\.11\.34:/);
+  assert.match(runtime, /houseGuideTranslations:v5\.11\.35:/);
   assert.match(runtime, /MAX_REQUEST_RETRIES = 2/);
   assert.match(runtime, /let flushRunning = false/);
 });
@@ -3905,8 +4119,9 @@ test("Bangkok housekeeping boundaries switch exactly at 10:30 and 19:30", () => 
       assert.doesNotMatch(result.answer, /within 30 minutes/i, item.iso);
       assert.deepEqual(result.actions, [], item.iso);
     } else {
-      assert.match(result.answer, /within 30 minutes/i, item.iso);
-      assert.equal(result.actions[0].route, "houseCall", item.iso);
+      assert.match(result.answer, /send your toilet paper request/i, item.iso);
+      assert.doesNotMatch(result.answer, /within 30 minutes/i, item.iso);
+      assert.deepEqual(result.actions, [], item.iso);
     }
   }
 });
@@ -3916,6 +4131,14 @@ test("routine housekeeping supplies always create one Su-and-owner service alert
     ["Can I have new toilet paper?", /toilet paper/i],
     ["I need fresh towels.", /fresh towels/i],
     ["Towels please.", /fresh towels/i],
+    ["There are no towels in my room.", /fresh towels/i],
+    ["No towels.", /fresh towels/i],
+    ["We don’t have towels.", /fresh towels/i],
+    ["Our room has no towels.", /fresh towels/i],
+    ["Missing towels.", /fresh towels/i],
+    ["No toilet paper.", /toilet paper/i],
+    ["We’re out of toilet paper.", /toilet paper/i],
+    ["There is no soap.", /soap/i],
     ["Can I have soap?", /soap/i],
     ["Can I have fresh soap?", /soap/i],
     ["Can I have additional toilet paper?", /toilet paper/i]
@@ -3946,8 +4169,10 @@ test("routine housekeeping supplies always create one Su-and-owner service alert
       const response = await handleConciergeRequest(guestRequest(question), env);
       const body = await response.json();
       assert.equal(response.status, 200, question);
-      assert.match(body.answer, /Thank you for your request/i, question);
+      assert.match(body.answer, /I’ve sent a request for/i, question);
       assert.match(body.answer, itemPattern, question);
+      assert.doesNotMatch(body.answer, /request (?:it|them) again|Call Us/i, question);
+      assert.deepEqual(body.actions, [], question);
       assert.doesNotMatch(body.answer, /confirmed information|do not have information|knowledge/i, question);
       assert.equal(store.alerts.length, 1, question);
       assert.equal(store.alerts[0].alertType, "stay_support", question);
@@ -3955,6 +4180,66 @@ test("routine housekeeping supplies always create one Su-and-owner service alert
       assert.equal(outbound.length, 3, question);
       assert.deepEqual(outbound.map((item) => item.to).sort(), ["66640000001", "66810000002", "66820000003"], question);
     }
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("supply questions stay informational while a verified missing-towel statement alerts immediately", async () => {
+  const now = new Date("2026-08-29T08:00:00.000Z");
+  const { env, store } = createEnvironment({
+    GUEST_ACCESS_ENFORCEMENT: "true",
+    WHATSAPP_ACCESS_TOKEN: "meta-test-token",
+    WHATSAPP_PHONE_NUMBER_ID: "1234567890",
+    WHATSAPP_ALERT_RECIPIENTS: JSON.stringify({
+      support: [{ label: "Su", phone: "+66 64 000 0001" }],
+      emergency: [
+        { label: "Owner 1", phone: "+66 81 000 0002" },
+        { label: "Owner 2", phone: "+66 82 000 0003" }
+      ]
+    })
+  });
+  const cookie = await syncAndVerifyStay(env, { now });
+  const nationality = await handleStayGuestRequest(new Request("https://guide.example/api/stay/nationality", {
+    method: "POST",
+    headers: { origin: "https://guide.example", cookie, "content-type": "application/json" },
+    body: JSON.stringify({ nationality: "thai", allGuestsThai: true })
+  }), env, "/api/stay/nationality", null, new Date(now.getTime() + 10));
+  assert.equal(nationality.status, 200);
+  const informational = await handleConciergeRequest(
+    verifiedConciergeRequest("How often are towels changed?", cookie),
+    env,
+    undefined,
+    now
+  );
+  const informationalBody = await informational.json();
+  assert.equal(informationalBody.needsHuman, false);
+  assert.equal(store.alerts.length, 0);
+
+  const originalFetch = globalThis.fetch;
+  const outbound = [];
+  globalThis.fetch = async (_url, options) => {
+    outbound.push(JSON.parse(options.body));
+    return new Response(JSON.stringify({ messages: [{ id: `wamid.verified-towels-${outbound.length}` }] }), {
+      status: 200,
+      headers: { "content-type": "application/json" }
+    });
+  };
+  try {
+    const actionable = await handleConciergeRequest(
+      verifiedConciergeRequest("There are no towels in my room.", cookie),
+      env,
+      undefined,
+      now
+    );
+    const actionableBody = await actionable.json();
+    assert.equal(actionableBody.intentId, "housekeeping_fresh_towels");
+    assert.match(actionableBody.answer, /I’ve sent a request for fresh towels/i);
+    assert.doesNotMatch(actionableBody.answer, /request (?:it|them) again|Call Us/i);
+    assert.deepEqual(actionableBody.actions, []);
+    assert.equal(store.alerts.length, 1);
+    assert.equal(store.alerts[0].recipientGroup, "support_with_owners");
+    assert.deepEqual(outbound.map((item) => item.to).sort(), ["66640000001", "66810000002", "66820000003"]);
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -4006,8 +4291,7 @@ test("room cleaning collects a preferred time and submits the same request witho
     assert.match(completedBody.answer, /preferred time of 3:30 PM/i);
     assert.match(completedBody.answer, /not confirmed until the team can accommodate it/i);
     assert.doesNotMatch(completedBody.answer, /send the request to|contact (?:our )?support|scheduled for|phone|WhatsApp/i);
-    assert.equal(completedBody.actions.length, 1);
-    assert.equal(completedBody.actions[0].route, "houseCall");
+    assert.deepEqual(completedBody.actions, []);
     assert.equal(store.alerts.length, 1);
     assert.equal(store.alerts[0].recipientGroup, "support_with_owners");
     assert.match(store.alerts[0].summary, /Preferred time: 3:30 PM/i);
@@ -4358,9 +4642,8 @@ test("after-hours housekeeping records the request once and sets next-morning ex
   const result = housekeepingServiceResult("Can I have fresh soap?", new Date("2026-08-27T12:30:00.000Z"));
   assert.ok(result);
   assert.match(result.answer, /currently off duty/i);
-  assert.match(result.answer, /already been recorded/i);
+  assert.match(result.answer, /send your soap request/i);
   assert.match(result.answer, /from 10:30 AM tomorrow/i);
-  assert.match(result.answer, /do not need to request it again/i);
   assert.doesNotMatch(result.answer, /within 30 minutes/i);
   assert.deepEqual(result.actions, []);
 });
@@ -4817,8 +5100,8 @@ test("agency-specific beginner and continuing courses pass the structured diving
   }
 });
 
-test("the bundled v5.11.34 catalog preserves current PADI, SSI and RAID pathways", () => {
-  assert.equal(divingCourses.updatedForRelease, "5.11.34");
+test("the bundled v5.11.35 catalog preserves current PADI, SSI and RAID pathways", () => {
+  assert.equal(divingCourses.updatedForRelease, "5.11.35");
   assert.deepEqual(divingCourses.houseRecommendation, {
     agency: "RAID",
     reason: "focus on dive safety and buoyancy control",
@@ -5221,7 +5504,6 @@ test("the final alert boundary rejects incomplete structured diving submissions"
 test("supported activity and transport information stays separate from booking intent", async () => {
   const cases = [
     ["What fishing trips are available?", "fishing", "I want to book a fishing trip."],
-    ["Which snorkeling trip do you recommend?", "snorkeling", "I want to book a snorkeling trip."],
     ["What taxi services are available?", "taxi", "Can you arrange a taxi?"],
     ["What taxi boat or longtail options are available?", "taxi_boat", "I want to book a taxi boat."],
     ["What ferry routes are available?", "ferry", "I want to book ferry tickets."],
@@ -6590,18 +6872,38 @@ test("corrected international contact completes the same taxi request once and a
 });
 
 test("booking UI never exposes Fah personal WhatsApp and service hours are guest-visible", async () => {
-  const [contacts, booking, app, concierge, practical, modulePractical] = await Promise.all([
+  const [
+    contacts,
+    booking,
+    app,
+    concierge,
+    practical,
+    modulePractical,
+    emergency,
+    moduleEmergency,
+    activity,
+    moduleActivity,
+    shop,
+    moduleShop
+  ] = await Promise.all([
     readFile(new URL("../public/contacts.js", import.meta.url), "utf8"),
     readFile(new URL("../public/concierge-booking.js", import.meta.url), "utf8"),
     readFile(new URL("../public/guide-app.js", import.meta.url), "utf8"),
     readFile(new URL("../public/ai-concierge.js", import.meta.url), "utf8"),
     readFile(new URL("../public/practical.html", import.meta.url), "utf8"),
-    readFile(new URL("../public/modules/practical/practical.html", import.meta.url), "utf8")
+    readFile(new URL("../public/modules/practical/practical.html", import.meta.url), "utf8"),
+    readFile(new URL("../public/emergency.html", import.meta.url), "utf8"),
+    readFile(new URL("../public/modules/emergency/emergency.html", import.meta.url), "utf8"),
+    readFile(new URL("../public/activity.html", import.meta.url), "utf8"),
+    readFile(new URL("../public/modules/activities/activity.html", import.meta.url), "utf8"),
+    readFile(new URL("../public/shop.html", import.meta.url), "utf8"),
+    readFile(new URL("../public/modules/shopping/shop.html", import.meta.url), "utf8")
   ]);
   for (const source of [contacts, booking, app, concierge]) {
     assert.doesNotMatch(source, /wa\.me\/66962741424|\+66962741424|0962741424/);
   }
   assert.match(booking, /whatsappHref: "#concierge-booking"/);
+  assert.doesNotMatch(booking, /phoneHref|callLabel/);
   assert.match(app, /bookingWhatsapp: "#concierge-booking"/);
   assert.match(concierge, /Housekeeping &amp; service hours: Tuesday–Sunday, 10:30 AM–7:30 PM/);
   assert.match(concierge, /unavailable on Mondays/);
@@ -6612,6 +6914,32 @@ test("booking UI never exposes Fah personal WhatsApp and service hours are guest
     assert.match(page, /Sunday evening request will be handled from Tuesday at 10:30 AM/);
     assert.match(page, /Help &amp; Emergency/);
   }
+  for (const page of [practical, modulePractical, emergency, moduleEmergency]) {
+    assert.match(page, /data-link="houseWhatsapp"[^>]*data-action="contact"[^>]*>Contact Us</);
+    assert.doesNotMatch(page, /data-link="houseCall"|>Call Us</);
+  }
+  for (const page of [activity, moduleActivity, shop, moduleShop]) {
+    assert.doesNotMatch(page, /booking\.phoneHref|data-action="bookingCall"|>Call Us</);
+  }
+  for (const page of [activity, moduleActivity]) {
+    assert.match(page, /HOUSE_CONCIERGE_BOOKING\.createBooking\(x\.name\)/);
+    assert.match(page, /Book with Us/);
+  }
+});
+
+test("all House map actions retain the single real-device-verified universal Maps URL", async () => {
+  const sources = await Promise.all([
+    readFile(new URL("../public/index.html", import.meta.url), "utf8"),
+    readFile(new URL("../public/room.html", import.meta.url), "utf8"),
+    readFile(new URL("../public/modules/house/room.html", import.meta.url), "utf8"),
+    readFile(new URL("../public/data/concierge-knowledge.json", import.meta.url), "utf8")
+  ]);
+  const combined = sources.join("\n");
+  const verifiedHouseMap = "https://maps.app.goo.gl/5MV4j4B1YzyR1SR69";
+  assert.equal((combined.match(new RegExp(verifiedHouseMap.replaceAll(".", "\\."), "g")) || []).length, 5);
+  assert.doesNotMatch(combined, /https:\/\/maps\.app\.goo\.gl\/P6dxecrmX6pRWsMb8/);
+  assert.doesNotMatch(combined, /https:\/\/share\.google\/xpdhZzm91F88beMAP/);
+  for (const html of sources.slice(0, 3)) assert.match(html, /Open Google Maps/);
 });
 
 test("owner-approved knowledge becomes active without a new deployment", async () => {
@@ -6633,7 +6961,7 @@ test("owner-approved knowledge becomes active without a new deployment", async (
   assert.equal(body.intentId, "borrow_umbrella");
   assert.equal(body.source, "approved");
   assert.equal(body.learningGap, false);
-  assert.equal(body.actions[0].route, "houseWhatsapp");
+  assert.deepEqual(body.actions, []);
 });
 
 test("passport details typed into chat are discarded before answering or learning", async () => {
@@ -8070,7 +8398,33 @@ test("the centralized Meta text sanitizer protects service, status and future ac
   assert.doesNotMatch(JSON.stringify(diagnostic), /66812345678|81 234 5678|Please bring new towels/);
 });
 
-test("staff quick-action templates remain opt-in and bind both actions to the exact alert", () => {
+test("release configuration activates the five exact reviewed staff quick-action templates", async () => {
+  const wrangler = JSON.parse(await readFile(new URL("../wrangler.jsonc", import.meta.url), "utf8"));
+  const vars = wrangler.vars;
+  assert.equal(vars.EXPLORE_ENABLED, "false");
+  assert.equal(vars.WHATSAPP_STAFF_ACTIONS_ENABLED, "true");
+  assert.equal(vars.WHATSAPP_SERVICE_ACTION_TEMPLATE_NAME, "house_service_alert_actions_v2");
+  assert.equal(vars.WHATSAPP_LUGGAGE_ACTION_TEMPLATE_NAME, "house_luggage_alert_actions_v1");
+  assert.equal(vars.WHATSAPP_BOOKING_ACTION_TEMPLATE_NAME, "house_booking_alert_actions_v1");
+  assert.equal(vars.WHATSAPP_URGENT_ACTION_TEMPLATE_NAME, "house_urgent_alert_actions_v1");
+  assert.equal(vars.WHATSAPP_LOST_KEY_ACTION_TEMPLATE_NAME, "house_lost_key_alert_actions_v1");
+  assert.equal(whatsappAlertConfiguration(vars).staffQuickActionsEnabled, true);
+  assert.equal(Object.values(whatsappAlertConfiguration(vars).staffQuickActionTemplates).length, 5);
+  const built = buildWhatsAppTemplatePayload({
+    id: "alert_release_config_1234567890",
+    room: "6",
+    alertType: "stay_support",
+    severity: "attention",
+    summary: "Fresh towels requested.",
+    createdAt: "2026-08-29T08:00:00.000Z",
+    bangkokTime: "29 Aug 2026, 15:00"
+  }, { label: "Su", phone: "66640000001" }, vars);
+  assert.equal(built.payload.template.name, "house_service_alert_actions_v2");
+  assert.equal(built.payload.template.language.code, "en");
+  assert.deepEqual(built.payload.template.components.slice(1).map((component) => component.index), ["0", "1"]);
+});
+
+test("staff quick-action templates fail closed and bind both actions to the exact alert", () => {
   const recipient = { label: "Team", phone: "66810000002" };
   const id = "alert_12345678-1234-1234-1234-123456789077";
   const base = {

@@ -1,12 +1,12 @@
 # Meta Staff Quick Actions — v5.11.20
 
-## Status and non-activation rule
+## v5.11.35 activation status
 
-Application support is code-ready, but staff quick actions remain **off by default** for this release. Keep `WHATSAPP_STAFF_ACTIONS_ENABLED=false`. Do not add or change production Cloudflare mappings while Meta review is incomplete.
+The owner confirmed that all five intended templates are reviewed and Active. v5.11.35 is the separately authorized activation release: the exact mappings below are now present in `wrangler.jsonc` and `WHATSAPP_STAFF_ACTIONS_ENABLED=true`.
 
 The accidentally created `house_service_alert_actions_v1` template has no buttons. It is not a valid action template, is rejected by the application schema and must never be mapped in production.
 
-Activation is a separate, explicitly authorized change only after all five intended templates below show **Active** in WhatsApp Manager with generic English code `en`, the exact BODY variables and two quick-reply buttons in this order:
+The activated definitions use generic English code `en`, the exact BODY variables and two quick-reply buttons in this order:
 
 1. **Received**
 2. **Resolve**
@@ -91,9 +91,9 @@ At send time, the Worker binds only signed operational identifiers:
 
 The signed webhook passes each event through the established known-recipient authorization, exact alert-reference validation, actor exclusion, duplicate-event idempotency, status fanout and escalation-stop rules. Button payloads contain no guest data, room data, phone number or credential.
 
-## Future activation mapping — do not apply in v5.11.20
+## Active v5.11.35 mapping
 
-Only after all five intended templates are confirmed Active, and only as a separately authorized activation change, use these exact non-secret mappings:
+The authorized release uses these exact non-secret mappings:
 
 ```text
 WHATSAPP_SERVICE_ACTION_TEMPLATE_NAME=house_service_alert_actions_v2
@@ -106,7 +106,7 @@ WHATSAPP_STAFF_ACTIONS_ENABLED=true
 
 The gate fails closed if the flag is false, any mapping is absent or a schema is not exact. Do not change the six current production template variables or any secret.
 
-## Future activation verification
+## Activation verification
 
 1. Confirm `/api/concierge/status` reports `staffQuickActionsEnabled: true` and all five exact mappings.
 2. Send one non-sensitive alert of each kind and verify both buttons and the intended recipient group.
@@ -115,6 +115,6 @@ The gate fails closed if the flag is false, any mapping is absent or a schema is
 5. Press **Resolve** and confirm one RESOLVED update reaches each other assigned recipient.
 6. Confirm typed `RECEIVED`, `ACK` and `RESOLVE` still work.
 
-## Rollback after a future activation
+## Rollback
 
 Set only `WHATSAPP_STAFF_ACTIONS_ENABLED=false` and redeploy. The Worker returns to the six existing production templates, while typed commands continue to work.

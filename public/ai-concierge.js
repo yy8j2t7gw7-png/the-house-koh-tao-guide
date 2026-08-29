@@ -13,6 +13,9 @@
   const pagePrompts = cfg.pagePrompts?.[currentPage] || cfg.defaultPrompts || [];
   const lostKeyRequest = /\b(?:(?:(?:i|we)\s+(?:have\s+)?)?lost\s+(?:(?:my|our|the|a)\s+)?(?:room\s+)?key|(?:(?:my|our|the)\s+)?(?:room\s+)?key\s+(?:is\s+)?(?:lost|missing)|(?:cannot|can['’]?t|unable\s+to)\s+find\s+(?:(?:my|our|the)\s+)?(?:room\s+)?key|(?:(?:i(?:['’]?m|\s+am)?|we(?:['’]?re|\s+are)?)\s+)?locked\s+out|(?:cannot|can['’]?t|unable\s+to)\s+(?:get|go)\s+(?:back\s+)?into\s+(?:my|our|the)\s+room|(?:(?:i|we)\s+)?forgot\s+(?:(?:my|our|the)\s+)?(?:room\s+)?key|(?:(?:i|we)\s+)?need\s+(?:a\s+)?(?:spare|replacement)\s+key|where\s+is\s+(?:(?:my|our|the)\s+)?spare\s+key)\b/i;
   const genericHumanContactRequest = /^(?:(?:please|hello|hi)\s+)?(?:i\s+(?:(?:need|want|would\s+like)\s+to|wanna)\s+(?:talk|speak)\s+(?:to|with)\s+(?:a\s+)?(?:human|person|someone|staff|(?:the\s+)?team|reception)|i\s+(?:(?:need|want|would\s+like)\s+to|wanna)\s+call\s+(?:you|(?:a\s+)?(?:human|person)|someone|staff|(?:the\s+)?team|reception)|(?:can|could)\s+i\s+(?:(?:talk|speak)\s+(?:to|with)|call)\s+(?:a\s+)?(?:you|human|person|someone|staff|(?:the\s+)?team|reception)|(?:talk|speak)\s+(?:to|with)\s+(?:a\s+)?(?:human|person|someone|staff|(?:the\s+)?team|reception)|contact\s+(?:the\s+)?(?:team|staff|reception)|(?:human|person|staff|reception)\s+please|i\s+need\s+(?:a\s+)?(?:human|person)|call\s+(?:the\s+)?(?:team|staff|reception))(?:\s+please)?$/;
+  const propertyHumanContactRequest = /^(?:(?:please\s+)?(?:call|contact)\s+(?:the\s+)?(?:hotel|house|property)|(?:can|could)\s+i\s+(?:call|contact)\s+(?:the\s+)?(?:hotel|house|property))(?:\s+please)?$/;
+  const persistentHumanContactRequest = /^(?:i\s+)?(?:still|really)\s+(?:need|want|would\s+like)\s+(?:(?:a\s+)?(?:human|person|someone|staff|team|reception)|(?:to\s+)?(?:talk|speak)\s+(?:to|with)\s+(?:a\s+)?(?:human|person|someone|staff|team|reception))(?:\s+please)?$/;
+  const actionableHousekeepingSupplyRequest = /(?:\b(?:(?:i|we)\s+(?:need|want|would\s+like)|(?:can|could)\s+(?:i|we|you)\s+(?:have|get|bring|send|provide)|please\s+(?:bring|send|provide)|there\s+(?:is|are)\s+no|(?:we|i)\s+(?:do\s+not|don['’]?t)\s+have|our\s+room\s+(?:has\s+no|doesn['’]?t\s+have))\b[^.?!]{0,60}\b(?:toilet\s+paper|soap|towels?)\b|\b(?:no|missing)\s+(?:toilet\s+paper|soap|towels?)\b|\b(?:toilet\s+paper|soap|towels?)\s+(?:are\s+|is\s+)?missing\b|\b(?:we(?:['’]?re|\s+are)|i(?:['’]?m|\s+am))\s+(?:out|all\s+out)\s+of\s+(?:toilet\s+paper|soap|towels?)\b|\b(?:toilet\s+paper|soap|towels?)\s+please\b)/i;
 
   function routineServiceOpen(date = new Date()) {
     const parts = new Intl.DateTimeFormat("en-GB", {
@@ -666,8 +669,11 @@
     );
     return isExplicitBookingRetry(source)
       || genericHumanContactRequest.test(normalized)
+      || propertyHumanContactRequest.test(normalized)
+      || persistentHumanContactRequest.test(normalized)
       || /(?:\+|00)?\d[\d ()-]{6,20}\d/.test(source)
       || impliedLuggageRequest
+      || actionableHousekeepingSupplyRequest.test(source)
       || /\b(?:luggage|baggage|store\s+(?:my|our)?\s*bags?|room\s+cleaning|clean\s+(?:my|our|the)\s+room)\b/i.test(source)
       || /\b(?:my|our|the)\s+room\s+(?:(?:is|feels|looks|seems)\s+(?:(?:really|very|quite|so)\s+)?(?:dirty|messy|unclean)|needs?\s+(?:a\s+)?clean(?:ing)?)\b/i.test(source)
       || lostKeyRequest.test(source)

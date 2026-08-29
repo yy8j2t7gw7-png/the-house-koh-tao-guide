@@ -2,6 +2,33 @@
 
 All notable changes to The House – Koh Tao guest guide are recorded here.
 
+## v5.11.35 — Smarter Concierge and Local Guide Integration
+
+### Current-message routing and local knowledge
+
+- Treats a clear independent information request as an informational detour before pending cleaning, booking, luggage or ordinary support workflows. The exact current question is sent to targeted retrieval/model context without stale transcript subjects, while normalized workflow state remains available for a later reply.
+- Connects the Concierge directly to the approved activities, bars, beaches, cafés, restaurants and shopping datasets with intent-weighted retrieval while the Explore UI remains disabled.
+- Returns one to three grounded recommendations; leads general drinks/nightlife answers with Bamboo Beach Bar and selects a more suitable approved venue for explicit late-night or food-plus-cocktail needs.
+- Adds deterministic House guidance for Mae Haad Beach (about 200 metres) and Sairee Beach (roughly a 20-minute walk), plus an informational towel-change answer.
+
+### Service and contact routing
+
+- Recognizes natural missing towel, toilet-paper and soap statements as actionable requests and sends one existing `support_with_owners` service alert. Successful responses confirm the request without asking again, promising a 30-minute delivery or exposing a routine call shortcut.
+- Keeps supply-policy questions informational and alert-free.
+- Removes routine House **Call Us** buttons from practical/emergency cards and House-arranged booking views. **Contact Us** and **Book with Us** continue into the AI Concierge with preserved page/service context.
+- Makes generic human contact AI-first. A first request asks what help is needed; a repeated/persistent request exposes routine WhatsApp and Call Us only during Tuesday–Sunday 10:30–19:30 Bangkok time. Emergency and protected 24/7 lost-key actions are unchanged.
+
+### Meta quick actions and Maps
+
+- Activates the five reviewed action templates: `house_service_alert_actions_v2`, `house_luggage_alert_actions_v1`, `house_booking_alert_actions_v1`, `house_urgent_alert_actions_v1` and `house_lost_key_alert_actions_v1`.
+- Keeps **Received** and **Resolve** payloads alert-bound and value-free under the existing signed-webhook, authorization, actor-exclusion, idempotency, fanout and escalation-stop controls. `WHATSAPP_STAFF_ACTIONS_ENABLED=false` remains the one-variable rollback; `house_service_alert_actions_v1` remains invalid.
+- Retains the single working House Maps universal link after mobile retesting showed the earlier failure was temporary. No platform split is shipped.
+
+### Regression and preservation
+
+- Expands the complete suite from 182 to 190 tests; all 190 pass with zero failures under an outbound-network-blocked runner.
+- Preserves `EXPLORE_ENABLED=false`, the mobile Room 11 `72% 100%` crop, stable mobile Concierge, emergency actions, lost-key authorization/rotation, bookings, luggage, maintenance, passport storage, Airbnb synchronization, owner operations, secrets and recipient mappings.
+
 ## v5.11.34 — Mobile Room 11 Crop Hotfix
 
 ### Real-iPhone framing correction

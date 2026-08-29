@@ -40,7 +40,7 @@ import {
   specialtyChoiceLabels
 } from "./diving-catalog.js";
 
-const RELEASE = "5.11.34";
+const RELEASE = "5.11.35";
 const ROOM_OPTIONS = new Set(["1", "2", "3", "4", "5", "6", "8", "9", "10", "11"]);
 const MAX_HISTORY_ITEMS = 10;
 const MAX_QUESTION_LENGTH = 800;
@@ -192,10 +192,16 @@ const SUPPORTED_BOOKING_KINDS = new Set(["diving", "fishing", "snorkeling", "tax
 const PROPERTY_ISSUE_CATEGORIES = new Set(["pest", "odor", "plumbing", "equipment", "fixture", "condition", "odor_clarification"]);
 const HOUSEKEEPING_ITEM_REQUEST = /\b(?:toilet\s+paper|soap|(?:(?:new|fresh|clean)\s+)?towels?|room\s+cleaning|clean\s+(?:my|our|the)\s+room|housekeeping)\b/i;
 const HOUSEKEEPING_REQUEST_ACTION = /\b(?:can\s+(?:i|we)\s+(?:have|get)|please\s+(?:bring|send|provide|clean)|can\s+you\s+(?:bring|send|provide|clean)|could\s+you\s+(?:bring|send|provide|clean)|i\s+(?:need|want|would\s+like)|(?:bring|send|provide)\s+(?:me\s+)?|clean\s+(?:my|our|the)\s+room)\b|\b(?:toilet\s+paper|soap|towels?)\s+please\b/i;
+const HOUSEKEEPING_SUPPLY_MISSING = /\b(?:there\s+(?:is|are)\s+no\s+(?:toilet\s+paper|soap|towels?)|(?:we|i)\s+(?:do\s+not|don['’]?t)\s+have\s+(?:any\s+)?(?:toilet\s+paper|soap|towels?)|our\s+room\s+(?:(?:does\s+not|doesn['’]?t)\s+have\s+(?:any\s+)?|has\s+no\s+)(?:toilet\s+paper|soap|towels?)|(?:no|missing)\s+(?:toilet\s+paper|soap|towels?)|(?:toilet\s+paper|soap|towels?)\s+(?:are\s+|is\s+)?missing|(?:we(?:['’]?re|\s+are)|i(?:['’]?m|\s+am))\s+(?:out|all\s+out)\s+of\s+(?:toilet\s+paper|soap|towels?))\b/i;
 const DIRTY_ROOM_CLEANING_REQUEST = /\b(?:(?:my|our|the)\s+(?:room|bathroom)\s+(?:(?:is|feels|looks|seems)\s+(?:(?:really|very|quite|so)\s+)?(?:dirty|messy|unclean)|needs?\s+(?:a\s+)?clean(?:ing)?)|(?:my|our|the)\s+(?:sheets?|bedding|bed\s*linen)\s+(?:(?:are|is|look|looks|seem|seems)\s+)?(?:dirty|stained|unclean)|(?:dirty|stained|unclean)\s+(?:sheets?|bedding|bed\s*linen)|(?:my|our|the)\s+(?:room|bathroom)\s+needs?\s+(?:cleaning|disinfect(?:ing|ion)))\b/i;
 const LOST_KEY_REQUEST = /\b(?:(?:(?:i|we)\s+(?:have\s+)?)?lost\s+(?:(?:my|our|the|a)\s+)?(?:room\s+)?key|(?:(?:my|our|the)\s+)?(?:room\s+)?key\s+(?:is\s+)?(?:lost|missing)|(?:cannot|can['’]?t|unable\s+to)\s+find\s+(?:(?:my|our|the)\s+)?(?:room\s+)?key|(?:(?:i(?:['’]?m|\s+am)?|we(?:['’]?re|\s+are)?)\s+)?locked\s+out|(?:cannot|can['’]?t|unable\s+to)\s+(?:get|go)\s+(?:back\s+)?into\s+(?:my|our|the)\s+room|(?:(?:i|we)\s+)?forgot\s+(?:(?:my|our|the)\s+)?(?:room\s+)?key|(?:(?:i|we)\s+)?need\s+(?:a\s+)?(?:spare|replacement)\s+key|where\s+is\s+(?:(?:my|our|the)\s+)?spare\s+key)\b/i;
 const GENERIC_HUMAN_CONTACT_REQUEST = /^(?:(?:please|hello|hi)\s+)?(?:i\s+(?:(?:need|want|would\s+like)\s+to|wanna)\s+(?:talk|speak)\s+(?:to|with)\s+(?:a\s+)?(?:human|person|someone|staff|(?:the\s+)?team|reception)|i\s+(?:(?:need|want|would\s+like)\s+to|wanna)\s+call\s+(?:you|(?:a\s+)?(?:human|person)|someone|staff|(?:the\s+)?team|reception)|(?:can|could)\s+i\s+(?:(?:talk|speak)\s+(?:to|with)|call)\s+(?:a\s+)?(?:you|human|person|someone|staff|(?:the\s+)?team|reception)|(?:talk|speak)\s+(?:to|with)\s+(?:a\s+)?(?:human|person|someone|staff|(?:the\s+)?team|reception)|contact\s+(?:the\s+)?(?:team|staff|reception)|(?:human|person|staff|reception)\s+please|i\s+need\s+(?:a\s+)?(?:human|person)|call\s+(?:the\s+)?(?:team|staff|reception))(?:\s+please)?$/;
+const PROPERTY_HUMAN_CONTACT_REQUEST = /^(?:(?:please\s+)?(?:call|contact)\s+(?:the\s+)?(?:hotel|house|property)|(?:can|could)\s+i\s+(?:call|contact)\s+(?:the\s+)?(?:hotel|house|property))(?:\s+please)?$/;
 const HUMAN_CONTACT_REFERENCE = /\b(?:human|person|someone|staff|team|reception|call|talk|speak|contact)\b/;
+const PERSISTENT_HUMAN_CONTACT_REQUEST = /^(?:i\s+)?(?:still|really)\s+(?:need|want|would\s+like)\s+(?:(?:a\s+)?(?:human|person|someone|staff|team|reception)|(?:to\s+)?(?:talk|speak)\s+(?:to|with)\s+(?:a\s+)?(?:human|person|someone|staff|team|reception))(?:\s+please)?$/;
+const LOCAL_INFORMATION_TOPIC = /\b(?:beach|bay|swim|snorkel|sunset|restaurant|dinner|lunch|breakfast|brunch|food|seafood|thai\s+food|bar|nightlife|drink|cocktail|cafe|coffee|bakery|shop|shopping|supermarket|pharmacy|atm|bank|laundry|viewpoint|hike|hiking|activity|activities|things\s+to\s+do|island|koh\s+tao|mae\s+haad|sairee|transport|taxi|ferry|scooter|directions?|distance|how\s+far)\w*\b/i;
+const INFORMATION_REQUEST_FORM = /^(?:how|what|where|which|when|why|is|are|do|does|can\s+i\s+find|could\s+you\s+(?:tell|recommend)|tell\s+me|recommend|suggest|any|good|best)\b|\b(?:how\s+far|nearby|close\s+to|recommend(?:ation)?|good\s+for|best\s+for|worth\s+visit)\b/i;
+const SUPPLY_INFORMATION_REQUEST = /\b(?:how\s+often|where\s+(?:are|is)|do\s+you\s+(?:provide|change|replace)|when\s+(?:are|do)|what\s+is\s+the\s+(?:towel|soap|toilet\s+paper))\b[^.?!]*(?:toilet\s+paper|soap|towels?|housekeeping)/i;
 const GENERIC_URGENT_WORDS = new Set([
   "a", "am", "an", "and", "bad", "emergency", "happened", "has", "have", "help", "i", "in", "is", "it",
   "my", "need", "please", "problem", "really", "room", "serious", "something", "the", "there", "urgent", "very",
@@ -529,6 +535,24 @@ function housekeepingItem(question) {
   return null;
 }
 
+function isActionableHousekeepingSupply(question) {
+  const source = String(question || "");
+  return HOUSEKEEPING_REQUEST_ACTION.test(source) || HOUSEKEEPING_SUPPLY_MISSING.test(source);
+}
+
+function isIndependentCurrentTurnInformation(question) {
+  const source = String(question || "").trim();
+  if (!source) return false;
+  if (LOST_KEY_REQUEST.test(source)
+    || isActionableStructuredBooking(source)
+    || isActionableLuggageMessage(source)
+    || DIRTY_ROOM_CLEANING_REQUEST.test(source)
+    || HOUSEKEEPING_SUPPLY_MISSING.test(source)
+    || (HOUSEKEEPING_ITEM_REQUEST.test(source) && HOUSEKEEPING_REQUEST_ACTION.test(source))) return false;
+  if (SUPPLY_INFORMATION_REQUEST.test(source)) return true;
+  return LOCAL_INFORMATION_TOPIC.test(source) && INFORMATION_REQUEST_FORM.test(source);
+}
+
 function isActionableCleaningRequest(question) {
   return DIRTY_ROOM_CLEANING_REQUEST.test(String(question || ""))
     || (HOUSEKEEPING_ITEM_REQUEST.test(String(question || "")) && HOUSEKEEPING_REQUEST_ACTION.test(String(question || "")));
@@ -832,13 +856,13 @@ export function housekeepingServiceResult(question, now = new Date()) {
   const item = housekeepingItem(question);
   if (!item || (item.id === "room_cleaning"
     ? !isActionableCleaningRequest(question)
-    : (!HOUSEKEEPING_ITEM_REQUEST.test(question) || !HOUSEKEEPING_REQUEST_ACTION.test(question)))) return null;
+    : (!HOUSEKEEPING_ITEM_REQUEST.test(question) || !isActionableHousekeepingSupply(question)))) return null;
   if (item.id === "room_cleaning") return applyCleaningRequestPolicy(question, null, now).result;
   const availability = housekeepingAvailability(now);
   const afterHours = availability.afterHours;
   const answer = afterHours
-    ? `Thank you for your request. Our housekeeping team is currently off duty, but your request has already been recorded. We’ll ${item.delivery} ${nextHousekeepingPhrase(availability)}, and you do not need to request it again.`
-    : `Thank you for your request. We’ll ${item.delivery} as soon as possible. If you haven’t received it within 30 minutes, please call us using the button below.`;
+    ? `I’ll send your ${item.label} request to The House team now. Housekeeping is currently off duty; the next normal availability is ${nextHousekeepingPhrase(availability)}.`
+    : `I’ll send your ${item.label} request to The House team now.`;
   return {
     answer,
     intentId: `housekeeping_${item.id}`,
@@ -848,8 +872,8 @@ export function housekeepingServiceResult(question, now = new Date()) {
     handoff: "stay_support",
     learningGap: false,
     learningReason: "none",
-    actions: afterHours ? [] : [{ label: "Call Us", type: "route", route: "houseCall" }],
-    suppressDefaultActions: afterHours,
+    actions: [],
+    suppressDefaultActions: true,
     housekeepingRequest: { item: item.label, afterHours, earliestService: availability.open ? "Current housekeeping hours" : availability.nextOpening },
     source: "service-policy"
   };
@@ -1067,17 +1091,32 @@ function activeLostKeyFeeWorkflow(workflowState) {
   return workflowState?.type === "lost_key" && workflowState.status === "awaiting_fee_acceptance";
 }
 
-function genericHumanContactResult(question, workflowState, now = new Date()) {
-  if (!GENERIC_HUMAN_CONTACT_REQUEST.test(normalizeText(question))) return null;
+function isGenericHumanContactRequest(question) {
+  const normalized = normalizeText(question);
+  return GENERIC_HUMAN_CONTACT_REQUEST.test(normalized)
+    || PROPERTY_HUMAN_CONTACT_REQUEST.test(normalized)
+    || PERSISTENT_HUMAN_CONTACT_REQUEST.test(normalized);
+}
+
+function priorGenericHumanRequest(history = []) {
+  return history.slice(-6).some((item) => item?.role === "user" && isGenericHumanContactRequest(item.content));
+}
+
+function genericHumanContactResult(question, workflowState, history = [], now = new Date()) {
+  if (!isGenericHumanContactRequest(question)) return null;
   const serviceOpen = housekeepingAvailability(now).open;
   const lostKeyFeePending = activeLostKeyFeeWorkflow(workflowState);
+  const repeatedRequest = PERSISTENT_HUMAN_CONTACT_REQUEST.test(normalizeText(question))
+    || priorGenericHumanRequest(history);
   const answer = serviceOpen
-    ? lostKeyFeePending
-      ? "I can continue helping with the spare-key process here, or you can contact The House team below."
-      : "Of course. You can contact The House team using the options below."
+    ? repeatedRequest
+      ? "I understand that you still need to speak with a person. Please use the human contact options below."
+      : lostKeyFeePending
+        ? "I can continue helping with the secure spare-key process here. What do you need help with?"
+        : "Of course. Tell me what you need help with, and I’ll try to resolve it here first."
     : lostKeyFeePending
-      ? "I can continue helping with the spare-key process here. Our team is currently outside normal service hours. If this is an emergency, please use Emergency help."
-      : "Our team is currently outside normal service hours. I can continue helping you here. If this is urgent, please use Emergency help.";
+      ? "I can continue helping with the secure spare-key process here. Our team is currently outside normal service hours. If this is an emergency, please use Emergency help."
+      : "Our team is currently outside normal service hours, but I can continue helping you here. What do you need help with? If this is urgent, please use Emergency help.";
   return {
     answer,
     intentId: "generic_human_contact",
@@ -1087,9 +1126,9 @@ function genericHumanContactResult(question, workflowState, now = new Date()) {
     handoff: "none",
     learningGap: false,
     learningReason: "none",
-    actions: serviceOpen
+    actions: serviceOpen && repeatedRequest
       ? actionsForHandoff("stay_support")
-      : [{ label: "Emergency help", type: "link", href: "/emergency.html" }],
+      : serviceOpen ? [] : [{ label: "Emergency help", type: "link", href: "/emergency.html" }],
     workflow: workflowState || null,
     suppressDefaultActions: true,
     source: "human-contact-policy"
@@ -1151,6 +1190,8 @@ function isExplicitBookingRetry(value) {
 function supportedBookingInformationResult(question) {
   const kind = bookingKindFromText(question);
   if (!kind || kind === "diving" || isActionableStructuredBooking(question)) return null;
+  if (kind === "snorkeling"
+    && /\b(?:spot|place|beach|bay|shore|reef|where|best|good|quiet|sunset|swim|around|recommend)\w*\b/i.test(question)) return null;
   const descriptions = {
     fishing: "The House can help arrange fishing trips, including sport, food-fishing and relaxed or family-style options where available. The booking team will confirm the current options, availability and price.",
     snorkeling: "The House can help arrange snorkeling trips. Private, group, boat and shore-based options depend on current operators, sea conditions and availability, so the booking team will confirm the current choices and price.",
@@ -1167,6 +1208,52 @@ function supportedBookingInformationResult(question) {
     actions: [{ label: "Book with Us", type: "prompt", prompt: bookingStartPrompt(kind) }],
     suppressDefaultActions: true,
     source: "booking-policy"
+  };
+}
+
+function conciseProjectReason(record) {
+  const source = String(record?.recommendation || record?.summary || record?.bestKnownFor || record?.perfectFor || "")
+    .replace(/\*\*/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!source) return "a relevant option from The House’s approved local guide";
+  const sentence = source.match(/^.*?(?:[.!?](?=\s|$)|$)/)?.[0] || source;
+  return sentence.slice(0, 260).replace(/[.!?]+$/, "");
+}
+
+function projectKnowledgeResult(question, projectKnowledge = []) {
+  if (!projectKnowledge.length) return null;
+  const source = String(question || "");
+  const barQuestion = /\b(?:bar|drink|cocktail|beer|nightlife|club|sunset)\w*\b/i.test(source);
+  const needsLateNightOrFood = /\b(?:nightclub|very\s+late|late[- ]night|after\s+midnight|food|eat|meal|kitchen|fire\s+show|sports\s+bar)\b/i.test(source);
+  let records = [...projectKnowledge];
+  if (barQuestion && needsLateNightOrFood) {
+    const suitable = records.filter((record) => record.name !== "Bamboo Beach Bar");
+    if (suitable.length) records = suitable;
+  }
+  const choices = records.slice(0, 3);
+  if (!choices.length) return null;
+  const bambooFirst = choices[0]?.name === "Bamboo Beach Bar" && !needsLateNightOrFood;
+  const introduction = bambooFirst
+    ? "Bamboo Beach Bar is The House’s first recommendation for a relaxed beach drink or sunset."
+    : choices.length === 1
+      ? `${choices[0].name} is the strongest match in The House’s approved local guide.`
+      : "These are the strongest matches in The House’s approved local guide:";
+  const details = choices
+    .map((record) => `${record.name} — ${conciseProjectReason(record)}`)
+    .join("\n");
+  return {
+    answer: `${introduction}\n${details}`,
+    intentId: `${choices[0].sourceType || "local"}_recommendation`,
+    category: "concierge",
+    confidence: 0.9,
+    needsHuman: false,
+    handoff: "none",
+    learningGap: false,
+    learningReason: "none",
+    actions: [],
+    suppressDefaultActions: true,
+    source: "project-knowledge"
   };
 }
 
@@ -2375,7 +2462,10 @@ AUTHORITATIVE KNOWLEDGE
 - Owner-approved entries are equally authoritative.
 - RETRIEVED APPROVED PROJECT RECORDS contain the most relevant existing activity, restaurant, café, beach, bar and shopping records for this question.
 - When a retrieved record is relevant, use it instead of claiming that no confirmed recommendation exists.
-- When asked for a general recommendation, lead with a record explicitly marked preferredByTheHouse=true. Otherwise choose by the guest's stated constraints and explain the fit without claiming every alternative is inferior.
+- Treat the exact CURRENT user message as authoritative. Analyze it before transcript history. If it clearly asks about a new independent topic, answer that topic only; never continue an older cleaning, booking, luggage, maintenance or other workflow in that answer.
+- Transcript history may resolve a pronoun or a genuinely incomplete follow-up, but it must never fabricate or replace the subject of a clear current request.
+- When asked for a general recommendation, lead with a record explicitly marked preferredByTheHouse=true. For general bars or drinks, Bamboo Beach Bar is first. If a specific requirement makes that preferred option unsuitable, choose a better matching approved record and explain why.
+- Give one to three strong choices with concise reasons. Do not dump the full dataset or expose raw project records.
 - For diving recommendations, always recommend RAID training because of its focus on dive safety and buoyancy control, and always recommend Roctopus Dive as The House’s preferred RAID dive centre. You may also explain the team’s friendly professional service, small groups, personal attention and welcoming approach for first-time or nervous divers. If a guest explicitly requests PADI or SSI, state accurately that Roctopus offers RAID training and that the booking team will check an appropriate provider; never imply that Roctopus issues PADI or SSI certification.
 - Treat hours, prices, availability, schedules and conditions as changeable. Mention verification when the record or question requires current confirmation.
 - The current Bangkok date and time is ${bangkokContext()}.
@@ -2560,6 +2650,14 @@ function finalizeResult(result, question = "") {
     if (action?.route === "bookingCall") return { ...action, route: "houseCall" };
     return action;
   });
+  const routineHumanEscalationAllowed = Boolean(
+    result.allowRoutineHumanEscalation
+    || result.learningGap
+    || result.intentId === "lost_key"
+  );
+  if (!routineHumanEscalationAllowed) {
+    actions = actions.filter((action) => !["houseCall", "houseWhatsapp"].includes(action?.route));
+  }
   let answer = replacesPrivateCommercialLanguage
     ? "Our concierge can help arrange this for you. Use the booking options below and tell us what you need."
     : replacesRoctopusTechnicalDetail
@@ -3025,7 +3123,7 @@ export async function handleConciergeRequest(request, env, ctx, now = new Date()
   const lostKeyResult = classifiedSafetyResult ? null : lostKeyPolicyResult(question, access, room, now);
   const humanContactResult = classifiedSafetyResult || lostKeyResult
     ? null
-    : genericHumanContactResult(question, workflowState, now);
+    : genericHumanContactResult(question, workflowState, history, now);
   const urgentClarificationActive = humanContactResult ? false : activeUrgentClarification(history, workflowState);
   const needsUrgentClarification = !classifiedSafetyResult
     && !humanContactResult
@@ -3115,25 +3213,27 @@ export async function handleConciergeRequest(request, env, ctx, now = new Date()
   }
 
   const effectiveKnowledge = mergeApprovedKnowledge(knowledge, approvedKnowledge);
-  const cleaningPolicy = safetyResult || lostKeyResult
+  const independentInformationRequest = isIndependentCurrentTurnInformation(question);
+  const informationDetour = Boolean(independentInformationRequest && workflowState);
+  const cleaningPolicy = safetyResult || lostKeyResult || independentInformationRequest
     ? { handled: false, result: null, alertQuestion: question, workflow: null }
     : applyCleaningRequestPolicy(question, workflowState, now);
   const servicePolicyResult = safetyResult || lostKeyResult || cleaningPolicy.handled ? null : housekeepingServiceResult(question, now);
-  const propertyPolicy = safetyResult || lostKeyResult || cleaningPolicy.handled || servicePolicyResult
+  const propertyPolicy = safetyResult || lostKeyResult || independentInformationRequest || cleaningPolicy.handled || servicePolicyResult
     ? { handled: false, result: null, alertQuestion: question, workflow: null }
     : propertyIssuePolicy(question, workflowState);
   const roomPolicyResult = safetyResult || lostKeyResult || cleaningPolicy.handled || servicePolicyResult || propertyPolicy.handled ? null : roomLocationResult(question, room);
   const bookingInformationResult = safetyResult || lostKeyResult || cleaningPolicy.handled || servicePolicyResult || propertyPolicy.handled || roomPolicyResult
-    || (workflowState?.type === "booking" && workflowState.status === "collecting")
+    || (workflowState?.type === "booking" && workflowState.status === "collecting" && !independentInformationRequest)
     ? null
     : supportedBookingInformationResult(question);
   const directPolicyResult = safetyResult || lostKeyResult || cleaningPolicy.result || servicePolicyResult || propertyPolicy.result || roomPolicyResult || bookingInformationResult;
   const criticalPropertyMatch = safetyResult?.intentId === "property_emergency"
     ? matchKnowledge("major water leak", effectiveKnowledge, 0.44)
     : null;
-  const luggageWorkflowActive = isActionableLuggageMessage(question)
+  const luggageWorkflowActive = !independentInformationRequest && (isActionableLuggageMessage(question)
     || workflowState?.type === "luggage"
-    || activeLuggageWorkflowMessages(history).length > 0;
+    || activeLuggageWorkflowMessages(history).length > 0);
   const luggageWorkflowMatch = !criticalPropertyMatch && luggageWorkflowActive
     ? matchKnowledge("luggage storage", effectiveKnowledge, 0.44)
     : null;
@@ -3145,20 +3245,30 @@ export async function handleConciergeRequest(request, env, ctx, now = new Date()
   } else if (contextualMatch || shouldUseDeterministic(match, history)) {
     result = deterministicResult(match);
   } else if (env.OPENAI_API_KEY) {
+    let projectKnowledge = [];
     try {
-      const retrievalQuestion = [...history.slice(-2).map((item) => item.content), question].join(" ");
-      const projectKnowledge = await retrieveApprovedProjectKnowledge(request, env, retrievalQuestion);
+      projectKnowledge = await retrieveApprovedProjectKnowledge(request, env, question);
+      const modelHistory = independentInformationRequest ? [] : history;
       result = {
-        ...(await callOpenAI({ env, question, history, knowledge, approvedKnowledge, projectKnowledge, room, language })),
+        ...(await callOpenAI({ env, question, history: modelHistory, knowledge, approvedKnowledge, projectKnowledge, room, language })),
         source: "ai"
       };
     } catch (_error) {
+      result = independentInformationRequest ? projectKnowledgeResult(question, projectKnowledge) : null;
+      if (!result) {
+        const fallbackMatch = safeFallbackMatch(match, question, effectiveKnowledge);
+        result = deterministicResult(fallbackMatch, fallbackMatch.matched ? "approved-fallback" : "fallback");
+      }
+    }
+  } else {
+    const projectKnowledge = independentInformationRequest
+      ? await retrieveApprovedProjectKnowledge(request, env, question).catch(() => [])
+      : [];
+    result = projectKnowledgeResult(question, projectKnowledge);
+    if (!result) {
       const fallbackMatch = safeFallbackMatch(match, question, effectiveKnowledge);
       result = deterministicResult(fallbackMatch, fallbackMatch.matched ? "approved-fallback" : "fallback");
     }
-  } else {
-    const fallbackMatch = safeFallbackMatch(match, question, effectiveKnowledge);
-    result = deterministicResult(fallbackMatch, fallbackMatch.matched ? "approved-fallback" : "fallback");
   }
   result = finalizeResult(result, question);
   result = applyLiveFeaturePolicy(result, env);
@@ -3195,6 +3305,7 @@ export async function handleConciergeRequest(request, env, ctx, now = new Date()
     || servicePolicyResult
     || bookingInformationResult
     || safetyResult
+    || independentInformationRequest
     || (isEmergencyResult(result) && !expectedDivingCertificationAnswer));
   const bookingPolicy = failedBookingCancel
     ? {
@@ -3229,6 +3340,8 @@ export async function handleConciergeRequest(request, env, ctx, now = new Date()
       ? { result, alertQuestion: question, workflow: directWorkflow }
     : servicePolicyResult
       ? { result, alertQuestion: question, workflow: null }
+      : informationDetour
+        ? { result, alertQuestion: question, workflow: workflowState }
       : bookingPolicy.handled
         ? bookingPolicy
         : (luggagePolicy.handled
@@ -3274,6 +3387,15 @@ export async function handleConciergeRequest(request, env, ctx, now = new Date()
       result = {
         ...result,
         answer: "Thank you for letting us know. I’ve sent this to The House team so they can check it as soon as possible.",
+        actions: []
+      };
+    } else if (result.housekeepingRequest?.item && result.housekeepingRequest.item !== "room cleaning") {
+      const item = result.housekeepingRequest.item;
+      result = {
+        ...result,
+        answer: result.housekeepingRequest.afterHours
+          ? `I’ve sent your request for ${item} to The House team. Housekeeping is currently off duty; the next normal availability is ${result.housekeepingRequest.earliestService}.`
+          : `I’ve sent a request for ${item} for your room.`,
         actions: []
       };
     } else if (!result.housekeepingRequest) {

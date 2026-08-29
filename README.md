@@ -1,4 +1,4 @@
-# Guest Guide Platform with AI Concierge — The House v5.11.34
+# Guest Guide Platform with AI Concierge — The House v5.11.35
 
 The House – Koh Tao guest guide is a production-oriented, mobile-first digital guest guide and concierge platform. It combines property information, curated island guidance, structured place and activity data, and centralized contact and booking routes.
 
@@ -17,6 +17,17 @@ The House – Koh Tao guest guide is a production-oriented, mobile-first digital
 - Model-powered, room-aware AI Concierge with controlled learning
 
 The Activities module contains 49 structured profiles covering diving, freediving, snorkelling, boat trips, beach experiences, kayaking, paddleboarding, hiking, viewpoints, climbing, yoga, Muay Thai, massage, cooking, wildlife, photography, night activities and rainy-day options.
+
+## v5.11.35 release focus
+
+- Gives a clear current-turn information question precedence over stale cleaning, booking, luggage or other ordinary workflow context, while preserving the pending workflow so the guest can resume it afterward.
+- Retrieves the existing approved activities, bars, beaches, cafés, restaurants and shopping datasets internally even while `EXPLORE_ENABLED=false`; recommendations are limited to one to three relevant choices, with Bamboo Beach Bar first for general drinks and a better fit when Bamboo is unsuitable.
+- Adds House-specific Mae Haad Beach guidance (about 200 metres / a very short walk) and Sairee Beach guidance (roughly a 20-minute walk), plus representative beach, snorkeling, Thai-food and work-café retrieval regressions.
+- Treats natural missing-supply statements such as **There are no towels** as immediate protected service requests to Su plus both owners, while questions such as **How often are towels changed?** remain informational.
+- Removes routine page-level House **Call Us** shortcuts and booking-call output. **Contact Us** and **Book with Us** open the Concierge; routine human contact appears only after an AI-first attempt and persistent request during service hours. Emergency and protected lost-key routes remain independent.
+- Keeps the single real-device-verified House Maps URL `https://maps.app.goo.gl/5MV4j4B1YzyR1SR69` on mobile and desktop. The proposed device split was withdrawn after the existing link resumed working on mobile.
+- Activates all five reviewed Meta staff quick-action templates with **Received** then **Resolve**, using the exact fail-closed mappings. Typed commands, signed-webhook authorization, actor exclusion, idempotency, recipient routing and one-flag rollback remain unchanged; the buttonless service action v1 remains rejected.
+- Preserves `72% 100%` as the mobile-only Room 11 crop, the stable mobile Concierge, `EXPLORE_ENABLED=false`, all passport/Airbnb/admin behavior and every protected operational boundary. The complete 190-test suite passes with zero failures.
 
 ## v5.11.34 release focus
 
@@ -487,7 +498,7 @@ Activities and services marked for House-arranged booking must use the centraliz
 - WhatsApp: `https://wa.me/66962741424`
 - Internal booking contact: Fah
 
-The public interface does not need to name Fah or Su. Generic labels such as **Book with Us**, **Contact Us** and **Call Us** are approved. Direct operator booking, call, website or social CTAs must not be shown for records marked `the-house-concierge`.
+The public interface does not need to name Fah or Su. **Book with Us** and **Contact Us** open the AI Concierge with the appropriate context. Routine page-level House/booking **Call Us** and personal WhatsApp shortcuts are not exposed. Direct operator booking, call, website or social CTAs must not be shown for records marked `the-house-concierge`.
 
 Guest-facing answers must never discuss internal commercial arrangements, referral terms, revenue or how The House may benefit from a booking.
 
@@ -501,7 +512,7 @@ No dedicated on-call person or number has been confirmed yet. The role therefore
 
 ## Verified stays and 24/7 spare keys
 
-Secure self-service lost-key recovery is available at every time of day. Housekeeping and office schedules do not limit this protected operation. Each room has one spare-key box next to its door, and a lost key adds a 500 THB replacement fee. During normal service hours the guest may additionally be offered a **Call Us** fallback, but staff assistance is never a prerequisite for the secure flow.
+Secure self-service lost-key recovery is available at every time of day. Housekeeping and office schedules do not limit this protected operation. Each room has one spare-key box next to its door, and a lost key adds a 500 THB replacement fee. Routine human contact remains an in-hours, last-resort Concierge escalation, but staff assistance is never a prerequisite for the secure flow.
 
 Each active room uses one permanent page. An Airbnb guest enters the HM confirmation code from the trip details; a walk-in or direct guest enters the private House stay code supplied by the owner. The Worker compares only the HMAC hash with the protected reservation for that room and stay period. The secure browser session expires at checkout.
 

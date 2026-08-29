@@ -1,6 +1,6 @@
 # Product Roadmap
 
-Baseline: v5.11.34
+Baseline: v5.11.35
 
 ## Completed
 
@@ -30,6 +30,12 @@ Baseline: v5.11.34
 - [x] Concierge loading state uses a quiet animated-dot indicator
 - [x] Concierge startup and concierge-first House-support contact routing protected by regression tests
 - [x] Six active Meta WhatsApp template integrations for service, booking, luggage, urgent, verified lost-key and staff status updates
+- [x] Five reviewed Meta action-template mappings active with alert-bound **Received** and **Resolve** quick replies; buttonless service action v1 remains rejected
+- [x] Clear local-information detours override stale ordinary workflow context without deleting recoverable booking, cleaning or luggage state
+- [x] Explore-disabled targeted Concierge retrieval across approved activities, bars, beaches, cafés, restaurants and shopping data
+- [x] Bamboo Beach Bar leads general drinks/nightlife recommendations while specific unsuitable requirements select a better approved fit
+- [x] Natural missing towel, toilet-paper and soap statements create the existing protected service alert; supply questions remain alert-free
+- [x] Routine House contact and booking CTAs are Concierge-first, with in-hours routine human calls available only after persistence
 - [x] Actionable luggage requests routed to Su with structured operational details
 - [x] Complete-field luggage workflow requiring arrival/departure, requested time, bag count and a transient international reply contact before submission
 - [x] Final server-side luggage alert boundary rejecting incomplete or stale requests and universal visible-contact redaction
@@ -190,8 +196,11 @@ Guests may continue using ordinary WhatsApp handoffs. Automated internal alerts 
 - [x] Implement and package v5.11.33 stable mobile Concierge behavior while preserving the Room 11 crop and all operational logic.
 - [x] Deploy v5.11.33 and run the focused real-iPhone smoke check in `DEVELOPMENT_HANDOFF_v5.11.33.md`; real-device review found the Room 11 entrance still clipped at the bottom.
 - [x] Implement and package v5.11.34 as a mobile-only Room 11 vertical crop correction; keep desktop/tablet unchanged.
-- [ ] Deploy v5.11.34 and confirm the full marked Room 11 entrance is visible on the real iPhone.
-- [ ] Submit and obtain Meta approval for the five optional quick-action templates documented in `META_STAFF_QUICK_ACTIONS_v5.11.20.md`; never map the buttonless service v1 template and enable only after every intended template is Active.
+- [x] Deploy v5.11.34 and confirm the full marked Room 11 entrance is visible on the real iPhone.
+- [x] Confirm all five intended quick-action templates are reviewed and Active in Meta; never map the buttonless service v1 template.
+- [x] Implement and package v5.11.35 with current-turn topic switching, internal local-guide retrieval, direct missing-supply alerts, Concierge-first routine contacts and reviewed Meta quick-action activation.
+- [x] Retest the existing House Google Maps universal link on mobile and retain it; withdraw the proposed device-specific URL split.
+- [ ] Deploy v5.11.35 and run the affected-behavior production smoke test in `RELEASE_NOTES_v5.11.35.md`.
 - [x] Add `STAY_TOKEN_PEPPER` and `RESERVATION_SYNC_TOKEN` Worker secrets
 - [x] Add protected `SPARE_KEY_CODES` Worker secret before activating automatic spare-key release
 - [x] Install and authorize the included Airbnb Google Apps Script synchronizer

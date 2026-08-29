@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0.0",
-  "release": "5.11.34",
+  "release": "5.11.35",
   "language": "en",
   "updated": "2026-08-14",
   "scope": "Verified accommodation, room, house-rule, support, booking and emergency answers for guests of The House – Koh Tao.",
@@ -310,6 +310,19 @@
       ]
     },
     {
+      "id": "towel_change_information",
+      "category": "concierge",
+      "priority": 45,
+      "triggers": [
+        "how often are towels changed",
+        "when are towels changed",
+        "do you change towels",
+        "towel change schedule"
+      ],
+      "answer": "Fresh towels are available on request. The House guide does not specify a fixed automatic towel-change schedule, so just tell the Concierge whenever you need fresh towels.",
+      "actions": []
+    },
+    {
       "id": "fresh_towels",
       "category": "stay-support",
       "priority": 30,
@@ -593,6 +606,36 @@
           "href": "https://maps.app.goo.gl/5MV4j4B1YzyR1SR69"
         }
       ]
+    },
+    {
+      "id": "closest_beach_from_house",
+      "category": "concierge",
+      "priority": 45,
+      "triggers": [
+        "how far is the beach from the house",
+        "how far is the closest beach",
+        "what is the closest beach to the house",
+        "which beach is nearest to the house",
+        "beach near the house",
+        "nearest beach",
+        "closest beach"
+      ],
+      "answer": "Mae Haad Beach is only around 200 metres down the road from The House — just a very short walk.",
+      "actions": []
+    },
+    {
+      "id": "sairee_beach_distance",
+      "category": "concierge",
+      "priority": 45,
+      "triggers": [
+        "how far is sairee beach",
+        "how far is sairee beach from the house",
+        "can i walk to sairee beach",
+        "walking time to sairee beach",
+        "distance to sairee beach"
+      ],
+      "answer": "Sairee Beach is roughly a 20-minute walk from The House, depending on your pace and the exact part of Sairee you are going to. A scooter or taxi is faster.",
+      "actions": []
     },
     {
       "id": "view_before_booking",

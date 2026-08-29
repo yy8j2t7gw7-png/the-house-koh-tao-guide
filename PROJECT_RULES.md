@@ -115,10 +115,11 @@ Internal booking contact:
 
 Public interface rules:
 
-- Generic labels such as “Book with Us”, “Call Us” and “WhatsApp Us” are approved.
+- **Book with Us** opens the AI Concierge with the relevant service context.
+- Do not expose a routine page-level booking call or personal WhatsApp shortcut.
 - Fah does not need to be named publicly.
 - Never discuss internal commercial arrangements, referral terms, revenue or how The House may benefit from a booking in guest-facing content.
-- Every booking call or WhatsApp action must use Fah’s number above.
+- Every completed protected booking alert must use the established Fah-plus-owner route.
 - Never use “Book Direct”, “Call Operator”, “Contact Operator” or equivalent direct-booking actions.
 - Do not expose an operator telephone number, website or social channel as a booking action for records marked `the-house-concierge`.
 - Operator details may remain in structured data for verification and internal AI context.
@@ -155,7 +156,7 @@ Public interface rules:
 
 ## Current baseline
 
-Current release: v5.11.34 (mobile-only Room 11 photo-framing hotfix: within the existing max-width 760 px rule, the Room 11 focal point is `72% 100%`, changing only the vertical crop so the marked entrance is fully visible. Desktop/tablet framing is unchanged. The v5.11.33 stable 148×52 px mobile **💬 AI Concierge** pill, safe-area placement, no scroll/collision/lift movement, and launcher-hidden-while-chat-open behavior remain authoritative. The 232 px mobile Room hero remains unchanged. v5.11.31 header-owned language access, denser Room spacing, verified/TM30 wording and **Open Concierge** label remain authoritative. v5.11.30 generic-human routing and routine Contact/Call gates, 24/7 protected lost-key access, RAID-and-Roctopus policy and every fee, notification, code-display, rotation, privacy and delivery safeguard are unchanged).
+Current release: v5.11.35 (current-turn independent information takes precedence over stale ordinary workflow context without destroying the pending workflow; targeted internal retrieval uses the approved activities, bars, beaches, cafés, restaurants and shopping records while `EXPLORE_ENABLED=false`; Bamboo Beach Bar leads general drinks/nightlife recommendations but is not forced when unsuitable; clear missing-supply statements create the established protected service alert, while supply questions remain informational; routine page-level House calls are removed and routine human escalation is AI-first and in-hours only; emergency and 24/7 lost-key routes remain independent. The five reviewed Meta action templates are enabled through exact fail-closed mappings, with **Received** and **Resolve** preserving every signed-webhook and recipient safeguard. The single real-device-verified House Maps URL remains unchanged. v5.11.34's mobile-only Room 11 `72% 100%` crop, v5.11.33's stable mobile Concierge, RAID-and-Roctopus policy and every fee, notification, code-display, rotation, privacy, passport, Airbnb, admin and delivery safeguard remain authoritative).
 
 Explore is intentionally disabled in the live v5.11.6 release. Do not delete its pages, structured records or media. Restore it only after the planned Explore rebuild and review by changing the protected deployment feature variable. Do not expose internal Explore detail paths in live concierge answers while the feature remains disabled; use approved external actions where supplied.
 

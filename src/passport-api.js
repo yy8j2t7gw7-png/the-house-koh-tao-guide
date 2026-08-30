@@ -150,10 +150,9 @@ function detectImage(bytes) {
 }
 
 function privateDownload(object, record) {
-  const isDetails = record.mediaType === "application/json" || record.extension === "json";
   const headers = new Headers({
     "content-type": record.mediaType || "application/octet-stream",
-    "content-disposition": `attachment; filename="${isDetails ? "passport-details" : "passport-image"}.${record.extension || "bin"}"`,
+    "content-disposition": `attachment; filename="passport-image.${record.extension || "bin"}"`,
     "cache-control": "no-store, max-age=0",
     "content-security-policy": "default-src 'none'; sandbox",
     "cross-origin-resource-policy": "same-origin",

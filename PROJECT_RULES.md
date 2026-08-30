@@ -115,11 +115,10 @@ Internal booking contact:
 
 Public interface rules:
 
-- **Book with Us** opens the AI Concierge with the relevant service context.
-- Do not expose a routine page-level booking call or personal WhatsApp shortcut.
+- Generic labels such as “Book with Us”, “Call Us” and “WhatsApp Us” are approved.
 - Fah does not need to be named publicly.
 - Never discuss internal commercial arrangements, referral terms, revenue or how The House may benefit from a booking in guest-facing content.
-- Every completed protected booking alert must use the established Fah-plus-owner route.
+- Every booking call or WhatsApp action must use Fah’s number above.
 - Never use “Book Direct”, “Call Operator”, “Contact Operator” or equivalent direct-booking actions.
 - Do not expose an operator telephone number, website or social channel as a booking action for records marked `the-house-concierge`.
 - Operator details may remain in structured data for verification and internal AI context.
@@ -156,7 +155,7 @@ Public interface rules:
 
 ## Current baseline
 
-Current release: v5.11.44 (narrow passport-registration correction on deployed v5.11.43: no guest-entered passport-detail form or submission API; private registration uses passport-image upload or the existing in-person original-passport route; all-Thai stays remain exempt and the exemption is shown in English and Thai before foreign passport collection; legacy v5.11.43 JSON records may be read/deleted only through protected Admin for cleanup; preserve the v5.11.43 Airbnb fast-sync and approved Meta-template activation plus all v5.11.42/v5.11.41/v5.11.39 security and routing behavior).
+Current release: v5.11.33 (presentation-only: a stable 148×52 px mobile **💬 AI Concierge** pill with safe-area placement, no scroll/collision/lift movement, and launcher visibility suppressed while the Concierge panel is open. The v5.11.32 232 px Room hero with Room 11-specific marked-entrance crop remains authoritative. v5.11.31 header-owned language access, denser Room spacing, verified/TM30 wording and **Open Concierge** label remain authoritative. v5.11.30 generic-human routing and routine Contact/Call gates, 24/7 protected lost-key access, RAID-and-Roctopus policy and every fee, notification, code-display, rotation, privacy and delivery safeguard are unchanged).
 
 Explore is intentionally disabled in the live v5.11.6 release. Do not delete its pages, structured records or media. Restore it only after the planned Explore rebuild and review by changing the protected deployment feature variable. Do not expose internal Explore detail paths in live concierge answers while the feature remains disabled; use approved external actions where supplied.
 

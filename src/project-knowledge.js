@@ -10,19 +10,18 @@ const DATASETS = [
 ];
 
 const QUERY_STOP_WORDS = new Set([
-  "about", "are", "around", "best", "could", "find", "for", "from", "go", "good", "help",
-  "island", "koh", "looking", "near", "nearby", "need", "please", "recommend", "recommended",
-  "recommendation", "should", "suitable", "tao", "tell", "the", "tonight", "want", "what",
-  "where", "which", "would"
+  "about", "best", "could", "find", "good", "help", "looking", "need", "please",
+  "recommend", "recommended", "recommendation", "should", "suitable", "tell", "want",
+  "what", "where", "which", "would"
 ]);
 
 const DATASET_HINTS = [
   { pattern: /\b(dive|diving|scuba|freediv|snorkel|boat|kayak|paddle|hike|viewpoint|climb|yoga|muay|massage|spa|cook|wildlife|photo|activity|experience)\w*\b/i, types: ["activity"] },
-  { pattern: /\b(bar|drink|cocktail|beer|nightlife|music|sunset|party|night\s*club|club)\w*\b/i, types: ["bar", "beach"] },
-  { pattern: /\b(beach|bay|swim|sand|shore|snorkel|sunset|quiet cove)\w*\b/i, types: ["beach", "activity", "bar"] },
-  { pattern: /\b(cafe|coffee|breakfast|brunch|bakery|pastry|laptop|cowork|workspace|remote work)\w*\b/i, types: ["cafe", "restaurant"] },
-  { pattern: /\b(restaurant|dinner|lunch|eat|food|meal|romantic|seafood|vegan|vegetarian|thai|italian)\w*\b/i, types: ["restaurant"] },
-  { pattern: /\b(shop|shopping|supermarket|pharmacy|souvenir|atm|essential|grocery|laundry|bank|fuel)\w*\b/i, types: ["shopping"] }
+  { pattern: /\b(bar|drink|cocktail|beer|nightlife|music|sunset|party)\w*\b/i, types: ["bar", "beach"] },
+  { pattern: /\b(beach|bay|swim|sand|shore|snorkel|sunset)\w*\b/i, types: ["beach", "activity", "bar"] },
+  { pattern: /\b(cafe|coffee|breakfast|brunch|bakery|pastry|remote work)\w*\b/i, types: ["cafe", "restaurant"] },
+  { pattern: /\b(restaurant|dinner|lunch|eat|food|meal|romantic|vegan|vegetarian|thai|italian)\w*\b/i, types: ["restaurant"] },
+  { pattern: /\b(shop|shopping|supermarket|pharmacy|souvenir|atm|essential|grocery)\w*\b/i, types: ["shopping"] }
 ];
 
 const EXPANSIONS = new Map([
@@ -31,19 +30,9 @@ const EXPANSIONS = new Map([
   ["snorkel", ["snorkelling", "snorkeling"]],
   ["snorkelling", ["snorkel", "snorkeling"]],
   ["snorkeling", ["snorkel", "snorkelling"]],
-  ["beaches", ["beach", "bay"]],
-  ["bays", ["bay", "beach"]],
   ["bar", ["drinks", "cocktails", "nightlife"]],
-  ["bars", ["bar", "drinks", "cocktails", "nightlife"]],
-  ["drink", ["bar", "drinks", "cocktails", "nightlife"]],
-  ["drinks", ["bar", "cocktails", "nightlife"]],
   ["restaurant", ["dinner", "food", "meal"]],
-  ["restaurants", ["restaurant", "dinner", "food", "meal"]],
-  ["cafe", ["coffee", "breakfast", "brunch"]],
-  ["coffee", ["cafe", "breakfast", "brunch"]],
-  ["laptop", ["workspace", "coworking", "remote", "air conditioning"]],
-  ["work", ["workspace", "coworking", "remote", "laptop"]],
-  ["quiet", ["relaxed", "remote", "secluded"]]
+  ["cafe", ["coffee", "breakfast", "brunch"]]
 ]);
 
 function cleanText(value, maximum = 900) {
@@ -92,14 +81,6 @@ function searchableRecord(record) {
     nested(record, "about"),
     nested(record, "recommendation"),
     nested(record, "localTip"),
-    record.atmosphere,
-    record.signatureDrink,
-    record.signatureFood,
-    record.musicStyle,
-    record.specialEvents,
-    record.remoteWork,
-    record.airConditioning,
-    record.hours,
     record.conciergeNotes,
     nested(record, "aiSummary"),
     record.whyChoose,
@@ -107,19 +88,7 @@ function searchableRecord(record) {
   ].filter(Boolean).join(" "));
 }
 
-function preferredSourceTypes(question) {
-  const source = String(question || "");
-  const types = new Set();
-  if (/\b(?:bars?|drinks?|cocktails?|beers?|nightlife|night\s*clubs?|clubs?|party)\b/i.test(source)) types.add("bar");
-  if (/\b(?:beach(?:es)?|bays?|swim(?:ming)?|sand|shore|cove)\b/i.test(source)) types.add("beach");
-  if (/\b(?:snorkel|dive|diving|scuba|freediv|boat|kayak|paddle|hike|viewpoint|climb|yoga|muay|massage|spa|activity|activities|things\s+to\s+do)\w*\b/i.test(source)) types.add("activity");
-  if (/\b(?:cafes?|coffee|breakfast|brunch|bakery|pastry|laptop|cowork|workspace|remote\s+work)\b/i.test(source)) types.add("cafe");
-  if (/\b(?:restaurants?|dinner|lunch|eat|food|meal|romantic|seafood|vegan|vegetarian|thai|italian)\b/i.test(source)) types.add("restaurant");
-  if (/\b(?:shops?|shopping|supermarkets?|pharmacy|pharmacies|souvenir|atm|essentials?|grocery|laundry|bank|fuel)\b/i.test(source)) types.add("shopping");
-  return types;
-}
-
-function recordScore(definition, record, terms, question) {
+function recordScore(record, terms) {
   if (!terms.length) return 0;
   const haystack = searchableRecord(record);
   const name = normalizeText(record.name);
@@ -129,10 +98,6 @@ function recordScore(definition, record, terms, question) {
     if (name.includes(term)) score += 4;
   });
   if (!score) return 0;
-  if (preferredSourceTypes(question).has(definition.sourceType)) score += 12;
-  if (definition.sourceType === "bar"
-    && /\b(?:bar|drink|cocktail)\w*\b/i.test(question)
-    && /\b(?:food|eat|meal|kitchen)\w*\b/i.test(question)) score += 10;
   if (record.preferred === true) score += 5;
   if (record.featured === true) score += 1;
   if (record.status && record.status !== "active") score -= 4;
@@ -160,12 +125,8 @@ function compactRecord(definition, record, score) {
     practical: cleanText(practical, 500),
     perfectFor,
     bestKnownFor: cleanText(record.bestKnownFor, 400),
-    atmosphere: cleanText(record.atmosphere, 400),
-    access: cleanText(record.access || record.accessibility, 400),
     price: cleanText(record.price || record.priceLevel, 240),
     hours: cleanText(record.hours, 300),
-    airConditioning: cleanText(record.airConditioning, 120),
-    remoteWork: cleanText(record.remoteWork || record.wifi, 180),
     safety: cleanText(record.safety, 500),
     weather: cleanText(record.weatherConsiderations || record.conditions, 400),
     childFriendly: cleanText(record.childFriendly ?? record.familyFriendly, 120),
@@ -204,7 +165,7 @@ export async function retrieveApprovedProjectKnowledge(request, env, question, m
   const loaded = await Promise.all(datasets.map((definition) => fetchDataset(request, env, definition).catch(() => [])));
   return loaded
     .flat()
-    .map(({ definition, record }) => ({ definition, record, score: recordScore(definition, record, terms, question) }))
+    .map(({ definition, record }) => ({ definition, record, score: recordScore(record, terms) }))
     .filter((item) => item.score > 0)
     .sort((left, right) => right.score - left.score || Number(left.record.displayOrder || 999) - Number(right.record.displayOrder || 999))
     .slice(0, maximumRecords)

@@ -6,7 +6,7 @@ TM30 accommodation registration concerns foreign guests. Thai nationals do not n
 
 This scope was checked against the Thai Immigration Bureau TM30 service description, which states that Section 38 notification applies when accommodation is provided to foreign nationals. Operational wording must remain limited to this exemption and must not expand into unsourced legal advice.
 
-The House intentionally does not offer guest-entered passport-detail fields. Guests must either upload a clear passport image through the private one-time form or provide the required original passport(s) in person. This avoids The House relying on retyped passport data that may be incomplete or incorrect. Do not add a manual-details form or API without a new explicit owner instruction.
+The current authoritative House information confirms the passport-photo requirement. It does not contain the exact structured TM30 field list. The alternative manual-details form must therefore remain disabled until that authoritative field specification is supplied. Do not guess legal or Immigration fields.
 
 ## Guest experience
 
@@ -20,7 +20,7 @@ The House intentionally does not offer guest-entered passport-detail fields. Gue
 8. Each upload form's 256-bit token is carried only in the URL fragment; fragments are not sent in the initial page request or referrer.
 9. The registration page explains why the information is needed and how it is handled. It does not open WhatsApp.
 10. Passport-image upload accepts one JPEG, PNG, WebP or HEIC image up to 10 MB.
-11. Manual passport-detail entry is not offered. Guests use the secure passport-image upload or the supported in-person original-passport route. Submission to the Immigration portal is not automated.
+11. Manual details remain disabled until the authoritative TM30 field list is supplied, preventing guessed, unnecessary or incomplete collection. Submission to the Immigration portal is not automated.
 12. The server validates authorization, reservation link, expiry, single use, byte limit and file signature before private storage.
 13. The upload link closes after success. The verified room page returns to the progress screen and creates a separate form for the next non-Thai guest until the declared total is reached. Selecting the all-Thai path is blocked after a foreign requirement or uploaded file exists unless staff review it.
 
@@ -92,8 +92,9 @@ This design minimizes exposure but does not by itself establish legal compliance
 
 ## Inputs still required
 
+- Authoritative structured list of the exact TM30 details that a guest may enter instead of uploading a passport image
 - Confirmation of any future production retention-policy change from the approved 14-day maximum
-- Any future owner decision to reintroduce structured manual entry; until then it must remain absent from the guest UI and Worker routes
+- Confirmed authoritative wording or field specification if a structured manual-details alternative is later required
 
 ## Verified reference
 

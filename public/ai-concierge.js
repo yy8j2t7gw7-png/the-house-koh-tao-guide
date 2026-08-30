@@ -13,9 +13,6 @@
   const pagePrompts = cfg.pagePrompts?.[currentPage] || cfg.defaultPrompts || [];
   const lostKeyRequest = /\b(?:(?:(?:i|we)\s+(?:have\s+)?)?lost\s+(?:(?:my|our|the|a)\s+)?(?:room\s+)?key|(?:(?:my|our|the)\s+)?(?:room\s+)?key\s+(?:is\s+)?(?:lost|missing)|(?:cannot|can['’]?t|unable\s+to)\s+find\s+(?:(?:my|our|the)\s+)?(?:room\s+)?key|(?:(?:i(?:['’]?m|\s+am)?|we(?:['’]?re|\s+are)?)\s+)?locked\s+out|(?:cannot|can['’]?t|unable\s+to)\s+(?:get|go)\s+(?:back\s+)?into\s+(?:my|our|the)\s+room|(?:(?:i|we)\s+)?forgot\s+(?:(?:my|our|the)\s+)?(?:room\s+)?key|(?:(?:i|we)\s+)?need\s+(?:a\s+)?(?:spare|replacement)\s+key|where\s+is\s+(?:(?:my|our|the)\s+)?spare\s+key)\b/i;
   const genericHumanContactRequest = /^(?:(?:please|hello|hi)\s+)?(?:i\s+(?:(?:need|want|would\s+like)\s+to|wanna)\s+(?:talk|speak)\s+(?:to|with)\s+(?:a\s+)?(?:human|person|someone|staff|(?:the\s+)?team|reception)|i\s+(?:(?:need|want|would\s+like)\s+to|wanna)\s+call\s+(?:you|(?:a\s+)?(?:human|person)|someone|staff|(?:the\s+)?team|reception)|(?:can|could)\s+i\s+(?:(?:talk|speak)\s+(?:to|with)|call)\s+(?:a\s+)?(?:you|human|person|someone|staff|(?:the\s+)?team|reception)|(?:talk|speak)\s+(?:to|with)\s+(?:a\s+)?(?:human|person|someone|staff|(?:the\s+)?team|reception)|contact\s+(?:the\s+)?(?:team|staff|reception)|(?:human|person|staff|reception)\s+please|i\s+need\s+(?:a\s+)?(?:human|person)|call\s+(?:the\s+)?(?:team|staff|reception))(?:\s+please)?$/;
-  const propertyHumanContactRequest = /^(?:(?:please\s+)?(?:call|contact)\s+(?:the\s+)?(?:hotel|house|property)|(?:can|could)\s+i\s+(?:call|contact)\s+(?:the\s+)?(?:hotel|house|property))(?:\s+please)?$/;
-  const persistentHumanContactRequest = /^(?:i\s+)?(?:still|really)\s+(?:need|want|would\s+like)\s+(?:(?:a\s+)?(?:human|person|someone|staff|team|reception)|(?:to\s+)?(?:talk|speak)\s+(?:to|with)\s+(?:a\s+)?(?:human|person|someone|staff|team|reception))(?:\s+please)?$/;
-  const actionableHousekeepingSupplyRequest = /(?:\b(?:(?:i|we)\s+(?:need|want|would\s+like)|(?:can|could)\s+(?:i|we|you)\s+(?:have|get|bring|send|provide)|please\s+(?:bring|send|provide)|there\s+(?:is|are)\s+no|(?:we|i)\s+(?:do\s+not|don['’]?t)\s+have|our\s+room\s+(?:has\s+no|doesn['’]?t\s+have))\b[^.?!]{0,60}\b(?:toilet\s+paper|soap|towels?)\b|\b(?:no|missing)\s+(?:toilet\s+paper|soap|towels?)\b|\b(?:toilet\s+paper|soap|towels?)\s+(?:are\s+|is\s+)?missing\b|\b(?:we(?:['’]?re|\s+are)|i(?:['’]?m|\s+am))\s+(?:out|all\s+out)\s+of\s+(?:toilet\s+paper|soap|towels?)\b|\b(?:toilet\s+paper|soap|towels?)\s+please\b)/i;
 
   function routineServiceOpen(date = new Date()) {
     const parts = new Intl.DateTimeFormat("en-GB", {
@@ -38,45 +35,6 @@
       .replace(/[^\p{L}\p{N}]+/gu, " ")
       .replace(/\s+/g, " ")
       .trim();
-  }
-
-  function broadHumanContactRequest(value) {
-    const normalized = normalizeIntentText(value);
-    if (!normalized || normalized.length > 320) return false;
-    const target = /\b(?:human(?:\s+being)?|real\s+(?:human|person)|actual\s+person|live\s+(?:person|agent)|person|someone|somebody|staff|member\s+of\s+staff|team|reception|receptionist|front\s+desk|housekeeper|manager|host|agent|support\s+agent|representative|operator|customer\s+(?:service|support)|support\s+team)\b/.test(normalized);
-    const action = /\b(?:talk(?:ing)?|speak(?:ing)?|chat(?:ting)?|call(?:ing)?|contact(?:ing)?|reach(?:ing)?|messag(?:e|ing)|connect(?:ing)?|transfer(?:ring)?|help)\b/.test(normalized);
-    const requestLanguage = /\b(?:need|want|wanna|would like|prefer|please|insist|demand|can i|could i|may i|can we|could we|let me|let us)\b/.test(normalized);
-    const direct = /\b(?:connect|transfer|put)\s+(?:me|us)\b|\b(?:get|give)\s+(?:me|us)\s+(?:a\s+)?(?:real\s+)?(?:human|person|someone|somebody|staff|member\s+of\s+staff|receptionist|agent|support\s+agent|representative|operator)|\b(?:let|allow)\s+(?:me|us)\s+(?:talk|speak|call|contact)\b/.test(normalized);
-    const imperative = /^(?:please\s+)?(?:talk|speak|chat|call|contact|reach|connect|transfer)\b/.test(normalized);
-    const dissatisfaction = /\b(?:(?:you|the ai|ai|the bot|bot|concierge)\s+(?:can not|cannot|cant|can t|does not|doesnt|is not|isnt)\s+(?:help|understand|solve|assist)|(?:you|the ai|ai|the bot|bot|concierge)\s+(?:are|re)\s+not\s+helping|this\s+(?:is not|isnt|does not|doesnt)\s+(?:help|work)|no\s+(?:ai|bot)|not\s+(?:the\s+)?(?:ai|bot)|someone\s+else|another\s+person)\b/.test(normalized);
-    const helpFromPerson = /\b(?:need|want|would like|can i get|could i get)\s+(?:some\s+)?(?:help|assistance)\s+(?:from|by)\s+(?:a\s+)?(?:human|person|someone|somebody|staff|member\s+of\s+staff|team|reception|receptionist|housekeeper|manager|host|agent|support\s+agent|representative|operator)\b/.test(normalized);
-    const bare = /^(?:human|real human|real person|person|someone|somebody|staff|member of staff|reception|receptionist|housekeeper|manager|agent|support agent|representative|operator)(?: please)?$/.test(normalized);
-    const property = /\b(?:call|contact|reach|speak to|talk to)\s+(?:the\s+)?(?:house|hotel|property|front desk|reception|team|staff|housekeeper|manager)\b/.test(normalized);
-    return bare || direct || helpFromPerson || property || (target && dissatisfaction) || (target && action && (requestLanguage || imperative)) || (target && /\b(?:need|want|wanna|prefer|would like|now)\b/.test(normalized));
-  }
-
-  function stayExtensionRequest(value) {
-    const normalized = normalizeIntentText(value);
-    if (!normalized) return false;
-    return /\b(?:extend|extension|prolong)\b[\s\S]{0,45}\b(?:stay|booking|reservation|room)\b/.test(normalized)
-      || /\b(?:stay|remain|keep the room|keep my room|keep our room)\b[\s\S]{0,45}\b(?:longer|another night|more nights?|extra nights?|additional nights?)\b/.test(normalized)
-      || /\b(?:can|could|may|would)\s+(?:i|we)\s+(?:stay|remain)\s+(?:for\s+)?longer\b/.test(normalized)
-      || /\b(?:i|we)\s+(?:want|wanna|need|would like|would love)\s+to\s+(?:stay|remain)\s+(?:for\s+)?longer\b/.test(normalized)
-      || /\b(?:add|book|have|take)\s+(?:another|an extra|extra|additional|more|\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten)\s+(?:more\s+|extra\s+|additional\s+)?nights?\b/.test(normalized)
-      || /\b(?:i|we)\s+(?:need|want|would like|would love)\s+(?:\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten)\s+(?:more|extra|additional)\s+nights?\b/.test(normalized)
-    || /\b(?:extend|prolong)\s+(?:it\s+)?(?:by|for)\s+(?:\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten)\s+nights?\b/.test(normalized)
-      || /\b(?:have|keep)\s+(?:the|my|our)\s+room\b[\s\S]{0,35}\b(?:\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten|another)\s+(?:more\s+|extra\s+|additional\s+)?nights?\b/.test(normalized)
-      || /\b(?:is it|would it be)\s+possible\s+(?:for\s+(?:me|us)\s+)?to\s+(?:stay|remain)\s+(?:for\s+)?longer\b/.test(normalized)
-      || /\b(?:i|we)(?:\s+d|\s+would)?\s+like\s+(?:another|an extra|extra|additional)\s+(?:\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten)?\s*nights?\b/.test(normalized)
-      || /^(?:\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten)\s+(?:more|extra|additional)\s+nights?(?:\s+please)?$/.test(normalized)
-      || /\b(?:another|one more|an extra|extra|additional)\s+night(?:s)?(?:\s+please)?$/.test(normalized)
-      || /\b(?:keep|have)\s+(?:the|my|our)\s+room\s+(?:for\s+)?(?:longer|another\s+day|more\s+days?|extra\s+days?|additional\s+days?)\b/.test(normalized)
-      || /\b(?:stay|remain)\s+(?:for\s+)?(?:another\s+day|one\s+more\s+day|more\s+days?|extra\s+days?|additional\s+days?)\b/.test(normalized)
-      || /\b(?:i|we)\s+(?:need|want|would\s+like|would\s+love)\s+(?:another|one\s+more|an\s+extra|extra|additional|more|\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten)\s+(?:more\s+|extra\s+|additional\s+)?days?\b/.test(normalized)
-      || /\b(?:add|book|have|take)\s+(?:another|an\s+extra|extra|additional|more|one\s+more|\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten)\s+(?:more\s+|extra\s+|additional\s+)?days?\b/.test(normalized)
-      || /\b(?:stay|remain)\s+until\s+(?:tomorrow|the\s+next\s+day|[a-z]{3,9}|\d{1,2}(?:st|nd|rd|th)?(?:\s+[a-z]{3,9})?)\b/.test(normalized)
-      || /^(?:(?:can|could|may)\s+(?:i|we)\s+)?extend(?:\s+(?:it|this))?(?:\s+please)?$/.test(normalized)
-      || /\bstay\s+(?:\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten)\s+(?:more|extra|additional)\s+nights?\b/.test(normalized);
   }
 
   function safeStorage(storage, operation, key, value) {
@@ -104,7 +62,6 @@
 
   function bookingPromptFor(value) {
     const source = String(value || "");
-    if (stayExtensionRequest(source)) return "I would like to extend my stay.";
     if (/\b(?:motorbike|motorcycle|scooter)\s+taxi\b/i.test(source)) return "I want to book a motorbike taxi.";
     if (/\b(?:taxi\s+boat|boat\s+taxi|longtail(?:\s+boat)?)\b/i.test(source)) return "I want to book a taxi boat.";
     if (/\bferr(?:y|ies)(?:\s+tickets?)?\b/i.test(source)) return "I want to book ferry tickets.";
@@ -184,17 +141,24 @@
   }
 
   function initialHistory() {
-    // A full page load starts a visibly fresh Concierge conversation. The
-    // browser does not restore an invisible old transcript because workflow
-    // state itself is intentionally not persisted across document loads.
-    safeStorage(window.sessionStorage, "remove", historyStorageKey);
-    return [];
+    try {
+      const stored = JSON.parse(safeStorage(window.sessionStorage, "get", historyStorageKey) || "[]");
+      if (!Array.isArray(stored)) return [];
+      return stored
+        .filter((item) => item && ["user", "assistant"].includes(item.role) && typeof item.content === "string")
+        .map((item) => ({ ...item, content: redactPrivateContact(item.content) }))
+        .slice(-historyLimit);
+    } catch (_error) {
+      return [];
+    }
   }
 
   const sessionId = initialSessionId();
   let conversationHistory = initialHistory();
   let pendingAnswer = null;
   let lastFocusedElement = null;
+  let dragStartY = null;
+  let dragCurrentY = null;
   let enginePromise = null;
   let privateWorkflowContact = "";
   let activeWorkflowState = null;
@@ -208,16 +172,6 @@
     };
   }
 
-  function initialConciergeMessage() {
-    if (!conciergeAccessState.verified) {
-      return cfg.initialMessage || "Hello. What can I help you with?";
-    }
-    if (conciergeAccessState.registrationIncomplete) {
-      return `Hello. Your stay is verified${selectedRoom ? ` for Room ${selectedRoom}` : ""}. Guest registration is still incomplete; you can finish it using Guest registration above, or ask me for help.`;
-    }
-    return `Hello. Your guest access is active${selectedRoom ? ` for Room ${selectedRoom}` : ""}. I can help with check-in, Wi-Fi, towels, cleaning, lost keys, bookings and questions about Koh Tao.`;
-  }
-
   function interpolate(value, context) {
     return String(value || "").replace(/\{(question|room|roomLabel)\}/g, (_match, key) => context[key] || "");
   }
@@ -228,6 +182,7 @@
       { role: "assistant", content: redactPrivateContact(answer).slice(0, 700) }
     );
     conversationHistory = conversationHistory.slice(-historyLimit);
+    safeStorage(window.sessionStorage, "set", historyStorageKey, JSON.stringify(conversationHistory));
   }
 
   function routeMap() {
@@ -458,7 +413,6 @@
   const quickActionsContainer = panel.querySelector(".ai-concierge-actions");
   const registrationReminder = panel.querySelector(".ai-concierge-registration-status");
   const serviceHours = panel.querySelector(".ai-concierge-service-hours");
-  const dragHandle = panel.querySelector(".ai-concierge-drag-handle");
 
   function appendMessage(role, text, actions = [], question = "", metadata = {}) {
     const message = document.createElement("article");
@@ -692,7 +646,7 @@
     const source = String(question || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
     if (["retry", "try again", "try it again", "try sending it again"].includes(source)) return true;
     const prefix = "(?:(?:can|could|would) you (?:please )?|please )?";
-    const activity = "(?:diving|fishing(?: trip)?|snorkeling(?: trip)?|taxi|ferry(?: tickets?)?|motorbike(?: taxi)?|taxi boat|stay extension)";
+    const activity = "(?:diving|fishing(?: trip)?|snorkeling(?: trip)?|taxi|ferry(?: tickets?)?|motorbike(?: taxi)?|taxi boat)";
     const target = `(?:it|(?:(?:my|the) )?(?:${activity} )?(?:booking|request))`;
     return new RegExp(`^${prefix}(?:retry(?: ${target})?|(?:try|send|resend)(?: sending)? ${target} again)$`, "i").test(source);
   }
@@ -711,18 +665,12 @@
       || /\b(?:burning smell|smell(?:s|ing)? (?:like )?burning|smoke (?:is )?(?:coming )?from|water (?:is )?pouring|ceiling (?:is )?(?:falling down|collapsing|caving in)|snake)\b/.test(normalized)
     );
     return isExplicitBookingRetry(source)
-      || broadHumanContactRequest(source)
       || genericHumanContactRequest.test(normalized)
-      || propertyHumanContactRequest.test(normalized)
-      || persistentHumanContactRequest.test(normalized)
       || /(?:\+|00)?\d[\d ()-]{6,20}\d/.test(source)
       || impliedLuggageRequest
-      || actionableHousekeepingSupplyRequest.test(source)
-      || /\b(?:luggage|baggage|store\s+(?:my|our)?\s*bags?|room\s+cleaning|clean\s+(?:my|our|the)\s+room|clean\s*up|cleanup)\b/i.test(source)
-      || /^\s*(?:please\s+)?(?:send|submit|forward)(?:\s+(?:the|my|this))?\s+request(?:\s+(?:now|please))?\s*[.!]?\s*$/i.test(source)
+      || /\b(?:luggage|baggage|store\s+(?:my|our)?\s*bags?|room\s+cleaning|clean\s+(?:my|our|the)\s+room)\b/i.test(source)
       || /\b(?:my|our|the)\s+room\s+(?:(?:is|feels|looks|seems)\s+(?:(?:really|very|quite|so)\s+)?(?:dirty|messy|unclean)|needs?\s+(?:a\s+)?clean(?:ing)?)\b/i.test(source)
       || lostKeyRequest.test(source)
-      || stayExtensionRequest(source)
       || /(?:^\s*(?:please\s+)?(?:book|reserve|arrange)\b|\b(?:please\s+(?:book|reserve|arrange)|can\s+you\s+(?:book|reserve|arrange)|could\s+you\s+(?:book|reserve|arrange)|help\s+me\s+(?:book|reserve|arrange)|i\s+(?:want|wanna|need|would\s+like)\s+(?:you\s+)?(?:to\s+)?(?:book|reserve|arrange)|book\s+(?:me|us)|make\s+(?:a\s+)?(?:booking|reservation))\b)/i.test(source)
       || /(?:\b(?:i\s+(?:need|want|would\s+like)|can\s+(?:i|we)\s+(?:get|have)|get\s+me|send\s+me)\s+(?:a\s+)?(?:taxi(?:\s+boat)?|longtail\s+boat|motorbike\s+taxi|ferry\s+tickets?)\b|^\s*(?:taxi(?:\s+boat)?|longtail(?:\s+boat)?|motorbike\s+taxi|ferry(?:\s+tickets?)?)\b(?=[\s\S]*\b(?:today|tomorrow|next\s+(?:mon|tues|wednes|thurs|fri|satur|sun)day|in\s+\d{1,3}\s+days?|from|to|at\s+\d)))/i.test(source)
       || /(?:\b(?:i|we)\s+(?:(?:want|need|plan)\s+to|would\s+like\s+to|wanna)\s+(?:(?:go|book|arrange)\s+)?(?:(?:scuba\s+)?div(?:e|ing)|fishing|snorkel(?:ing|ling)?)\b|\b(?:i|we)['’]d\s+like\s+to\s+(?:(?:go|book|arrange)\s+)?(?:(?:scuba\s+)?div(?:e|ing)|fishing|snorkel(?:ing|ling)?)\b|\b(?:i|we)\s+(?:want|need|would\s+like)\s+(?:a\s+)?(?:diving|fishing|snorkel(?:ing|ling)?)\s+(?:trip|tour)\b|\b(?:take\s+(?:me|us)|can\s+you\s+take\s+(?:me|us)|help\s+(?:me|us)\s+(?:go\s+)?)\s*(?:(?:scuba\s+)?div(?:e|ing)|fishing|snorkel(?:ing|ling)?)\b)/i.test(source)
@@ -735,10 +683,7 @@
       || result.workflow?.type === "booking";
     const activePrivateWorkflow = result.workflow?.status === "collecting"
       || (result.workflow?.type === "booking" && result.workflow?.status === "delivery_failed");
-    const activeCleaningWorkflow = result.workflow?.type === "cleaning"
-      && result.workflow?.status === "collecting";
     const activeWorkflow = activePrivateWorkflow
-      || activeCleaningWorkflow
       || (result.workflow?.type === "property_issue" && result.workflow?.status === "monitoring")
       || (result.workflow?.type === "lost_key" && result.workflow?.status === "awaiting_fee_acceptance");
     activeWorkflowState = activeWorkflow ? result.workflow : null;
@@ -831,7 +776,7 @@
     }
   }
 
-  appendMessage("concierge", initialConciergeMessage());
+  appendMessage("concierge", cfg.initialMessage || "Hello. What can I help you with during your stay?");
   if (!isPublicAccess) loadEngine().catch(() => {});
 
   const appearanceDelay = Number.isFinite(cfg.appearanceDelayMs) ? cfg.appearanceDelayMs : 1200;
@@ -997,10 +942,32 @@
   });
   window.addEventListener("pageshow", refreshConciergeAccessState);
 
-  // Mobile sheet drag-to-dismiss is intentionally disabled. The chat has its
-  // own scroll surface, and a gesture that can translate/close the whole sheet
-  // makes ordinary conversation scrolling feel unstable on iOS. Use the
-  // explicit close button instead.
+  const resetDrag = () => {
+    dragStartY = null;
+    dragCurrentY = null;
+    panel.classList.remove("is-dragging");
+    panel.style.transform = "";
+  };
+
+  panel.addEventListener("touchstart", (event) => {
+    if (window.innerWidth > 640 || !panel.classList.contains("is-open") || event.touches.length !== 1) return;
+    dragStartY = event.touches[0].clientY;
+    dragCurrentY = dragStartY;
+    panel.classList.add("is-dragging");
+  }, { passive: true });
+
+  panel.addEventListener("touchmove", (event) => {
+    if (dragStartY === null || event.touches.length !== 1) return;
+    dragCurrentY = event.touches[0].clientY;
+    panel.style.transform = `translateY(${Math.max(0, dragCurrentY - dragStartY)}px)`;
+  }, { passive: true });
+
+  panel.addEventListener("touchend", () => {
+    if (dragStartY === null) return;
+    const distance = Math.max(0, (dragCurrentY ?? dragStartY) - dragStartY);
+    if (distance > 110) closePanel();
+    else resetDrag();
+  });
 
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape") closePanel();

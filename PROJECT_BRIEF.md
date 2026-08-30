@@ -20,9 +20,9 @@ The product should feel like a competent hotel concierge in a guest’s pocket, 
 
 ### Current state
 
-Current release: v5.11.44.
+Current release: v5.11.33.
 
-The live release prioritizes the operational guest journey and AI Concierge. v5.11.44 is a narrow corrective release on deployed v5.11.43: guest-entered passport-detail fields are removed completely, the private registration form returns to passport-image upload only, the in-person original-passport route remains supported, and the all-Thai exemption remains available before foreign passport collection with explicit English and Thai wording. Protected Admin retains read/delete compatibility only for any legacy v5.11.43 JSON submission already stored. The v5.11.43 five-minute Airbnb fast sync and five approved Meta action templates remain unchanged and authoritative, together with v5.11.42 human/stay-extension, v5.11.41 emergency/mobile, v5.11.39 cleaning/state, lost-key, privacy and `EXPLORE_ENABLED=false` safeguards.
+The live release prioritizes the operational guest journey and AI Concierge. v5.11.33 is a presentation-only simplification built directly from deployed v5.11.32. Below 768 px the Concierge is a stable 148×52 px **💬 AI Concierge** bottom-right pill with iPhone safe-area offsets; the rejected v5.11.32 scroll/collision/lift controller is removed, so the launcher does not collapse or jump while scrolling. When the Concierge panel opens, the floating launcher is hidden completely and is restored on close. The approved 232 px Room 11 marked-entrance crop remains unchanged. The v5.11.31 language, spacing, verified/TM30 and **Open Concierge** corrections remain authoritative. v5.11.30 current-message generic-human routing and hard routine-contact gates remain unchanged. Routine House contact follows Tuesday–Sunday 10:30–19:30 Bangkok time with Monday closed; Emergency help remains separate, and lost-key self-service remains protected and available 24/7. The v5.11.26 PADI/SSI/RAID catalog, mixed-party collector, RAID safety/buoyancy-control recommendation and preferred Roctopus guidance remain authoritative. Every Meta sanitizer, retry, contact, booking schema, recipient, property, cleaning, urgent-console and secure lost-key safeguard remains intact. Explore remains disabled through its reversible deployment feature switch.
 
 Existing content areas:
 
@@ -38,7 +38,7 @@ Activities cover diving, freediving, snorkelling, boat trips, beach experiences,
 
 ### Concierge booking rule
 
-Activities and services marked for House-arranged booking must use The House structured Concierge route. Public pages use **Book with Us** and must not expose a direct booking call or personal WhatsApp shortcut. The protected completed-booking alert route is managed by Fah.
+Activities and services marked for House-arranged booking must use The House booking routes. Public labels may be generic. The underlying booking telephone and WhatsApp number must be +66 96 274 1424, which is managed by Fah.
 
 Guest-facing content must never discuss internal commercial arrangements, referral terms, revenue or how The House may benefit from a booking.
 

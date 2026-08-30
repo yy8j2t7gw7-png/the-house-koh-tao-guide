@@ -1,4 +1,4 @@
-# Guest Guide Platform with AI Concierge — The House v5.11.44
+# Guest Guide Platform with AI Concierge — The House v5.11.33
 
 The House – Koh Tao guest guide is a production-oriented, mobile-first digital guest guide and concierge platform. It combines property information, curated island guidance, structured place and activity data, and centralized contact and booking routes.
 
@@ -17,78 +17,6 @@ The House – Koh Tao guest guide is a production-oriented, mobile-first digital
 - Model-powered, room-aware AI Concierge with controlled learning
 
 The Activities module contains 49 structured profiles covering diving, freediving, snorkelling, boat trips, beach experiences, kayaking, paddleboarding, hiking, viewpoints, climbing, yoga, Muay Thai, massage, cooking, wildlife, photography, night activities and rainy-day options.
-
-## v5.11.44 release focus
-
-v5.11.44 is a narrow passport-registration rollback/correction on deployed v5.11.43. Guest-entered manual passport details are removed completely from the public registration UI and Worker submission routes. The private registration form accepts only a passport image; the existing in-person original-passport route remains available from the verified Room page. The all-Thai exemption remains before foreign passport collection and is shown in both English and Thai. Existing v5.11.43 JSON submissions, if any, remain readable/deletable by protected Admin only for cleanup, but no new guest JSON submission can be created.
-
-The v5.11.43 Airbnb fast-sync and approved Meta action-template activation remain unchanged and authoritative. The standalone Airbnb Apps Script trigger has already been installed at five-minute cadence and a full audit confirmed the Room 3 HM-code path in production.
-
-## v5.11.43 release focus
-
-v5.11.43 is a production-critical synchronization, messaging and registration release on deployed v5.11.42. The Airbnb synchronizer now checks recent Airbnb mail every five minutes, immediately posts trustworthy room/listing/code/date records to the existing protected reservation-sync endpoint, and reconciles all ten active private iCal feeds at least hourly even when no email change is detected. The complete 24-hour audit remains the only absence-based cancellation path, so partial fast/hourly syncs cannot mass-cancel good stays. The standalone Google Apps Script must be updated separately after the Worker is deployed.
-
-The five owner-confirmed approved Meta quick-action templates are now the only interactive mappings accepted by the all-template gate: `house_service_alert_actions_v3`, `house_booking_alert_actions_v2`, `house_luggage_alert_actions_v2`, `house_urgent_alert_actions_v2` and `house_lost_key_alert_actions_v2`. Visible buttons remain **Received** and **Resolved**, while the signed webhook command remains internal `RESOLVE`. Setting `WHATSAPP_STAFF_ACTIONS_ENABLED=false` still returns all alert kinds to the established buttonless templates.
-
-The secure passport form now offers the approved manual alternative to image upload. Option 2 collects exactly **passport number, full name, birthday, nationality, gender/sex as shown on the passport, and phone number**. It uses the same reservation-bound, expiring, single-use private token, stores the submission only in the private `PASSPORT_UPLOADS` bucket, follows the same maximum 14-day deletion lifecycle and never places the values in the AI Concierge, WhatsApp, learning data or normal operational logs.
-
-## v5.11.42 release focus
-
-v5.11.42 is a narrow Concierge routing and booking-workflow release on deployed v5.11.41. Human-contact recognition now uses a broad deterministic intent family covering natural requests for a human, person, member of staff, team, reception/front desk, housekeeper, manager, agent, representative and customer support instead of depending on a small exact-phrase list. Strong, repeated, frustrated or direct-transfer wording exposes the existing **The House team** Contact Us / Call Us actions only during Tuesday–Sunday 10:30–19:30 Bangkok service hours; no private staff identity is exposed and no alert is created.
-
-Natural requests to extend the current stay now enter a dedicated `stay_extension` booking workflow. The Concierge collects the number of additional nights and an international WhatsApp/phone number, then sends exactly one existing booking alert through `booking_with_owners` to Fah plus both owners. The guest is told that availability and payment still need confirmation. Private contact data remains transient and is included only in the protected delivery payload.
-
-The Airbnb reservation synchronizer is intentionally unchanged in this release. A separately observed last-minute-booking sync delay remains a known production issue for the next narrow release and must not be conflated with v5.11.42.
-
-## v5.11.41 release focus
-
-v5.11.41 is a narrow mobile/emergency UX correction on the already-pushed v5.11.40 human-routing release. It adds **Call The House Emergency Support** to fire/property-emergency action sets without exposing the responder identity, handles direct emergency-contact questions deterministically, gives the actual mobile conversation more vertical space by compacting the seven quick actions after chat starts, and removes drag-to-dismiss so ordinary chat scrolling cannot move or accidentally close the sheet. v5.11.40 remains the persistent-human routing fix for **I need to talk to a human you can not help me**, and all v5.11.39 cleaning/state behavior remains authoritative.
-
-
-## v5.11.39 release focus
-
-v5.11.39 is a production cleaning/state correction built directly from deployed v5.11.38. Natural **clean up / cleanup** requests now enter the deterministic room-cleaning collector, the browser retains that cleaning workflow between turns, and a bare hour such as **11** completes the same request and automatically sends the existing service alert. Full page loads no longer restore invisible old transcript history, verified guests receive an access-aware greeting instead of pre-verification copy, and vague **Please send the request** wording cannot create a context-free `Guest request` alert. The AI Concierge remains a one-way operational request interface rather than a live staff-chat channel. No Meta-template activation or recipient/security change is included.
-
-## v5.11.38 release focus
-
-v5.11.38 is a narrow post-deployment wording correction on v5.11.37. Persistent in-hours human/staff-contact handoffs now refer to **The House team** rather than naming Su to the guest. Routine Contact Us / Call Us actions remain available only Tuesday–Sunday 10:30–19:30 Bangkok time and remain suppressed on Monday and after hours. All v5.11.37 Wi-Fi, current-turn routing, cleaning and dive-provider fixes remain unchanged, and the pending human-friendly Meta replacement templates are not activated here.
-
-## v5.11.37 release focus
-
-- Fixes five real production gaps found after v5.11.36: strong/direct human or housekeeper contact now reaches Su with routine **Contact Us / Call Us** options during service hours; cancelled fire context cannot contaminate a later unrelated contact request; natural stained-bed-sheet wording enters and completes the deterministic cleaning workflow; French Kiss Divers preference is preserved even when it is expressed before an established diving collector; and authorized Wi-Fi-password questions no longer lose the numeric password to generic contact-number redaction.
-- Keeps the first ordinary generic human request AI-first, but treats clear persistence or explicit staff-contact wording such as **I urgently need to talk to a human**, **please let me call the housekeeper** and **can I call the housekeeper** as sufficient for direct in-hours Su contact. Monday/closed-hours routine-contact suppression remains unchanged.
-- Adds targeted emergency-history isolation: a new staff-contact turn is authoritative after a cancelled fire alert, while genuine continuation such as **there is more smoke now** remains fire-safety-first.
-- Recognizes natural stained-linen forms including **there is a stain on my bed sheet**, **my bed sheet has a stain** and **the sheets have stains**; **now/ASAP** continues the same cleaning request and produces exactly one normal service alert to Su plus both owners.
-- Treats **I wanna learn diving** as structured diving context and recognizes explicit named-provider questions such as **can I go with French Kiss Divers?**. The preference is acknowledged and retained without promising availability or replacing it with the default Roctopus/RAID recommendation.
-- Keeps authorized Wi-Fi-password questions on deterministic approved knowledge so the numeric password is shown exactly instead of **[number removed]**; the generic contact/privacy sanitizer remains unchanged for model output and stored diagnostic excerpts.
-- Preserves the v5.11.36 snorkeling correction and every existing Meta, House Maps, Explore-disabled guide, Room 11/mobile UI, lost-key, emergency, luggage, passport, Airbnb, Admin and security boundary. The complete **196-test** suite passes with zero failures. The five newer human-friendly Meta templates remain under review and are **not activated** by this release.
-
-## v5.11.36 release focus
-
-- Fixes the production snorkeling regression from v5.11.35. Phrases such as **which beach is good for snorkeling**, **which beach is best for snorkeling** and **is there good snorkeling** now return approved Koh Tao snorkeling records instead of the generic Concierge welcome or a false learning-gap handoff.
-- Prevents an independent local-information question from accepting the `welcome` intent when the short **hi** trigger appears only as a substring inside another word such as **which**. Other high-confidence deterministic House/local facts remain unchanged.
-- Makes approved snorkeling retrieval authoritative once relevant records exist: these information-only snorkeling questions are answered from `public/data/activities.json` / `public/data/beaches.json` without depending on model compliance, while actionable snorkeling booking requests still enter the protected structured booking collector.
-- Improves deterministic guest-facing snorkeling reasons by preferring concise `bestKnownFor` text for activity records, avoiding internal editorial/verification wording where a clean approved reason exists.
-- Preserves every v5.11.35 Meta action mapping, House Maps decision, local-guide integration, AI-first contact rule, missing-supply route, Room 11 crop, stable mobile Concierge, lost-key, emergency, booking, luggage, passport, Airbnb, Admin and security boundary. The complete **191-test** suite passes with zero failures.
-
-## v5.11.35 release focus
-
-- Gives a clear current-turn information question precedence over stale cleaning, booking, luggage or other ordinary workflow context, while preserving the pending workflow so the guest can resume it afterward.
-- Retrieves the existing approved activities, bars, beaches, cafés, restaurants and shopping datasets internally even while `EXPLORE_ENABLED=false`; recommendations are limited to one to three relevant choices, with Bamboo Beach Bar first for general drinks and a better fit when Bamboo is unsuitable.
-- Adds House-specific Mae Haad Beach guidance (about 200 metres / a very short walk) and Sairee Beach guidance (roughly a 20-minute walk), plus representative beach, snorkeling, Thai-food and work-café retrieval regressions.
-- Treats natural missing-supply statements such as **There are no towels** as immediate protected service requests to Su plus both owners, while questions such as **How often are towels changed?** remain informational.
-- Removes routine page-level House **Call Us** shortcuts and booking-call output. **Contact Us** and **Book with Us** open the Concierge; routine human contact appears only after an AI-first attempt and persistent request during service hours. Emergency and protected lost-key routes remain independent.
-- Keeps the single real-device-verified House Maps URL `https://maps.app.goo.gl/5MV4j4B1YzyR1SR69` on mobile and desktop. The proposed device split was withdrawn after the existing link resumed working on mobile.
-- Activates all five reviewed Meta staff quick-action templates with **Received** then **Resolve**, using the exact fail-closed mappings. Typed commands, signed-webhook authorization, actor exclusion, idempotency, recipient routing and one-flag rollback remain unchanged; the buttonless service action v1 remains rejected.
-- Preserves `72% 100%` as the mobile-only Room 11 crop, the stable mobile Concierge, `EXPLORE_ENABLED=false`, all passport/Airbnb/admin behavior and every protected operational boundary. The complete 190-test suite passes with zero failures.
-
-## v5.11.34 release focus
-
-- Corrects only the **mobile** Room 11 location-photo framing after real-iPhone review: the Room 11 focal point keeps its approved horizontal position at `72%` and moves vertically from `58%` to `100%` so the marked entrance is fully visible.
-- The correction lives only inside the existing `@media(max-width:760px)` Room rule. Tablet/desktop Room imagery is unchanged.
-- Preserves the stable **💬 AI Concierge** behavior, Room hero height, overlay position and every operational workflow from v5.11.33.
-- No Admin Dashboard, WhatsApp, booking, lost-key, passport, stay, Airbnb or other operational code changes.
-- The complete 182-test suite is required to pass with zero failures.
 
 ## v5.11.33 release focus
 
@@ -551,7 +479,7 @@ Activities and services marked for House-arranged booking must use the centraliz
 - WhatsApp: `https://wa.me/66962741424`
 - Internal booking contact: Fah
 
-The public interface does not need to name Fah or Su. **Book with Us** and **Contact Us** open the AI Concierge with the appropriate context. Routine page-level House/booking **Call Us** and personal WhatsApp shortcuts are not exposed. Direct operator booking, call, website or social CTAs must not be shown for records marked `the-house-concierge`.
+The public interface does not need to name Fah or Su. Generic labels such as **Book with Us**, **Contact Us** and **Call Us** are approved. Direct operator booking, call, website or social CTAs must not be shown for records marked `the-house-concierge`.
 
 Guest-facing answers must never discuss internal commercial arrangements, referral terms, revenue or how The House may benefit from a booking.
 
@@ -565,7 +493,7 @@ No dedicated on-call person or number has been confirmed yet. The role therefore
 
 ## Verified stays and 24/7 spare keys
 
-Secure self-service lost-key recovery is available at every time of day. Housekeeping and office schedules do not limit this protected operation. Each room has one spare-key box next to its door, and a lost key adds a 500 THB replacement fee. Routine human contact remains an in-hours, last-resort Concierge escalation, but staff assistance is never a prerequisite for the secure flow.
+Secure self-service lost-key recovery is available at every time of day. Housekeeping and office schedules do not limit this protected operation. Each room has one spare-key box next to its door, and a lost key adds a 500 THB replacement fee. During normal service hours the guest may additionally be offered a **Call Us** fallback, but staff assistance is never a prerequisite for the secure flow.
 
 Each active room uses one permanent page. An Airbnb guest enters the HM confirmation code from the trip details; a walk-in or direct guest enters the private House stay code supplied by the owner. The Worker compares only the HMAC hash with the protected reservation for that room and stay period. The secure browser session expires at checkout.
 

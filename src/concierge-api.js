@@ -40,7 +40,7 @@ import {
   specialtyChoiceLabels
 } from "./diving-catalog.js";
 
-const RELEASE = "5.11.43";
+const RELEASE = "5.11.33";
 const ROOM_OPTIONS = new Set(["1", "2", "3", "4", "5", "6", "8", "9", "10", "11"]);
 const MAX_HISTORY_ITEMS = 10;
 const MAX_QUESTION_LENGTH = 800;
@@ -188,35 +188,14 @@ const DIVING_COURSE_REFERENCE = /(?:\b(?:padi|ssi|raid)\b[^.?!]{0,80}\b(?:scuba\
 const ACTIONABLE_STRUCTURED_BOOKING = /(?:^\s*(?:please\s+)?(?:book|reserve|arrange)\b|\b(?:please\s+(?:book|reserve|arrange)|can\s+you\s+(?:book|reserve|arrange)|could\s+you\s+(?:book|reserve|arrange)|help\s+me\s+(?:book|reserve|arrange)|i\s+(?:want|wanna|need|would\s+like)\s+(?:you\s+)?(?:to\s+)?(?:book|reserve|arrange)|book\s+(?:me|us)|make\s+(?:a\s+)?(?:booking|reservation))\b)/i;
 const DIRECT_TRANSPORT_BOOKING = /(?:\b(?:i\s+(?:need|want|would\s+like)|can\s+(?:i|we)\s+(?:get|have)|get\s+me|send\s+me)\s+(?:a\s+)?(?:taxi(?:\s+boat)?|longtail\s+boat|motorbike\s+taxi|ferry\s+tickets?)\b|^\s*(?:taxi(?:\s+boat)?|longtail(?:\s+boat)?|motorbike\s+taxi|ferry(?:\s+tickets?)?)\b(?=[\s\S]*\b(?:today|tomorrow|next\s+(?:mon|tues|wednes|thurs|fri|satur|sun)day|in\s+\d{1,3}\s+days?|from|to|at\s+\d)))/i;
 const DIRECT_ACTIVITY_BOOKING = /(?:\b(?:i|we)\s+(?:(?:want|need|plan)\s+to|would\s+like\s+to|wanna)\s+(?:(?:go|book|arrange)\s+)?(?:(?:scuba\s+)?div(?:e|ing)|fishing|snorkel(?:ing|ling)?)\b|\b(?:i|we)['’]d\s+like\s+to\s+(?:(?:go|book|arrange)\s+)?(?:(?:scuba\s+)?div(?:e|ing)|fishing|snorkel(?:ing|ling)?)\b|\b(?:i|we)\s+(?:want|need|would\s+like)\s+(?:a\s+)?(?:diving|fishing|snorkel(?:ing|ling)?)\s+(?:trip|tour)\b|\b(?:take\s+(?:me|us)|can\s+you\s+take\s+(?:me|us)|help\s+(?:me|us)\s+(?:go\s+)?)\s*(?:(?:scuba\s+)?div(?:e|ing)|fishing|snorkel(?:ing|ling)?)\b)/i;
-const DIVING_LEARNING_REQUEST = /\b(?:i|we)\s+(?:(?:want|need|plan)\s+to|would\s+like\s+to|wanna)\s+learn(?:\s+how)?\s+(?:to\s+)?div(?:e|ing)\b/i;
-const SUPPORTED_BOOKING_KINDS = new Set(["diving", "fishing", "snorkeling", "taxi", "taxi_boat", "ferry", "motorbike_taxi", "stay_extension"]);
+const SUPPORTED_BOOKING_KINDS = new Set(["diving", "fishing", "snorkeling", "taxi", "taxi_boat", "ferry", "motorbike_taxi"]);
 const PROPERTY_ISSUE_CATEGORIES = new Set(["pest", "odor", "plumbing", "equipment", "fixture", "condition", "odor_clarification"]);
 const HOUSEKEEPING_ITEM_REQUEST = /\b(?:toilet\s+paper|soap|(?:(?:new|fresh|clean)\s+)?towels?|room\s+cleaning|clean\s+(?:my|our|the)\s+room|housekeeping)\b/i;
 const HOUSEKEEPING_REQUEST_ACTION = /\b(?:can\s+(?:i|we)\s+(?:have|get)|please\s+(?:bring|send|provide|clean)|can\s+you\s+(?:bring|send|provide|clean)|could\s+you\s+(?:bring|send|provide|clean)|i\s+(?:need|want|would\s+like)|(?:bring|send|provide)\s+(?:me\s+)?|clean\s+(?:my|our|the)\s+room)\b|\b(?:toilet\s+paper|soap|towels?)\s+please\b/i;
-const CLEANUP_REQUEST = /\b(?:(?:i|we)\s+(?:need|want|would\s+like)\s+(?:a\s+)?(?:clean\s*up|cleanup)|(?:can|could)\s+(?:i|we)\s+(?:get|have)\s+(?:a\s+)?(?:clean\s*up|cleanup)|(?:please\s+)?clean\s*up\s+(?:(?:my|our|the)\s+)?room|(?:room\s+)?(?:clean\s*up|cleanup)\s+please)\b/i;
-const GENERIC_EXISTING_REQUEST_SUBMISSION = /^\s*(?:please\s+)?(?:send|submit|forward)(?:\s+(?:the|my|this))?\s+request(?:\s+(?:now|please))?\s*[.!]?\s*$/i;
-const VERIFIED_ACCESS_ACKNOWLEDGEMENT = /^\s*(?:(?:i\s+am|i[’\']m|im)\s+already(?:\s+(?:verified|registered|done))?|i\s+already\s+(?:verified|registered|did\s+that|did\s+it))\s*[.!]?\s*$/i;
-const HOUSEKEEPING_SUPPLY_MISSING = /\b(?:there\s+(?:is|are)\s+no\s+(?:toilet\s+paper|soap|towels?)|(?:we|i)\s+(?:do\s+not|don['’]?t)\s+have\s+(?:any\s+)?(?:toilet\s+paper|soap|towels?)|our\s+room\s+(?:(?:does\s+not|doesn['’]?t)\s+have\s+(?:any\s+)?|has\s+no\s+)(?:toilet\s+paper|soap|towels?)|(?:no|missing)\s+(?:toilet\s+paper|soap|towels?)|(?:toilet\s+paper|soap|towels?)\s+(?:are\s+|is\s+)?missing|(?:we(?:['’]?re|\s+are)|i(?:['’]?m|\s+am))\s+(?:out|all\s+out)\s+of\s+(?:toilet\s+paper|soap|towels?))\b/i;
 const DIRTY_ROOM_CLEANING_REQUEST = /\b(?:(?:my|our|the)\s+(?:room|bathroom)\s+(?:(?:is|feels|looks|seems)\s+(?:(?:really|very|quite|so)\s+)?(?:dirty|messy|unclean)|needs?\s+(?:a\s+)?clean(?:ing)?)|(?:my|our|the)\s+(?:sheets?|bedding|bed\s*linen)\s+(?:(?:are|is|look|looks|seem|seems)\s+)?(?:dirty|stained|unclean)|(?:dirty|stained|unclean)\s+(?:sheets?|bedding|bed\s*linen)|(?:my|our|the)\s+(?:room|bathroom)\s+needs?\s+(?:cleaning|disinfect(?:ing|ion)))\b/i;
-const STAINED_LINEN_REQUEST = /\b(?:there\s+(?:is|are)\s+(?:a\s+)?stains?\s+on\s+(?:(?:my|our|the)\s+)?(?:bed\s+)?(?:sheets?|bedding|bed\s*linen)|(?:(?:my|our|the)\s+)?(?:bed\s+)?(?:sheets?|bedding|bed\s*linen)\s+(?:has|have)\s+(?:a\s+)?stains?|stains?\s+on\s+(?:(?:my|our|the)\s+)?(?:bed\s+)?(?:sheets?|bedding|bed\s*linen))\b/i;
 const LOST_KEY_REQUEST = /\b(?:(?:(?:i|we)\s+(?:have\s+)?)?lost\s+(?:(?:my|our|the|a)\s+)?(?:room\s+)?key|(?:(?:my|our|the)\s+)?(?:room\s+)?key\s+(?:is\s+)?(?:lost|missing)|(?:cannot|can['’]?t|unable\s+to)\s+find\s+(?:(?:my|our|the)\s+)?(?:room\s+)?key|(?:(?:i(?:['’]?m|\s+am)?|we(?:['’]?re|\s+are)?)\s+)?locked\s+out|(?:cannot|can['’]?t|unable\s+to)\s+(?:get|go)\s+(?:back\s+)?into\s+(?:my|our|the)\s+room|(?:(?:i|we)\s+)?forgot\s+(?:(?:my|our|the)\s+)?(?:room\s+)?key|(?:(?:i|we)\s+)?need\s+(?:a\s+)?(?:spare|replacement)\s+key|where\s+is\s+(?:(?:my|our|the)\s+)?spare\s+key)\b/i;
-const GENERIC_HUMAN_CONTACT_REQUEST = /^(?:(?:please|hello|hi)\s+)?(?:i\s+(?:(?:need|want|would\s+like)\s+to|wanna)\s+(?:talk|speak)\s+(?:to|with)\s+(?:a\s+)?(?:human|person|someone|staff|(?:the\s+)?team|reception|housekeeper)|i\s+(?:(?:need|want|would\s+like)\s+to|wanna)\s+call\s+(?:you|(?:a\s+)?(?:human|person)|someone|staff|(?:the\s+)?team|reception|(?:the\s+)?housekeeper)|(?:can|could)\s+i\s+(?:(?:talk|speak)\s+(?:to|with)|call)\s+(?:a\s+)?(?:you|human|person|someone|staff|(?:the\s+)?team|reception|(?:the\s+)?housekeeper)|(?:talk|speak)\s+(?:to|with)\s+(?:a\s+)?(?:human|person|someone|staff|(?:the\s+)?team|reception|housekeeper)|contact\s+(?:the\s+)?(?:team|staff|reception|housekeeper)|(?:human|person|staff|reception|housekeeper)\s+please|i\s+need\s+(?:a\s+)?(?:human|person)|call\s+(?:the\s+)?(?:team|staff|reception|housekeeper))(?:\s+please)?$/;
-const PROPERTY_HUMAN_CONTACT_REQUEST = /^(?:(?:please\s+)?(?:call|contact)\s+(?:the\s+)?(?:hotel|house|property)|(?:can|could)\s+i\s+(?:call|contact)\s+(?:the\s+)?(?:hotel|house|property))(?:\s+please)?$/;
-const SPECIFIC_STAFF_CONTACT_REQUEST = /^(?:(?:please\s+)?(?:can|could|may)\s+i\s+(?:call|contact|talk\s+to|speak\s+to)\s+(?:the\s+)?(?:housekeeper|su)|please\s+let\s+me\s+(?:call|contact|talk\s+to|speak\s+to)\s+(?:the\s+)?(?:housekeeper|su)|(?:please\s+)?(?:call|contact|talk\s+to|speak\s+to)\s+(?:the\s+)?(?:housekeeper|su)|please\s+call\s+for\s+me)$/;
-const STRONG_HUMAN_CONTACT_REQUEST = /^(?:(?:i\s+)?(?:urgently|really)\s+(?:need|want|would\s+like)\s+(?:(?:a\s+)?(?:human|person|someone|staff|team|reception|housekeeper)|(?:to\s+)?(?:talk|speak)\s+(?:to|with)\s+(?:a\s+)?(?:human|person|someone|staff|team|reception|housekeeper))|i\s+(?:need|want|would\s+like)\s+to\s+personally\s+(?:talk|speak)\s+(?:to|with)\s+(?:them|(?:a\s+)?(?:human|person|someone|staff|team|reception|housekeeper)))(?:\s+please)?$/;
-const DISSATISFIED_HUMAN_CONTACT_REQUEST = /\b(?:i\s+)?(?:need|want|would\s+like)\s+to\s+(?:talk|speak)\s+(?:to|with)\s+(?:a\s+)?(?:human|person|someone|staff|team|reception|housekeeper)\b[\s\S]{0,80}\b(?:you\s+(?:can\s+not|cannot|cant)\s+help(?:\s+me)?|you\s+(?:are|re)\s+not\s+helping(?:\s+me)?|this\s+(?:is\s+not|isnt)\s+helping)\b/;
-const HUMAN_CONTACT_REFERENCE = /\b(?:human|person|someone|staff|team|reception|housekeeper|su|call|talk|speak|contact)\b/;
-const PERSISTENT_HUMAN_CONTACT_REQUEST = /^(?:i\s+)?(?:still|really)\s+(?:need|want|would\s+like)\s+(?:(?:a\s+)?(?:human|person|someone|staff|team|reception|housekeeper)|(?:to\s+)?(?:talk|speak)\s+(?:to|with)\s+(?:a\s+)?(?:human|person|someone|staff|team|reception|housekeeper))(?:\s+please)?$/;
-const HUMAN_CONTACT_TARGET = /\b(?:human(?:\s+being)?|real\s+(?:human|person)|actual\s+person|live\s+(?:person|agent)|person|someone|somebody|staff|member\s+of\s+staff|team|reception|receptionist|front\s+desk|housekeeper|manager|host|agent|support\s+agent|representative|operator|customer\s+(?:service|support)|support\s+team)\b/;
-const HUMAN_CONTACT_ACTION = /\b(?:talk(?:ing)?|speak(?:ing)?|chat(?:ting)?|call(?:ing)?|contact(?:ing)?|reach(?:ing)?|messag(?:e|ing)|connect(?:ing)?|transfer(?:ring)?|help)\b/;
-const HUMAN_CONTACT_DIRECT = /\b(?:connect|transfer|put)\s+(?:me|us)\b|\b(?:get|give)\s+(?:me|us)\s+(?:a\s+)?(?:real\s+)?(?:human|person|someone|somebody|staff|member\s+of\s+staff|receptionist|agent|support\s+agent|representative|operator)|\b(?:let|allow)\s+(?:me|us)\s+(?:talk|speak|call|contact)\b/;
-const HUMAN_CONTACT_DISSATISFACTION = /\b(?:(?:you|the\s+ai|ai|the\s+bot|bot|concierge)\s+(?:can\s+not|cannot|cant|can\s*t|does\s+not|doesnt|is\s+not|isnt)\s+(?:help|understand|solve|assist)|(?:you|the\s+ai|ai|the\s+bot|bot|concierge)\s+(?:are|re)\s+not\s+helping|this\s+(?:is\s+not|isnt|does\s+not|doesnt)\s+(?:help|work)|no\s+(?:ai|bot)|not\s+(?:the\s+)?(?:ai|bot)|someone\s+else|another\s+person)\b/;
-const HUMAN_CONTACT_URGENCY = /\b(?:urgent(?:ly)?|really|still|now|immediately|personally|must|insist|just)\b/;
-const LOCAL_INFORMATION_TOPIC = /\b(?:beach|bay|swim|snorkel|sunset|restaurant|dinner|lunch|breakfast|brunch|food|seafood|thai\s+food|bar|nightlife|drink|cocktail|cafe|coffee|bakery|shop|shopping|supermarket|pharmacy|atm|bank|laundry|viewpoint|hike|hiking|activity|activities|things\s+to\s+do|island|koh\s+tao|mae\s+haad|sairee|transport|taxi|ferry|scooter|directions?|distance|how\s+far)\w*\b/i;
-const INFORMATION_REQUEST_FORM = /^(?:how|what|where|which|when|why|is|are|do|does|can\s+i\s+find|could\s+you\s+(?:tell|recommend)|tell\s+me|recommend|suggest|any|good|best)\b|\b(?:how\s+far|nearby|close\s+to|recommend(?:ation)?|good\s+for|best\s+for|worth\s+visit)\b/i;
-const SUPPLY_INFORMATION_REQUEST = /\b(?:how\s+often|where\s+(?:are|is)|do\s+you\s+(?:provide|change|replace)|when\s+(?:are|do)|what\s+is\s+the\s+(?:towel|soap|toilet\s+paper))\b[^.?!]*(?:toilet\s+paper|soap|towels?|housekeeping)/i;
-const WIFI_PASSWORD_INFORMATION_REQUEST = /\b(?:(?:wifi|wi\s*fi|internet)\b[^.?!]{0,40}\bpassword|password\b[^.?!]{0,40}\b(?:wifi|wi\s*fi|internet))\b/i;
-const HOUSE_EMERGENCY_CONTACT_REQUEST = /\b(?:(?:do|have|is|are)\s+(?:you|the\s+house)\s+(?:have\s+)?(?:an?\s+)?emergency\s+(?:contact|number|line)|(?:what|which)\s+(?:is\s+)?(?:the\s+)?(?:house\s+)?emergency\s+(?:contact|number|line)|(?:can|could|may)\s+i\s+call\s+(?:an?\s+)?emergency\s+(?:contact|number|line)|emergency\s+(?:contact|number|line)\s+(?:i|we)\s+(?:can|could)\s+call)\b/i;
+const GENERIC_HUMAN_CONTACT_REQUEST = /^(?:(?:please|hello|hi)\s+)?(?:i\s+(?:(?:need|want|would\s+like)\s+to|wanna)\s+(?:talk|speak)\s+(?:to|with)\s+(?:a\s+)?(?:human|person|someone|staff|(?:the\s+)?team|reception)|i\s+(?:(?:need|want|would\s+like)\s+to|wanna)\s+call\s+(?:you|(?:a\s+)?(?:human|person)|someone|staff|(?:the\s+)?team|reception)|(?:can|could)\s+i\s+(?:(?:talk|speak)\s+(?:to|with)|call)\s+(?:a\s+)?(?:you|human|person|someone|staff|(?:the\s+)?team|reception)|(?:talk|speak)\s+(?:to|with)\s+(?:a\s+)?(?:human|person|someone|staff|(?:the\s+)?team|reception)|contact\s+(?:the\s+)?(?:team|staff|reception)|(?:human|person|staff|reception)\s+please|i\s+need\s+(?:a\s+)?(?:human|person)|call\s+(?:the\s+)?(?:team|staff|reception))(?:\s+please)?$/;
+const HUMAN_CONTACT_REFERENCE = /\b(?:human|person|someone|staff|team|reception|call|talk|speak|contact)\b/;
 const GENERIC_URGENT_WORDS = new Set([
   "a", "am", "an", "and", "bad", "emergency", "happened", "has", "have", "help", "i", "in", "is", "it",
   "my", "need", "please", "problem", "really", "room", "serious", "something", "the", "there", "urgent", "very",
@@ -335,7 +314,7 @@ function cleanWorkflowState(value) {
     const countNumber = Number(String(request.guestCount || "").trim());
     const guestCount = Number.isInteger(countNumber) && countNumber >= 1 && countNumber <= 99 ? String(countNumber) : "";
     const allowedMissing = [
-      "kind", "date", "guests", "option", "course", "certification", "time", "pickup", "destination", "tripType", "contact", "nights",
+      "kind", "date", "guests", "option", "course", "certification", "time", "pickup", "destination", "tripType", "contact",
       "planMode", "groupActivity", "groupCount", "agency", "specialty", "specialtyDetail", "unsureCertified", "goal"
     ];
     const groups = kind === "diving" ? cleanDivingGroups(request.groups) : [];
@@ -357,7 +336,6 @@ function cleanWorkflowState(value) {
         preferredDate: cleanWorkflowValue(request.preferredDate, 120),
         guestCount,
         option: cleanWorkflowValue(request.option, 120),
-        extensionNights: kind === "stay_extension" ? (stayExtensionNights(request.extensionNights || request.option || "", true) || "") : "",
         courseName: cleanWorkflowValue(request.courseName, 120),
         certificationLevel: cleanWorkflowValue(request.certificationLevel, 120),
         preferredProvider: cleanWorkflowValue(request.preferredProvider, 120),
@@ -540,115 +518,20 @@ function isFireEmergencyMessage(question) {
   return /\b(?:fire (?:in|inside|at) (?:my |the |our )?(?:room|bathroom|property|house|building)|(?:my |the |our )?(?:room|bathroom|property|house|building) is on fire|there is (?:a )?fire|flames? (?:in|inside|coming from) (?:my |the |our )?(?:room|property|house|building))\b/.test(normalized);
 }
 
-function recentFireEmergencyContext(history = []) {
-  return history.slice(-6).some((item) => {
-    const content = String(item?.content || "");
-    if (item?.role === "user" && (isFireEmergencyMessage(content) || /\b(?:fire|smoke|flames?)\b/i.test(content))) return true;
-    return item?.role === "assistant" && /\b(?:fire extinguisher|Koh Tao Rescue|real fire|leave the room or building)\b/i.test(content);
-  });
-}
-
-function isFireContinuationMessage(question) {
-  const normalized = normalizeText(question);
-  return /^(?:there is )?(?:more|still) (?:smoke|fire|flames?)(?: now)?$/.test(normalized)
-    || /^(?:the )?fire (?:is )?(?:getting|becoming) (?:worse|bigger|stronger)$/.test(normalized)
-    || /^(?:it is|it s) (?:getting )?worse$/.test(normalized);
-}
-
-function contextualSafetyResult(question, history = []) {
-  if (!recentFireEmergencyContext(history) || !isFireContinuationMessage(question)) return null;
-  return safetyResultForQuestion("There is a fire in my room.");
-}
-
 function housekeepingItem(question) {
   const source = String(question || "");
   if (/\btoilet\s+paper\b/i.test(source)) return { id: "toilet_paper", label: "toilet paper", delivery: "bring toilet paper to your room" };
   if (/\bsoap\b/i.test(source)) return { id: "soap", label: "soap", delivery: "bring soap to your room" };
   if (/\b(?:(?:new|fresh|clean)\s+)?towels?\b|\btowel\s+(?:change|replacement)\b/i.test(source)) return { id: "fresh_towels", label: "fresh towels", delivery: "bring fresh towels to your room" };
-  if (/\b(?:room\s+cleaning|clean\s+(?:my|our|the)\s+room|housekeeping)\b/i.test(source) || CLEANUP_REQUEST.test(source) || DIRTY_ROOM_CLEANING_REQUEST.test(source) || STAINED_LINEN_REQUEST.test(source)) {
+  if (/\b(?:room\s+cleaning|clean\s+(?:my|our|the)\s+room|housekeeping)\b/i.test(source) || DIRTY_ROOM_CLEANING_REQUEST.test(source)) {
     return { id: "room_cleaning", label: "room cleaning", delivery: "arrange room cleaning" };
   }
   return null;
 }
 
-function isActionableHousekeepingSupply(question) {
-  const source = String(question || "");
-  return HOUSEKEEPING_REQUEST_ACTION.test(source) || HOUSEKEEPING_SUPPLY_MISSING.test(source);
-}
-
-function isWifiPasswordInformationRequest(question) {
-  return WIFI_PASSWORD_INFORMATION_REQUEST.test(normalizeText(question));
-}
-
-function wifiPasswordKnowledgeResult(question, knowledge) {
-  if (!isWifiPasswordInformationRequest(question)) return null;
-  const intent = (knowledge?.intents || []).find((entry) => entry?.id === "wifi");
-  if (!intent?.answer) return null;
-  return deterministicResult({
-    matched: true,
-    intentId: intent.id,
-    category: intent.category || "room",
-    confidence: 1,
-    answer: intent.answer,
-    actions: intent.actions || []
-  }, "approved");
-}
-
-function isIndependentCurrentTurnInformation(question) {
-  const source = String(question || "").trim();
-  if (!source) return false;
-  if (LOST_KEY_REQUEST.test(source)
-    || isActionableStructuredBooking(source)
-    || isActionableLuggageMessage(source)
-    || CLEANUP_REQUEST.test(source)
-    || DIRTY_ROOM_CLEANING_REQUEST.test(source)
-    || STAINED_LINEN_REQUEST.test(source)
-    || HOUSEKEEPING_SUPPLY_MISSING.test(source)
-    || (HOUSEKEEPING_ITEM_REQUEST.test(source) && HOUSEKEEPING_REQUEST_ACTION.test(source))) return false;
-  if (SUPPLY_INFORMATION_REQUEST.test(source) || isWifiPasswordInformationRequest(source)) return true;
-  return LOCAL_INFORMATION_TOPIC.test(source) && INFORMATION_REQUEST_FORM.test(source);
-}
-
 function isActionableCleaningRequest(question) {
-  return CLEANUP_REQUEST.test(String(question || ""))
-    || DIRTY_ROOM_CLEANING_REQUEST.test(String(question || ""))
-    || STAINED_LINEN_REQUEST.test(String(question || ""))
+  return DIRTY_ROOM_CLEANING_REQUEST.test(String(question || ""))
     || (HOUSEKEEPING_ITEM_REQUEST.test(String(question || "")) && HOUSEKEEPING_REQUEST_ACTION.test(String(question || "")));
-}
-
-function verifiedAccessAcknowledgementResult(question, access, room) {
-  if (!VERIFIED_ACCESS_ACKNOWLEDGEMENT.test(String(question || "")) || !access?.verified) return null;
-  if (access.accessGranted) {
-    return {
-      answer: `Yes — your guest access is already active${room ? ` for Room ${room}` : ""}. You can use the options above or ask me anything about your stay.`,
-      intentId: "verified_guest_acknowledgement",
-      category: "arrival", confidence: 1, needsHuman: false, handoff: "none",
-      learningGap: false, learningReason: "none", actions: [], suppressDefaultActions: true, source: "access-policy"
-    };
-  }
-  return {
-    answer: `Your stay is already verified${room ? ` for Room ${room}` : ""}, but the required guest registration is not complete yet. Please use Guest registration above to finish it.`,
-    intentId: "verified_guest_registration_pending",
-    category: "arrival", confidence: 1, needsHuman: false, handoff: "none",
-    learningGap: false, learningReason: "none", actions: [], suppressDefaultActions: true, source: "access-policy"
-  };
-}
-
-function genericExistingRequestSubmissionResult(question, workflowState = null) {
-  if (!GENERIC_EXISTING_REQUEST_SUBMISSION.test(String(question || ""))) return null;
-  const structuredCollectorActive = workflowState?.status === "collecting"
-    && ["booking", "luggage", "cleaning"].includes(workflowState?.type);
-  // A real structured collector remains authoritative and will ask for or use
-  // its own missing fields below. Any other stale/monitoring workflow must not
-  // let a context-free "send the request" sentence fall through to the model
-  // and fabricate a generic operational alert or false success message.
-  if (structuredCollectorActive) return null;
-  return {
-    answer: "Please tell me what you need. I’ll send the appropriate request automatically once I have the required details.",
-    intentId: "request_submission_needs_context",
-    category: "stay-support", confidence: 1, needsHuman: false, handoff: "none",
-    learningGap: false, learningReason: "none", actions: [], suppressDefaultActions: true, source: "service-policy"
-  };
 }
 
 function applyRoutineContactAvailability(result, _question, now = new Date()) {
@@ -659,25 +542,14 @@ function applyRoutineContactAvailability(result, _question, now = new Date()) {
   };
 }
 
-function displayPreferredTime(value, allowBareHour = false) {
+function displayPreferredTime(value) {
   const source = String(value || "");
   if (/\b(?:asap|as soon as possible|soonest possible)\b/i.test(source)) return "As soon as possible";
   if (/\b(?:now|right now|immediately|right away)\b/i.test(source)) return "Now";
   if (/\bnoon\b/i.test(source)) return "12:00 PM";
-  let match = source.match(/\b(?:(?:at|around|by|from|prefer(?:red)?(?:\s+time)?(?:\s+is)?)\s*)?((?:[01]?\d|2[0-3])(?::[0-5]\d)?\s*(?:am|pm))\b/i)
+  const match = source.match(/\b(?:(?:at|around|by|from|prefer(?:red)?(?:\s+time)?(?:\s+is)?)\s*)?((?:[01]?\d|2[0-3])(?::[0-5]\d)?\s*(?:am|pm))\b/i)
     || source.match(/\b(?:at|around|by|from)\s*((?:[01]?\d|2[0-3]):[0-5]\d)\b/i)
     || source.match(/^\s*((?:[01]?\d|2[0-3]):[0-5]\d)\s*[.!]?\s*$/i);
-  if (!match && allowBareHour) {
-    const bare = source.match(/^\s*(?:at\s+)?(\d{1,2})\s*[.!]?\s*$/i);
-    if (bare) {
-      const rawHour = Number(bare[1]);
-      if (rawHour >= 1 && rawHour <= 12) {
-        const contextualHour = rawHour >= 1 && rawHour <= 7 ? rawHour + 12 : rawHour;
-        return new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", hour12: true, timeZone: "UTC" })
-          .format(new Date(Date.UTC(2020, 0, 1, contextualHour, 0)));
-      }
-    }
-  }
   if (!match) return "";
   const clock = match[1].trim().toLowerCase();
   const parts = clock.match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)?$/i);
@@ -754,8 +626,8 @@ function cleaningRequestedDay(value, now = new Date()) {
   return addCleaningDays(today, offset);
 }
 
-function cleaningPreference(value, allowBareHour = false) {
-  const display = displayPreferredTime(value, allowBareHour);
+function cleaningPreference(value) {
+  const display = displayPreferredTime(value);
   if (!display) return null;
   if (display === "Now") return { kind: "immediate", display };
   if (display === "As soon as possible") return { kind: "immediate", display };
@@ -767,10 +639,8 @@ function cleaningPreference(value, allowBareHour = false) {
   return { kind: "clock", display, minutes: (hour * 60) + Number(parts[2]) };
 }
 
-function cleaningPreferenceOnly(value, allowBareHour = false) {
-  const source = String(value || "");
-  return /^\s*(?:(?:today|tomorrow|(?:next\s+)?(?:sun|mon|tues|wednes|thurs|fri|satur)day)\s+)?(?:(?:at|around|by|from)\s*)?(?:asap|as\s+soon\s+as\s+possible|soonest\s+possible|now|right\s+now|immediately|right\s+away|noon|(?:[01]?\d|2[0-3])(?::[0-5]\d)?\s*(?:am|pm)|(?:[01]?\d|2[0-3]):[0-5]\d)\s*[.!]?\s*$/i.test(source)
-    || (allowBareHour && /^\s*(?:at\s+)?(?:[1-9]|1[0-2])\s*[.!]?\s*$/i.test(source));
+function cleaningPreferenceOnly(value) {
+  return /^\s*(?:(?:today|tomorrow|(?:next\s+)?(?:sun|mon|tues|wednes|thurs|fri|satur)day)\s+)?(?:(?:at|around|by|from)\s*)?(?:asap|as\s+soon\s+as\s+possible|soonest\s+possible|now|right\s+now|immediately|right\s+away|noon|(?:[01]?\d|2[0-3])(?::[0-5]\d)?\s*(?:am|pm)|(?:[01]?\d|2[0-3]):[0-5]\d)\s*[.!]?\s*$/i.test(String(value || ""));
 }
 
 function cleaningPreferenceLabel(preference, requestedDay, today) {
@@ -860,12 +730,7 @@ function cleaningCompletionAnswer(preferredTime, availability) {
       : availability.weekday === "Sunday" && availability.minutes >= (19 * 60 + 30)
         ? " Housekeeping is currently off duty and is not available on Mondays, so the earliest normal availability is Tuesday from 10:30 AM."
         : ` The earliest normal housekeeping availability is ${nextHousekeepingPhrase(availability)}.`;
-  const displayTime = preferredTime === "Now"
-    ? "now"
-    : preferredTime === "As soon as possible"
-      ? "as soon as possible"
-      : preferredTime;
-  return `Thank you. I’ve sent your cleaning request to The House team. Preferred time: ${displayTime}.${timing} Housekeeping will come as close to your preferred time as possible, depending on availability.`;
+  return `Thank you. I’ve sent your cleaning request to the team with your preferred time of ${preferredTime}.${timing} The requested time depends on staff availability and is not confirmed until the team can accommodate it.`;
 }
 
 function applyCleaningRequestPolicy(question, workflowState = null, now = new Date()) {
@@ -889,12 +754,11 @@ function applyCleaningRequestPolicy(question, workflowState = null, now = new Da
       workflow: { type: "cleaning", status: "cancelled", retainPrivateContact: false, missing: [] }
     };
   }
-  const allowBareHour = Boolean(pendingState || actionableNow);
-  const currentNotes = cleaningPreferenceOnly(question, allowBareHour) ? "" : cleanWorkflowNotes(question);
+  const currentNotes = cleaningPreferenceOnly(question) ? "" : cleanWorkflowNotes(question);
   const notes = pendingState
     ? [pendingState.cleaningRequest?.notes, currentNotes].filter(Boolean).join(" ").replace(/\s+/g, " ").trim().slice(0, 500)
     : currentNotes;
-  const preference = cleaningPreference(question, allowBareHour);
+  const preference = cleaningPreference(question);
   const availability = housekeepingAvailability(now);
   const today = bangkokCleaningDay(now);
   const explicitRequestedDay = cleaningRequestedDay(question, now);
@@ -948,9 +812,7 @@ function applyCleaningRequestPolicy(question, workflowState = null, now = new Da
       intentId: "housekeeping_room_cleaning",
       category: "stay-support", confidence: 1, needsHuman: true, handoff: "stay_support",
       learningGap: false, learningReason: "none",
-      // A complete cleaning collector submits automatically. Routine contact
-      // is exposed only if the operational delivery itself fails.
-      actions: [],
+      actions: availability.open ? [{ label: "Call Us", type: "route", route: "houseCall" }] : [],
       suppressDefaultActions: true,
       housekeepingRequest: {
         item: "room cleaning", afterHours: availability.afterHours, preferredTime,
@@ -970,13 +832,13 @@ export function housekeepingServiceResult(question, now = new Date()) {
   const item = housekeepingItem(question);
   if (!item || (item.id === "room_cleaning"
     ? !isActionableCleaningRequest(question)
-    : (!HOUSEKEEPING_ITEM_REQUEST.test(question) || !isActionableHousekeepingSupply(question)))) return null;
+    : (!HOUSEKEEPING_ITEM_REQUEST.test(question) || !HOUSEKEEPING_REQUEST_ACTION.test(question)))) return null;
   if (item.id === "room_cleaning") return applyCleaningRequestPolicy(question, null, now).result;
   const availability = housekeepingAvailability(now);
   const afterHours = availability.afterHours;
   const answer = afterHours
-    ? `I’ll send your ${item.label} request to The House team now. Housekeeping is currently off duty; the next normal availability is ${nextHousekeepingPhrase(availability)}.`
-    : `I’ll send your ${item.label} request to The House team now.`;
+    ? `Thank you for your request. Our housekeeping team is currently off duty, but your request has already been recorded. We’ll ${item.delivery} ${nextHousekeepingPhrase(availability)}, and you do not need to request it again.`
+    : `Thank you for your request. We’ll ${item.delivery} as soon as possible. If you haven’t received it within 30 minutes, please call us using the button below.`;
   return {
     answer,
     intentId: `housekeeping_${item.id}`,
@@ -986,8 +848,8 @@ export function housekeepingServiceResult(question, now = new Date()) {
     handoff: "stay_support",
     learningGap: false,
     learningReason: "none",
-    actions: [],
-    suppressDefaultActions: true,
+    actions: afterHours ? [] : [{ label: "Call Us", type: "route", route: "houseCall" }],
+    suppressDefaultActions: afterHours,
     housekeepingRequest: { item: item.label, afterHours, earliestService: availability.open ? "Current housekeeping hours" : availability.nextOpening },
     source: "service-policy"
   };
@@ -1205,66 +1067,17 @@ function activeLostKeyFeeWorkflow(workflowState) {
   return workflowState?.type === "lost_key" && workflowState.status === "awaiting_fee_acceptance";
 }
 
-function broadHumanContactRequest(question) {
-  const normalized = normalizeText(question);
-  if (!normalized || normalized.length > 320) return false;
-  const hasTarget = HUMAN_CONTACT_TARGET.test(normalized);
-  const hasAction = HUMAN_CONTACT_ACTION.test(normalized);
-  const direct = HUMAN_CONTACT_DIRECT.test(normalized);
-  const requestLanguage = /\b(?:need|want|wanna|would like|prefer|please|insist|demand|can i|could i|may i|can we|could we|let me|let us)\b/.test(normalized);
-  const imperative = /^(?:please\s+)?(?:talk|speak|chat|call|contact|reach|connect|transfer)\b/.test(normalized);
-  const dissatisfaction = HUMAN_CONTACT_DISSATISFACTION.test(normalized);
-  const helpFromPerson = /\b(?:need|want|would like|can i get|could i get)\s+(?:some\s+)?(?:help|assistance)\s+(?:from|by)\s+(?:a\s+)?(?:human|person|someone|somebody|staff|member\s+of\s+staff|team|reception|receptionist|housekeeper|manager|host|agent|support\s+agent|representative|operator)\b/.test(normalized);
-  const bareDirect = /^(?:human|real human|real person|person|someone|somebody|staff|member of staff|reception|receptionist|housekeeper|manager|agent|support agent|representative|operator)(?: please)?$/.test(normalized);
-  const callUs = /\b(?:call|contact|reach|speak to|talk to)\s+(?:the\s+)?(?:house|hotel|property|front desk|reception|team|staff|housekeeper|manager)\b/.test(normalized);
-  return bareDirect || direct || helpFromPerson || callUs || (hasTarget && dissatisfaction) || (hasTarget && hasAction && (requestLanguage || imperative)) || (hasTarget && /\b(?:need|want|wanna|prefer|would like|now)\b/.test(normalized));
-}
-
-function broadPersistentHumanContactRequest(question) {
-  const normalized = normalizeText(question);
-  if (!broadHumanContactRequest(normalized)) return false;
-  return HUMAN_CONTACT_DISSATISFACTION.test(normalized)
-    || HUMAN_CONTACT_URGENCY.test(normalized)
-    || HUMAN_CONTACT_DIRECT.test(normalized)
-    || /^(?:human|real human|real person|person|someone|somebody|staff|member of staff|reception|receptionist|housekeeper|manager|agent|support agent|representative|operator)(?: please)?$/.test(normalized);
-}
-
-function isPersistentHumanContactRequest(question) {
-  const normalized = normalizeText(question);
-  return PERSISTENT_HUMAN_CONTACT_REQUEST.test(normalized)
-    || STRONG_HUMAN_CONTACT_REQUEST.test(normalized)
-    || DISSATISFIED_HUMAN_CONTACT_REQUEST.test(normalized)
-    || SPECIFIC_STAFF_CONTACT_REQUEST.test(normalized)
-    || broadPersistentHumanContactRequest(normalized);
-}
-
-function isGenericHumanContactRequest(question) {
-  const normalized = normalizeText(question);
-  return GENERIC_HUMAN_CONTACT_REQUEST.test(normalized)
-    || PROPERTY_HUMAN_CONTACT_REQUEST.test(normalized)
-    || broadHumanContactRequest(normalized)
-    || isPersistentHumanContactRequest(normalized);
-}
-
-function priorGenericHumanRequest(history = []) {
-  return history.slice(-6).some((item) => item?.role === "user" && isGenericHumanContactRequest(item.content));
-}
-
-function genericHumanContactResult(question, workflowState, history = [], now = new Date()) {
-  if (!isGenericHumanContactRequest(question)) return null;
+function genericHumanContactResult(question, workflowState, now = new Date()) {
+  if (!GENERIC_HUMAN_CONTACT_REQUEST.test(normalizeText(question))) return null;
   const serviceOpen = housekeepingAvailability(now).open;
   const lostKeyFeePending = activeLostKeyFeeWorkflow(workflowState);
-  const repeatedRequest = isPersistentHumanContactRequest(question)
-    || priorGenericHumanRequest(history);
   const answer = serviceOpen
-    ? repeatedRequest
-      ? "Of course. You can contact The House team directly using the options below."
-      : lostKeyFeePending
-        ? "I can continue helping with the secure spare-key process here. What do you need help with?"
-        : "Of course. Tell me what you need help with, and I’ll try to resolve it here first."
+    ? lostKeyFeePending
+      ? "I can continue helping with the spare-key process here, or you can contact The House team below."
+      : "Of course. You can contact The House team using the options below."
     : lostKeyFeePending
-      ? "I can continue helping with the secure spare-key process here. Our team is currently outside normal service hours. If this is an emergency, please use Emergency help."
-      : "Our team is currently outside normal service hours, but I can continue helping you here. What do you need help with? If this is urgent, please use Emergency help.";
+      ? "I can continue helping with the spare-key process here. Our team is currently outside normal service hours. If this is an emergency, please use Emergency help."
+      : "Our team is currently outside normal service hours. I can continue helping you here. If this is urgent, please use Emergency help.";
   return {
     answer,
     intentId: "generic_human_contact",
@@ -1274,79 +1087,23 @@ function genericHumanContactResult(question, workflowState, history = [], now = 
     handoff: "none",
     learningGap: false,
     learningReason: "none",
-    actions: serviceOpen && repeatedRequest
+    actions: serviceOpen
       ? actionsForHandoff("stay_support")
-      : serviceOpen ? [] : [{ label: "Emergency help", type: "link", href: "/emergency.html" }],
+      : [{ label: "Emergency help", type: "link", href: "/emergency.html" }],
     workflow: workflowState || null,
     suppressDefaultActions: true,
     source: "human-contact-policy"
   };
 }
 
-function isStayExtensionRequest(value) {
-  const normalized = normalizeText(value);
-  if (!normalized) return false;
-  return /\b(?:extend|extension|prolong)\b[\s\S]{0,45}\b(?:stay|booking|reservation|room)\b/.test(normalized)
-    || /\b(?:stay|remain|keep the room|keep my room|keep our room)\b[\s\S]{0,45}\b(?:longer|another night|more nights?|extra nights?|additional nights?)\b/.test(normalized)
-    || /\b(?:can|could|may|would)\s+(?:i|we)\s+(?:stay|remain)\s+(?:for\s+)?longer\b/.test(normalized)
-    || /\b(?:i|we)\s+(?:want|wanna|need|would like|would love)\s+to\s+(?:stay|remain)\s+(?:for\s+)?longer\b/.test(normalized)
-    || /\b(?:add|book|have|take)\s+(?:another|an extra|extra|additional|more|\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten)\s+(?:more\s+|extra\s+|additional\s+)?nights?\b/.test(normalized)
-    || /\b(?:i|we)\s+(?:need|want|would like|would love)\s+(?:\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten)\s+(?:more|extra|additional)\s+nights?\b/.test(normalized)
-    || /\b(?:extend|prolong)\s+(?:it\s+)?(?:by|for)\s+(?:\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten)\s+nights?\b/.test(normalized)
-    || /\b(?:have|keep)\s+(?:the|my|our)\s+room\b[\s\S]{0,35}\b(?:\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten|another)\s+(?:more\s+|extra\s+|additional\s+)?nights?\b/.test(normalized)
-    || /\b(?:is it|would it be)\s+possible\s+(?:for\s+(?:me|us)\s+)?to\s+(?:stay|remain)\s+(?:for\s+)?longer\b/.test(normalized)
-    || /\b(?:i|we)(?:\s+d|\s+would)?\s+like\s+(?:another|an extra|extra|additional)\s+(?:\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten)?\s*nights?\b/.test(normalized)
-    || /^(?:\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten)\s+(?:more|extra|additional)\s+nights?(?:\s+please)?$/.test(normalized)
-    || /\b(?:another|one more|an extra|extra|additional)\s+night(?:s)?\s+(?:please|for our stay|for my stay)?$/.test(normalized)
-    || /\b(?:keep|have)\s+(?:the|my|our)\s+room\s+(?:for\s+)?(?:longer|another\s+day|more\s+days?|extra\s+days?|additional\s+days?)\b/.test(normalized)
-      || /\b(?:stay|remain)\s+(?:for\s+)?(?:another\s+day|one\s+more\s+day|more\s+days?|extra\s+days?|additional\s+days?)\b/.test(normalized)
-      || /\b(?:i|we)\s+(?:need|want|would\s+like|would\s+love)\s+(?:another|one\s+more|an\s+extra|extra|additional|more|\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten)\s+(?:more\s+|extra\s+|additional\s+)?days?\b/.test(normalized)
-      || /\b(?:add|book|have|take)\s+(?:another|an\s+extra|extra|additional|more|one\s+more|\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten)\s+(?:more\s+|extra\s+|additional\s+)?days?\b/.test(normalized)
-      || /\b(?:stay|remain)\s+until\s+(?:tomorrow|the\s+next\s+day|[a-z]{3,9}|\d{1,2}(?:st|nd|rd|th)?(?:\s+[a-z]{3,9})?)\b/.test(normalized)
-      || /^(?:(?:can|could|may)\s+(?:i|we)\s+)?extend(?:\s+(?:it|this))?(?:\s+please)?$/.test(normalized)
-      || /\bstay\s+(?:\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten)\s+(?:more|extra|additional)\s+nights?\b/.test(normalized);
-}
-
-function stayExtensionNights(value, allowBare = false) {
-  const normalized = normalizeText(value);
-  const words = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10 };
-  const numeric = normalized.match(/\b(\d{1,2})\s+(?:(?:more|extra|additional)\s+)?nights?\b/)
-    || normalized.match(/\b(?:another|extra|additional)\s+(\d{1,2})\s+nights?\b/)
-    || normalized.match(/\b(?:extend|extension|stay)\b[\s\S]{0,30}\b(?:by|for)?\s*(\d{1,2})\s+nights?\b/);
-  if (numeric) {
-    const nights = Number(numeric[1]);
-    return nights >= 1 && nights <= 99 ? String(nights) : "";
-  }
-  const written = normalized.match(/\b(one|two|three|four|five|six|seven|eight|nine|ten)\s+(?:(?:more|extra|additional)\s+)?nights?\b/)
-    || normalized.match(/\b(?:another|extra|additional)\s+(one|two|three|four|five|six|seven|eight|nine|ten)\s+nights?\b/);
-  if (written) return String(words[written[1]]);
-  if (/\b(?:another night|one more night|an extra night|extra night|additional night)\b/.test(normalized)) return "1";
-  if (allowBare) {
-    const bare = normalized.match(/^(\d{1,2})$/);
-    if (bare) {
-      const nights = Number(bare[1]);
-      return nights >= 1 && nights <= 99 ? String(nights) : "";
-    }
-    if (words[normalized]) return String(words[normalized]);
-  }
-  return "";
-}
-
-function stayExtensionOption(nights) {
-  const count = Number(nights);
-  if (!Number.isInteger(count) || count < 1) return "";
-  return `${count} additional night${count === 1 ? "" : "s"}`;
-}
-
 function bookingKindFromText(value) {
   const source = String(value || "");
-  if (isStayExtensionRequest(source)) return "stay_extension";
   if (/\b(?:motorbike|motorcycle|scooter)\s+taxi\b/i.test(source)) return "motorbike_taxi";
   if (/\b(?:taxi\s+boat|boat\s+taxi|longtail(?:\s+boat)?)\b/i.test(source)) return "taxi_boat";
   if (/\bferr(?:y|ies)(?:\s+tickets?)?\b/i.test(source)) return "ferry";
   if (/\b(?:fish(?:ing)?\s+trip|sport\s+fishing|food\s+fishing|go\s+fishing|fishing)\b/i.test(source)) return "fishing";
   if (/\b(?:snorkel|snorkeling|snorkelling)\b/i.test(source)) return "snorkeling";
-  if (/\b(?:dive|diving|scuba|open\s+water|advanced\s+open\s+water)\b/i.test(source) || DIVING_COURSE_REFERENCE.test(source) || fullDivingProviderName(source)) return "diving";
+  if (/\b(?:dive|diving|scuba|open\s+water|advanced\s+open\s+water)\b/i.test(source) || DIVING_COURSE_REFERENCE.test(source)) return "diving";
   if (/\btaxi\b/i.test(source)) return "taxi";
   return "";
 }
@@ -1359,8 +1116,7 @@ function bookingActivity(kind) {
     taxi: "Taxi",
     taxi_boat: "Taxi boat",
     ferry: "Ferry tickets",
-    motorbike_taxi: "Motorbike taxi",
-    stay_extension: "Stay extension"
+    motorbike_taxi: "Motorbike taxi"
   }[kind] || "Booking request";
 }
 
@@ -1372,26 +1128,22 @@ function bookingStartPrompt(kind) {
     taxi: "Can you arrange a taxi?",
     taxi_boat: "I want to book a taxi boat.",
     ferry: "I want to book ferry tickets.",
-    motorbike_taxi: "I want to book a motorbike taxi.",
-    stay_extension: "I would like to extend my stay."
+    motorbike_taxi: "I want to book a motorbike taxi."
   }[kind] || "I would like to make a booking.";
 }
 
 function isActionableStructuredBooking(value) {
   const source = String(value || "");
-  return isStayExtensionRequest(source)
-    || ACTIONABLE_STRUCTURED_BOOKING.test(source)
+  return ACTIONABLE_STRUCTURED_BOOKING.test(source)
     || DIRECT_TRANSPORT_BOOKING.test(source)
-    || DIRECT_ACTIVITY_BOOKING.test(source)
-    || DIVING_LEARNING_REQUEST.test(source)
-    || isActionableDivingBooking(source);
+    || DIRECT_ACTIVITY_BOOKING.test(source);
 }
 
 function isExplicitBookingRetry(value) {
   const source = String(value || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
   if (["retry", "try again", "try it again", "try sending it again"].includes(source)) return true;
   const prefix = "(?:(?:can|could|would) you (?:please )?|please )?";
-  const activity = "(?:diving|fishing(?: trip)?|snorkeling(?: trip)?|taxi|ferry(?: tickets?)?|motorbike(?: taxi)?|taxi boat|stay extension)";
+  const activity = "(?:diving|fishing(?: trip)?|snorkeling(?: trip)?|taxi|ferry(?: tickets?)?|motorbike(?: taxi)?|taxi boat)";
   const target = `(?:it|(?:(?:my|the) )?(?:${activity} )?(?:booking|request))`;
   return new RegExp(`^${prefix}(?:retry(?: ${target})?|(?:try|send|resend)(?: sending)? ${target} again)$`, "i").test(source);
 }
@@ -1399,8 +1151,6 @@ function isExplicitBookingRetry(value) {
 function supportedBookingInformationResult(question) {
   const kind = bookingKindFromText(question);
   if (!kind || kind === "diving" || isActionableStructuredBooking(question)) return null;
-  if (kind === "snorkeling"
-    && /\b(?:spot|place|beach|bay|shore|reef|where|best|good|quiet|sunset|swim|around|recommend)\w*\b/i.test(question)) return null;
   const descriptions = {
     fishing: "The House can help arrange fishing trips, including sport, food-fishing and relaxed or family-style options where available. The booking team will confirm the current options, availability and price.",
     snorkeling: "The House can help arrange snorkeling trips. Private, group, boat and shore-based options depend on current operators, sea conditions and availability, so the booking team will confirm the current choices and price.",
@@ -1420,66 +1170,9 @@ function supportedBookingInformationResult(question) {
   };
 }
 
-function conciseProjectReason(record) {
-  const source = String(record?.sourceType === "beach"
-    ? (record?.recommendation || record?.bestKnownFor || record?.summary || record?.perfectFor || "")
-    : (record?.bestKnownFor || record?.summary || record?.recommendation || record?.perfectFor || ""))
-    .replace(/\*\*/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
-  if (!source) return "a relevant option from The House’s approved local guide";
-  const sentence = source.match(/^.*?(?:[.!?](?=\s|$)|$)/)?.[0] || source;
-  return sentence.slice(0, 260).replace(/[.!?]+$/, "");
-}
-
-function projectKnowledgeResult(question, projectKnowledge = []) {
-  if (!projectKnowledge.length) return null;
-  const source = String(question || "");
-  const barQuestion = /\b(?:bar|drink|cocktail|beer|nightlife|club|sunset)\w*\b/i.test(source);
-  const needsLateNightOrFood = /\b(?:nightclub|very\s+late|late[- ]night|after\s+midnight|food|eat|meal|kitchen|fire\s+show|sports\s+bar)\b/i.test(source);
-  let records = [...projectKnowledge];
-  if (barQuestion && needsLateNightOrFood) {
-    const suitable = records.filter((record) => record.name !== "Bamboo Beach Bar");
-    if (suitable.length) records = suitable;
-  }
-  const choices = records.slice(0, 3);
-  if (!choices.length) return null;
-  const bambooFirst = choices[0]?.name === "Bamboo Beach Bar" && !needsLateNightOrFood;
-  const introduction = bambooFirst
-    ? "Bamboo Beach Bar is The House’s first recommendation for a relaxed beach drink or sunset."
-    : choices.length === 1
-      ? `${choices[0].name} is the strongest match in The House’s approved local guide.`
-      : "These are the strongest matches in The House’s approved local guide:";
-  const details = choices
-    .map((record) => `${record.name} — ${conciseProjectReason(record)}`)
-    .join("\n");
-  return {
-    answer: `${introduction}\n${details}`,
-    intentId: `${choices[0].sourceType || "local"}_recommendation`,
-    category: "concierge",
-    confidence: 0.9,
-    needsHuman: false,
-    handoff: "none",
-    learningGap: false,
-    learningReason: "none",
-    actions: [],
-    suppressDefaultActions: true,
-    source: "project-knowledge"
-  };
-}
-
-function isSnorkelingInformationRequest(question) {
-  return /\bsnorkel(?:ing|ling)?\w*\b/i.test(String(question || ""));
-}
-
 function isActionableDivingBooking(value) {
   const source = String(value || "");
-  const provider = fullDivingProviderName(source);
-  const providerBookingIntent = Boolean(provider
-    && /\b(?:can|could|would|may|want|wanna|prefer|choose|go|book|arrange|with|through|at)\b/i.test(source));
   return ACTIONABLE_DIVING_BOOKING.test(source)
-    || DIVING_LEARNING_REQUEST.test(source)
-    || providerBookingIntent
     || (DIRECT_ACTIVITY_BOOKING.test(source) && bookingKindFromText(source) === "diving")
     || (ACTIONABLE_STRUCTURED_BOOKING.test(source) && DIVING_COURSE_REFERENCE.test(source));
 }
@@ -1595,38 +1288,22 @@ function divingRequestedCourseText(value) {
     .trim();
 }
 
-function canonicalDivingProvider(provider) {
-  const clean = String(provider || "").trim();
-  if (!clean) return "";
-  const canonical = {
-    "french kiss diver": "French Kiss Divers",
-    "french kiss divers": "French Kiss Divers",
-    "roctopus dive": "Roctopus Dive",
-    "master diver": "Master Divers",
-    "master divers": "Master Divers"
-  }[clean.toLowerCase()];
-  return canonical || clean;
-}
-
-function fullDivingProviderName(value) {
+function preferredBookingProvider(kind, value) {
+  if (kind !== "diving") return "";
   const source = cleanWorkflowValue(value, 180);
   const candidates = [...source.matchAll(/\b([A-Za-z&'’.-]+(?:\s+[A-Za-z&'’.-]+){0,4}\s+(?:Divers?|Dive(?:\s+(?:Center|Centre|School))?))\b/gi)]
     .map((match) => match[1]
-      .replace(/^(?:(?:or|and|but|instead|rather|can|could|would|may|we|i|to|go|at|via|through|with|the|use|choose|prefer|please)\s+)+/i, "")
+      .replace(/^(?:(?:or|and|but|instead|rather|can|could|would|we|i|to|go|at|via|through|with|the|use|choose|prefer|please)\s+)+/i, "")
       .trim())
     .filter(Boolean);
   const provider = candidates.at(-1) || "";
   if (!provider || provider.split(/\s+/).length > 5) return "";
-  return canonicalDivingProvider(provider);
-}
-
-function preferredBookingProvider(kind, value) {
-  if (kind !== "diving") return "";
-  const source = cleanWorkflowValue(value, 180);
-  const fullProvider = fullDivingProviderName(source);
-  if (fullProvider) return fullProvider;
-  if (/\bfrench\s+kiss\b/i.test(source)) return "French Kiss Divers";
-  return "";
+  const canonical = {
+    "french kiss divers": "French Kiss Divers",
+    "roctopus dive": "Roctopus Dive",
+    "master divers": "Master Divers"
+  }[provider.toLowerCase()];
+  return canonical || provider;
 }
 
 function bookingSideContext(kind, value) {
@@ -2187,82 +1864,6 @@ function bookingCollectionStep(kind, missing, rejectedLocalContact = false, isNe
   };
 }
 
-function stayExtensionBookingPolicy(result, question, currentReplyContact = "", workflowState = null, retryingDelivery = false) {
-  const pendingState = workflowState?.type === "booking" && workflowState.status === "collecting" && workflowState.kind === "stay_extension"
-    ? workflowState
-    : null;
-  const actionableNow = isStayExtensionRequest(question);
-  if (!pendingState && !actionableNow) return { handled: false, result, alertQuestion: question, workflow: null };
-  if (/^\s*(?:cancel|never\s*mind|nevermind|forget\s+it)\s*[.!]?\s*$/i.test(question)) {
-    return {
-      handled: true,
-      result: { ...result, answer: "No problem. I have cancelled the stay-extension request.", intentId: "stay_extension_cancelled", category: "booking", needsHuman: false, handoff: "none", actions: [], suppressDefaultActions: true, source: "booking-policy" },
-      alertQuestion: question,
-      workflow: { type: "booking", kind: "stay_extension", status: "cancelled", retainPrivateContact: false, missing: [] }
-    };
-  }
-  const previous = pendingState?.bookingRequest || {};
-  const expectedField = pendingState?.missing?.[0] || "";
-  const currentNights = retryingDelivery ? "" : stayExtensionNights(question, expectedField === "nights");
-  const extensionNights = currentNights || previous.extensionNights || stayExtensionNights(previous.option || "");
-  const contact = validInternationalReplyContact(currentReplyContact);
-  const rejectedLocalContact = Boolean(currentReplyContact && !contact);
-  const option = stayExtensionOption(extensionNights) || previous.option || "";
-  const notes = previous.notes || (actionableNow ? cleanWorkflowNotes(question) : "");
-  const request = {
-    kind: "stay_extension",
-    activity: "Stay extension",
-    preferredDate: "",
-    guestCount: "",
-    option,
-    extensionNights,
-    courseName: "",
-    certificationLevel: "",
-    preferredProvider: "",
-    pickupTime: "",
-    pickupLocation: "",
-    destination: "",
-    tripType: "",
-    notes
-  };
-  const missing = [];
-  if (!extensionNights) missing.push("nights");
-  if (!contact) missing.push("contact");
-  if (missing.length) {
-    const field = missing[0];
-    const answer = field === "nights"
-      ? `${pendingState ? "" : "Of course. "}How many additional nights would you like to stay?`
-      : rejectedLocalContact ? LOCAL_CONTACT_PROMPT : CONTACT_PROMPT;
-    return {
-      handled: true,
-      result: {
-        ...result,
-        answer,
-        intentId: "stay_extension_booking_request",
-        category: "booking", confidence: 1, needsHuman: false, handoff: "booking", learningGap: false, learningReason: "none", actions: [], suppressDefaultActions: true,
-        source: "booking-policy"
-      },
-      alertQuestion: `Stay extension request pending${extensionNights ? `; ${stayExtensionOption(extensionNights)}` : ""}.`,
-      workflow: { type: "booking", kind: "stay_extension", status: "collecting", retainPrivateContact: Boolean(contact), missing, bookingRequest: request }
-    };
-  }
-  const summary = `Stay extension request; ${stayExtensionOption(extensionNights)}.`;
-  return {
-    handled: true,
-    result: {
-      ...result,
-      intentId: "stay_extension_booking_request",
-      category: "booking", confidence: 1, handoff: "booking", needsHuman: true, learningGap: false, learningReason: "none", actions: [], suppressDefaultActions: true,
-      privateReplyContact: contact,
-      requestedDateTime: stayExtensionOption(extensionNights),
-      bookingRequest: request,
-      source: "booking-policy"
-    },
-    alertQuestion: summary,
-    workflow: { type: "booking", kind: "stay_extension", status: "ready", retainPrivateContact: false, missing: [], bookingRequest: request }
-  };
-}
-
 function generalBookingPolicy(result, question, currentReplyContact = "", workflowState = null, now = new Date(), retryingDelivery = false) {
   const pendingState = workflowState?.type === "booking" && workflowState.status === "collecting"
     ? workflowState
@@ -2384,40 +1985,16 @@ function generalBookingPolicy(result, question, currentReplyContact = "", workfl
 function applyStructuredBookingPolicy(result, question, history, currentReplyContact = "", workflowState = null, now = new Date(), retryingDelivery = false) {
   const pendingKind = workflowState?.type === "booking" && workflowState.status === "collecting" ? workflowState.kind : "";
   const kindNow = bookingKindFromText(question);
-  if (pendingKind === "stay_extension" || kindNow === "stay_extension" || isStayExtensionRequest(question)) {
-    return stayExtensionBookingPolicy(result, question, currentReplyContact, workflowState, retryingDelivery);
-  }
   if (pendingKind === "diving" || kindNow === "diving" || isActionableDivingBooking(question)) {
     return applyDivingBookingPolicy(result, question, history, currentReplyContact, workflowState, now, retryingDelivery);
   }
   return generalBookingPolicy(result, question, currentReplyContact, workflowState, now, retryingDelivery);
 }
 
-function houseEmergencyContactResult(question) {
-  if (!HOUSE_EMERGENCY_CONTACT_REQUEST.test(String(question || ""))) return null;
-  return {
-    answer: "Yes. You can call The House Emergency Support using the button below. If anyone is in immediate danger, call Koh Tao Rescue first.",
-    intentId: "house_emergency_contact",
-    category: "property-emergency",
-    confidence: 1,
-    needsHuman: false,
-    handoff: "property_emergency",
-    learningGap: false,
-    learningReason: "none",
-    actions: [
-      { label: "Call The House Emergency Support", type: "route", route: "propertyEmergencyCall", style: "danger" },
-      { label: "Call Koh Tao Rescue", type: "route", route: "rescueCall", style: "danger" }
-    ],
-    suppressDefaultActions: true,
-    source: "safety-policy"
-  };
-}
-
 function emergencyConfirmationActions(kind) {
   if (kind === "fire") {
     return [
       { label: "Call Koh Tao Rescue", type: "route", route: "rescueCall", style: "danger" },
-      { label: "Call The House Emergency Support", type: "route", route: "propertyEmergencyCall", style: "danger" },
       { label: "Send urgent alert", type: "server_action", action: "confirm_urgent_property", style: "danger" },
       { label: "Cancel", type: "dismiss" }
     ];
@@ -2425,7 +2002,6 @@ function emergencyConfirmationActions(kind) {
   if (kind === "property") {
     return [
       { label: "Send urgent alert", type: "server_action", action: "confirm_urgent_property", style: "danger" },
-      { label: "Call The House Emergency Support", type: "route", route: "propertyEmergencyCall", style: "danger" },
       { label: "Cancel", type: "dismiss" }
     ];
   }
@@ -2439,7 +2015,7 @@ function emergencyConfirmationActions(kind) {
 function safetyResultForQuestion(question) {
   if (isFireEmergencyMessage(question)) {
     return {
-      answer: "If there is a real fire, leave the room or building and move to a safe place immediately. Call Koh Tao Rescue using the button below. There is a fire extinguisher mounted outside on the wall on each floor. Only try to use it if the fire is small, you have a safe escape route and you can do so without putting yourself in danger. You can also call The House Emergency Support or send an urgent alert to The House team.",
+      answer: "If there is a real fire, leave the room or building and move to a safe place immediately. Call Koh Tao Rescue using the button below. There is a fire extinguisher mounted outside on the wall on each floor. Only try to use it if the fire is small, you have a safe escape route and you can do so without putting yourself in danger. Would you also like to send an urgent alert to The House emergency team?",
       intentId: "fire_emergency",
       category: "property-emergency",
       confidence: 1,
@@ -2453,7 +2029,7 @@ function safetyResultForQuestion(question) {
   }
   if (isCriticalPropertyMessage(question)) {
     return {
-      answer: "This sounds serious. Move away from the danger first. You can call The House Emergency Support now or send an urgent alert to The House team.",
+      answer: "This sounds serious. Move away from the danger first. Send an urgent alert to The House emergency team now?",
       intentId: "property_emergency",
       category: "property-emergency",
       confidence: 1,
@@ -2799,10 +2375,7 @@ AUTHORITATIVE KNOWLEDGE
 - Owner-approved entries are equally authoritative.
 - RETRIEVED APPROVED PROJECT RECORDS contain the most relevant existing activity, restaurant, café, beach, bar and shopping records for this question.
 - When a retrieved record is relevant, use it instead of claiming that no confirmed recommendation exists.
-- Treat the exact CURRENT user message as authoritative. Analyze it before transcript history. If it clearly asks about a new independent topic, answer that topic only; never continue an older cleaning, booking, luggage, maintenance or other workflow in that answer.
-- Transcript history may resolve a pronoun or a genuinely incomplete follow-up, but it must never fabricate or replace the subject of a clear current request.
-- When asked for a general recommendation, lead with a record explicitly marked preferredByTheHouse=true. For general bars or drinks, Bamboo Beach Bar is first. If a specific requirement makes that preferred option unsuitable, choose a better matching approved record and explain why.
-- Give one to three strong choices with concise reasons. Do not dump the full dataset or expose raw project records.
+- When asked for a general recommendation, lead with a record explicitly marked preferredByTheHouse=true. Otherwise choose by the guest's stated constraints and explain the fit without claiming every alternative is inferior.
 - For diving recommendations, always recommend RAID training because of its focus on dive safety and buoyancy control, and always recommend Roctopus Dive as The House’s preferred RAID dive centre. You may also explain the team’s friendly professional service, small groups, personal attention and welcoming approach for first-time or nervous divers. If a guest explicitly requests PADI or SSI, state accurately that Roctopus offers RAID training and that the booking team will check an appropriate provider; never imply that Roctopus issues PADI or SSI certification.
 - Treat hours, prices, availability, schedules and conditions as changeable. Mention verification when the record or question requires current confirmation.
 - The current Bangkok date and time is ${bangkokContext()}.
@@ -2820,10 +2393,7 @@ ABSOLUTE SAFETY AND OPERATIONS RULES
 - Classify the full sentence and intended action, not isolated words. Figurative, joking, slang or ambiguous statements such as dying for love, dying laughing, bloody hell, being drunk, or vague burning language are not operational requests by themselves. Clarify when meaning or requested action is uncertain.
 - A statement such as "I am unconscious" is logically ambiguous when typed by the speaker. Give conditional emergency guidance immediately, but do not claim that any House alert has been sent.
 - Routine stay needs such as fresh towels, toilet paper, soap, cleaning, lost keys and room problems use stay_support. Housekeeping operates Tuesday-Sunday from 10:30-19:30 Bangkok time and is unavailable all day Monday. Cleaning requests collect a preferred time and never imply that the time is confirmed; after-hours wording must use the actual next available housekeeping day.
-- This AI Concierge website is not a live staff-chat channel. Never tell a guest that staff will reply in this website/chat, and never ask the guest to manually send a request to the team after the Concierge has collected an operational request. Staff alerts are one-way operational notifications; guest-facing confirmation must state only whether the request was successfully sent and must not promise a chat reply.
 - Activities, transport, rentals, tours and services that The House can arrange use booking. Never suggest booking directly with an operator and never open a direct personal WhatsApp conversation with a staff member.
-- Requests to speak, call, contact, reach, message or be connected/transferred to a human, real person, staff member, reception, housekeeper, manager, host, agent or The House team are human-contact requests regardless of natural wording. Do not turn them into a learning gap or ask the guest to choose an internal routing category. Routine direct contact remains subject to the established service-hours gate.
-- Requests to extend the current stay, stay longer, add extra/additional/more nights or keep the room longer are booking requests. Collect only how many additional nights are requested and an international WhatsApp/phone number, then send the booking request to the booking team. Never promise that the extension is available or confirmed.
 - An information or recommendation question is not a booking request. A clear request to arrange diving must collect the preferred date, number of divers, requested option/course, the exact other course when relevant, certification level for Fun Diving, and an international WhatsApp/phone number before staff is alerted.
 - A booking request is not a confirmed reservation. Availability may be checked first, but a booking is confirmed only after availability has been confirmed and payment has been received.
 - Never discuss internal commercial arrangements, referral terms, revenue or how The House may benefit from a booking. Keep the answer focused on helping the guest arrange what they need.
@@ -2990,14 +2560,6 @@ function finalizeResult(result, question = "") {
     if (action?.route === "bookingCall") return { ...action, route: "houseCall" };
     return action;
   });
-  const routineHumanEscalationAllowed = Boolean(
-    result.allowRoutineHumanEscalation
-    || result.learningGap
-    || result.intentId === "lost_key"
-  );
-  if (!routineHumanEscalationAllowed) {
-    actions = actions.filter((action) => !["houseCall", "houseWhatsapp"].includes(action?.route));
-  }
   let answer = replacesPrivateCommercialLanguage
     ? "Our concierge can help arrange this for you. Use the booking options below and tell us what you need."
     : replacesRoctopusTechnicalDetail
@@ -3025,11 +2587,11 @@ function applyLiveFeaturePolicy(result, env) {
 }
 
 function applyEmergencyConfirmationPolicy(result) {
-  if (["fire_emergency", "urgent_clarification", "house_emergency_contact"].includes(result?.intentId)) return result;
+  if (result?.intentId === "fire_emergency" || result?.intentId === "urgent_clarification") return result;
   if (isCriticalPropertyResult(result)) {
     return {
       ...result,
-      answer: "This sounds serious. Move away from the danger first. You can call The House Emergency Support now or send an urgent alert to The House team.",
+      answer: "This sounds serious. Move away from the danger first. Send an urgent alert to The House emergency team now?",
       needsHuman: false,
       actions: emergencyConfirmationActions("property")
     };
@@ -3133,7 +2695,6 @@ function bookingRequestFromRetrySnapshot(snapshot) {
     preferredDate: snapshot.preferredDate,
     guestCount: snapshot.guestCount,
     option: snapshot.option,
-    extensionNights: snapshot.kind === "stay_extension" ? stayExtensionNights(snapshot.option || "") : "",
     courseName: snapshot.courseName,
     certificationLevel: snapshot.certificationLevel,
     preferredProvider: snapshot.preferredProvider,
@@ -3396,9 +2957,8 @@ export async function handleConciergeRequest(request, env, ctx, now = new Date()
   const history = cleanHistory(body.history);
   const workflowState = cleanWorkflowState(body.workflowState);
   const validShortWorkflowReply = /^\d$/.test(question)
-    && ((workflowState?.type === "booking" && ["guests", "groupCount", "nights"].includes(workflowState.missing?.[0]))
-      || (workflowState?.type === "luggage" && workflowState.missing?.[0] === "bags")
-      || (workflowState?.type === "cleaning" && workflowState.missing?.[0] === "preferredTime"));
+    && ((workflowState?.type === "booking" && ["guests", "groupCount"].includes(workflowState.missing?.[0]))
+      || (workflowState?.type === "luggage" && workflowState.missing?.[0] === "bags"));
   if (!sessionId || (question.length < 2 && !validShortWorkflowReply) || question.length > MAX_QUESTION_LENGTH) {
     return json({ error: "invalid_request" }, 400);
   }
@@ -3461,22 +3021,18 @@ export async function handleConciergeRequest(request, env, ctx, now = new Date()
       ], source: "confirmed-operation", language
     });
   }
-  const directEmergencyContactResult = houseEmergencyContactResult(question);
-  const classifiedSafetyResult = directEmergencyContactResult || safetyResultForQuestion(question) || contextualSafetyResult(question, history);
+  const classifiedSafetyResult = safetyResultForQuestion(question);
   const lostKeyResult = classifiedSafetyResult ? null : lostKeyPolicyResult(question, access, room, now);
   const humanContactResult = classifiedSafetyResult || lostKeyResult
     ? null
-    : genericHumanContactResult(question, workflowState, history, now);
-  const accessAcknowledgementResult = classifiedSafetyResult || lostKeyResult || humanContactResult
-    ? null
-    : verifiedAccessAcknowledgementResult(question, access, room);
-  const urgentClarificationActive = humanContactResult || accessAcknowledgementResult ? false : activeUrgentClarification(history, workflowState);
+    : genericHumanContactResult(question, workflowState, now);
+  const urgentClarificationActive = humanContactResult ? false : activeUrgentClarification(history, workflowState);
   const needsUrgentClarification = !classifiedSafetyResult
     && !humanContactResult
     && (isVagueUrgentMessage(question)
       || (urgentClarificationActive && !hasMeaningfulIncidentDescription(question)));
   const safetyResult = classifiedSafetyResult || (needsUrgentClarification ? urgentClarificationResult(room) : null);
-  let earlyPolicyResult = humanContactResult || accessAcknowledgementResult || (access.accessGranted || (lostKeyResult && access.verified)
+  let earlyPolicyResult = humanContactResult || (access.accessGranted || (lostKeyResult && access.verified)
     ? null
     : (lostKeyResult || publicAccessResult(question, access, room, safetyResult)));
   if (earlyPolicyResult) {
@@ -3559,31 +3115,25 @@ export async function handleConciergeRequest(request, env, ctx, now = new Date()
   }
 
   const effectiveKnowledge = mergeApprovedKnowledge(knowledge, approvedKnowledge);
-  const wifiPasswordResult = wifiPasswordKnowledgeResult(question, effectiveKnowledge);
-  const independentInformationRequest = isIndependentCurrentTurnInformation(question);
-  const informationDetour = Boolean(independentInformationRequest && workflowState);
-  const cleaningPolicy = safetyResult || lostKeyResult || independentInformationRequest
+  const cleaningPolicy = safetyResult || lostKeyResult
     ? { handled: false, result: null, alertQuestion: question, workflow: null }
     : applyCleaningRequestPolicy(question, workflowState, now);
   const servicePolicyResult = safetyResult || lostKeyResult || cleaningPolicy.handled ? null : housekeepingServiceResult(question, now);
-  const propertyPolicy = safetyResult || lostKeyResult || independentInformationRequest || cleaningPolicy.handled || servicePolicyResult
+  const propertyPolicy = safetyResult || lostKeyResult || cleaningPolicy.handled || servicePolicyResult
     ? { handled: false, result: null, alertQuestion: question, workflow: null }
     : propertyIssuePolicy(question, workflowState);
   const roomPolicyResult = safetyResult || lostKeyResult || cleaningPolicy.handled || servicePolicyResult || propertyPolicy.handled ? null : roomLocationResult(question, room);
   const bookingInformationResult = safetyResult || lostKeyResult || cleaningPolicy.handled || servicePolicyResult || propertyPolicy.handled || roomPolicyResult
-    || (workflowState?.type === "booking" && workflowState.status === "collecting" && !independentInformationRequest)
+    || (workflowState?.type === "booking" && workflowState.status === "collecting")
     ? null
     : supportedBookingInformationResult(question);
-  const genericSubmissionResult = safetyResult || lostKeyResult || cleaningPolicy.handled || servicePolicyResult || propertyPolicy.handled || bookingInformationResult
-    ? null
-    : genericExistingRequestSubmissionResult(question, workflowState);
-  const directPolicyResult = safetyResult || lostKeyResult || wifiPasswordResult || cleaningPolicy.result || servicePolicyResult || propertyPolicy.result || roomPolicyResult || bookingInformationResult || genericSubmissionResult;
+  const directPolicyResult = safetyResult || lostKeyResult || cleaningPolicy.result || servicePolicyResult || propertyPolicy.result || roomPolicyResult || bookingInformationResult;
   const criticalPropertyMatch = safetyResult?.intentId === "property_emergency"
     ? matchKnowledge("major water leak", effectiveKnowledge, 0.44)
     : null;
-  const luggageWorkflowActive = !independentInformationRequest && (isActionableLuggageMessage(question)
+  const luggageWorkflowActive = isActionableLuggageMessage(question)
     || workflowState?.type === "luggage"
-    || activeLuggageWorkflowMessages(history).length > 0);
+    || activeLuggageWorkflowMessages(history).length > 0;
   const luggageWorkflowMatch = !criticalPropertyMatch && luggageWorkflowActive
     ? matchKnowledge("luggage storage", effectiveKnowledge, 0.44)
     : null;
@@ -3592,38 +3142,23 @@ export async function handleConciergeRequest(request, env, ctx, now = new Date()
   let result;
   if (directPolicyResult) {
     result = directPolicyResult;
-  } else if (contextualMatch || (shouldUseDeterministic(match, history)
-    && !(independentInformationRequest && match?.intentId === "welcome"))) {
+  } else if (contextualMatch || shouldUseDeterministic(match, history)) {
     result = deterministicResult(match);
   } else if (env.OPENAI_API_KEY) {
-    let projectKnowledge = [];
     try {
-      projectKnowledge = await retrieveApprovedProjectKnowledge(request, env, question);
-      if (independentInformationRequest && isSnorkelingInformationRequest(question) && projectKnowledge.length) {
-        result = projectKnowledgeResult(question, projectKnowledge);
-      } else {
-        const modelHistory = independentInformationRequest ? [] : history;
-        result = {
-          ...(await callOpenAI({ env, question, history: modelHistory, knowledge, approvedKnowledge, projectKnowledge, room, language })),
-          source: "ai"
-        };
-      }
+      const retrievalQuestion = [...history.slice(-2).map((item) => item.content), question].join(" ");
+      const projectKnowledge = await retrieveApprovedProjectKnowledge(request, env, retrievalQuestion);
+      result = {
+        ...(await callOpenAI({ env, question, history, knowledge, approvedKnowledge, projectKnowledge, room, language })),
+        source: "ai"
+      };
     } catch (_error) {
-      result = independentInformationRequest ? projectKnowledgeResult(question, projectKnowledge) : null;
-      if (!result) {
-        const fallbackMatch = safeFallbackMatch(match, question, effectiveKnowledge);
-        result = deterministicResult(fallbackMatch, fallbackMatch.matched ? "approved-fallback" : "fallback");
-      }
-    }
-  } else {
-    const projectKnowledge = independentInformationRequest
-      ? await retrieveApprovedProjectKnowledge(request, env, question).catch(() => [])
-      : [];
-    result = projectKnowledgeResult(question, projectKnowledge);
-    if (!result) {
       const fallbackMatch = safeFallbackMatch(match, question, effectiveKnowledge);
       result = deterministicResult(fallbackMatch, fallbackMatch.matched ? "approved-fallback" : "fallback");
     }
+  } else {
+    const fallbackMatch = safeFallbackMatch(match, question, effectiveKnowledge);
+    result = deterministicResult(fallbackMatch, fallbackMatch.matched ? "approved-fallback" : "fallback");
   }
   result = finalizeResult(result, question);
   result = applyLiveFeaturePolicy(result, env);
@@ -3660,7 +3195,6 @@ export async function handleConciergeRequest(request, env, ctx, now = new Date()
     || servicePolicyResult
     || bookingInformationResult
     || safetyResult
-    || independentInformationRequest
     || (isEmergencyResult(result) && !expectedDivingCertificationAnswer));
   const bookingPolicy = failedBookingCancel
     ? {
@@ -3695,8 +3229,6 @@ export async function handleConciergeRequest(request, env, ctx, now = new Date()
       ? { result, alertQuestion: question, workflow: directWorkflow }
     : servicePolicyResult
       ? { result, alertQuestion: question, workflow: null }
-      : informationDetour
-        ? { result, alertQuestion: question, workflow: workflowState }
       : bookingPolicy.handled
         ? bookingPolicy
         : (luggagePolicy.handled
@@ -3742,15 +3274,6 @@ export async function handleConciergeRequest(request, env, ctx, now = new Date()
       result = {
         ...result,
         answer: "Thank you for letting us know. I’ve sent this to The House team so they can check it as soon as possible.",
-        actions: []
-      };
-    } else if (result.housekeepingRequest?.item && result.housekeepingRequest.item !== "room cleaning") {
-      const item = result.housekeepingRequest.item;
-      result = {
-        ...result,
-        answer: result.housekeepingRequest.afterHours
-          ? `I’ve sent your request for ${item} to The House team. Housekeeping is currently off duty; the next normal availability is ${result.housekeepingRequest.earliestService}.`
-          : `I’ve sent a request for ${item} for your room.`,
         actions: []
       };
     } else if (!result.housekeepingRequest) {

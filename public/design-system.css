@@ -403,7 +403,7 @@ html:not(.explore-enabled) a.card[href="/explore.html"]{display:none!important}
   .room-guide-intro .small{margin-top:5px;line-height:1.45}
   .room-guide-page .hero{min-height:232px;height:232px}
   .room-guide-page .hero img{height:232px;object-position:50% 54%}
-  .room-guide-page[data-room-number="11"] .hero img{object-position:72% 100%}
+  .room-guide-page[data-room-number="11"] .hero img{object-position:72% 58%}
   .room-guide-page[data-room-number="11"] .hero-copy{right:auto;left:18px;max-width:54%}
   .room-guide-page .grid>.card{padding:13px 15px}
   .room-guide-page .grid>.card p{font-size:15px;line-height:1.42}

@@ -1,6 +1,6 @@
 # Product Roadmap
 
-Baseline: v5.11.44
+Baseline: v5.11.33
 
 ## Completed
 
@@ -30,12 +30,6 @@ Baseline: v5.11.44
 - [x] Concierge loading state uses a quiet animated-dot indicator
 - [x] Concierge startup and concierge-first House-support contact routing protected by regression tests
 - [x] Six active Meta WhatsApp template integrations for service, booking, luggage, urgent, verified lost-key and staff status updates
-- [x] Five reviewed Meta action-template mappings active with alert-bound **Received** and **Resolve** quick replies; buttonless service action v1 remains rejected
-- [x] Clear local-information detours override stale ordinary workflow context without deleting recoverable booking, cleaning or luggage state
-- [x] Explore-disabled targeted Concierge retrieval across approved activities, bars, beaches, cafés, restaurants and shopping data
-- [x] Bamboo Beach Bar leads general drinks/nightlife recommendations while specific unsuitable requirements select a better approved fit
-- [x] Natural missing towel, toilet-paper and soap statements create the existing protected service alert; supply questions remain alert-free
-- [x] Routine House contact and booking CTAs are Concierge-first, with in-hours routine human calls available only after persistence
 - [x] Actionable luggage requests routed to Su with structured operational details
 - [x] Complete-field luggage workflow requiring arrival/departure, requested time, bag count and a transient international reply contact before submission
 - [x] Final server-side luggage alert boundary rejecting incomplete or stale requests and universal visible-contact redaction
@@ -150,7 +144,8 @@ The concierge must be useful to real guests before further Explore expansion.
 - [x] Create the private production R2 passport bucket
 - [x] Configure `PASSPORT_TOKEN_PEPPER` and the 14-day R2 lifecycle rule
 - [x] Verify the complete passport flow with a non-sensitive test image
-- [x] Owner decision: do not collect guest-entered passport details; keep registration image-upload/in-person only unless explicitly changed in a future release
+- [ ] Supply the authoritative TM30 manual-entry field specification
+- [ ] Add the secure manual-details alternative after that specification is approved
 - [x] Add a no-upload in-person passport-handover alternative without collecting passport details in the platform
 - [x] Prepare Airbnb scheduled messages as the automatic pre-arrival passport reminder
 - [ ] Confirm the dedicated 24/7 property-emergency person and number
@@ -193,20 +188,8 @@ Guests may continue using ordinary WhatsApp handoffs. Automated internal alerts 
 - [x] Implement and package v5.11.32 smart mobile Concierge states and Room 11 hero crop without changing operational logic.
 - [x] Deploy v5.11.32 and use its real-iPhone movement/duplicate-launcher findings to define v5.11.33.
 - [x] Implement and package v5.11.33 stable mobile Concierge behavior while preserving the Room 11 crop and all operational logic.
-- [x] Deploy v5.11.33 and run the focused real-iPhone smoke check in `DEVELOPMENT_HANDOFF_v5.11.33.md`; real-device review found the Room 11 entrance still clipped at the bottom.
-- [x] Implement and package v5.11.34 as a mobile-only Room 11 vertical crop correction; keep desktop/tablet unchanged.
-- [x] Deploy v5.11.34 and confirm the full marked Room 11 entrance is visible on the real iPhone.
-- [x] Confirm all five intended quick-action templates are reviewed and Active in Meta; never map the buttonless service v1 template.
-- [x] Implement and package v5.11.35 with current-turn topic switching, internal local-guide retrieval, direct missing-supply alerts, Concierge-first routine contacts and reviewed Meta quick-action activation.
-- [x] Retest the existing House Google Maps universal link on mobile and retain it; withdraw the proposed device-specific URL split.
-- [x] Implement and package v5.11.36 directly from deployed v5.11.35 to correct the snorkeling welcome collision and make approved snorkeling records deterministic.
-- [x] Deploy v5.11.36 and smoke-test its production paths; the follow-up testing exposed the four current-turn routing gaps plus the verified Wi-Fi-password redaction failure corrected in v5.11.37 before push.
-- [x] Deploy v5.11.35 and run the affected-behavior production smoke test; real production testing exposed the snorkeling welcome/learning-gap regression now corrected in v5.11.36.
-- [x] Implement and package v5.11.37 directly from deployed v5.11.36 to fix lower-friction Su contact, emergency-history topic switching, natural stained-linen collection, named dive-provider preference and deterministic authorized Wi-Fi-password delivery.
-- [x] Deploy v5.11.37 and begin production smoke testing; testing exposed one guest-facing personal-name wording issue in the otherwise-correct in-hours human handoff.
-- [x] Implement and package v5.11.38 to generalize the handoff wording to **The House team** and explicitly protect the existing office-hours gate.
-- [x] Deploy v5.11.38 and run production smoke testing; the subsequent Room 6 cleaning/reload screenshots exposed the workflow/state issues corrected in v5.11.39.
-- [ ] Keep the five newer human-friendly Meta templates untouched while under review; activate them only after all five are Active in a separate explicitly authorized release.
+- [ ] Deploy v5.11.33 and run the focused real-iPhone smoke check in `DEVELOPMENT_HANDOFF_v5.11.33.md`.
+- [ ] Submit and obtain Meta approval for the five optional quick-action templates documented in `META_STAFF_QUICK_ACTIONS_v5.11.20.md`; never map the buttonless service v1 template and enable only after every intended template is Active.
 - [x] Add `STAY_TOKEN_PEPPER` and `RESERVATION_SYNC_TOKEN` Worker secrets
 - [x] Add protected `SPARE_KEY_CODES` Worker secret before activating automatic spare-key release
 - [x] Install and authorize the included Airbnb Google Apps Script synchronizer
@@ -306,35 +289,3 @@ Live status: disabled through `EXPLORE_ENABLED=false`. Existing pages, data and 
 - Analytics
 - Airbnb and housekeeping integrations
 - Automated availability and booking integrations where commercially appropriate
-
-- [x] Implement and package v5.11.39 to make clean up/cleanup requests deterministic, retain the cleaning collector in the browser, accept contextual bare-hour replies, auto-submit the service alert, remove false website-chat reply wording, use access-aware initial copy, clear invisible stale history on reload, and block context-free generic request alerts.
-- [x] Implement v5.11.40 as a narrow production correction for explicit human requests that include a clear cannot-help reason, preserving routine contact hours and private staff identity.
-- [x] Implement v5.11.41 as a separate mobile/emergency UX correction: add the generic House emergency-call action, deterministic emergency-contact questions, a more compact in-conversation mobile action grid, and remove drag-to-dismiss so chat scrolling cannot move or close the sheet.
-- [x] v5.11.41 was pushed/deployed; fire emergency-call UX, direct emergency-contact routing and mobile sheet stability became the production baseline for later releases.
-
-
-## v5.11.44 release checkpoint
-
-- [x] Remove guest-entered manual passport details from the public registration UI.
-- [x] Remove the `/api/passport-details` guest submission route and all six-field validation/storage logic.
-- [x] Keep passport-image upload and the existing in-person original-passport path unchanged.
-- [x] Keep the all-Thai exemption before foreign passport collection and show the Thai-only exemption in both English and Thai.
-- [x] Preserve protected Admin read/delete compatibility for any legacy v5.11.43 JSON passport-details object so it can be cleaned up safely.
-- [x] Leave v5.11.43 Airbnb five-minute sync, hourly iCal safety net and approved Meta action templates unchanged.
-- [x] Regression suite: 216 passed, 0 failed.
-
-## v5.11.43 release checkpoint
-
-- [x] Harden last-minute Airbnb synchronization with five-minute recent-email polling, trustworthy immediate `complete:false` ingestion, hourly full active-room iCal reconciliation and the existing cancellation-safe 24-hour audit.
-- [x] Activate the five owner-approved human-friendly Meta action templates with exact BODY order and fail-closed all-template gating.
-- [x] Enable secure passport Option 2 with exactly passport number, full name, birthday, nationality, gender/sex as shown on passport and phone number, using the existing private single-use token and retention lifecycle.
-- [x] Production follow-up completed: the standalone Apps Script was updated, `installHouseReservationTrigger` and a full audit were run, and the Room 3 HM-code verification path was confirmed working.
-- [ ] Smoke-test one non-sensitive alert of each Meta kind and one controlled last-minute reservation.
-
-## v5.11.42 release checkpoint
-
-- [x] Replace narrow human-contact phrase matching with a broad deterministic human/person/staff/team/reception/manager/representative intent family while preserving AI-first ordinary requests and service-hour gating.
-- [x] Add a dedicated current-stay extension booking collector for natural “stay longer / extend / extra nights” wording.
-- [x] Collect additional nights and a transient international WhatsApp/phone contact, then route exactly one booking alert to Fah plus both owners.
-- [x] Keep stay-extension wording non-committal: availability, price/payment and final confirmation remain with the team.
-- [x] The last-minute Airbnb synchronization issue was promoted into v5.11.43 with five-minute email detection, immediate trustworthy partial ingestion and hourly iCal reconciliation.

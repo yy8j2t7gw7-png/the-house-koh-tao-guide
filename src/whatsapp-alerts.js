@@ -19,14 +19,6 @@ const TEMPLATE_DEFAULTS = Object.freeze({
   status: "house_alert_status_v1"
 });
 
-const APPROVED_ACTION_TEMPLATE_NAMES = Object.freeze({
-  service: "house_service_alert_actions_v3",
-  booking: "house_booking_alert_actions_v2",
-  luggage: "house_luggage_alert_actions_v2",
-  urgent: "house_urgent_alert_actions_v2",
-  lostKey: "house_lost_key_alert_actions_v2"
-});
-
 const TEMPLATE_SCHEMAS = Object.freeze({
   // These current templates are approved in Meta as generic English. Meta
   // treats `en` and `en_US` as different translations and returns 132001
@@ -48,14 +40,6 @@ const TEMPLATE_SCHEMAS = Object.freeze({
   house_booking_alert_actions_v1: Object.freeze({ kind: "booking", languageCode: "en", bodyParameterCount: 6, quickActions: true }),
   house_urgent_alert_actions_v1: Object.freeze({ kind: "urgent", languageCode: "en", bodyParameterCount: 5, quickActions: true }),
   house_lost_key_alert_actions_v1: Object.freeze({ kind: "lostKey", languageCode: "en", bodyParameterCount: 3, quickActions: true }),
-  // v5.11.43 approved human-friendly action templates. Their BODY variable
-  // order differs from the legacy action templates, so templateValues()
-  // explicitly serializes the approved layout by exact template name.
-  house_service_alert_actions_v3: Object.freeze({ kind: "service", languageCode: "en", bodyParameterCount: 5, quickActions: true, layout: "approved_v2" }),
-  house_booking_alert_actions_v2: Object.freeze({ kind: "booking", languageCode: "en", bodyParameterCount: 6, quickActions: true, layout: "approved_v2" }),
-  house_luggage_alert_actions_v2: Object.freeze({ kind: "luggage", languageCode: "en", bodyParameterCount: 6, quickActions: true, layout: "approved_v2" }),
-  house_urgent_alert_actions_v2: Object.freeze({ kind: "urgent", languageCode: "en", bodyParameterCount: 5, quickActions: true, layout: "approved_v2" }),
-  house_lost_key_alert_actions_v2: Object.freeze({ kind: "lostKey", languageCode: "en", bodyParameterCount: 3, quickActions: true, layout: "approved_v2" }),
   // Kept only as a deliberate rollback path. These are the legacy payload
   // layouts shipped before the replacement templates became active.
   house_service_alert_v1: Object.freeze({ kind: "service", languageCode: "en_US", bodyParameterCount: 5 }),
@@ -102,7 +86,7 @@ function validatedBookingSubmission(result) {
   if (!contact) return null;
   const request = result?.bookingRequest;
   if (!request) return null;
-  const supportedKinds = ["diving", "fishing", "snorkeling", "taxi", "taxi_boat", "ferry", "motorbike_taxi", "stay_extension"];
+  const supportedKinds = ["diving", "fishing", "snorkeling", "taxi", "taxi_boat", "ferry", "motorbike_taxi"];
   if (!supportedKinds.includes(request.kind)) return null;
   const preferredDate = String(request.preferredDate || "").trim().slice(0, 120);
   const guestCount = Number(String(request.guestCount || "").trim());
@@ -115,10 +99,7 @@ function validatedBookingSubmission(result) {
   const pickupLocation = String(request.pickupLocation || "").trim().slice(0, 160);
   const destination = String(request.destination || "").trim().slice(0, 160);
   const tripType = String(request.tripType || "").trim().slice(0, 60);
-  const extensionNights = Number(String(request.extensionNights || "").trim() || String(option).match(/\b(\d{1,2})\b/)?.[1] || "");
-  if (request.kind === "stay_extension") {
-    if (!activity || !Number.isInteger(extensionNights) || extensionNights < 1 || extensionNights > 99) return null;
-  } else if (!preferredDate || !activity || !Number.isInteger(guestCount) || guestCount < 1 || guestCount > 99) return null;
+  if (!preferredDate || !activity || !Number.isInteger(guestCount) || guestCount < 1 || guestCount > 99) return null;
   let divingGroups = [];
   let planMode = "";
   let structuredSummary = "";
@@ -166,10 +147,9 @@ function validatedBookingSubmission(result) {
     request: {
       kind: request.kind,
       preferredDate,
-      guestCount: request.kind === "stay_extension" ? "" : String(guestCount),
+      guestCount: String(guestCount),
       activity,
       option,
-      extensionNights: request.kind === "stay_extension" ? String(extensionNights) : "",
       courseName,
       certificationLevel,
       preferredProvider,
@@ -254,10 +234,9 @@ export function whatsappAlertConfiguration(env) {
 function staffQuickActionsEnabled(env) {
   if (String(env.WHATSAPP_STAFF_ACTIONS_ENABLED || "false").toLowerCase() !== "true") return false;
   const mappings = actionTemplateNames(env);
-  return Object.entries(APPROVED_ACTION_TEMPLATE_NAMES).every(([kind, approvedName]) => {
-    const name = mappings[kind];
+  return Object.entries(mappings).every(([kind, name]) => {
     const schema = TEMPLATE_SCHEMAS[name];
-    return Boolean(name === approvedName && schema?.kind === kind && schema.quickActions && schema.layout === "approved_v2");
+    return Boolean(name && schema?.kind === kind && schema.quickActions);
   });
 }
 
@@ -370,7 +349,7 @@ function alertTemplateKind(alert) {
   return "service";
 }
 
-function legacyTemplateValues(alert, kind) {
+function templateValues(alert, kind) {
   const summary = safeAlertSummary(alert.summary || "Guest requested assistance.").slice(0, 900);
   const room = roomLabel(alert);
   const time = alert.bangkokTime || formatBangkokAlertTime(new Date(alert.createdAt));
@@ -382,13 +361,6 @@ function legacyTemplateValues(alert, kind) {
     return [reference, room, luggage.context, luggage.bagCount, requested, appendProtectedContact(summary, alert.privateReplyContact)];
   }
   if (kind === "booking") {
-    if (alert.bookingRequest?.kind === "stay_extension") {
-      const booking = alert.bookingRequest;
-      const nights = Number(booking.extensionNights || String(booking.option || "").match(/\b(\d{1,2})\b/)?.[1] || 0);
-      const requested = nights > 0 ? `${nights} additional night${nights === 1 ? "" : "s"}` : (booking.option || "Additional nights requested");
-      const detail = [booking.notes, summary].filter(Boolean).join(" · ");
-      return [reference, room, booking.activity || "Stay extension", requested, "Current stay", appendProtectedContact(detail, alert.privateReplyContact)];
-    }
     if (alert.bookingRequest?.kind === "diving") {
       const booking = alert.bookingRequest;
       if (Array.isArray(booking.groups) && booking.groups.length) {
@@ -418,68 +390,6 @@ function legacyTemplateValues(alert, kind) {
   return [reference, room, requestLabel(alert), time, appendProtectedContact(summary, alert.privateReplyContact)];
 }
 
-function approvedActionTemplateValues(alert, kind) {
-  const summary = safeAlertSummary(alert.summary || "Guest requested assistance.").slice(0, 900);
-  const room = roomLabel(alert);
-  const time = alert.bangkokTime || formatBangkokAlertTime(new Date(alert.createdAt));
-  const reference = alert.id;
-  if (kind === "lostKey") return [room, time, reference];
-  if (kind === "luggage") {
-    const luggage = alert.luggageRequest || {};
-    const requested = [luggage.requestedDate, luggage.requestedTime].filter(Boolean).join(", ");
-    return [
-      luggage.context || "Luggage request",
-      room,
-      luggage.bagCount || "Not provided",
-      requested || "Not provided",
-      appendProtectedContact(summary, alert.privateReplyContact),
-      reference
-    ];
-  }
-  if (kind === "booking") {
-    if (alert.bookingRequest?.kind === "stay_extension") {
-      const booking = alert.bookingRequest;
-      const nights = Number(booking.extensionNights || String(booking.option || "").match(/\b(\d{1,2})\b/)?.[1] || 0);
-      const requested = nights > 0 ? `${nights} additional night${nights === 1 ? "" : "s"}` : (booking.option || "Additional nights requested");
-      const detail = [requested, booking.notes, summary].filter(Boolean).join(" · ");
-      return ["Stay extension", room, "Current stay", "Not provided", appendProtectedContact(detail, alert.privateReplyContact), reference];
-    }
-    if (alert.bookingRequest?.kind === "diving") {
-      const booking = alert.bookingRequest;
-      if (Array.isArray(booking.groups) && booking.groups.length) {
-        const structured = divingBookingSummary(booking, { includeNotes: false });
-        const notes = [structured, booking.notes ? `Notes: ${booking.notes}` : ""].filter(Boolean).join("\n");
-        return [booking.activity, room, booking.preferredDate, booking.guestCount, appendProtectedContact(notes, alert.privateReplyContact), reference];
-      }
-      const detail = booking.option === "Other course" ? booking.courseName : booking.option;
-      const qualification = booking.certificationLevel ? `Certification: ${booking.certificationLevel}` : "";
-      const notes = [detail, qualification, booking.notes, summary].filter(Boolean).join(" · ");
-      return [booking.activity, room, booking.preferredDate, booking.guestCount, appendProtectedContact(notes, alert.privateReplyContact), reference];
-    }
-    if (alert.bookingRequest) {
-      const booking = alert.bookingRequest;
-      const route = booking.pickupLocation || booking.destination
-        ? `Route: ${booking.pickupLocation || "Not provided"} → ${booking.destination || "Not provided"}`
-        : "";
-      const detail = [booking.option, booking.tripType, route, booking.notes, summary].filter(Boolean).join(" · ");
-      const requested = [booking.preferredDate, booking.pickupTime].filter(Boolean).join(", ");
-      return [booking.activity, room, requested, booking.guestCount, appendProtectedContact(detail, alert.privateReplyContact), reference];
-    }
-    const preferredTime = alert.requestedDateTime || normalizeBangkokRequestedDate(summary, new Date(alert.createdAt));
-    const guests = firstMatch(summary, /\b(\d{1,2})\s*(?:guests?|people|persons?|adults?)\b/i, "Not provided");
-    return [summary, room, preferredTime, guests, appendProtectedContact(summary, alert.privateReplyContact), reference];
-  }
-  if (kind === "urgent") return [requestLabel(alert), room, time, appendProtectedContact(summary, alert.privateReplyContact), reference];
-  return [requestLabel(alert), room, time, appendProtectedContact(summary, alert.privateReplyContact), reference];
-}
-
-function templateValues(alert, kind, templateName = "") {
-  const schema = TEMPLATE_SCHEMAS[String(templateName || "").trim()];
-  return schema?.layout === "approved_v2"
-    ? approvedActionTemplateValues(alert, kind)
-    : legacyTemplateValues(alert, kind);
-}
-
 export function validateWhatsAppTemplateParameters(name, kind, parameters) {
   const schema = TEMPLATE_SCHEMAS[String(name || "").trim()];
   if (!schema || schema.kind !== kind) return { ok: false, name, errorCode: "unmapped_template" };
@@ -500,7 +410,7 @@ function selectedTemplateForAlert(alert, env) {
     && actionSchema.quickActions
     ? mappedActionName
     : names[kind];
-  const parameters = templateValues(alert, kind, name);
+  const parameters = templateValues(alert, kind);
   return validateWhatsAppTemplateParameters(name, kind, parameters);
 }
 

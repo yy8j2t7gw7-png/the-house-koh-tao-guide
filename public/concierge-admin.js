@@ -254,7 +254,7 @@
       const card = element("article", "concierge-admin-registration-item");
       card.dataset.registrationId = item.id;
       const size = `${Math.max(1, Math.round(Number(item.sizeBytes || 0) / 1024))} KB`;
-      const submissionLabel = item.mediaType === "application/json" ? "Passport details" : "Passport image";
+      const submissionLabel = item.mediaType === "application/json" ? "Passport details (legacy)" : "Passport image";
       card.append(
         element("strong", "", `Room ${item.room}`),
         element("span", "", `Received: ${bangkokDate(item.uploadedAt)}`),
@@ -950,7 +950,7 @@
         const extensions = { "application/json": "json", "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/heic": "heic" };
         link.href = url;
         const extension = extensions[contentType] || "bin";
-        link.download = `${contentType === "application/json" ? "passport-details" : "passport-image"}-${id}.${extension}`;
+        link.download = `${contentType === "application/json" ? "passport-details-legacy" : "passport-image"}-${id}.${extension}`;
         link.click();
         window.setTimeout(() => URL.revokeObjectURL(url), 1000);
       } else if (button.dataset.passportAction === "reminded") {

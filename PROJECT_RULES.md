@@ -156,7 +156,7 @@ Public interface rules:
 
 ## Current baseline
 
-Current release: v5.11.43 (production-critical Airbnb/Meta/passport release on deployed v5.11.42: five-minute lightweight Airbnb email detection with trustworthy email fast-path ingestion and hourly ten-room iCal reconciliation; the 24-hour complete audit remains the only absence-cancellation path; activate exactly the five owner-approved Meta action templates with visible Received/Resolved but internal `RECEIVED`/`RESOLVE`; enable secure passport Option 2 with exactly passport number, full name, birthday, nationality, gender/sex as shown on passport and phone number; preserve all v5.11.42 human/stay-extension, v5.11.41 emergency/mobile, v5.11.39 cleaning/state, lost-key and privacy safeguards).
+Current release: v5.11.44 (narrow passport-registration correction on deployed v5.11.43: no guest-entered passport-detail form or submission API; private registration uses passport-image upload or the existing in-person original-passport route; all-Thai stays remain exempt and the exemption is shown in English and Thai before foreign passport collection; legacy v5.11.43 JSON records may be read/deleted only through protected Admin for cleanup; preserve the v5.11.43 Airbnb fast-sync and approved Meta-template activation plus all v5.11.42/v5.11.41/v5.11.39 security and routing behavior).
 
 Explore is intentionally disabled in the live v5.11.6 release. Do not delete its pages, structured records or media. Restore it only after the planned Explore rebuild and review by changing the protected deployment feature variable. Do not expose internal Explore detail paths in live concierge answers while the feature remains disabled; use approved external actions where supplied.
 

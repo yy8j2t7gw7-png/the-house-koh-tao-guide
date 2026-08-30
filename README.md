@@ -1,4 +1,4 @@
-# Guest Guide Platform with AI Concierge — The House v5.11.43
+# Guest Guide Platform with AI Concierge — The House v5.11.44
 
 The House – Koh Tao guest guide is a production-oriented, mobile-first digital guest guide and concierge platform. It combines property information, curated island guidance, structured place and activity data, and centralized contact and booking routes.
 
@@ -17,6 +17,12 @@ The House – Koh Tao guest guide is a production-oriented, mobile-first digital
 - Model-powered, room-aware AI Concierge with controlled learning
 
 The Activities module contains 49 structured profiles covering diving, freediving, snorkelling, boat trips, beach experiences, kayaking, paddleboarding, hiking, viewpoints, climbing, yoga, Muay Thai, massage, cooking, wildlife, photography, night activities and rainy-day options.
+
+## v5.11.44 release focus
+
+v5.11.44 is a narrow passport-registration rollback/correction on deployed v5.11.43. Guest-entered manual passport details are removed completely from the public registration UI and Worker submission routes. The private registration form accepts only a passport image; the existing in-person original-passport route remains available from the verified Room page. The all-Thai exemption remains before foreign passport collection and is shown in both English and Thai. Existing v5.11.43 JSON submissions, if any, remain readable/deletable by protected Admin only for cleanup, but no new guest JSON submission can be created.
+
+The v5.11.43 Airbnb fast-sync and approved Meta action-template activation remain unchanged and authoritative. The standalone Airbnb Apps Script trigger has already been installed at five-minute cadence and a full audit confirmed the Room 3 HM-code path in production.
 
 ## v5.11.43 release focus
 

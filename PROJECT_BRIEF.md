@@ -20,9 +20,9 @@ The product should feel like a competent hotel concierge in a guest’s pocket, 
 
 ### Current state
 
-Current release: v5.11.43.
+Current release: v5.11.44.
 
-The live release prioritizes the operational guest journey and AI Concierge. v5.11.43 is a production-critical release on deployed v5.11.42: the standalone Airbnb Apps Script now polls recent Airbnb mail every five minutes, fast-posts trustworthy last-minute reservations to the protected Worker sync endpoint and forces a complete ten-room iCal reconciliation at least hourly, while the 24-hour full audit remains the only absence-based cancellation path. The five newly approved Meta staff action templates are activated with exact fail-closed mappings and the existing signed **RECEIVED** / internal **RESOLVE** lifecycle. Secure passport Option 2 is now active and collects exactly passport number, full name, birthday, nationality, gender/sex as shown on the passport, and phone number through the same single-use private registration link and 14-day maximum private-storage lifecycle. v5.11.42 human routing/stay extension, v5.11.41 emergency/mobile stability, v5.11.39 cleaning/state behavior and all existing lost-key, privacy, Admin and `EXPLORE_ENABLED=false` safeguards remain authoritative.
+The live release prioritizes the operational guest journey and AI Concierge. v5.11.44 is a narrow corrective release on deployed v5.11.43: guest-entered passport-detail fields are removed completely, the private registration form returns to passport-image upload only, the in-person original-passport route remains supported, and the all-Thai exemption remains available before foreign passport collection with explicit English and Thai wording. Protected Admin retains read/delete compatibility only for any legacy v5.11.43 JSON submission already stored. The v5.11.43 five-minute Airbnb fast sync and five approved Meta action templates remain unchanged and authoritative, together with v5.11.42 human/stay-extension, v5.11.41 emergency/mobile, v5.11.39 cleaning/state, lost-key, privacy and `EXPLORE_ENABLED=false` safeguards.
 
 Existing content areas:
 

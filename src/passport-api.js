@@ -149,51 +149,6 @@ function detectImage(bytes) {
   return null;
 }
 
-function cleanField(value, maximumLength) {
-  return String(value || "").replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim().slice(0, maximumLength);
-}
-
-function validBirthday(value) {
-  const birthday = String(value || "").trim();
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(birthday)) return "";
-  const date = new Date(`${birthday}T00:00:00Z`);
-  if (!Number.isFinite(date.getTime()) || date.toISOString().slice(0, 10) !== birthday) return "";
-  const now = new Date();
-  const earliest = new Date(Date.UTC(now.getUTCFullYear() - 120, now.getUTCMonth(), now.getUTCDate()));
-  if (date > now || date < earliest) return "";
-  return birthday;
-}
-
-function validatePassportDetails(body) {
-  if (body?.authorized !== true) return { ok: false, error: "authorization_required" };
-  const passportNumber = cleanField(body?.passportNumber, 30).toUpperCase();
-  if (!/^[A-Z0-9< .-]{3,30}$/.test(passportNumber) || !/[A-Z0-9]/.test(passportNumber)) {
-    return { ok: false, error: "invalid_passport_number" };
-  }
-  const fullName = cleanField(body?.fullName, 120);
-  if (fullName.length < 2 || !/\p{L}/u.test(fullName)) return { ok: false, error: "invalid_full_name" };
-  const birthday = validBirthday(body?.birthday);
-  if (!birthday) return { ok: false, error: "invalid_birthday" };
-  const nationality = cleanField(body?.nationality, 80);
-  if (nationality.length < 2 || !/\p{L}/u.test(nationality)) return { ok: false, error: "invalid_nationality" };
-  const gender = String(body?.gender || "").trim().toUpperCase();
-  if (!new Set(["M", "F", "X"]).has(gender)) return { ok: false, error: "invalid_gender" };
-  const sourcePhone = cleanField(body?.phoneNumber, 32);
-  const phoneDigits = sourcePhone.replace(/\D/g, "");
-  if (phoneDigits.length < 7 || phoneDigits.length > 15) {
-    return { ok: false, error: "invalid_phone_number" };
-  }
-  const phoneNumber = sourcePhone.startsWith("+")
-    ? `+${phoneDigits}`
-    : sourcePhone.startsWith("00")
-      ? `00${phoneDigits.replace(/^00/, "")}`
-      : phoneDigits;
-  return {
-    ok: true,
-    details: { passportNumber, fullName, birthday, nationality, gender, phoneNumber }
-  };
-}
-
 function privateDownload(object, record) {
   const isDetails = record.mediaType === "application/json" || record.extension === "json";
   const headers = new Headers({
@@ -225,70 +180,7 @@ export async function handlePassportGuestRequest(request, env, path) {
       expiresAt: result.session.expiresAt,
       retentionDays: retentionDays(env),
       maximumBytes: MAX_UPLOAD_BYTES,
-      acceptedTypes: ["image/jpeg", "image/png", "image/webp", "image/heic"],
-      acceptedMethods: ["passport_image", "passport_details"],
-      requiredDetailFields: ["passportNumber", "fullName", "birthday", "nationality", "gender", "phoneNumber"]
-    });
-  }
-
-  if (path === "/api/passport-details") {
-    if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405, { allow: "POST" });
-    const result = await sessionForRequest(request, env, store);
-    if (result?.rateLimited) return json({ error: "rate_limited" }, 429);
-    if (!result || !validPendingSession(result.session)) return json({ error: "invalid_or_expired_link" }, 410);
-    const body = await readJson(request, 8_000);
-    const validated = validatePassportDetails(body);
-    if (!validated.ok) return json({ error: validated.error }, 400);
-
-    const uploadedAt = new Date().toISOString();
-    const deleteAfter = new Date(Date.now() + (retentionDays(env) * 86_400_000)).toISOString();
-    const objectKey = `passport-details/${uploadedAt.slice(0, 7)}/${crypto.randomUUID()}.json`;
-    const bytes = new TextEncoder().encode(JSON.stringify({
-      schemaVersion: 1,
-      ...validated.details,
-      submittedAt: uploadedAt
-    }));
-    try {
-      await env.PASSPORT_UPLOADS.put(objectKey, bytes, {
-        httpMetadata: { contentType: "application/json" },
-        customMetadata: { deleteAfter }
-      });
-    } catch (_error) {
-      return json({ error: "storage_unavailable" }, 503);
-    }
-
-    let completed;
-    try {
-      completed = await store.completePassportUpload({
-        tokenHash: result.digest,
-        objectKey,
-        mediaType: "application/json",
-        extension: "json",
-        sizeBytes: bytes.byteLength,
-        uploadedAt,
-        deleteAfter
-      });
-    } catch (_error) {
-      await env.PASSPORT_UPLOADS.delete(objectKey).catch(() => {});
-      return json({ error: "storage_unavailable" }, 503);
-    }
-    if (!completed?.ok) {
-      await env.PASSPORT_UPLOADS.delete(objectKey).catch(() => {});
-      return json({ error: "link_already_used" }, 409);
-    }
-    let registration = null;
-    if (typeof store.markRegistrationFromPassport === "function") {
-      registration = await store.markRegistrationFromPassport(completed.id, uploadedAt).catch(() => null);
-    }
-    return json({
-      ok: true,
-      room: completed.room,
-      deleteAfter,
-      submissionType: "passport_details",
-      registrationStatus: registration?.status || "passport_pending",
-      requiredPassports: Number(registration?.requiredPassports) || 1,
-      receivedPassports: Number(registration?.receivedPassports) || 1,
-      accessGranted: registration?.status === "passport_complete"
+      acceptedTypes: ["image/jpeg", "image/png", "image/webp", "image/heic"]
     });
   }
 

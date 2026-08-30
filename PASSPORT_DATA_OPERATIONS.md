@@ -6,7 +6,7 @@ TM30 accommodation registration concerns foreign guests. Thai nationals do not n
 
 This scope was checked against the Thai Immigration Bureau TM30 service description, which states that Section 38 notification applies when accommodation is provided to foreign nationals. Operational wording must remain limited to this exemption and must not expand into unsourced legal advice.
 
-The owner has now supplied the exact guest-entered alternative required for The House workflow. The secure manual-details option is active and collects exactly six fields: **passport number, full name, birthday, nationality, gender/sex as shown on the passport, and phone number**. Do not add further legal, Immigration, address, visa, arrival-card or document fields without a new authoritative instruction.
+The House intentionally does not offer guest-entered passport-detail fields. Guests must either upload a clear passport image through the private one-time form or provide the required original passport(s) in person. This avoids The House relying on retyped passport data that may be incomplete or incorrect. Do not add a manual-details form or API without a new explicit owner instruction.
 
 ## Guest experience
 
@@ -19,10 +19,10 @@ The owner has now supplied the exact guest-entered alternative required for The 
 7. The private guide remains locked until one passport has been received for every declared non-Thai overnight guest, or until an authorized owner confirms that every required original passport was checked in person and the manual TM30 registration was completed.
 8. Each upload form's 256-bit token is carried only in the URL fragment; fragments are not sent in the initial page request or referrer.
 9. The registration page explains why the information is needed and how it is handled. It does not open WhatsApp.
-10. Option 1 accepts one JPEG, PNG, WebP or HEIC passport image up to 10 MB.
-11. Option 2 accepts exactly passport number, full name, birthday, nationality, gender/sex as shown on the passport, and phone number. No extra guest data is requested. Submission to the Immigration portal is not automated.
-12. Both methods use the same reservation- and room-bound, expiring, single-use token. The server validates authorization, link status, expiry and input before private storage.
-13. A successful image or manual-details submission consumes the one-time link. The verified room page returns to the progress screen and creates a separate form for the next non-Thai guest until the declared total is reached. Selecting the all-Thai path is blocked after a foreign requirement or received submission exists unless staff review it.
+10. Passport-image upload accepts one JPEG, PNG, WebP or HEIC image up to 10 MB.
+11. Manual passport-detail entry is not offered. Guests use the secure passport-image upload or the supported in-person original-passport route. Submission to the Immigration portal is not automated.
+12. The server validates authorization, reservation link, expiry, single use, byte limit and file signature before private storage.
+13. The upload link closes after success. The verified room page returns to the progress screen and creates a separate form for the next non-Thai guest until the declared total is reached. Selecting the all-Thai path is blocked after a foreign requirement or uploaded file exists unless staff review it.
 
 Create one link per passport image. Do not ask a guest to combine multiple passports into one image.
 
@@ -44,12 +44,12 @@ Do not silently add personal phone numbers to this store. The protected staff-al
 
 ## Data handling
 
-- Passport images and manual passport-detail submissions are stored only in the private `PASSPORT_UPLOADS` R2 bucket.
+- Passport images are stored only in the private `PASSPORT_UPLOADS` R2 bucket.
 - The bucket must not have public access or a public custom domain.
 - The AI model, learning queue, interaction log, public files and WhatsApp messages never receive the document.
 - If a guest pastes multiple recognizable passport fields into chat, the server discards the values and keeps only a generic `passport registration` intent before answering or logging.
-- Object keys are random and contain no room number, guest name or passport identifier. Image objects use the `passport/` prefix; manual-detail JSON objects use `passport-details/`.
-- The Durable Object stores only operational metadata: room, random record ID, token hash, status, object key, media type/file type, size and lifecycle timestamps. The six manual field values are not copied into ordinary Durable Object records, Concierge history, learning data or WhatsApp.
+- Object keys are random and contain no room number, guest name or passport identifier.
+- The Durable Object stores only operational metadata: room, random record ID, token hash, status, file type, file size and lifecycle timestamps.
 - The raw one-time token is returned once to the verified browser and is never stored in readable form.
 - Only requests carrying the owner admin bearer token can retrieve a document.
 - Downloads use no-store, no-referrer, frame-denial and content-sniffing protection headers.
@@ -75,9 +75,9 @@ This design minimizes exposure but does not by itself establish legal compliance
    npx wrangler secret put PASSPORT_TOKEN_PEPPER
    ```
 
-4. In the R2 bucket settings, add 14-day object lifecycle coverage for both `passport/` and `passport-details/` (or an equivalent bucket-wide rule that covers both private prefixes).
+4. In the R2 bucket settings, add an object lifecycle rule for the `passport/` prefix with a 14-day expiration.
 5. Deploy the Worker and confirm `/api/concierge/status` reports `passportUploadsConfigured: true`.
-6. Synchronize a non-sensitive future test reservation, verify it from the correct permanent room page, create the private form, test both a non-sensitive image and a clearly fictional manual-details submission, retrieve each through the owner area, delete it and confirm the object is gone.
+6. Synchronize a non-sensitive future test reservation, verify it from the correct permanent room page, create the upload form, upload a test image, download it through the owner area, delete it and confirm the object is gone.
 7. Never test with a real passport until access control, deletion and the owner workflow have been verified in production.
 
 `PASSPORT_RETENTION_DAYS` defaults to `14` and may be reduced to as little as 1. The application caps it at 14 days so it cannot silently exceed the main R2 lifecycle rule.
@@ -93,7 +93,7 @@ This design minimizes exposure but does not by itself establish legal compliance
 ## Inputs still required
 
 - Confirmation of any future production retention-policy change from the approved 14-day maximum
-- Any future authoritative change to the six approved manual fields; until then do not add extra TM30/Immigration fields
+- Any future owner decision to reintroduce structured manual entry; until then it must remain absent from the guest UI and Worker routes
 
 ## Verified reference
 

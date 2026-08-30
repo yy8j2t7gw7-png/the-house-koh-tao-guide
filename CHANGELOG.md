@@ -2,6 +2,15 @@
 
 All notable changes to The House – Koh Tao guest guide are recorded here.
 
+## v5.11.44 — Passport Image-Only Registration Restore
+
+- Removes guest-entered passport-detail fields and the `/api/passport-details` submission route introduced in v5.11.43.
+- Restores the private passport page to image upload only; the existing in-person original-passport route remains available from the verified Room page.
+- Preserves the all-Thai exemption before foreign passport collection and shows the Thai-only exemption in both English and Thai.
+- Keeps protected Admin read/delete compatibility for any legacy v5.11.43 JSON passport-details object solely so previously stored data can be cleaned up safely.
+- Leaves the v5.11.43 Airbnb five-minute fast sync, hourly iCal reconciliation, approved Meta action templates and all earlier Concierge/security behavior unchanged.
+- Complete suite: **216 passed, 0 failed**.
+
 ## v5.11.43 — Last-Minute Airbnb Sync + Approved Meta Actions + Manual Passport Details
 
 - Changes the standalone Airbnb reservation trigger from hourly to every five minutes for lightweight recent-mail detection.

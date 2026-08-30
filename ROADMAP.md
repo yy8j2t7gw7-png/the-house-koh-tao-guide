@@ -1,6 +1,6 @@
 # Product Roadmap
 
-Baseline: v5.11.43
+Baseline: v5.11.44
 
 ## Completed
 
@@ -150,8 +150,7 @@ The concierge must be useful to real guests before further Explore expansion.
 - [x] Create the private production R2 passport bucket
 - [x] Configure `PASSPORT_TOKEN_PEPPER` and the 14-day R2 lifecycle rule
 - [x] Verify the complete passport flow with a non-sensitive test image
-- [ ] Supply the authoritative TM30 manual-entry field specification
-- [ ] Add the secure manual-details alternative after that specification is approved
+- [x] Owner decision: do not collect guest-entered passport details; keep registration image-upload/in-person only unless explicitly changed in a future release
 - [x] Add a no-upload in-person passport-handover alternative without collecting passport details in the platform
 - [x] Prepare Airbnb scheduled messages as the automatic pre-arrival passport reminder
 - [ ] Confirm the dedicated 24/7 property-emergency person and number
@@ -314,12 +313,22 @@ Live status: disabled through `EXPLORE_ENABLED=false`. Existing pages, data and 
 - [x] v5.11.41 was pushed/deployed; fire emergency-call UX, direct emergency-contact routing and mobile sheet stability became the production baseline for later releases.
 
 
+## v5.11.44 release checkpoint
+
+- [x] Remove guest-entered manual passport details from the public registration UI.
+- [x] Remove the `/api/passport-details` guest submission route and all six-field validation/storage logic.
+- [x] Keep passport-image upload and the existing in-person original-passport path unchanged.
+- [x] Keep the all-Thai exemption before foreign passport collection and show the Thai-only exemption in both English and Thai.
+- [x] Preserve protected Admin read/delete compatibility for any legacy v5.11.43 JSON passport-details object so it can be cleaned up safely.
+- [x] Leave v5.11.43 Airbnb five-minute sync, hourly iCal safety net and approved Meta action templates unchanged.
+- [x] Regression suite: 216 passed, 0 failed.
+
 ## v5.11.43 release checkpoint
 
 - [x] Harden last-minute Airbnb synchronization with five-minute recent-email polling, trustworthy immediate `complete:false` ingestion, hourly full active-room iCal reconciliation and the existing cancellation-safe 24-hour audit.
 - [x] Activate the five owner-approved human-friendly Meta action templates with exact BODY order and fail-closed all-template gating.
 - [x] Enable secure passport Option 2 with exactly passport number, full name, birthday, nationality, gender/sex as shown on passport and phone number, using the existing private single-use token and retention lifecycle.
-- [ ] After deployment, update the existing standalone Apps Script with `airbnb-sync/Code.gs`, run `installHouseReservationTrigger` once and verify exactly one five-minute trigger.
+- [x] Production follow-up completed: the standalone Apps Script was updated, `installHouseReservationTrigger` and a full audit were run, and the Room 3 HM-code verification path was confirmed working.
 - [ ] Smoke-test one non-sensitive alert of each Meta kind and one controlled last-minute reservation.
 
 ## v5.11.42 release checkpoint

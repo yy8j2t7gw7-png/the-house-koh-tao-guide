@@ -2625,14 +2625,10 @@ test("main and room welcome pages make required registration prominent", async (
   assert.doesNotMatch(registrationEntry, /spareKeySection\.hidden = false;\s*if \(spareKeyForm\)/);
   assert.match(registrationEntry, /spareKeyTrigger\?\.addEventListener\("click", \(event\) =>/);
   assert.doesNotMatch(registrationEntry, /HOUSE_PRIVATE_REGISTRATION_URL/);
-  assert.match(registrationForm, /Option 1 — Upload passport image/);
-  assert.match(registrationForm, /Option 2 — Enter the required details/);
-  assert.match(registrationForm, /Passport number/);
-  assert.match(registrationForm, /Full name/);
-  assert.match(registrationForm, /Birthday/);
-  assert.match(registrationForm, /Nationality/);
-  assert.match(registrationForm, /Gender \/ sex as shown on passport/);
-  assert.match(registrationForm, /Phone \/ WhatsApp number/);
+  assert.match(registrationForm, /Upload passport image/);
+  assert.doesNotMatch(registrationForm, /Option 2|Enter the required details|Passport number|Full name|Birthday|Gender \/ sex as shown on passport|Phone \/ WhatsApp number/);
+  assert.match(registrationForm, /Thai nationals are exempt/);
+  assert.match(registrationForm, /ผู้มีสัญชาติไทยไม่ต้องอัปโหลดหนังสือเดินทาง/);
   assert.match(room, /Please conserve water and electricity/);
   assert.match(room, /undersea grid connection, reducing reliance on local diesel generators/);
   assert.match(room, /switch off the air conditioning and lights when you leave the room/);
@@ -2917,7 +2913,7 @@ test("guest localization supports seven languages and keeps the owner dashboard 
   assert.doesNotMatch(admin, /src="\/i18n\.js"/);
   assert.match(runtime, /exploreContentDeferred/);
   assert.match(runtime, /element\.closest\("\.section,\.footer"\)/);
-  assert.match(runtime, /houseGuideTranslations:v5\.11\.43:/);
+  assert.match(runtime, /houseGuideTranslations:v5\.11\.44:/);
   assert.match(runtime, /MAX_REQUEST_RETRIES = 2/);
   assert.match(runtime, /let flushRunning = false/);
 });
@@ -9687,7 +9683,7 @@ test("v5.11.28 guest visual contracts keep registration and lost-key consent sca
   assert.match(stayStyles, /#spareKeyViewAction\{[^}]*border-top/);
   assert.match(stayStyles, /@media\(max-width:650px\)[\s\S]*\.stay-access-actions\{display:grid/);
   assert.match(passportStyles, /\.passport-facts\{[^}]*repeat\(3,minmax\(0,1fr\)\)/);
-  assert.match(passportStyles, /@media\(max-width:650px\)[\s\S]*\.passport-facts,\.passport-privacy ul,\.passport-session,\.registration-methods,\.passport-details-grid\{grid-template-columns:1fr\}/);
+  assert.match(passportStyles, /@media\(max-width:650px\)[\s\S]*\.passport-facts,\.passport-privacy ul,\.passport-session,\.registration-methods\{grid-template-columns:1fr\}/);
 });
 
 test("v5.11.28 landing and room hierarchy use safe imagery, exact guidance and accurate actions", async () => {
@@ -10326,93 +10322,36 @@ test("v5.11.43 approved Meta action templates use the exact new BODY orders and 
   assert.equal(fallback.payload.template.components.length, 1);
 });
 
-test("v5.11.43 manual passport details option stores exactly the six required fields privately and consumes the one-time link", async () => {
-  const { env, store, passportBucket } = createEnvironment();
-  const createdResponse = await handleAdminRequest(new Request("https://guide.example/api/concierge/admin/passport-links", {
-    method: "POST",
-    headers: { authorization: "Bearer admin_token_test_5500", "content-type": "application/json" },
-    body: JSON.stringify({ room: "6", expiresHours: 24, nonThaiConfirmed: true })
-  }), env, "/api/concierge/admin/passport-links");
-  const created = await createdResponse.json();
-  const token = new URL(created.uploadUrl).hash.replace("#token=", "");
-
-  const sessionResponse = await handlePassportGuestRequest(new Request("https://guide.example/api/passport-upload/session", {
-    method: "POST",
-    headers: { authorization: `Bearer ${token}` }
-  }), env, "/api/passport-upload/session");
-  const sessionBody = await sessionResponse.json();
-  assert.deepEqual(sessionBody.acceptedMethods, ["passport_image", "passport_details"]);
-  assert.deepEqual(sessionBody.requiredDetailFields, ["passportNumber", "fullName", "birthday", "nationality", "gender", "phoneNumber"]);
-
-  const details = {
-    passportNumber: "TESTP123456",
-    fullName: "Example Guest",
-    birthday: "1990-01-02",
-    nationality: "Exampleland",
-    gender: "M",
-    phoneNumber: "0812345678",
-    authorized: true
-  };
-  const submitted = await handlePassportGuestRequest(new Request("https://guide.example/api/passport-details", {
-    method: "POST",
-    headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
-    body: JSON.stringify(details)
-  }), env, "/api/passport-details");
-  const body = await submitted.json();
-  assert.equal(submitted.status, 200);
-  assert.equal(body.submissionType, "passport_details");
-  assert.equal(body.room, "6");
-  assert.equal(store.passportRecords[0].status, "uploaded");
-  assert.equal(store.passportRecords[0].mediaType, "application/json");
-  assert.match(store.passportRecords[0].objectKey, /^passport-details\//);
-  assert.equal(passportBucket.objects.size, 1);
-  const storedBytes = [...passportBucket.objects.values()][0];
-  const stored = JSON.parse(new TextDecoder().decode(storedBytes));
-  assert.deepEqual(Object.keys(stored).sort(), ["birthday", "fullName", "gender", "nationality", "passportNumber", "phoneNumber", "schemaVersion", "submittedAt"].sort());
-  assert.equal(stored.passportNumber, "TESTP123456");
-  assert.equal(stored.fullName, "Example Guest");
-  assert.equal(stored.birthday, "1990-01-02");
-  assert.equal(stored.nationality, "Exampleland");
-  assert.equal(stored.gender, "M");
-  assert.equal(stored.phoneNumber, "0812345678");
-  assert.equal(store.interactions.length, 0);
-  assert.doesNotMatch(JSON.stringify(store.passportRecords), /TESTP123456|Example Guest|Exampleland|0812345678/);
-
-  const reused = await handlePassportGuestRequest(new Request("https://guide.example/api/passport-details", {
-    method: "POST",
-    headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
-    body: JSON.stringify(details)
-  }), env, "/api/passport-details");
-  assert.equal(reused.status, 410);
-});
-
-test("v5.11.43 passport details API is reachable from the Worker and validates required fields", async () => {
-  const [indexSource, formSource, scriptSource, adminSource] = await Promise.all([
+test("v5.11.44 removes guest-entered passport details completely and keeps image upload only", async () => {
+  const [indexSource, formSource, scriptSource, apiSource, adminSource] = await Promise.all([
     readFile(new URL("../src/index.js", import.meta.url), "utf8"),
     readFile(new URL("../public/passport-upload.html", import.meta.url), "utf8"),
     readFile(new URL("../public/passport-upload.js", import.meta.url), "utf8"),
+    readFile(new URL("../src/passport-api.js", import.meta.url), "utf8"),
     readFile(new URL("../public/concierge-admin.js", import.meta.url), "utf8")
   ]);
-  assert.match(indexSource, /"\/api\/passport-details"/);
-  for (const field of ["passportNumber", "fullName", "birthday", "nationality", "gender", "phoneNumber"]) {
-    assert.match(formSource, new RegExp(`name="${field}"`));
-  }
-  assert.match(scriptSource, /fetch|request\("\/api\/passport-details"/);
-  assert.match(adminSource, /"application\/json": "json"/);
-  assert.match(adminSource, /Passport details/);
+  assert.doesNotMatch(indexSource, /\/api\/passport-details/);
+  assert.doesNotMatch(apiSource, /if \(path === "\/api\/passport-details"\)|requiredDetailFields|acceptedMethods|validatePassportDetails/);
+  assert.doesNotMatch(scriptSource, /passportDetailsForm|passportDetailsSubmit|\/api\/passport-details/);
+  assert.doesNotMatch(formSource, /Option 2|Enter the required details|passportDetailsForm|name="passportNumber"|name="fullName"|name="birthday"|name="nationality"|name="gender"|name="phoneNumber"/);
+  assert.match(formSource, /Upload passport image/);
+  assert.match(formSource, /Choose a clear passport image/);
+  assert.match(adminSource, /Passport details \(legacy\)/);
+});
 
-  const { env } = createEnvironment();
-  const createdResponse = await handleAdminRequest(new Request("https://guide.example/api/concierge/admin/passport-links", {
-    method: "POST",
-    headers: { authorization: "Bearer admin_token_test_5500", "content-type": "application/json" },
-    body: JSON.stringify({ room: "5", expiresHours: 24, nonThaiConfirmed: true })
-  }), env, "/api/concierge/admin/passport-links");
-  const token = new URL((await createdResponse.json()).uploadUrl).hash.replace("#token=", "");
-  const invalid = await handlePassportGuestRequest(new Request("https://guide.example/api/passport-details", {
-    method: "POST",
-    headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
-    body: JSON.stringify({ passportNumber: "TEST123", fullName: "Example Guest", birthday: "1990-01-02", nationality: "Exampleland", gender: "M", phoneNumber: "123", authorized: true })
-  }), env, "/api/passport-details");
-  assert.equal(invalid.status, 400);
-  assert.equal((await invalid.json()).error, "invalid_phone_number");
+test("v5.11.44 keeps the Thai-only exemption bilingual and before foreign passport collection", async () => {
+  const [roomAccess, registrationScript, passportPage] = await Promise.all([
+    readFile(new URL("../public/room-access.html", import.meta.url), "utf8"),
+    readFile(new URL("../public/registration-entry.js", import.meta.url), "utf8"),
+    readFile(new URL("../public/passport-upload.html", import.meta.url), "utf8")
+  ]);
+  assert.match(roomAccess, /Thai nationals only/);
+  assert.match(roomAccess, /เฉพาะผู้มีสัญชาติไทยเท่านั้น/);
+  assert.match(roomAccess, /All overnight guests are Thai/);
+  assert.match(roomAccess, /ผู้เข้าพักค้างคืนทุกคนมีสัญชาติไทย/);
+  assert.ok(roomAccess.indexOf('id="nationalityPanel"') < roomAccess.indexOf('id="passportProgressPanel"'));
+  assert.match(registrationScript, /if \(data\.guestType === "foreign"/);
+  assert.match(registrationScript, /if \(nationalityPanel\) nationalityPanel\.hidden = false/);
+  assert.match(passportPage, /Thai nationals are exempt/);
+  assert.match(passportPage, /ผู้มีสัญชาติไทยไม่ต้องอัปโหลดหนังสือเดินทาง/);
 });

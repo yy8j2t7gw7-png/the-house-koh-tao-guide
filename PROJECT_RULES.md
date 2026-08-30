@@ -156,7 +156,7 @@ Public interface rules:
 
 ## Current baseline
 
-Current release: v5.11.38 (narrow post-deployment wording correction on v5.11.37: persistent in-hours human/staff-contact handoffs say **The House team** rather than naming Su to guests; routine Contact Us / Call Us remains limited to Tuesday–Sunday 10:30–19:30 Bangkok time and suppressed on Monday/after-hours. Preserve every v5.11.37 Wi-Fi, current-turn routing, cleaning, dive-provider, Meta, lost-key, emergency, booking, luggage, passport, Airbnb, Admin, privacy and security boundary; do not activate the pending replacement Meta templates in this release).
+Current release: v5.11.39 (production cleaning/state correction on v5.11.38: clean up/cleanup wording is deterministic; the browser retains a collecting cleaning workflow; bare-hour cleaning replies are accepted in context; successful completion sends the existing service alert automatically; full page loads do not restore invisible stale transcript history; verified guests get access-aware initial copy; context-free send-request wording cannot create a generic service alert; the website Concierge must never imply that staff can reply inside the chat. Preserve all v5.11.38 routine-contact wording and emergency separation plus every v5.11.37 Wi-Fi/current-turn/security safeguard; pending Meta replacements remain inactive).
 
 Explore is intentionally disabled in the live v5.11.6 release. Do not delete its pages, structured records or media. Restore it only after the planned Explore rebuild and review by changing the protected deployment feature variable. Do not expose internal Explore detail paths in live concierge answers while the feature remains disabled; use approved external actions where supplied.
 

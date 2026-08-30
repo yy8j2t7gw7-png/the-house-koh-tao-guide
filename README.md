@@ -1,4 +1,4 @@
-# Guest Guide Platform with AI Concierge — The House v5.11.38
+# Guest Guide Platform with AI Concierge — The House v5.11.39
 
 The House – Koh Tao guest guide is a production-oriented, mobile-first digital guest guide and concierge platform. It combines property information, curated island guidance, structured place and activity data, and centralized contact and booking routes.
 
@@ -17,6 +17,10 @@ The House – Koh Tao guest guide is a production-oriented, mobile-first digital
 - Model-powered, room-aware AI Concierge with controlled learning
 
 The Activities module contains 49 structured profiles covering diving, freediving, snorkelling, boat trips, beach experiences, kayaking, paddleboarding, hiking, viewpoints, climbing, yoga, Muay Thai, massage, cooking, wildlife, photography, night activities and rainy-day options.
+
+## v5.11.39 release focus
+
+v5.11.39 is a production cleaning/state correction built directly from deployed v5.11.38. Natural **clean up / cleanup** requests now enter the deterministic room-cleaning collector, the browser retains that cleaning workflow between turns, and a bare hour such as **11** completes the same request and automatically sends the existing service alert. Full page loads no longer restore invisible old transcript history, verified guests receive an access-aware greeting instead of pre-verification copy, and vague **Please send the request** wording cannot create a context-free `Guest request` alert. The AI Concierge remains a one-way operational request interface rather than a live staff-chat channel. No Meta-template activation or recipient/security change is included.
 
 ## v5.11.38 release focus
 

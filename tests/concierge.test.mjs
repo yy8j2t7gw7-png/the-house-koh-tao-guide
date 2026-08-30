@@ -601,7 +601,10 @@ async function syncAndVerifyStay(env, {
   room = "11",
   confirmationCode = "HMROOM11A",
   checkInDate = "2026-08-27",
-  checkOutDate = "2026-08-30",
+  // Keep the shared verified-stay fixture safely active when the historical
+  // suite is run on or after 30 Aug 2026. Tests that need a specific checkout
+  // date override this value explicitly.
+  checkOutDate = "2026-09-30",
   now = new Date("2026-08-28T04:30:00.000Z")
 } = {}) {
   const listingId = Object.entries(listingRoomMap).find(([, mappedRoom]) => mappedRoom === room)?.[0];
@@ -2313,7 +2316,7 @@ test("a local-information detour answers directly and preserves a pending cleani
     }), env, undefined, now);
     const resumedBody = await resumed.json();
     assert.equal(resumedBody.workflow.status, "submitted");
-    assert.match(resumedBody.answer, /preferred time of 3:00 PM/i);
+    assert.match(resumedBody.answer, /Preferred time: 3:00 PM/i);
     assert.equal(store.alerts.length, 1);
   } finally {
     globalThis.fetch = originalFetch;
@@ -2909,7 +2912,7 @@ test("guest localization supports seven languages and keeps the owner dashboard 
   assert.doesNotMatch(admin, /src="\/i18n\.js"/);
   assert.match(runtime, /exploreContentDeferred/);
   assert.match(runtime, /element\.closest\("\.section,\.footer"\)/);
-  assert.match(runtime, /houseGuideTranslations:v5\.11\.38:/);
+  assert.match(runtime, /houseGuideTranslations:v5\.11\.39:/);
   assert.match(runtime, /MAX_REQUEST_RETRIES = 2/);
   assert.match(runtime, /let flushRunning = false/);
 });
@@ -4336,8 +4339,9 @@ test("room cleaning collects a preferred time and submits the same request witho
     }), env, undefined, openTuesday);
     const completedBody = await completed.json();
     assert.equal(completedBody.workflow.status, "submitted");
-    assert.match(completedBody.answer, /preferred time of 3:30 PM/i);
-    assert.match(completedBody.answer, /not confirmed until the team can accommodate it/i);
+    assert.match(completedBody.answer, /Preferred time: 3:30 PM/i);
+    assert.match(completedBody.answer, /come as close to your preferred time as possible, depending on availability/i);
+    assert.doesNotMatch(completedBody.answer, /until (?:they|the team) repl(?:y|ies)|support team.*reply/i);
     assert.doesNotMatch(completedBody.answer, /send the request to|contact (?:our )?support|scheduled for|phone|WhatsApp/i);
     assert.deepEqual(completedBody.actions, []);
     assert.equal(store.alerts.length, 1);
@@ -4425,7 +4429,7 @@ test("a past same-day cleaning time stays pending and one valid correction submi
     }), env, undefined, now);
     const correctedBody = await corrected.json();
     assert.equal(correctedBody.workflow.status, "submitted");
-    assert.match(correctedBody.answer, /preferred time of 4:00 PM/i);
+    assert.match(correctedBody.answer, /Preferred time: 4:00 PM/i);
     assert.equal(store.alerts.length, 1);
     assert.match(store.alerts[0].summary, /Preferred time: 4:00 PM/i);
     assert.doesNotMatch(store.alerts[0].summary, /Preferred time: 2:00 PM/i);
@@ -6480,7 +6484,7 @@ test("booking retry snapshots are bound to the verified stay, room and protected
       room: "10",
       confirmationCode: "HMRETRY10",
       checkInDate: "2026-08-27",
-      checkOutDate: "2026-08-30",
+      checkOutDate: "2026-09-30",
       now: new Date(now.getTime() + 600)
     });
     await handleStayGuestRequest(new Request("https://guide.example/api/stay/nationality", {
@@ -9228,7 +9232,7 @@ test("natural stained-bed-sheet wording enters cleaning collection and now submi
     const completedBody = await completed.json();
     assert.equal(completedBody.intentId, "housekeeping_room_cleaning");
     assert.equal(completedBody.workflow.status, "submitted");
-    assert.match(completedBody.answer, /preferred time of Now/i);
+    assert.match(completedBody.answer, /Preferred time: now/i);
     assert.doesNotMatch(completedBody.answer, /support handoff|contact (?:our )?support/i);
     assert.equal(store.alerts.length, 1);
     assert.equal(store.alerts[0].recipientGroup, "support_with_owners");
@@ -9250,6 +9254,274 @@ test("natural stained-bed-sheet wording enters cleaning collection and now submi
   } finally {
     globalThis.fetch = originalFetch;
   }
+});
+
+test("cleanup wording plus bare hour completes one automatic service alert without promising a website-chat reply", async () => {
+  const { env, store } = createEnvironment({
+    OPENAI_API_KEY: "not-used",
+    WHATSAPP_ACCESS_TOKEN: "meta-test-token",
+    WHATSAPP_PHONE_NUMBER_ID: "1234567890",
+    WHATSAPP_ALERT_RECIPIENTS: JSON.stringify({
+      support: [{ label: "Su", phone: "+66 64 000 0001" }],
+      emergency: [
+        { label: "Owner 1", phone: "+66 81 000 0002" },
+        { label: "Owner 2", phone: "+66 82 000 0003" }
+      ]
+    })
+  });
+  const openSunday = new Date("2026-08-30T03:54:00.000Z"); // 10:54 Bangkok
+
+  for (const phrase of ["I need a clean up", "I need a cleanup", "can I get a clean up"]) {
+    const first = await handleConciergeRequest(guestRequest(phrase), env, undefined, openSunday);
+    const firstBody = await first.json();
+    assert.equal(firstBody.intentId, "housekeeping_room_cleaning", phrase);
+    assert.equal(firstBody.source, "service-policy", phrase);
+    assert.equal(firstBody.workflow.type, "cleaning", phrase);
+    assert.equal(firstBody.workflow.status, "collecting", phrase);
+    assert.deepEqual(firstBody.workflow.missing, ["preferredTime"], phrase);
+    assert.match(firstBody.answer, /What time would be most convenient/i, phrase);
+    assert.doesNotMatch(firstBody.answer, /support team.*reply|send the request to/i, phrase);
+    assert.equal(store.alerts.length, 0, phrase);
+  }
+
+  const first = await handleConciergeRequest(guestRequest("I need a clean up"), env, undefined, openSunday);
+  const firstBody = await first.json();
+
+  const originalFetch = globalThis.fetch;
+  const outbound = [];
+  globalThis.fetch = async (_url, options) => {
+    outbound.push(JSON.parse(options.body));
+    return new Response(JSON.stringify({ messages: [{ id: `wamid.cleanup-${outbound.length}` }] }), {
+      status: 200,
+      headers: { "content-type": "application/json" }
+    });
+  };
+  try {
+    const completed = await handleConciergeRequest(guestRequest("11", {
+      workflowState: firstBody.workflow,
+      history: [
+        { role: "user", content: "I need a clean up" },
+        { role: "assistant", content: firstBody.answer }
+      ]
+    }), env, undefined, openSunday);
+    const completedBody = await completed.json();
+    assert.equal(completedBody.intentId, "housekeeping_room_cleaning");
+    assert.equal(completedBody.source, "service-policy");
+    assert.equal(completedBody.workflow.status, "submitted");
+    assert.match(completedBody.answer, /sent your cleaning request to The House team/i);
+    assert.match(completedBody.answer, /Preferred time: 11:00 AM/i);
+    assert.doesNotMatch(completedBody.answer, /until (?:they|the team) repl(?:y|ies)|support team.*reply|Please send the request/i);
+    assert.equal(store.alerts.length, 1);
+    assert.equal(store.alerts[0].recipientGroup, "support_with_owners");
+    assert.match(store.alerts[0].summary, /Room cleaning request.*Preferred time: 11:00 AM/i);
+    assert.deepEqual(completedBody.actions, []);
+    assert.equal(outbound.length, 3);
+    outbound.forEach((payload) => {
+      const parameters = payload.template.components[0].parameters;
+      assert.equal(parameters[2].text, "Room cleaning");
+      assert.match(parameters[4].text, /Preferred time: 11:00 AM/i);
+      assert.doesNotMatch(parameters[4].text, /^Please send the request$/i);
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("generic send-request wording cannot create a context-free service alert", async () => {
+  const { env, store } = createEnvironment({
+    OPENAI_API_KEY: "test-key",
+    WHATSAPP_ACCESS_TOKEN: "meta-test-token",
+    WHATSAPP_PHONE_NUMBER_ID: "1234567890",
+    WHATSAPP_ALERT_RECIPIENTS: JSON.stringify({
+      support: [{ label: "Su", phone: "+66 64 000 0001" }],
+      emergency: [
+        { label: "Owner 1", phone: "+66 81 000 0002" },
+        { label: "Owner 2", phone: "+66 82 000 0003" }
+      ]
+    })
+  });
+  const originalFetch = globalThis.fetch;
+  let modelCalls = 0;
+  globalThis.fetch = async () => {
+    modelCalls += 1;
+    return new Response(JSON.stringify({
+      output: [{ type: "message", content: [{ type: "output_text", text: JSON.stringify({
+        answer: "I will send it.", intent_id: "guest_request", category: "stay-support", confidence: 0.9,
+        needs_human: true, handoff: "stay_support", learning_gap: false, learning_reason: "none"
+      }) }] }]
+    }), { status: 200, headers: { "content-type": "application/json" } });
+  };
+  try {
+    const response = await handleConciergeRequest(guestRequest("Please send the request"), env, undefined, new Date("2026-08-30T04:12:00.000Z"));
+    const body = await response.json();
+    assert.equal(body.intentId, "request_submission_needs_context");
+    assert.equal(body.needsHuman, false);
+    assert.equal(body.handoff, "none");
+    assert.match(body.answer, /Please tell me what you need/i);
+    assert.doesNotMatch(body.answer, /has been sent|sent to The House team/i);
+    assert.equal(store.alerts.length, 0);
+    assert.equal(modelCalls, 0);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("context-free send-request wording is also blocked when only an unrelated monitoring workflow is stale", async () => {
+  const { env, store } = createEnvironment({ OPENAI_API_KEY: "test-key" });
+  const originalFetch = globalThis.fetch;
+  let modelCalls = 0;
+  globalThis.fetch = async () => {
+    modelCalls += 1;
+    throw new Error("model should not be called");
+  };
+  try {
+    const response = await handleConciergeRequest(guestRequest("Please send the request", {
+      workflowState: {
+        type: "property_issue",
+        status: "monitoring",
+        issueCategory: "equipment",
+        notified: true,
+        notes: "Air conditioner was previously reported."
+      }
+    }), env, undefined, new Date("2026-08-30T04:12:30.000Z"));
+    const body = await response.json();
+    assert.equal(body.intentId, "request_submission_needs_context");
+    assert.equal(body.needsHuman, false);
+    assert.equal(body.handoff, "none");
+    assert.match(body.answer, /Please tell me what you need/i);
+    assert.doesNotMatch(body.answer, /has been sent|sent to The House team/i);
+    assert.equal(store.alerts.length, 0);
+    assert.equal(modelCalls, 0);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("bare 3 in an active cleaning collector means 3:00 PM and submits the structured request once", async () => {
+  const { env, store } = createEnvironment({
+    OPENAI_API_KEY: "",
+    WHATSAPP_ACCESS_TOKEN: "meta-test-token",
+    WHATSAPP_PHONE_NUMBER_ID: "1234567890",
+    WHATSAPP_ALERT_RECIPIENTS: JSON.stringify({
+      support: [{ label: "Su", phone: "+66 64 000 0001" }],
+      emergency: [
+        { label: "Owner 1", phone: "+66 81 000 0002" },
+        { label: "Owner 2", phone: "+66 82 000 0003" }
+      ]
+    })
+  });
+  const now = new Date("2026-08-30T03:54:00.000Z");
+  const first = await handleConciergeRequest(guestRequest("I need a clean up"), env, undefined, now);
+  const firstBody = await first.json();
+  const originalFetch = globalThis.fetch;
+  let sends = 0;
+  globalThis.fetch = async () => {
+    sends += 1;
+    return new Response(JSON.stringify({ messages: [{ id: `wamid.cleanup-three-${sends}` }] }), { status: 200 });
+  };
+  try {
+    const completed = await handleConciergeRequest(guestRequest("3", {
+      workflowState: firstBody.workflow
+    }), env, undefined, now);
+    const body = await completed.json();
+    assert.equal(body.workflow.status, "submitted");
+    assert.match(body.answer, /Preferred time: 3:00 PM/i);
+    assert.equal(store.alerts.length, 1);
+    assert.match(store.alerts[0].summary, /Room cleaning request.*Preferred time: 3:00 PM/i);
+    assert.equal(sends, 3);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("failed cleaning delivery stays truthful, keeps the collector recoverable and never creates a duplicate alert on retry", async () => {
+  const { env, store } = createEnvironment({
+    OPENAI_API_KEY: "",
+    WHATSAPP_ACCESS_TOKEN: "meta-test-token",
+    WHATSAPP_PHONE_NUMBER_ID: "1234567890",
+    WHATSAPP_ALERT_RECIPIENTS: JSON.stringify({
+      support: [{ label: "Su", phone: "+66 64 000 0001" }],
+      emergency: [
+        { label: "Owner 1", phone: "+66 81 000 0002" },
+        { label: "Owner 2", phone: "+66 82 000 0003" }
+      ]
+    })
+  });
+  const now = new Date("2026-08-30T03:54:00.000Z");
+  const first = await handleConciergeRequest(guestRequest("I need a clean up"), env, undefined, now);
+  const firstBody = await first.json();
+  const originalFetch = globalThis.fetch;
+  let sends = 0;
+  globalThis.fetch = async () => {
+    sends += 1;
+    return new Response(JSON.stringify({ error: { code: 2, message: "simulated Meta failure" } }), { status: 500 });
+  };
+  try {
+    const failed = await handleConciergeRequest(guestRequest("11", {
+      workflowState: firstBody.workflow
+    }), env, undefined, now);
+    const failedBody = await failed.json();
+    assert.equal(failedBody.workflow.status, "collecting");
+    assert.match(failedBody.answer, /couldn.t send that request automatically/i);
+    assert.doesNotMatch(failedBody.answer, /sent your cleaning request|request has been sent/i);
+    assert.deepEqual(failedBody.actions.map((action) => action.label), ["Call Us"]);
+    assert.equal(store.alerts.length, 1);
+    assert.equal(sends, 3);
+
+    const retry = await handleConciergeRequest(guestRequest("11", {
+      workflowState: failedBody.workflow
+    }), env, undefined, new Date(now.getTime() + 1000));
+    const retryBody = await retry.json();
+    assert.equal(retryBody.workflow.status, "collecting");
+    assert.match(retryBody.answer, /couldn.t send that request automatically/i);
+    assert.equal(store.alerts.length, 1);
+    assert.equal(sends, 3);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("verified shorthand acknowledgement ignores stale hidden cleaning transcript", async () => {
+  const { env, store } = createEnvironment({ OPENAI_API_KEY: "test-key" });
+  const originalFetch = globalThis.fetch;
+  let modelCalls = 0;
+  globalThis.fetch = async () => {
+    modelCalls += 1;
+    throw new Error("model should not be called");
+  };
+  try {
+    const response = await handleConciergeRequest(guestRequest("I am already", {
+      history: [
+        { role: "user", content: "I need a clean up" },
+        { role: "assistant", content: "What time would you prefer?" },
+        { role: "user", content: "3" },
+        { role: "assistant", content: "I have noted 3:00 PM." }
+      ]
+    }), env, undefined, new Date("2026-08-30T04:13:00.000Z"));
+    const body = await response.json();
+    assert.equal(body.intentId, "verified_guest_acknowledgement");
+    assert.match(body.answer, /guest access is already active.*Room 6/i);
+    assert.doesNotMatch(body.answer, /cleaning|preferred time|support/i);
+    assert.equal(body.needsHuman, false);
+    assert.equal(body.workflow, null);
+    assert.equal(store.alerts.length, 0);
+    assert.equal(modelCalls, 0);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("browser starts a visible fresh conversation on reload and uses access-aware initial copy", async () => {
+  const script = await readFile(new URL("../public/ai-concierge.js", import.meta.url), "utf8");
+  assert.match(script, /function initialHistory\(\) \{[\s\S]*sessionStorage, "remove", historyStorageKey[\s\S]*return \[\]/);
+  assert.doesNotMatch(script, /rememberExchange[\s\S]{0,500}sessionStorage, "set", historyStorageKey/);
+  assert.match(script, /function initialConciergeMessage\(\)/);
+  assert.match(script, /if \(!conciergeAccessState\.verified\)/);
+  assert.match(script, /Your guest access is active/);
+  assert.match(script, /Your stay is verified[\s\S]*Guest registration is still incomplete/);
+  assert.match(script, /appendMessage\("concierge", initialConciergeMessage\(\)\)/);
+  assert.match(script, /activeCleaningWorkflow = result\.workflow\?\.type === "cleaning"[\s\S]*result\.workflow\?\.status === "collecting"/);
+  assert.match(script, /const activeWorkflow = activePrivateWorkflow[\s\S]*\|\| activeCleaningWorkflow/);
 });
 
 test("diving learning and standalone named-provider turns preserve French Kiss Divers preference without promising availability", async () => {

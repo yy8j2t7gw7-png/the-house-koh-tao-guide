@@ -2,6 +2,17 @@
 
 All notable changes to The House – Koh Tao guest guide are recorded here.
 
+## v5.11.39 — Cleaning Workflow + Fresh Concierge State
+
+- Recognizes natural **clean up / cleanup** wording and preserves the cleaning collector in the browser between turns.
+- Accepts contextual bare-hour replies such as **11** and automatically submits the existing cleaning service alert when collection is complete.
+- Prevents false website-chat reply wording and removes routine contact buttons after a successful cleaning send.
+- Starts a fresh visible conversation on full reload instead of restoring invisible stale transcript history.
+- Uses access-aware initial copy so verified guests are not told to verify again.
+- Blocks context-free **Please send the request** turns from creating generic `Guest request` alerts.
+- Makes historical verified-stay test fixtures time-stable; complete suite is **203 passed, 0 failed**.
+- Preserves v5.11.38 contact-hours wording/emergency routing and all v5.11.37/v5.11.36 operational and security fixes.
+
 ## v5.11.38 — Guest-Facing House Contact Wording
 
 - Replaced the persistent human-handoff phrase **contact Su directly** with **contact The House team directly**.

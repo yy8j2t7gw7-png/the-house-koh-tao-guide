@@ -1,6 +1,6 @@
 # Product Roadmap
 
-Baseline: v5.11.38
+Baseline: v5.11.39
 
 ## Completed
 
@@ -206,7 +206,7 @@ Guests may continue using ordinary WhatsApp handoffs. Automated internal alerts 
 - [x] Implement and package v5.11.37 directly from deployed v5.11.36 to fix lower-friction Su contact, emergency-history topic switching, natural stained-linen collection, named dive-provider preference and deterministic authorized Wi-Fi-password delivery.
 - [x] Deploy v5.11.37 and begin production smoke testing; testing exposed one guest-facing personal-name wording issue in the otherwise-correct in-hours human handoff.
 - [x] Implement and package v5.11.38 to generalize the handoff wording to **The House team** and explicitly protect the existing office-hours gate.
-- [ ] Deploy v5.11.38 and run the short contact-hours smoke test in `RELEASE_NOTES_v5.11.38.md`.
+- [x] Deploy v5.11.38 and run production smoke testing; the subsequent Room 6 cleaning/reload screenshots exposed the workflow/state issues corrected in v5.11.39.
 - [ ] Keep the five newer human-friendly Meta templates untouched while under review; activate them only after all five are Active in a separate explicitly authorized release.
 - [x] Add `STAY_TOKEN_PEPPER` and `RESERVATION_SYNC_TOKEN` Worker secrets
 - [x] Add protected `SPARE_KEY_CODES` Worker secret before activating automatic spare-key release
@@ -307,3 +307,6 @@ Live status: disabled through `EXPLORE_ENABLED=false`. Existing pages, data and 
 - Analytics
 - Airbnb and housekeeping integrations
 - Automated availability and booking integrations where commercially appropriate
+
+- [x] Implement and package v5.11.39 to make clean up/cleanup requests deterministic, retain the cleaning collector in the browser, accept contextual bare-hour replies, auto-submit the service alert, remove false website-chat reply wording, use access-aware initial copy, clear invisible stale history on reload, and block context-free generic request alerts.
+- [ ] Deploy v5.11.39 and smoke-test `I need a clean up` → `11` → one correctly labelled Room cleaning alert, then reload verified Room 6 and confirm the access-aware greeting.

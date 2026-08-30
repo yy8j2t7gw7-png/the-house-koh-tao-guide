@@ -144,16 +144,11 @@
   }
 
   function initialHistory() {
-    try {
-      const stored = JSON.parse(safeStorage(window.sessionStorage, "get", historyStorageKey) || "[]");
-      if (!Array.isArray(stored)) return [];
-      return stored
-        .filter((item) => item && ["user", "assistant"].includes(item.role) && typeof item.content === "string")
-        .map((item) => ({ ...item, content: redactPrivateContact(item.content) }))
-        .slice(-historyLimit);
-    } catch (_error) {
-      return [];
-    }
+    // A full page load starts a visibly fresh Concierge conversation. The
+    // browser does not restore an invisible old transcript because workflow
+    // state itself is intentionally not persisted across document loads.
+    safeStorage(window.sessionStorage, "remove", historyStorageKey);
+    return [];
   }
 
   const sessionId = initialSessionId();
@@ -175,6 +170,16 @@
     };
   }
 
+  function initialConciergeMessage() {
+    if (!conciergeAccessState.verified) {
+      return cfg.initialMessage || "Hello. What can I help you with?";
+    }
+    if (conciergeAccessState.registrationIncomplete) {
+      return `Hello. Your stay is verified${selectedRoom ? ` for Room ${selectedRoom}` : ""}. Guest registration is still incomplete; you can finish it using Guest registration above, or ask me for help.`;
+    }
+    return `Hello. Your guest access is active${selectedRoom ? ` for Room ${selectedRoom}` : ""}. I can help with check-in, Wi-Fi, towels, cleaning, lost keys, bookings and questions about Koh Tao.`;
+  }
+
   function interpolate(value, context) {
     return String(value || "").replace(/\{(question|room|roomLabel)\}/g, (_match, key) => context[key] || "");
   }
@@ -185,7 +190,6 @@
       { role: "assistant", content: redactPrivateContact(answer).slice(0, 700) }
     );
     conversationHistory = conversationHistory.slice(-historyLimit);
-    safeStorage(window.sessionStorage, "set", historyStorageKey, JSON.stringify(conversationHistory));
   }
 
   function routeMap() {
@@ -674,7 +678,8 @@
       || /(?:\+|00)?\d[\d ()-]{6,20}\d/.test(source)
       || impliedLuggageRequest
       || actionableHousekeepingSupplyRequest.test(source)
-      || /\b(?:luggage|baggage|store\s+(?:my|our)?\s*bags?|room\s+cleaning|clean\s+(?:my|our|the)\s+room)\b/i.test(source)
+      || /\b(?:luggage|baggage|store\s+(?:my|our)?\s*bags?|room\s+cleaning|clean\s+(?:my|our|the)\s+room|clean\s*up|cleanup)\b/i.test(source)
+      || /^\s*(?:please\s+)?(?:send|submit|forward)(?:\s+(?:the|my|this))?\s+request(?:\s+(?:now|please))?\s*[.!]?\s*$/i.test(source)
       || /\b(?:my|our|the)\s+room\s+(?:(?:is|feels|looks|seems)\s+(?:(?:really|very|quite|so)\s+)?(?:dirty|messy|unclean)|needs?\s+(?:a\s+)?clean(?:ing)?)\b/i.test(source)
       || lostKeyRequest.test(source)
       || /(?:^\s*(?:please\s+)?(?:book|reserve|arrange)\b|\b(?:please\s+(?:book|reserve|arrange)|can\s+you\s+(?:book|reserve|arrange)|could\s+you\s+(?:book|reserve|arrange)|help\s+me\s+(?:book|reserve|arrange)|i\s+(?:want|wanna|need|would\s+like)\s+(?:you\s+)?(?:to\s+)?(?:book|reserve|arrange)|book\s+(?:me|us)|make\s+(?:a\s+)?(?:booking|reservation))\b)/i.test(source)
@@ -689,7 +694,10 @@
       || result.workflow?.type === "booking";
     const activePrivateWorkflow = result.workflow?.status === "collecting"
       || (result.workflow?.type === "booking" && result.workflow?.status === "delivery_failed");
+    const activeCleaningWorkflow = result.workflow?.type === "cleaning"
+      && result.workflow?.status === "collecting";
     const activeWorkflow = activePrivateWorkflow
+      || activeCleaningWorkflow
       || (result.workflow?.type === "property_issue" && result.workflow?.status === "monitoring")
       || (result.workflow?.type === "lost_key" && result.workflow?.status === "awaiting_fee_acceptance");
     activeWorkflowState = activeWorkflow ? result.workflow : null;
@@ -782,7 +790,7 @@
     }
   }
 
-  appendMessage("concierge", cfg.initialMessage || "Hello. What can I help you with during your stay?");
+  appendMessage("concierge", initialConciergeMessage());
   if (!isPublicAccess) loadEngine().catch(() => {});
 
   const appearanceDelay = Number.isFinite(cfg.appearanceDelayMs) ? cfg.appearanceDelayMs : 1200;

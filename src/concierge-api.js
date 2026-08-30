@@ -40,7 +40,7 @@ import {
   specialtyChoiceLabels
 } from "./diving-catalog.js";
 
-const RELEASE = "5.11.40";
+const RELEASE = "5.11.41";
 const ROOM_OPTIONS = new Set(["1", "2", "3", "4", "5", "6", "8", "9", "10", "11"]);
 const MAX_HISTORY_ITEMS = 10;
 const MAX_QUESTION_LENGTH = 800;
@@ -211,6 +211,7 @@ const LOCAL_INFORMATION_TOPIC = /\b(?:beach|bay|swim|snorkel|sunset|restaurant|d
 const INFORMATION_REQUEST_FORM = /^(?:how|what|where|which|when|why|is|are|do|does|can\s+i\s+find|could\s+you\s+(?:tell|recommend)|tell\s+me|recommend|suggest|any|good|best)\b|\b(?:how\s+far|nearby|close\s+to|recommend(?:ation)?|good\s+for|best\s+for|worth\s+visit)\b/i;
 const SUPPLY_INFORMATION_REQUEST = /\b(?:how\s+often|where\s+(?:are|is)|do\s+you\s+(?:provide|change|replace)|when\s+(?:are|do)|what\s+is\s+the\s+(?:towel|soap|toilet\s+paper))\b[^.?!]*(?:toilet\s+paper|soap|towels?|housekeeping)/i;
 const WIFI_PASSWORD_INFORMATION_REQUEST = /\b(?:(?:wifi|wi\s*fi|internet)\b[^.?!]{0,40}\bpassword|password\b[^.?!]{0,40}\b(?:wifi|wi\s*fi|internet))\b/i;
+const HOUSE_EMERGENCY_CONTACT_REQUEST = /\b(?:(?:do|have|is|are)\s+(?:you|the\s+house)\s+(?:have\s+)?(?:an?\s+)?emergency\s+(?:contact|number|line)|(?:what|which)\s+(?:is\s+)?(?:the\s+)?(?:house\s+)?emergency\s+(?:contact|number|line)|(?:can|could|may)\s+i\s+call\s+(?:an?\s+)?emergency\s+(?:contact|number|line)|emergency\s+(?:contact|number|line)\s+(?:i|we)\s+(?:can|could)\s+call)\b/i;
 const GENERIC_URGENT_WORDS = new Set([
   "a", "am", "an", "and", "bad", "emergency", "happened", "has", "have", "help", "i", "in", "is", "it",
   "my", "need", "please", "problem", "really", "room", "serious", "something", "the", "there", "urgent", "very",
@@ -2222,10 +2223,31 @@ function applyStructuredBookingPolicy(result, question, history, currentReplyCon
   return generalBookingPolicy(result, question, currentReplyContact, workflowState, now, retryingDelivery);
 }
 
+function houseEmergencyContactResult(question) {
+  if (!HOUSE_EMERGENCY_CONTACT_REQUEST.test(String(question || ""))) return null;
+  return {
+    answer: "Yes. You can call The House Emergency Support using the button below. If anyone is in immediate danger, call Koh Tao Rescue first.",
+    intentId: "house_emergency_contact",
+    category: "property-emergency",
+    confidence: 1,
+    needsHuman: false,
+    handoff: "property_emergency",
+    learningGap: false,
+    learningReason: "none",
+    actions: [
+      { label: "Call The House Emergency Support", type: "route", route: "propertyEmergencyCall", style: "danger" },
+      { label: "Call Koh Tao Rescue", type: "route", route: "rescueCall", style: "danger" }
+    ],
+    suppressDefaultActions: true,
+    source: "safety-policy"
+  };
+}
+
 function emergencyConfirmationActions(kind) {
   if (kind === "fire") {
     return [
       { label: "Call Koh Tao Rescue", type: "route", route: "rescueCall", style: "danger" },
+      { label: "Call The House Emergency Support", type: "route", route: "propertyEmergencyCall", style: "danger" },
       { label: "Send urgent alert", type: "server_action", action: "confirm_urgent_property", style: "danger" },
       { label: "Cancel", type: "dismiss" }
     ];
@@ -2233,6 +2255,7 @@ function emergencyConfirmationActions(kind) {
   if (kind === "property") {
     return [
       { label: "Send urgent alert", type: "server_action", action: "confirm_urgent_property", style: "danger" },
+      { label: "Call The House Emergency Support", type: "route", route: "propertyEmergencyCall", style: "danger" },
       { label: "Cancel", type: "dismiss" }
     ];
   }
@@ -2246,7 +2269,7 @@ function emergencyConfirmationActions(kind) {
 function safetyResultForQuestion(question) {
   if (isFireEmergencyMessage(question)) {
     return {
-      answer: "If there is a real fire, leave the room or building and move to a safe place immediately. Call Koh Tao Rescue using the button below. There is a fire extinguisher mounted outside on the wall on each floor. Only try to use it if the fire is small, you have a safe escape route and you can do so without putting yourself in danger. Would you also like to send an urgent alert to The House emergency team?",
+      answer: "If there is a real fire, leave the room or building and move to a safe place immediately. Call Koh Tao Rescue using the button below. There is a fire extinguisher mounted outside on the wall on each floor. Only try to use it if the fire is small, you have a safe escape route and you can do so without putting yourself in danger. You can also call The House Emergency Support or send an urgent alert to The House team.",
       intentId: "fire_emergency",
       category: "property-emergency",
       confidence: 1,
@@ -2260,7 +2283,7 @@ function safetyResultForQuestion(question) {
   }
   if (isCriticalPropertyMessage(question)) {
     return {
-      answer: "This sounds serious. Move away from the danger first. Send an urgent alert to The House emergency team now?",
+      answer: "This sounds serious. Move away from the danger first. You can call The House Emergency Support now or send an urgent alert to The House team.",
       intentId: "property_emergency",
       category: "property-emergency",
       confidence: 1,
@@ -2830,11 +2853,11 @@ function applyLiveFeaturePolicy(result, env) {
 }
 
 function applyEmergencyConfirmationPolicy(result) {
-  if (result?.intentId === "fire_emergency" || result?.intentId === "urgent_clarification") return result;
+  if (["fire_emergency", "urgent_clarification", "house_emergency_contact"].includes(result?.intentId)) return result;
   if (isCriticalPropertyResult(result)) {
     return {
       ...result,
-      answer: "This sounds serious. Move away from the danger first. Send an urgent alert to The House emergency team now?",
+      answer: "This sounds serious. Move away from the danger first. You can call The House Emergency Support now or send an urgent alert to The House team.",
       needsHuman: false,
       actions: emergencyConfirmationActions("property")
     };
@@ -3265,7 +3288,8 @@ export async function handleConciergeRequest(request, env, ctx, now = new Date()
       ], source: "confirmed-operation", language
     });
   }
-  const classifiedSafetyResult = safetyResultForQuestion(question) || contextualSafetyResult(question, history);
+  const directEmergencyContactResult = houseEmergencyContactResult(question);
+  const classifiedSafetyResult = directEmergencyContactResult || safetyResultForQuestion(question) || contextualSafetyResult(question, history);
   const lostKeyResult = classifiedSafetyResult ? null : lostKeyPolicyResult(question, access, room, now);
   const humanContactResult = classifiedSafetyResult || lostKeyResult
     ? null

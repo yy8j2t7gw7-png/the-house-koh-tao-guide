@@ -155,8 +155,6 @@
   let conversationHistory = initialHistory();
   let pendingAnswer = null;
   let lastFocusedElement = null;
-  let dragStartY = null;
-  let dragCurrentY = null;
   let enginePromise = null;
   let privateWorkflowContact = "";
   let activeWorkflowState = null;
@@ -420,6 +418,7 @@
   const quickActionsContainer = panel.querySelector(".ai-concierge-actions");
   const registrationReminder = panel.querySelector(".ai-concierge-registration-status");
   const serviceHours = panel.querySelector(".ai-concierge-service-hours");
+  const dragHandle = panel.querySelector(".ai-concierge-drag-handle");
 
   function appendMessage(role, text, actions = [], question = "", metadata = {}) {
     const message = document.createElement("article");
@@ -956,32 +955,10 @@
   });
   window.addEventListener("pageshow", refreshConciergeAccessState);
 
-  const resetDrag = () => {
-    dragStartY = null;
-    dragCurrentY = null;
-    panel.classList.remove("is-dragging");
-    panel.style.transform = "";
-  };
-
-  panel.addEventListener("touchstart", (event) => {
-    if (window.innerWidth > 640 || !panel.classList.contains("is-open") || event.touches.length !== 1) return;
-    dragStartY = event.touches[0].clientY;
-    dragCurrentY = dragStartY;
-    panel.classList.add("is-dragging");
-  }, { passive: true });
-
-  panel.addEventListener("touchmove", (event) => {
-    if (dragStartY === null || event.touches.length !== 1) return;
-    dragCurrentY = event.touches[0].clientY;
-    panel.style.transform = `translateY(${Math.max(0, dragCurrentY - dragStartY)}px)`;
-  }, { passive: true });
-
-  panel.addEventListener("touchend", () => {
-    if (dragStartY === null) return;
-    const distance = Math.max(0, (dragCurrentY ?? dragStartY) - dragStartY);
-    if (distance > 110) closePanel();
-    else resetDrag();
-  });
+  // Mobile sheet drag-to-dismiss is intentionally disabled. The chat has its
+  // own scroll surface, and a gesture that can translate/close the whole sheet
+  // makes ordinary conversation scrolling feel unstable on iOS. Use the
+  // explicit close button instead.
 
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape") closePanel();

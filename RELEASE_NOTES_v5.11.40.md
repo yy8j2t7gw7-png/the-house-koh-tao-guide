@@ -2,31 +2,18 @@
 
 ## Outcome
 
-v5.11.40 is a narrow production correction built directly from deployed v5.11.39. It fixes one real-device human-routing phrase that still fell through deterministic recognition.
+v5.11.40 is a narrow production correction on v5.11.39 for one remaining explicit human-contact routing phrase.
 
-## Production failure fixed
+## Fix
 
-Verified Room 6 guest, Sunday during open service hours, asked:
+The Room 6 phrase:
 
 `I need to talk to a human you can not help me`
 
-Actual v5.11.39 behavior: the turn fell through to generic support wording and did not expose the routine **Contact Us / Call Us** actions.
-
-Correct v5.11.40 behavior: the explicit human request plus clear cannot-help reason is treated as persistent human-contact intent before model/knowledge routing. During open service hours the Concierge says the guest can contact **The House team** and exposes the existing **Contact Us / Call Us** actions.
+now enters the deterministic persistent-human path. During Tuesday–Sunday 10:30–19:30 Bangkok service hours the guest sees **The House team** with **Contact Us / Call Us**. Monday and after-hours routine contact remain suppressed. No private staff name is exposed and no alert is created by the contact request.
 
 ## Preserved boundaries
 
-- first ordinary generic human request remains AI-first;
-- Tuesday–Sunday 10:30–19:30 Bangkok routine-contact hours remain unchanged;
-- Monday and after-hours routine contact remains suppressed;
-- no private staff name is exposed;
-- no operational alert is created by the contact question;
-- property emergency / Emergency Support routing remains independent;
-- all v5.11.39 cleaning/state corrections remain unchanged;
-- pending replacement Meta templates are not activated.
+All v5.11.39 cleaning/state behavior, Wi-Fi password handling, emergency routing, snorkeling, French Kiss Divers preference, lost-key security, Meta mappings, recipients, webhook, passport/Airbnb behavior and `EXPLORE_ENABLED=false` remain unchanged.
 
-## Validation
-
-- Complete automated suite: **204 passed, 0 failed**.
-- Exact production phrase tested at Sunday 12:57 Bangkok: deterministic human-contact result with both routine contact actions.
-- Same phrase tested Sunday 20:00 Bangkok: no routine call/WhatsApp action, Emergency help remains available.
+The subsequent mobile emergency-call, conversation-space and sheet-gesture findings are released separately as v5.11.41.

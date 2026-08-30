@@ -1,4 +1,4 @@
-# Guest Guide Platform with AI Concierge — The House v5.11.40
+# Guest Guide Platform with AI Concierge — The House v5.11.41
 
 The House – Koh Tao guest guide is a production-oriented, mobile-first digital guest guide and concierge platform. It combines property information, curated island guidance, structured place and activity data, and centralized contact and booking routes.
 
@@ -18,9 +18,10 @@ The House – Koh Tao guest guide is a production-oriented, mobile-first digital
 
 The Activities module contains 49 structured profiles covering diving, freediving, snorkelling, boat trips, beach experiences, kayaking, paddleboarding, hiking, viewpoints, climbing, yoga, Muay Thai, massage, cooking, wildlife, photography, night activities and rainy-day options.
 
-## v5.11.40 release focus
+## v5.11.41 release focus
 
-v5.11.40 is a narrow production human-routing correction on deployed v5.11.39. A guest phrase such as **I need to talk to a human you can not help me** is now classified deterministically as a persistent human-contact request instead of falling through to generic knowledge/model routing. During Tuesday–Sunday 10:30–19:30 Bangkok service hours it exposes the existing **Contact Us / Call Us** actions for **The House team** without naming staff; Monday and after-hours suppression remain unchanged. No cleaning, emergency, lost-key, Meta-template, recipient, Airbnb, passport or other workflow behavior is changed.
+v5.11.41 is a narrow mobile/emergency UX correction on the already-pushed v5.11.40 human-routing release. It adds **Call The House Emergency Support** to fire/property-emergency action sets without exposing the responder identity, handles direct emergency-contact questions deterministically, gives the actual mobile conversation more vertical space by compacting the seven quick actions after chat starts, and removes drag-to-dismiss so ordinary chat scrolling cannot move or accidentally close the sheet. v5.11.40 remains the persistent-human routing fix for **I need to talk to a human you can not help me**, and all v5.11.39 cleaning/state behavior remains authoritative.
+
 
 ## v5.11.39 release focus
 

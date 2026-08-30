@@ -2912,7 +2912,7 @@ test("guest localization supports seven languages and keeps the owner dashboard 
   assert.doesNotMatch(admin, /src="\/i18n\.js"/);
   assert.match(runtime, /exploreContentDeferred/);
   assert.match(runtime, /element\.closest\("\.section,\.footer"\)/);
-  assert.match(runtime, /houseGuideTranslations:v5\.11\.40:/);
+  assert.match(runtime, /houseGuideTranslations:v5\.11\.41:/);
   assert.match(runtime, /MAX_REQUEST_RETRIES = 2/);
   assert.match(runtime, /let flushRunning = false/);
 });
@@ -9174,6 +9174,46 @@ test("fire cancellation cannot contaminate a later housekeeper-contact turn whil
   assert.equal(store.alerts.length, 0);
 });
 
+test("property emergencies expose private-role House emergency calling without naming the responder", async () => {
+  const { env, store } = createEnvironment({
+    OPENAI_API_KEY: "not-used",
+    WHATSAPP_ALERT_RECIPIENTS: JSON.stringify({
+      support: [{ label: "Su", phone: "+66 64 000 0001" }],
+      emergency: [
+        { label: "Owner 1", phone: "+66 81 000 0002" },
+        { label: "Westy", phone: "+66 82 000 0003" }
+      ]
+    })
+  });
+  const now = new Date("2026-08-30T06:16:00.000Z");
+
+  const fire = await handleConciergeRequest(guestRequest("There is fire in my room"), env, undefined, now);
+  const fireBody = await fire.json();
+  assert.equal(fireBody.intentId, "fire_emergency");
+  assert.equal(fireBody.actions.some((action) => action.route === "rescueCall"), true);
+  assert.equal(fireBody.actions.some((action) => action.route === "propertyEmergencyCall"), true);
+  assert.equal(fireBody.actions[1].route, "propertyEmergencyCall");
+  assert.equal(fireBody.actions.some((action) => action.action === "confirm_urgent_property"), true);
+  assert.match(fireBody.answer, /The House Emergency Support/i);
+  assert.doesNotMatch(fireBody.answer, /\b(?:Westy|Su)\b/i);
+  assert.equal(store.alerts.length, 0);
+
+  const history = [
+    { role: "user", content: "There is fire in my room" },
+    { role: "assistant", content: fireBody.answer }
+  ];
+  const contact = await handleConciergeRequest(guestRequest("Do you have a emergency contact I can call", { history }), env, undefined, now);
+  const contactBody = await contact.json();
+  assert.equal(contactBody.intentId, "house_emergency_contact");
+  assert.equal(contactBody.source, "safety-policy");
+  assert.match(contactBody.answer, /call The House Emergency Support/i);
+  assert.doesNotMatch(contactBody.answer, /\b(?:Westy|Su)\b/i);
+  assert.equal(contactBody.actions[0].route, "propertyEmergencyCall");
+  assert.equal(contactBody.actions.some((action) => action.route === "rescueCall"), true);
+  assert.equal(contactBody.actions.some((action) => action.action === "confirm_urgent_property"), false);
+  assert.equal(store.alerts.length, 0);
+});
+
 test("natural stained-bed-sheet wording enters cleaning collection and now submits exactly one service alert", async () => {
   const { env, store } = createEnvironment({
     OPENAI_API_KEY: "",
@@ -9580,12 +9620,20 @@ test("desktop Concierge expands the conversation while mobile keeps its polished
   assert.match(styles, /height:min\(84dvh,800px\)/);
   assert.match(styles, /\.ai-concierge-panel\.has-conversation \.ai-concierge-messages[\s\S]*flex:1[\s\S]*max-height:none/);
   assert.match(styles, /\.ai-concierge-panel\.has-conversation \.ai-concierge-context\{display:none\}/);
-  assert.match(styles, /@media\(max-width:640px\)[\s\S]*height:min\(88dvh,760px\)[\s\S]*max-height:88dvh/);
+  assert.match(styles, /@media\(max-width:640px\)[\s\S]*height:min\(92dvh,820px\)[\s\S]*max-height:92dvh/);
   assert.match(styles, /\.ai-concierge-panel\.has-conversation \.ai-concierge-actions\{grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
   assert.match(styles, /\.ai-concierge-message-action\{[^}]*white-space:normal[^}]*overflow-wrap:anywhere/);
   assert.match(styles, /\.ai-concierge-input\{[^}]*font-size:16px/);
   assert.match(script, /panel\.classList\.add\("has-conversation"\)/);
   assert.match(styles, /\.ai-concierge-panel\.has-conversation \.ai-concierge-chat[\s\S]*flex:1/);
+  assert.match(styles, /@media\(max-width:640px\)[\s\S]*\.ai-concierge-panel\.has-conversation \.ai-concierge-actions\{grid-template-columns:repeat\(3,minmax\(0,1fr\)\)/);
+  assert.match(styles, /@media\(max-width:640px\)[\s\S]*\.ai-concierge-panel\.has-conversation \.ai-concierge-action\{min-height:39px/);
+  assert.match(styles, /\.ai-concierge-messages\{flex:1;min-height:170px;max-height:none\}/);
+  assert.match(styles, /\.ai-concierge-drag-handle\{display:none\}/);
+  assert.doesNotMatch(script, /dragHandle\.addEventListener\("touchstart"/);
+  assert.doesNotMatch(script, /dragHandle\.addEventListener\("touchmove"/);
+  assert.doesNotMatch(script, /distance > 140/);
+  assert.doesNotMatch(script, /panel\.addEventListener\("touchstart"/);
 });
 
 test("v5.11.28 shared visual system constrains width, hero height, motion and overflow", async () => {

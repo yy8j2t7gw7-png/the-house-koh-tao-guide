@@ -2,13 +2,22 @@
 
 All notable changes to The House – Koh Tao guest guide are recorded here.
 
-## v5.11.40 — Persistent Human Contact Phrase Routing
+## v5.11.41 — Mobile Emergency Call + Conversation Sheet Stability
 
-- Fixes the live Room 6 phrase **I need to talk to a human you can not help me** falling through to generic support wording without the routine contact actions.
-- Treats an explicit human request plus clear **you cannot help me / you are not helping** wording as persistent human-contact intent before model/knowledge routing.
-- During open service hours, returns the existing **The House team** wording with **Contact Us / Call Us**; Monday and after-hours remain closed to routine contact.
-- Does not expose private staff names, create an alert, or change property-emergency routing.
-- Preserves all v5.11.39 cleaning/state fixes and previous Wi-Fi, snorkeling, French Kiss Divers, lost-key, Meta and security behavior.
+- Adds **Call The House Emergency Support** to property/fire emergency actions while keeping the configured responder identity and telephone number private.
+- Keeps **Call Koh Tao Rescue** first for fire and preserves the deliberate **Send urgent alert** confirmation boundary.
+- Handles **Do you have a emergency contact I can call** deterministically with House Emergency Support + Rescue actions and no automatic alert.
+- Gives the mobile chat materially more vertical space by compacting the seven quick actions into three columns after conversation start.
+- Removes mobile drag-to-dismiss entirely so scrolling inside the conversation cannot translate or accidentally close the Concierge sheet; the explicit close control remains available.
+- Preserves v5.11.40 human-contact routing and all v5.11.39 cleaning/state fixes.
+- Complete suite: **205 passed, 0 failed**.
+
+## v5.11.40 — Persistent Human Routing
+
+- Fixes the live Room 6 phrase **I need to talk to a human you can not help me** falling through to generic support wording without routine contact actions.
+- Treats explicit human requests plus clear **you cannot help me / you are not helping** wording as persistent human-contact intent before model/knowledge routing.
+- During open service hours, returns **The House team** with **Contact Us / Call Us**; Monday and after-hours routine contact remain suppressed.
+- Preserves all v5.11.39 cleaning/state fixes and previous Wi-Fi, emergency, snorkeling, French Kiss Divers, lost-key, Meta and security behavior.
 
 ## v5.11.39 — Cleaning Workflow + Fresh Concierge State
 
@@ -1271,3 +1280,7 @@ Roctopus Dive is RAID, not PADI.
 ## Earlier completed work
 
 Earlier releases established Restaurants, Beaches, Cafés, Shopping & Essentials, House information and the modular platform architecture. The repository Git history preserves the granular implementation commits.
+
+
+### v5.11.40 final mobile emergency and chat-sheet polish
+- Prominent House emergency call action, compact mobile in-conversation quick actions, and disabled drag-to-dismiss to prevent accidental sheet movement/closure.

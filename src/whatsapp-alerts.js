@@ -86,7 +86,7 @@ function validatedBookingSubmission(result) {
   if (!contact) return null;
   const request = result?.bookingRequest;
   if (!request) return null;
-  const supportedKinds = ["diving", "fishing", "snorkeling", "taxi", "taxi_boat", "ferry", "motorbike_taxi"];
+  const supportedKinds = ["diving", "fishing", "snorkeling", "taxi", "taxi_boat", "ferry", "motorbike_taxi", "stay_extension"];
   if (!supportedKinds.includes(request.kind)) return null;
   const preferredDate = String(request.preferredDate || "").trim().slice(0, 120);
   const guestCount = Number(String(request.guestCount || "").trim());
@@ -99,7 +99,10 @@ function validatedBookingSubmission(result) {
   const pickupLocation = String(request.pickupLocation || "").trim().slice(0, 160);
   const destination = String(request.destination || "").trim().slice(0, 160);
   const tripType = String(request.tripType || "").trim().slice(0, 60);
-  if (!preferredDate || !activity || !Number.isInteger(guestCount) || guestCount < 1 || guestCount > 99) return null;
+  const extensionNights = Number(String(request.extensionNights || "").trim() || String(option).match(/\b(\d{1,2})\b/)?.[1] || "");
+  if (request.kind === "stay_extension") {
+    if (!activity || !Number.isInteger(extensionNights) || extensionNights < 1 || extensionNights > 99) return null;
+  } else if (!preferredDate || !activity || !Number.isInteger(guestCount) || guestCount < 1 || guestCount > 99) return null;
   let divingGroups = [];
   let planMode = "";
   let structuredSummary = "";
@@ -147,9 +150,10 @@ function validatedBookingSubmission(result) {
     request: {
       kind: request.kind,
       preferredDate,
-      guestCount: String(guestCount),
+      guestCount: request.kind === "stay_extension" ? "" : String(guestCount),
       activity,
       option,
+      extensionNights: request.kind === "stay_extension" ? String(extensionNights) : "",
       courseName,
       certificationLevel,
       preferredProvider,
@@ -361,6 +365,13 @@ function templateValues(alert, kind) {
     return [reference, room, luggage.context, luggage.bagCount, requested, appendProtectedContact(summary, alert.privateReplyContact)];
   }
   if (kind === "booking") {
+    if (alert.bookingRequest?.kind === "stay_extension") {
+      const booking = alert.bookingRequest;
+      const nights = Number(booking.extensionNights || String(booking.option || "").match(/\b(\d{1,2})\b/)?.[1] || 0);
+      const requested = nights > 0 ? `${nights} additional night${nights === 1 ? "" : "s"}` : (booking.option || "Additional nights requested");
+      const detail = [booking.notes, summary].filter(Boolean).join(" · ");
+      return [reference, room, booking.activity || "Stay extension", requested, "Current stay", appendProtectedContact(detail, alert.privateReplyContact)];
+    }
     if (alert.bookingRequest?.kind === "diving") {
       const booking = alert.bookingRequest;
       if (Array.isArray(booking.groups) && booking.groups.length) {

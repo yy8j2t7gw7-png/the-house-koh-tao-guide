@@ -40,6 +40,45 @@
       .trim();
   }
 
+  function broadHumanContactRequest(value) {
+    const normalized = normalizeIntentText(value);
+    if (!normalized || normalized.length > 320) return false;
+    const target = /\b(?:human(?:\s+being)?|real\s+(?:human|person)|actual\s+person|live\s+(?:person|agent)|person|someone|somebody|staff|member\s+of\s+staff|team|reception|receptionist|front\s+desk|housekeeper|manager|host|agent|support\s+agent|representative|operator|customer\s+(?:service|support)|support\s+team)\b/.test(normalized);
+    const action = /\b(?:talk(?:ing)?|speak(?:ing)?|chat(?:ting)?|call(?:ing)?|contact(?:ing)?|reach(?:ing)?|messag(?:e|ing)|connect(?:ing)?|transfer(?:ring)?|help)\b/.test(normalized);
+    const requestLanguage = /\b(?:need|want|wanna|would like|prefer|please|insist|demand|can i|could i|may i|can we|could we|let me|let us)\b/.test(normalized);
+    const direct = /\b(?:connect|transfer|put)\s+(?:me|us)\b|\b(?:get|give)\s+(?:me|us)\s+(?:a\s+)?(?:real\s+)?(?:human|person|someone|somebody|staff|member\s+of\s+staff|receptionist|agent|support\s+agent|representative|operator)|\b(?:let|allow)\s+(?:me|us)\s+(?:talk|speak|call|contact)\b/.test(normalized);
+    const imperative = /^(?:please\s+)?(?:talk|speak|chat|call|contact|reach|connect|transfer)\b/.test(normalized);
+    const dissatisfaction = /\b(?:(?:you|the ai|ai|the bot|bot|concierge)\s+(?:can not|cannot|cant|can t|does not|doesnt|is not|isnt)\s+(?:help|understand|solve|assist)|(?:you|the ai|ai|the bot|bot|concierge)\s+(?:are|re)\s+not\s+helping|this\s+(?:is not|isnt|does not|doesnt)\s+(?:help|work)|no\s+(?:ai|bot)|not\s+(?:the\s+)?(?:ai|bot)|someone\s+else|another\s+person)\b/.test(normalized);
+    const helpFromPerson = /\b(?:need|want|would like|can i get|could i get)\s+(?:some\s+)?(?:help|assistance)\s+(?:from|by)\s+(?:a\s+)?(?:human|person|someone|somebody|staff|member\s+of\s+staff|team|reception|receptionist|housekeeper|manager|host|agent|support\s+agent|representative|operator)\b/.test(normalized);
+    const bare = /^(?:human|real human|real person|person|someone|somebody|staff|member of staff|reception|receptionist|housekeeper|manager|agent|support agent|representative|operator)(?: please)?$/.test(normalized);
+    const property = /\b(?:call|contact|reach|speak to|talk to)\s+(?:the\s+)?(?:house|hotel|property|front desk|reception|team|staff|housekeeper|manager)\b/.test(normalized);
+    return bare || direct || helpFromPerson || property || (target && dissatisfaction) || (target && action && (requestLanguage || imperative)) || (target && /\b(?:need|want|wanna|prefer|would like|now)\b/.test(normalized));
+  }
+
+  function stayExtensionRequest(value) {
+    const normalized = normalizeIntentText(value);
+    if (!normalized) return false;
+    return /\b(?:extend|extension|prolong)\b[\s\S]{0,45}\b(?:stay|booking|reservation|room)\b/.test(normalized)
+      || /\b(?:stay|remain|keep the room|keep my room|keep our room)\b[\s\S]{0,45}\b(?:longer|another night|more nights?|extra nights?|additional nights?)\b/.test(normalized)
+      || /\b(?:can|could|may|would)\s+(?:i|we)\s+(?:stay|remain)\s+(?:for\s+)?longer\b/.test(normalized)
+      || /\b(?:i|we)\s+(?:want|wanna|need|would like|would love)\s+to\s+(?:stay|remain)\s+(?:for\s+)?longer\b/.test(normalized)
+      || /\b(?:add|book|have|take)\s+(?:another|an extra|extra|additional|more|\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten)\s+(?:more\s+|extra\s+|additional\s+)?nights?\b/.test(normalized)
+      || /\b(?:i|we)\s+(?:need|want|would like|would love)\s+(?:\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten)\s+(?:more|extra|additional)\s+nights?\b/.test(normalized)
+    || /\b(?:extend|prolong)\s+(?:it\s+)?(?:by|for)\s+(?:\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten)\s+nights?\b/.test(normalized)
+      || /\b(?:have|keep)\s+(?:the|my|our)\s+room\b[\s\S]{0,35}\b(?:\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten|another)\s+(?:more\s+|extra\s+|additional\s+)?nights?\b/.test(normalized)
+      || /\b(?:is it|would it be)\s+possible\s+(?:for\s+(?:me|us)\s+)?to\s+(?:stay|remain)\s+(?:for\s+)?longer\b/.test(normalized)
+      || /\b(?:i|we)(?:\s+d|\s+would)?\s+like\s+(?:another|an extra|extra|additional)\s+(?:\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten)?\s*nights?\b/.test(normalized)
+      || /^(?:\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten)\s+(?:more|extra|additional)\s+nights?(?:\s+please)?$/.test(normalized)
+      || /\b(?:another|one more|an extra|extra|additional)\s+night(?:s)?(?:\s+please)?$/.test(normalized)
+      || /\b(?:keep|have)\s+(?:the|my|our)\s+room\s+(?:for\s+)?(?:longer|another\s+day|more\s+days?|extra\s+days?|additional\s+days?)\b/.test(normalized)
+      || /\b(?:stay|remain)\s+(?:for\s+)?(?:another\s+day|one\s+more\s+day|more\s+days?|extra\s+days?|additional\s+days?)\b/.test(normalized)
+      || /\b(?:i|we)\s+(?:need|want|would\s+like|would\s+love)\s+(?:another|one\s+more|an\s+extra|extra|additional|more|\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten)\s+(?:more\s+|extra\s+|additional\s+)?days?\b/.test(normalized)
+      || /\b(?:add|book|have|take)\s+(?:another|an\s+extra|extra|additional|more|one\s+more|\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten)\s+(?:more\s+|extra\s+|additional\s+)?days?\b/.test(normalized)
+      || /\b(?:stay|remain)\s+until\s+(?:tomorrow|the\s+next\s+day|[a-z]{3,9}|\d{1,2}(?:st|nd|rd|th)?(?:\s+[a-z]{3,9})?)\b/.test(normalized)
+      || /^(?:(?:can|could|may)\s+(?:i|we)\s+)?extend(?:\s+(?:it|this))?(?:\s+please)?$/.test(normalized)
+      || /\bstay\s+(?:\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten)\s+(?:more|extra|additional)\s+nights?\b/.test(normalized);
+  }
+
   function safeStorage(storage, operation, key, value) {
     try {
       if (operation === "get") return storage.getItem(key);
@@ -65,6 +104,7 @@
 
   function bookingPromptFor(value) {
     const source = String(value || "");
+    if (stayExtensionRequest(source)) return "I would like to extend my stay.";
     if (/\b(?:motorbike|motorcycle|scooter)\s+taxi\b/i.test(source)) return "I want to book a motorbike taxi.";
     if (/\b(?:taxi\s+boat|boat\s+taxi|longtail(?:\s+boat)?)\b/i.test(source)) return "I want to book a taxi boat.";
     if (/\bferr(?:y|ies)(?:\s+tickets?)?\b/i.test(source)) return "I want to book ferry tickets.";
@@ -652,7 +692,7 @@
     const source = String(question || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
     if (["retry", "try again", "try it again", "try sending it again"].includes(source)) return true;
     const prefix = "(?:(?:can|could|would) you (?:please )?|please )?";
-    const activity = "(?:diving|fishing(?: trip)?|snorkeling(?: trip)?|taxi|ferry(?: tickets?)?|motorbike(?: taxi)?|taxi boat)";
+    const activity = "(?:diving|fishing(?: trip)?|snorkeling(?: trip)?|taxi|ferry(?: tickets?)?|motorbike(?: taxi)?|taxi boat|stay extension)";
     const target = `(?:it|(?:(?:my|the) )?(?:${activity} )?(?:booking|request))`;
     return new RegExp(`^${prefix}(?:retry(?: ${target})?|(?:try|send|resend)(?: sending)? ${target} again)$`, "i").test(source);
   }
@@ -671,6 +711,7 @@
       || /\b(?:burning smell|smell(?:s|ing)? (?:like )?burning|smoke (?:is )?(?:coming )?from|water (?:is )?pouring|ceiling (?:is )?(?:falling down|collapsing|caving in)|snake)\b/.test(normalized)
     );
     return isExplicitBookingRetry(source)
+      || broadHumanContactRequest(source)
       || genericHumanContactRequest.test(normalized)
       || propertyHumanContactRequest.test(normalized)
       || persistentHumanContactRequest.test(normalized)
@@ -681,6 +722,7 @@
       || /^\s*(?:please\s+)?(?:send|submit|forward)(?:\s+(?:the|my|this))?\s+request(?:\s+(?:now|please))?\s*[.!]?\s*$/i.test(source)
       || /\b(?:my|our|the)\s+room\s+(?:(?:is|feels|looks|seems)\s+(?:(?:really|very|quite|so)\s+)?(?:dirty|messy|unclean)|needs?\s+(?:a\s+)?clean(?:ing)?)\b/i.test(source)
       || lostKeyRequest.test(source)
+      || stayExtensionRequest(source)
       || /(?:^\s*(?:please\s+)?(?:book|reserve|arrange)\b|\b(?:please\s+(?:book|reserve|arrange)|can\s+you\s+(?:book|reserve|arrange)|could\s+you\s+(?:book|reserve|arrange)|help\s+me\s+(?:book|reserve|arrange)|i\s+(?:want|wanna|need|would\s+like)\s+(?:you\s+)?(?:to\s+)?(?:book|reserve|arrange)|book\s+(?:me|us)|make\s+(?:a\s+)?(?:booking|reservation))\b)/i.test(source)
       || /(?:\b(?:i\s+(?:need|want|would\s+like)|can\s+(?:i|we)\s+(?:get|have)|get\s+me|send\s+me)\s+(?:a\s+)?(?:taxi(?:\s+boat)?|longtail\s+boat|motorbike\s+taxi|ferry\s+tickets?)\b|^\s*(?:taxi(?:\s+boat)?|longtail(?:\s+boat)?|motorbike\s+taxi|ferry(?:\s+tickets?)?)\b(?=[\s\S]*\b(?:today|tomorrow|next\s+(?:mon|tues|wednes|thurs|fri|satur|sun)day|in\s+\d{1,3}\s+days?|from|to|at\s+\d)))/i.test(source)
       || /(?:\b(?:i|we)\s+(?:(?:want|need|plan)\s+to|would\s+like\s+to|wanna)\s+(?:(?:go|book|arrange)\s+)?(?:(?:scuba\s+)?div(?:e|ing)|fishing|snorkel(?:ing|ling)?)\b|\b(?:i|we)['’]d\s+like\s+to\s+(?:(?:go|book|arrange)\s+)?(?:(?:scuba\s+)?div(?:e|ing)|fishing|snorkel(?:ing|ling)?)\b|\b(?:i|we)\s+(?:want|need|would\s+like)\s+(?:a\s+)?(?:diving|fishing|snorkel(?:ing|ling)?)\s+(?:trip|tour)\b|\b(?:take\s+(?:me|us)|can\s+you\s+take\s+(?:me|us)|help\s+(?:me|us)\s+(?:go\s+)?)\s*(?:(?:scuba\s+)?div(?:e|ing)|fishing|snorkel(?:ing|ling)?)\b)/i.test(source)

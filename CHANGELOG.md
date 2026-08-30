@@ -2,6 +2,18 @@
 
 All notable changes to The House – Koh Tao guest guide are recorded here.
 
+## v5.11.42 — Broad Human Routing + Stay Extension Booking
+
+- Replaces exact-sentence dependence for human contact with a broad deterministic intent family covering human/person/staff/team/reception/front desk/housekeeper/manager/agent/representative/customer-support wording and common speak/call/contact/connect/transfer variants.
+- Keeps a first ordinary human request AI-first; repeated, frustrated, urgent or direct-transfer requests expose **The House team** Contact Us / Call Us only during Tuesday–Sunday 10:30–19:30 Bangkok service hours. No private staff identity is exposed and no operational alert is created.
+- Adds dedicated `stay_extension` booking recognition for natural variants such as **stay longer**, **extend my stay**, **keep the room longer**, **one more night**, **extra nights**, **another day** and related wording.
+- Collects only additional nights and an international WhatsApp/phone contact; local-format contacts remain pending until a country code is supplied.
+- Sends exactly one existing `booking_request` alert through `booking_with_owners` to Fah plus both owners. Raw reply contact remains transient and is absent from normal interaction/alert storage.
+- Never claims an extension is confirmed; availability and payment remain subject to team confirmation.
+- Preserves v5.11.41 emergency-call privacy/mobile stability, v5.11.39 cleaning/state safeguards, lost-key security, Wi-Fi, snorkeling, French Kiss Divers preference, Meta mappings and `EXPLORE_ENABLED=false`.
+- Airbnb synchronization is unchanged; the newly observed last-minute booking sync delay is intentionally deferred to the next narrow release.
+- Complete suite: **208 passed, 0 failed**.
+
 ## v5.11.41 — Mobile Emergency Call + Conversation Sheet Stability
 
 - Adds **Call The House Emergency Support** to property/fire emergency actions while keeping the configured responder identity and telephone number private.

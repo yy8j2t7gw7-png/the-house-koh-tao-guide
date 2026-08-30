@@ -1,6 +1,6 @@
 # Product Roadmap
 
-Baseline: v5.11.41
+Baseline: v5.11.42
 
 ## Completed
 
@@ -312,3 +312,11 @@ Live status: disabled through `EXPLORE_ENABLED=false`. Existing pages, data and 
 - [x] Implement v5.11.40 as a narrow production correction for explicit human requests that include a clear cannot-help reason, preserving routine contact hours and private staff identity.
 - [x] Implement v5.11.41 as a separate mobile/emergency UX correction: add the generic House emergency-call action, deterministic emergency-contact questions, a more compact in-conversation mobile action grid, and remove drag-to-dismiss so chat scrolling cannot move or close the sheet.
 - [ ] Deploy v5.11.41 and smoke-test fire → **Call The House Emergency Support**, direct emergency-contact question → call actions without an alert, mobile conversation-space compaction, and stable chat scrolling with no sheet drag/accidental close.
+
+## v5.11.42 release checkpoint
+
+- [x] Replace narrow human-contact phrase matching with a broad deterministic human/person/staff/team/reception/manager/representative intent family while preserving AI-first ordinary requests and service-hour gating.
+- [x] Add a dedicated current-stay extension booking collector for natural “stay longer / extend / extra nights” wording.
+- [x] Collect additional nights and a transient international WhatsApp/phone contact, then route exactly one booking alert to Fah plus both owners.
+- [x] Keep stay-extension wording non-committal: availability, price/payment and final confirmation remain with the team.
+- [ ] Next narrow production fix: harden last-minute Airbnb reservation synchronization so a newly booked guest’s confirmation code becomes usable promptly without manual stay creation. Do not fold that sync change into v5.11.42.

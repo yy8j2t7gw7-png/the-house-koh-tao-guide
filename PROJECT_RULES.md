@@ -156,7 +156,7 @@ Public interface rules:
 
 ## Current baseline
 
-Current release: v5.11.41 (narrow mobile/emergency UX correction on the already-pushed v5.11.40 human-routing release: property/fire emergencies expose the generic **The House Emergency Support** call action without exposing a responder identity; direct emergency-contact questions route deterministically; the mobile conversation gets more space after chat starts; and drag-to-dismiss is disabled so scrolling cannot move or close the sheet. v5.11.40 remains the explicit persistent-human routing correction; v5.11.39 cleaning/state behavior remains authoritative. Preserve routine contact-hour gating, emergency separation, Wi-Fi/current-turn/security safeguards and keep pending Meta replacements inactive).
+Current release: v5.11.42 (narrow Concierge routing and stay-extension workflow release on deployed v5.11.41: broad deterministic human-contact recognition; routine Contact Us / Call Us remains Tuesday–Sunday 10:30–19:30 Bangkok only; stay-extension requests collect additional nights plus an international reply contact and send exactly one booking alert to Fah plus both owners; no availability/confirmation promise; preserve v5.11.41 mobile/emergency stability, v5.11.39 cleaning/state safeguards, privacy boundaries and inactive pending Meta replacements).
 
 Explore is intentionally disabled in the live v5.11.6 release. Do not delete its pages, structured records or media. Restore it only after the planned Explore rebuild and review by changing the protected deployment feature variable. Do not expose internal Explore detail paths in live concierge answers while the feature remains disabled; use approved external actions where supplied.
 

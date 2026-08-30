@@ -40,7 +40,7 @@ import {
   specialtyChoiceLabels
 } from "./diving-catalog.js";
 
-const RELEASE = "5.11.41";
+const RELEASE = "5.11.42";
 const ROOM_OPTIONS = new Set(["1", "2", "3", "4", "5", "6", "8", "9", "10", "11"]);
 const MAX_HISTORY_ITEMS = 10;
 const MAX_QUESTION_LENGTH = 800;
@@ -189,7 +189,7 @@ const ACTIONABLE_STRUCTURED_BOOKING = /(?:^\s*(?:please\s+)?(?:book|reserve|arra
 const DIRECT_TRANSPORT_BOOKING = /(?:\b(?:i\s+(?:need|want|would\s+like)|can\s+(?:i|we)\s+(?:get|have)|get\s+me|send\s+me)\s+(?:a\s+)?(?:taxi(?:\s+boat)?|longtail\s+boat|motorbike\s+taxi|ferry\s+tickets?)\b|^\s*(?:taxi(?:\s+boat)?|longtail(?:\s+boat)?|motorbike\s+taxi|ferry(?:\s+tickets?)?)\b(?=[\s\S]*\b(?:today|tomorrow|next\s+(?:mon|tues|wednes|thurs|fri|satur|sun)day|in\s+\d{1,3}\s+days?|from|to|at\s+\d)))/i;
 const DIRECT_ACTIVITY_BOOKING = /(?:\b(?:i|we)\s+(?:(?:want|need|plan)\s+to|would\s+like\s+to|wanna)\s+(?:(?:go|book|arrange)\s+)?(?:(?:scuba\s+)?div(?:e|ing)|fishing|snorkel(?:ing|ling)?)\b|\b(?:i|we)['’]d\s+like\s+to\s+(?:(?:go|book|arrange)\s+)?(?:(?:scuba\s+)?div(?:e|ing)|fishing|snorkel(?:ing|ling)?)\b|\b(?:i|we)\s+(?:want|need|would\s+like)\s+(?:a\s+)?(?:diving|fishing|snorkel(?:ing|ling)?)\s+(?:trip|tour)\b|\b(?:take\s+(?:me|us)|can\s+you\s+take\s+(?:me|us)|help\s+(?:me|us)\s+(?:go\s+)?)\s*(?:(?:scuba\s+)?div(?:e|ing)|fishing|snorkel(?:ing|ling)?)\b)/i;
 const DIVING_LEARNING_REQUEST = /\b(?:i|we)\s+(?:(?:want|need|plan)\s+to|would\s+like\s+to|wanna)\s+learn(?:\s+how)?\s+(?:to\s+)?div(?:e|ing)\b/i;
-const SUPPORTED_BOOKING_KINDS = new Set(["diving", "fishing", "snorkeling", "taxi", "taxi_boat", "ferry", "motorbike_taxi"]);
+const SUPPORTED_BOOKING_KINDS = new Set(["diving", "fishing", "snorkeling", "taxi", "taxi_boat", "ferry", "motorbike_taxi", "stay_extension"]);
 const PROPERTY_ISSUE_CATEGORIES = new Set(["pest", "odor", "plumbing", "equipment", "fixture", "condition", "odor_clarification"]);
 const HOUSEKEEPING_ITEM_REQUEST = /\b(?:toilet\s+paper|soap|(?:(?:new|fresh|clean)\s+)?towels?|room\s+cleaning|clean\s+(?:my|our|the)\s+room|housekeeping)\b/i;
 const HOUSEKEEPING_REQUEST_ACTION = /\b(?:can\s+(?:i|we)\s+(?:have|get)|please\s+(?:bring|send|provide|clean)|can\s+you\s+(?:bring|send|provide|clean)|could\s+you\s+(?:bring|send|provide|clean)|i\s+(?:need|want|would\s+like)|(?:bring|send|provide)\s+(?:me\s+)?|clean\s+(?:my|our|the)\s+room)\b|\b(?:toilet\s+paper|soap|towels?)\s+please\b/i;
@@ -207,6 +207,11 @@ const STRONG_HUMAN_CONTACT_REQUEST = /^(?:(?:i\s+)?(?:urgently|really)\s+(?:need
 const DISSATISFIED_HUMAN_CONTACT_REQUEST = /\b(?:i\s+)?(?:need|want|would\s+like)\s+to\s+(?:talk|speak)\s+(?:to|with)\s+(?:a\s+)?(?:human|person|someone|staff|team|reception|housekeeper)\b[\s\S]{0,80}\b(?:you\s+(?:can\s+not|cannot|cant)\s+help(?:\s+me)?|you\s+(?:are|re)\s+not\s+helping(?:\s+me)?|this\s+(?:is\s+not|isnt)\s+helping)\b/;
 const HUMAN_CONTACT_REFERENCE = /\b(?:human|person|someone|staff|team|reception|housekeeper|su|call|talk|speak|contact)\b/;
 const PERSISTENT_HUMAN_CONTACT_REQUEST = /^(?:i\s+)?(?:still|really)\s+(?:need|want|would\s+like)\s+(?:(?:a\s+)?(?:human|person|someone|staff|team|reception|housekeeper)|(?:to\s+)?(?:talk|speak)\s+(?:to|with)\s+(?:a\s+)?(?:human|person|someone|staff|team|reception|housekeeper))(?:\s+please)?$/;
+const HUMAN_CONTACT_TARGET = /\b(?:human(?:\s+being)?|real\s+(?:human|person)|actual\s+person|live\s+(?:person|agent)|person|someone|somebody|staff|member\s+of\s+staff|team|reception|receptionist|front\s+desk|housekeeper|manager|host|agent|support\s+agent|representative|operator|customer\s+(?:service|support)|support\s+team)\b/;
+const HUMAN_CONTACT_ACTION = /\b(?:talk(?:ing)?|speak(?:ing)?|chat(?:ting)?|call(?:ing)?|contact(?:ing)?|reach(?:ing)?|messag(?:e|ing)|connect(?:ing)?|transfer(?:ring)?|help)\b/;
+const HUMAN_CONTACT_DIRECT = /\b(?:connect|transfer|put)\s+(?:me|us)\b|\b(?:get|give)\s+(?:me|us)\s+(?:a\s+)?(?:real\s+)?(?:human|person|someone|somebody|staff|member\s+of\s+staff|receptionist|agent|support\s+agent|representative|operator)|\b(?:let|allow)\s+(?:me|us)\s+(?:talk|speak|call|contact)\b/;
+const HUMAN_CONTACT_DISSATISFACTION = /\b(?:(?:you|the\s+ai|ai|the\s+bot|bot|concierge)\s+(?:can\s+not|cannot|cant|can\s*t|does\s+not|doesnt|is\s+not|isnt)\s+(?:help|understand|solve|assist)|(?:you|the\s+ai|ai|the\s+bot|bot|concierge)\s+(?:are|re)\s+not\s+helping|this\s+(?:is\s+not|isnt|does\s+not|doesnt)\s+(?:help|work)|no\s+(?:ai|bot)|not\s+(?:the\s+)?(?:ai|bot)|someone\s+else|another\s+person)\b/;
+const HUMAN_CONTACT_URGENCY = /\b(?:urgent(?:ly)?|really|still|now|immediately|personally|must|insist|just)\b/;
 const LOCAL_INFORMATION_TOPIC = /\b(?:beach|bay|swim|snorkel|sunset|restaurant|dinner|lunch|breakfast|brunch|food|seafood|thai\s+food|bar|nightlife|drink|cocktail|cafe|coffee|bakery|shop|shopping|supermarket|pharmacy|atm|bank|laundry|viewpoint|hike|hiking|activity|activities|things\s+to\s+do|island|koh\s+tao|mae\s+haad|sairee|transport|taxi|ferry|scooter|directions?|distance|how\s+far)\w*\b/i;
 const INFORMATION_REQUEST_FORM = /^(?:how|what|where|which|when|why|is|are|do|does|can\s+i\s+find|could\s+you\s+(?:tell|recommend)|tell\s+me|recommend|suggest|any|good|best)\b|\b(?:how\s+far|nearby|close\s+to|recommend(?:ation)?|good\s+for|best\s+for|worth\s+visit)\b/i;
 const SUPPLY_INFORMATION_REQUEST = /\b(?:how\s+often|where\s+(?:are|is)|do\s+you\s+(?:provide|change|replace)|when\s+(?:are|do)|what\s+is\s+the\s+(?:towel|soap|toilet\s+paper))\b[^.?!]*(?:toilet\s+paper|soap|towels?|housekeeping)/i;
@@ -330,7 +335,7 @@ function cleanWorkflowState(value) {
     const countNumber = Number(String(request.guestCount || "").trim());
     const guestCount = Number.isInteger(countNumber) && countNumber >= 1 && countNumber <= 99 ? String(countNumber) : "";
     const allowedMissing = [
-      "kind", "date", "guests", "option", "course", "certification", "time", "pickup", "destination", "tripType", "contact",
+      "kind", "date", "guests", "option", "course", "certification", "time", "pickup", "destination", "tripType", "contact", "nights",
       "planMode", "groupActivity", "groupCount", "agency", "specialty", "specialtyDetail", "unsureCertified", "goal"
     ];
     const groups = kind === "diving" ? cleanDivingGroups(request.groups) : [];
@@ -352,6 +357,7 @@ function cleanWorkflowState(value) {
         preferredDate: cleanWorkflowValue(request.preferredDate, 120),
         guestCount,
         option: cleanWorkflowValue(request.option, 120),
+        extensionNights: kind === "stay_extension" ? (stayExtensionNights(request.extensionNights || request.option || "", true) || "") : "",
         courseName: cleanWorkflowValue(request.courseName, 120),
         certificationLevel: cleanWorkflowValue(request.certificationLevel, 120),
         preferredProvider: cleanWorkflowValue(request.preferredProvider, 120),
@@ -1199,18 +1205,44 @@ function activeLostKeyFeeWorkflow(workflowState) {
   return workflowState?.type === "lost_key" && workflowState.status === "awaiting_fee_acceptance";
 }
 
+function broadHumanContactRequest(question) {
+  const normalized = normalizeText(question);
+  if (!normalized || normalized.length > 320) return false;
+  const hasTarget = HUMAN_CONTACT_TARGET.test(normalized);
+  const hasAction = HUMAN_CONTACT_ACTION.test(normalized);
+  const direct = HUMAN_CONTACT_DIRECT.test(normalized);
+  const requestLanguage = /\b(?:need|want|wanna|would like|prefer|please|insist|demand|can i|could i|may i|can we|could we|let me|let us)\b/.test(normalized);
+  const imperative = /^(?:please\s+)?(?:talk|speak|chat|call|contact|reach|connect|transfer)\b/.test(normalized);
+  const dissatisfaction = HUMAN_CONTACT_DISSATISFACTION.test(normalized);
+  const helpFromPerson = /\b(?:need|want|would like|can i get|could i get)\s+(?:some\s+)?(?:help|assistance)\s+(?:from|by)\s+(?:a\s+)?(?:human|person|someone|somebody|staff|member\s+of\s+staff|team|reception|receptionist|housekeeper|manager|host|agent|support\s+agent|representative|operator)\b/.test(normalized);
+  const bareDirect = /^(?:human|real human|real person|person|someone|somebody|staff|member of staff|reception|receptionist|housekeeper|manager|agent|support agent|representative|operator)(?: please)?$/.test(normalized);
+  const callUs = /\b(?:call|contact|reach|speak to|talk to)\s+(?:the\s+)?(?:house|hotel|property|front desk|reception|team|staff|housekeeper|manager)\b/.test(normalized);
+  return bareDirect || direct || helpFromPerson || callUs || (hasTarget && dissatisfaction) || (hasTarget && hasAction && (requestLanguage || imperative)) || (hasTarget && /\b(?:need|want|wanna|prefer|would like|now)\b/.test(normalized));
+}
+
+function broadPersistentHumanContactRequest(question) {
+  const normalized = normalizeText(question);
+  if (!broadHumanContactRequest(normalized)) return false;
+  return HUMAN_CONTACT_DISSATISFACTION.test(normalized)
+    || HUMAN_CONTACT_URGENCY.test(normalized)
+    || HUMAN_CONTACT_DIRECT.test(normalized)
+    || /^(?:human|real human|real person|person|someone|somebody|staff|member of staff|reception|receptionist|housekeeper|manager|agent|support agent|representative|operator)(?: please)?$/.test(normalized);
+}
+
 function isPersistentHumanContactRequest(question) {
   const normalized = normalizeText(question);
   return PERSISTENT_HUMAN_CONTACT_REQUEST.test(normalized)
     || STRONG_HUMAN_CONTACT_REQUEST.test(normalized)
     || DISSATISFIED_HUMAN_CONTACT_REQUEST.test(normalized)
-    || SPECIFIC_STAFF_CONTACT_REQUEST.test(normalized);
+    || SPECIFIC_STAFF_CONTACT_REQUEST.test(normalized)
+    || broadPersistentHumanContactRequest(normalized);
 }
 
 function isGenericHumanContactRequest(question) {
   const normalized = normalizeText(question);
   return GENERIC_HUMAN_CONTACT_REQUEST.test(normalized)
     || PROPERTY_HUMAN_CONTACT_REQUEST.test(normalized)
+    || broadHumanContactRequest(normalized)
     || isPersistentHumanContactRequest(normalized);
 }
 
@@ -1251,8 +1283,64 @@ function genericHumanContactResult(question, workflowState, history = [], now = 
   };
 }
 
+function isStayExtensionRequest(value) {
+  const normalized = normalizeText(value);
+  if (!normalized) return false;
+  return /\b(?:extend|extension|prolong)\b[\s\S]{0,45}\b(?:stay|booking|reservation|room)\b/.test(normalized)
+    || /\b(?:stay|remain|keep the room|keep my room|keep our room)\b[\s\S]{0,45}\b(?:longer|another night|more nights?|extra nights?|additional nights?)\b/.test(normalized)
+    || /\b(?:can|could|may|would)\s+(?:i|we)\s+(?:stay|remain)\s+(?:for\s+)?longer\b/.test(normalized)
+    || /\b(?:i|we)\s+(?:want|wanna|need|would like|would love)\s+to\s+(?:stay|remain)\s+(?:for\s+)?longer\b/.test(normalized)
+    || /\b(?:add|book|have|take)\s+(?:another|an extra|extra|additional|more|\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten)\s+(?:more\s+|extra\s+|additional\s+)?nights?\b/.test(normalized)
+    || /\b(?:i|we)\s+(?:need|want|would like|would love)\s+(?:\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten)\s+(?:more|extra|additional)\s+nights?\b/.test(normalized)
+    || /\b(?:extend|prolong)\s+(?:it\s+)?(?:by|for)\s+(?:\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten)\s+nights?\b/.test(normalized)
+    || /\b(?:have|keep)\s+(?:the|my|our)\s+room\b[\s\S]{0,35}\b(?:\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten|another)\s+(?:more\s+|extra\s+|additional\s+)?nights?\b/.test(normalized)
+    || /\b(?:is it|would it be)\s+possible\s+(?:for\s+(?:me|us)\s+)?to\s+(?:stay|remain)\s+(?:for\s+)?longer\b/.test(normalized)
+    || /\b(?:i|we)(?:\s+d|\s+would)?\s+like\s+(?:another|an extra|extra|additional)\s+(?:\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten)?\s*nights?\b/.test(normalized)
+    || /^(?:\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten)\s+(?:more|extra|additional)\s+nights?(?:\s+please)?$/.test(normalized)
+    || /\b(?:another|one more|an extra|extra|additional)\s+night(?:s)?\s+(?:please|for our stay|for my stay)?$/.test(normalized)
+    || /\b(?:keep|have)\s+(?:the|my|our)\s+room\s+(?:for\s+)?(?:longer|another\s+day|more\s+days?|extra\s+days?|additional\s+days?)\b/.test(normalized)
+      || /\b(?:stay|remain)\s+(?:for\s+)?(?:another\s+day|one\s+more\s+day|more\s+days?|extra\s+days?|additional\s+days?)\b/.test(normalized)
+      || /\b(?:i|we)\s+(?:need|want|would\s+like|would\s+love)\s+(?:another|one\s+more|an\s+extra|extra|additional|more|\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten)\s+(?:more\s+|extra\s+|additional\s+)?days?\b/.test(normalized)
+      || /\b(?:add|book|have|take)\s+(?:another|an\s+extra|extra|additional|more|one\s+more|\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten)\s+(?:more\s+|extra\s+|additional\s+)?days?\b/.test(normalized)
+      || /\b(?:stay|remain)\s+until\s+(?:tomorrow|the\s+next\s+day|[a-z]{3,9}|\d{1,2}(?:st|nd|rd|th)?(?:\s+[a-z]{3,9})?)\b/.test(normalized)
+      || /^(?:(?:can|could|may)\s+(?:i|we)\s+)?extend(?:\s+(?:it|this))?(?:\s+please)?$/.test(normalized)
+      || /\bstay\s+(?:\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten)\s+(?:more|extra|additional)\s+nights?\b/.test(normalized);
+}
+
+function stayExtensionNights(value, allowBare = false) {
+  const normalized = normalizeText(value);
+  const words = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10 };
+  const numeric = normalized.match(/\b(\d{1,2})\s+(?:(?:more|extra|additional)\s+)?nights?\b/)
+    || normalized.match(/\b(?:another|extra|additional)\s+(\d{1,2})\s+nights?\b/)
+    || normalized.match(/\b(?:extend|extension|stay)\b[\s\S]{0,30}\b(?:by|for)?\s*(\d{1,2})\s+nights?\b/);
+  if (numeric) {
+    const nights = Number(numeric[1]);
+    return nights >= 1 && nights <= 99 ? String(nights) : "";
+  }
+  const written = normalized.match(/\b(one|two|three|four|five|six|seven|eight|nine|ten)\s+(?:(?:more|extra|additional)\s+)?nights?\b/)
+    || normalized.match(/\b(?:another|extra|additional)\s+(one|two|three|four|five|six|seven|eight|nine|ten)\s+nights?\b/);
+  if (written) return String(words[written[1]]);
+  if (/\b(?:another night|one more night|an extra night|extra night|additional night)\b/.test(normalized)) return "1";
+  if (allowBare) {
+    const bare = normalized.match(/^(\d{1,2})$/);
+    if (bare) {
+      const nights = Number(bare[1]);
+      return nights >= 1 && nights <= 99 ? String(nights) : "";
+    }
+    if (words[normalized]) return String(words[normalized]);
+  }
+  return "";
+}
+
+function stayExtensionOption(nights) {
+  const count = Number(nights);
+  if (!Number.isInteger(count) || count < 1) return "";
+  return `${count} additional night${count === 1 ? "" : "s"}`;
+}
+
 function bookingKindFromText(value) {
   const source = String(value || "");
+  if (isStayExtensionRequest(source)) return "stay_extension";
   if (/\b(?:motorbike|motorcycle|scooter)\s+taxi\b/i.test(source)) return "motorbike_taxi";
   if (/\b(?:taxi\s+boat|boat\s+taxi|longtail(?:\s+boat)?)\b/i.test(source)) return "taxi_boat";
   if (/\bferr(?:y|ies)(?:\s+tickets?)?\b/i.test(source)) return "ferry";
@@ -1271,7 +1359,8 @@ function bookingActivity(kind) {
     taxi: "Taxi",
     taxi_boat: "Taxi boat",
     ferry: "Ferry tickets",
-    motorbike_taxi: "Motorbike taxi"
+    motorbike_taxi: "Motorbike taxi",
+    stay_extension: "Stay extension"
   }[kind] || "Booking request";
 }
 
@@ -1283,13 +1372,15 @@ function bookingStartPrompt(kind) {
     taxi: "Can you arrange a taxi?",
     taxi_boat: "I want to book a taxi boat.",
     ferry: "I want to book ferry tickets.",
-    motorbike_taxi: "I want to book a motorbike taxi."
+    motorbike_taxi: "I want to book a motorbike taxi.",
+    stay_extension: "I would like to extend my stay."
   }[kind] || "I would like to make a booking.";
 }
 
 function isActionableStructuredBooking(value) {
   const source = String(value || "");
-  return ACTIONABLE_STRUCTURED_BOOKING.test(source)
+  return isStayExtensionRequest(source)
+    || ACTIONABLE_STRUCTURED_BOOKING.test(source)
     || DIRECT_TRANSPORT_BOOKING.test(source)
     || DIRECT_ACTIVITY_BOOKING.test(source)
     || DIVING_LEARNING_REQUEST.test(source)
@@ -1300,7 +1391,7 @@ function isExplicitBookingRetry(value) {
   const source = String(value || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
   if (["retry", "try again", "try it again", "try sending it again"].includes(source)) return true;
   const prefix = "(?:(?:can|could|would) you (?:please )?|please )?";
-  const activity = "(?:diving|fishing(?: trip)?|snorkeling(?: trip)?|taxi|ferry(?: tickets?)?|motorbike(?: taxi)?|taxi boat)";
+  const activity = "(?:diving|fishing(?: trip)?|snorkeling(?: trip)?|taxi|ferry(?: tickets?)?|motorbike(?: taxi)?|taxi boat|stay extension)";
   const target = `(?:it|(?:(?:my|the) )?(?:${activity} )?(?:booking|request))`;
   return new RegExp(`^${prefix}(?:retry(?: ${target})?|(?:try|send|resend)(?: sending)? ${target} again)$`, "i").test(source);
 }
@@ -2096,6 +2187,82 @@ function bookingCollectionStep(kind, missing, rejectedLocalContact = false, isNe
   };
 }
 
+function stayExtensionBookingPolicy(result, question, currentReplyContact = "", workflowState = null, retryingDelivery = false) {
+  const pendingState = workflowState?.type === "booking" && workflowState.status === "collecting" && workflowState.kind === "stay_extension"
+    ? workflowState
+    : null;
+  const actionableNow = isStayExtensionRequest(question);
+  if (!pendingState && !actionableNow) return { handled: false, result, alertQuestion: question, workflow: null };
+  if (/^\s*(?:cancel|never\s*mind|nevermind|forget\s+it)\s*[.!]?\s*$/i.test(question)) {
+    return {
+      handled: true,
+      result: { ...result, answer: "No problem. I have cancelled the stay-extension request.", intentId: "stay_extension_cancelled", category: "booking", needsHuman: false, handoff: "none", actions: [], suppressDefaultActions: true, source: "booking-policy" },
+      alertQuestion: question,
+      workflow: { type: "booking", kind: "stay_extension", status: "cancelled", retainPrivateContact: false, missing: [] }
+    };
+  }
+  const previous = pendingState?.bookingRequest || {};
+  const expectedField = pendingState?.missing?.[0] || "";
+  const currentNights = retryingDelivery ? "" : stayExtensionNights(question, expectedField === "nights");
+  const extensionNights = currentNights || previous.extensionNights || stayExtensionNights(previous.option || "");
+  const contact = validInternationalReplyContact(currentReplyContact);
+  const rejectedLocalContact = Boolean(currentReplyContact && !contact);
+  const option = stayExtensionOption(extensionNights) || previous.option || "";
+  const notes = previous.notes || (actionableNow ? cleanWorkflowNotes(question) : "");
+  const request = {
+    kind: "stay_extension",
+    activity: "Stay extension",
+    preferredDate: "",
+    guestCount: "",
+    option,
+    extensionNights,
+    courseName: "",
+    certificationLevel: "",
+    preferredProvider: "",
+    pickupTime: "",
+    pickupLocation: "",
+    destination: "",
+    tripType: "",
+    notes
+  };
+  const missing = [];
+  if (!extensionNights) missing.push("nights");
+  if (!contact) missing.push("contact");
+  if (missing.length) {
+    const field = missing[0];
+    const answer = field === "nights"
+      ? `${pendingState ? "" : "Of course. "}How many additional nights would you like to stay?`
+      : rejectedLocalContact ? LOCAL_CONTACT_PROMPT : CONTACT_PROMPT;
+    return {
+      handled: true,
+      result: {
+        ...result,
+        answer,
+        intentId: "stay_extension_booking_request",
+        category: "booking", confidence: 1, needsHuman: false, handoff: "booking", learningGap: false, learningReason: "none", actions: [], suppressDefaultActions: true,
+        source: "booking-policy"
+      },
+      alertQuestion: `Stay extension request pending${extensionNights ? `; ${stayExtensionOption(extensionNights)}` : ""}.`,
+      workflow: { type: "booking", kind: "stay_extension", status: "collecting", retainPrivateContact: Boolean(contact), missing, bookingRequest: request }
+    };
+  }
+  const summary = `Stay extension request; ${stayExtensionOption(extensionNights)}.`;
+  return {
+    handled: true,
+    result: {
+      ...result,
+      intentId: "stay_extension_booking_request",
+      category: "booking", confidence: 1, handoff: "booking", needsHuman: true, learningGap: false, learningReason: "none", actions: [], suppressDefaultActions: true,
+      privateReplyContact: contact,
+      requestedDateTime: stayExtensionOption(extensionNights),
+      bookingRequest: request,
+      source: "booking-policy"
+    },
+    alertQuestion: summary,
+    workflow: { type: "booking", kind: "stay_extension", status: "ready", retainPrivateContact: false, missing: [], bookingRequest: request }
+  };
+}
+
 function generalBookingPolicy(result, question, currentReplyContact = "", workflowState = null, now = new Date(), retryingDelivery = false) {
   const pendingState = workflowState?.type === "booking" && workflowState.status === "collecting"
     ? workflowState
@@ -2217,6 +2384,9 @@ function generalBookingPolicy(result, question, currentReplyContact = "", workfl
 function applyStructuredBookingPolicy(result, question, history, currentReplyContact = "", workflowState = null, now = new Date(), retryingDelivery = false) {
   const pendingKind = workflowState?.type === "booking" && workflowState.status === "collecting" ? workflowState.kind : "";
   const kindNow = bookingKindFromText(question);
+  if (pendingKind === "stay_extension" || kindNow === "stay_extension" || isStayExtensionRequest(question)) {
+    return stayExtensionBookingPolicy(result, question, currentReplyContact, workflowState, retryingDelivery);
+  }
   if (pendingKind === "diving" || kindNow === "diving" || isActionableDivingBooking(question)) {
     return applyDivingBookingPolicy(result, question, history, currentReplyContact, workflowState, now, retryingDelivery);
   }
@@ -2652,6 +2822,8 @@ ABSOLUTE SAFETY AND OPERATIONS RULES
 - Routine stay needs such as fresh towels, toilet paper, soap, cleaning, lost keys and room problems use stay_support. Housekeeping operates Tuesday-Sunday from 10:30-19:30 Bangkok time and is unavailable all day Monday. Cleaning requests collect a preferred time and never imply that the time is confirmed; after-hours wording must use the actual next available housekeeping day.
 - This AI Concierge website is not a live staff-chat channel. Never tell a guest that staff will reply in this website/chat, and never ask the guest to manually send a request to the team after the Concierge has collected an operational request. Staff alerts are one-way operational notifications; guest-facing confirmation must state only whether the request was successfully sent and must not promise a chat reply.
 - Activities, transport, rentals, tours and services that The House can arrange use booking. Never suggest booking directly with an operator and never open a direct personal WhatsApp conversation with a staff member.
+- Requests to speak, call, contact, reach, message or be connected/transferred to a human, real person, staff member, reception, housekeeper, manager, host, agent or The House team are human-contact requests regardless of natural wording. Do not turn them into a learning gap or ask the guest to choose an internal routing category. Routine direct contact remains subject to the established service-hours gate.
+- Requests to extend the current stay, stay longer, add extra/additional/more nights or keep the room longer are booking requests. Collect only how many additional nights are requested and an international WhatsApp/phone number, then send the booking request to the booking team. Never promise that the extension is available or confirmed.
 - An information or recommendation question is not a booking request. A clear request to arrange diving must collect the preferred date, number of divers, requested option/course, the exact other course when relevant, certification level for Fun Diving, and an international WhatsApp/phone number before staff is alerted.
 - A booking request is not a confirmed reservation. Availability may be checked first, but a booking is confirmed only after availability has been confirmed and payment has been received.
 - Never discuss internal commercial arrangements, referral terms, revenue or how The House may benefit from a booking. Keep the answer focused on helping the guest arrange what they need.
@@ -2961,6 +3133,7 @@ function bookingRequestFromRetrySnapshot(snapshot) {
     preferredDate: snapshot.preferredDate,
     guestCount: snapshot.guestCount,
     option: snapshot.option,
+    extensionNights: snapshot.kind === "stay_extension" ? stayExtensionNights(snapshot.option || "") : "",
     courseName: snapshot.courseName,
     certificationLevel: snapshot.certificationLevel,
     preferredProvider: snapshot.preferredProvider,
@@ -3223,7 +3396,7 @@ export async function handleConciergeRequest(request, env, ctx, now = new Date()
   const history = cleanHistory(body.history);
   const workflowState = cleanWorkflowState(body.workflowState);
   const validShortWorkflowReply = /^\d$/.test(question)
-    && ((workflowState?.type === "booking" && ["guests", "groupCount"].includes(workflowState.missing?.[0]))
+    && ((workflowState?.type === "booking" && ["guests", "groupCount", "nights"].includes(workflowState.missing?.[0]))
       || (workflowState?.type === "luggage" && workflowState.missing?.[0] === "bags")
       || (workflowState?.type === "cleaning" && workflowState.missing?.[0] === "preferredTime"));
   if (!sessionId || (question.length < 2 && !validShortWorkflowReply) || question.length > MAX_QUESTION_LENGTH) {

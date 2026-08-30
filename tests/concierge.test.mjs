@@ -2912,7 +2912,7 @@ test("guest localization supports seven languages and keeps the owner dashboard 
   assert.doesNotMatch(admin, /src="\/i18n\.js"/);
   assert.match(runtime, /exploreContentDeferred/);
   assert.match(runtime, /element\.closest\("\.section,\.footer"\)/);
-  assert.match(runtime, /houseGuideTranslations:v5\.11\.41:/);
+  assert.match(runtime, /houseGuideTranslations:v5\.11\.42:/);
   assert.match(runtime, /MAX_REQUEST_RETRIES = 2/);
   assert.match(runtime, /let flushRunning = false/);
 });
@@ -9854,4 +9854,218 @@ test("explicit human request with a cannot-help reason reaches routine House con
   assert.equal(closedBody.actions.some((action) => action.route === "houseCall"), false);
   assert.equal(closedBody.actions.some((action) => action.href === "/emergency.html"), true);
   assert.equal(store.alerts.length, 0);
+});
+
+test("broad human-contact phrasing stays deterministic across natural variants", async () => {
+  const { env, store } = createEnvironment({ OPENAI_API_KEY: "" });
+  const openNow = new Date("2026-08-30T06:10:00.000Z"); // Sunday 13:10 Bangkok
+  const recognized = [
+    "Can I speak with someone?",
+    "I want a real person",
+    "I need help from a person",
+    "Can you connect me to the team?",
+    "Please put me through to reception",
+    "Can I contact your staff?",
+    "I want to speak to a manager",
+    "I need customer service",
+    "I want a live agent",
+    "Can I call the housekeeper?",
+    "I need someone",
+    "I prefer to talk to a person",
+    "Can I speak to a representative?",
+    "I need a member of staff",
+    "Can you get me a receptionist?",
+    "Please connect me with customer support",
+    "Could I talk with a support agent?",
+    "I need somebody from your team"
+  ];
+  for (const phrase of recognized) {
+    const response = await handleConciergeRequest(guestRequest(phrase), env, undefined, openNow);
+    const body = await response.json();
+    assert.equal(body.intentId, "generic_human_contact", phrase);
+    assert.equal(body.source, "human-contact-policy", phrase);
+    assert.equal(body.learningGap, false, phrase);
+    assert.equal(store.alerts.length, 0, phrase);
+  }
+
+  const direct = [
+    "Human please you can't help",
+    "Human please you cannot help me",
+    "Talk to a human now",
+    "Please give me a real person",
+    "Connect me to someone please",
+    "Transfer me to a person",
+    "I really need a human",
+    "I still want to speak to someone",
+    "The AI can't help me, I want a person",
+    "This bot is not helping, connect me to staff",
+    "I need to personally speak with a manager",
+    "I insist on speaking to a representative",
+    "No bot please, get me a member of staff",
+    "I still need customer support now"
+  ];
+  for (const phrase of direct) {
+    const response = await handleConciergeRequest(guestRequest(phrase), env, undefined, openNow);
+    const body = await response.json();
+    assert.equal(body.intentId, "generic_human_contact", phrase);
+    assert.equal(body.source, "human-contact-policy", phrase);
+    assert.match(body.answer, /contact The House team directly/i, phrase);
+    assert.equal(body.actions.some((action) => action.route === "houseWhatsapp"), true, phrase);
+    assert.equal(body.actions.some((action) => action.route === "houseCall"), true, phrase);
+    assert.doesNotMatch(body.answer, /\bSu\b|\bWesty\b|\bFah\b/i, phrase);
+    assert.equal(store.alerts.length, 0, phrase);
+  }
+
+  const closed = await handleConciergeRequest(guestRequest("Human please you can't help"), env, undefined, new Date("2026-08-30T13:10:00.000Z"));
+  const closedBody = await closed.json();
+  assert.equal(closedBody.intentId, "generic_human_contact");
+  assert.equal(closedBody.actions.some((action) => action.route === "houseWhatsapp"), false);
+  assert.equal(closedBody.actions.some((action) => action.route === "houseCall"), false);
+  assert.equal(store.alerts.length, 0);
+});
+
+test("stay-extension phrasing always enters the dedicated booking collector", async () => {
+  const phrases = [
+    "I would like to extend my stay please",
+    "I wanna stay longer",
+    "Can I extend my stay?",
+    "Can we stay longer?",
+    "We would like to stay longer",
+    "Could we extend our booking?",
+    "Can I prolong my reservation?",
+    "Would it be possible to stay longer?",
+    "Can I stay another night?",
+    "Can we add two more nights?",
+    "I need 3 extra nights",
+    "Can I keep the room for another night?",
+    "Extend my booking please",
+    "Extend our reservation please",
+    "Can we extend by 4 nights?",
+    "We'd like another two nights",
+    "Can I stay one more night?",
+    "I want to stay 5 more nights",
+    "Could we have the room for two extra nights?",
+    "Stay longer please",
+    "One more night please",
+    "Two more nights please",
+    "Can we stay for longer?",
+    "I want to remain for longer",
+    "Can we keep our room longer?",
+    "Can I have the room for another day?",
+    "We need one more day",
+    "Can we add two extra days?",
+    "Could we stay until tomorrow?",
+    "Can I extend?",
+    "Extend it please"
+  ];
+  for (const phrase of phrases) {
+    const { env, store } = createEnvironment({ OPENAI_API_KEY: "" });
+    const response = await handleConciergeRequest(guestRequest(phrase), env, undefined, new Date("2026-08-30T06:15:00.000Z"));
+    const body = await response.json();
+    assert.equal(body.intentId, "stay_extension_booking_request", phrase);
+    assert.equal(body.source, "booking-policy", phrase);
+    assert.equal(body.workflow.type, "booking", phrase);
+    assert.equal(body.workflow.kind, "stay_extension", phrase);
+    assert.equal(body.workflow.status, "collecting", phrase);
+    assert.equal(body.learningGap, false, phrase);
+    assert.equal(body.workflow.missing.includes("contact"), true, phrase);
+    assert.equal(store.alerts.length, 0, phrase);
+  }
+});
+
+test("stay extension collects nights then private contact and sends one Fah-and-owner booking alert", async () => {
+  const { env, store } = createEnvironment({
+    OPENAI_API_KEY: "",
+    WHATSAPP_ACCESS_TOKEN: "meta-test-token",
+    WHATSAPP_PHONE_NUMBER_ID: "1234567890",
+    WHATSAPP_ALERT_RECIPIENTS: JSON.stringify({
+      support: [{ label: "Su", phone: "+66 64 000 0001" }],
+      booking: [{ label: "Fah", phone: "+66 96 000 0001" }],
+      emergency: [
+        { label: "Owner 1", phone: "+66 81 000 0002" },
+        { label: "Owner 2", phone: "+66 82 000 0003" }
+      ]
+    })
+  });
+  const now = new Date("2026-08-30T06:20:00.000Z");
+  const first = await handleConciergeRequest(guestRequest("I wanna stay longer"), env, undefined, now);
+  const firstBody = await first.json();
+  assert.equal(firstBody.workflow.kind, "stay_extension");
+  assert.deepEqual(firstBody.workflow.missing, ["nights", "contact"]);
+  assert.match(firstBody.answer, /How many additional nights/i);
+  assert.equal(store.alerts.length, 0);
+
+  const nights = await handleConciergeRequest(guestRequest("2", {
+    workflowState: firstBody.workflow,
+    history: [
+      { role: "user", content: "I wanna stay longer" },
+      { role: "assistant", content: firstBody.answer }
+    ]
+  }), env, undefined, now);
+  const nightsBody = await nights.json();
+  assert.equal(nightsBody.workflow.kind, "stay_extension");
+  assert.deepEqual(nightsBody.workflow.missing, ["contact"]);
+  assert.equal(nightsBody.workflow.bookingRequest.extensionNights, "2");
+  assert.equal(nightsBody.workflow.bookingRequest.option, "2 additional nights");
+  assert.match(nightsBody.answer, /WhatsApp or phone number/i);
+  assert.equal(store.alerts.length, 0);
+
+  const local = await handleConciergeRequest(guestRequest("0812345678", {
+    workflowState: nightsBody.workflow,
+    history: [
+      { role: "user", content: "I wanna stay longer" },
+      { role: "assistant", content: firstBody.answer },
+      { role: "user", content: "2" },
+      { role: "assistant", content: nightsBody.answer }
+    ]
+  }), env, undefined, now);
+  const localBody = await local.json();
+  assert.deepEqual(localBody.workflow.missing, ["contact"]);
+  assert.match(localBody.answer, /local number/i);
+  assert.match(localBody.answer, /\+66 for Thailand/i);
+  assert.equal(store.alerts.length, 0);
+
+  const originalFetch = globalThis.fetch;
+  const outbound = [];
+  globalThis.fetch = async (_url, options) => {
+    outbound.push(JSON.parse(options.body));
+    return new Response(JSON.stringify({ messages: [{ id: `wamid.extension-${outbound.length}` }] }), {
+      status: 200,
+      headers: { "content-type": "application/json" }
+    });
+  };
+  try {
+    const completed = await handleConciergeRequest(guestRequest("+66 81 234 5678", {
+      workflowState: localBody.workflow,
+      history: [
+        { role: "user", content: "I wanna stay longer" },
+        { role: "assistant", content: firstBody.answer },
+        { role: "user", content: "2" },
+        { role: "assistant", content: nightsBody.answer }
+      ]
+    }), env, undefined, now);
+    const completedBody = await completed.json();
+    assert.equal(completedBody.intentId, "stay_extension_booking_request");
+    assert.equal(completedBody.workflow.kind, "stay_extension");
+    assert.equal(completedBody.workflow.status, "submitted");
+    assert.match(completedBody.answer, /sent your request to our booking team/i);
+    assert.match(completedBody.answer, /check availability/i);
+    assert.equal(store.alerts.length, 1);
+    assert.equal(store.alerts[0].alertType, "booking_request");
+    assert.equal(store.alerts[0].recipientGroup, "booking_with_owners");
+    assert.equal(outbound.length, 3);
+    assert.deepEqual(outbound.map((payload) => payload.to).sort(), ["66810000002", "66820000003", "66960000001"]);
+    assert.equal(outbound.every((payload) => payload.template.name === "house_booking_alert_v2"), true);
+    const parameters = outbound[0].template.components[0].parameters;
+    assert.equal(parameters.length, 6);
+    assert.equal(parameters[2].text, "Stay extension");
+    assert.equal(parameters[3].text, "2 additional nights");
+    assert.equal(parameters[4].text, "Current stay");
+    assert.match(parameters[5].text, /Guest reply: \+66812345678/);
+    assert.doesNotMatch(JSON.stringify(outbound), /66640000001/);
+    assert.doesNotMatch(JSON.stringify(store.interactions), /66812345678|81 234 5678/);
+    assert.doesNotMatch(JSON.stringify(store.alerts), /66812345678|81 234 5678/);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });

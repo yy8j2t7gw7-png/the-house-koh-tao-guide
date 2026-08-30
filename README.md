@@ -1,4 +1,4 @@
-# Guest Guide Platform with AI Concierge — The House v5.11.41
+# Guest Guide Platform with AI Concierge — The House v5.11.42
 
 The House – Koh Tao guest guide is a production-oriented, mobile-first digital guest guide and concierge platform. It combines property information, curated island guidance, structured place and activity data, and centralized contact and booking routes.
 
@@ -17,6 +17,14 @@ The House – Koh Tao guest guide is a production-oriented, mobile-first digital
 - Model-powered, room-aware AI Concierge with controlled learning
 
 The Activities module contains 49 structured profiles covering diving, freediving, snorkelling, boat trips, beach experiences, kayaking, paddleboarding, hiking, viewpoints, climbing, yoga, Muay Thai, massage, cooking, wildlife, photography, night activities and rainy-day options.
+
+## v5.11.42 release focus
+
+v5.11.42 is a narrow Concierge routing and booking-workflow release on deployed v5.11.41. Human-contact recognition now uses a broad deterministic intent family covering natural requests for a human, person, member of staff, team, reception/front desk, housekeeper, manager, agent, representative and customer support instead of depending on a small exact-phrase list. Strong, repeated, frustrated or direct-transfer wording exposes the existing **The House team** Contact Us / Call Us actions only during Tuesday–Sunday 10:30–19:30 Bangkok service hours; no private staff identity is exposed and no alert is created.
+
+Natural requests to extend the current stay now enter a dedicated `stay_extension` booking workflow. The Concierge collects the number of additional nights and an international WhatsApp/phone number, then sends exactly one existing booking alert through `booking_with_owners` to Fah plus both owners. The guest is told that availability and payment still need confirmation. Private contact data remains transient and is included only in the protected delivery payload.
+
+The Airbnb reservation synchronizer is intentionally unchanged in this release. A separately observed last-minute-booking sync delay remains a known production issue for the next narrow release and must not be conflated with v5.11.42.
 
 ## v5.11.41 release focus
 

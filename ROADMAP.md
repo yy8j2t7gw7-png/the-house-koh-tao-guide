@@ -1,6 +1,6 @@
 # Product Roadmap
 
-Baseline: v5.11.39
+Baseline: v5.11.40
 
 ## Completed
 
@@ -309,4 +309,5 @@ Live status: disabled through `EXPLORE_ENABLED=false`. Existing pages, data and 
 - Automated availability and booking integrations where commercially appropriate
 
 - [x] Implement and package v5.11.39 to make clean up/cleanup requests deterministic, retain the cleaning collector in the browser, accept contextual bare-hour replies, auto-submit the service alert, remove false website-chat reply wording, use access-aware initial copy, clear invisible stale history on reload, and block context-free generic request alerts.
+- [x] Implement v5.11.40 as a narrow production correction for explicit human requests that include a clear cannot-help reason, preserving routine contact hours and private staff identity.
 - [ ] Deploy v5.11.39 and smoke-test `I need a clean up` → `11` → one correctly labelled Room cleaning alert, then reload verified Room 6 and confirm the access-aware greeting.

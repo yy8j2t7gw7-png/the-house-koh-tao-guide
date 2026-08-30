@@ -2,6 +2,14 @@
 
 All notable changes to The House – Koh Tao guest guide are recorded here.
 
+## v5.11.40 — Persistent Human Contact Phrase Routing
+
+- Fixes the live Room 6 phrase **I need to talk to a human you can not help me** falling through to generic support wording without the routine contact actions.
+- Treats an explicit human request plus clear **you cannot help me / you are not helping** wording as persistent human-contact intent before model/knowledge routing.
+- During open service hours, returns the existing **The House team** wording with **Contact Us / Call Us**; Monday and after-hours remain closed to routine contact.
+- Does not expose private staff names, create an alert, or change property-emergency routing.
+- Preserves all v5.11.39 cleaning/state fixes and previous Wi-Fi, snorkeling, French Kiss Divers, lost-key, Meta and security behavior.
+
 ## v5.11.39 — Cleaning Workflow + Fresh Concierge State
 
 - Recognizes natural **clean up / cleanup** wording and preserves the cleaning collector in the browser between turns.

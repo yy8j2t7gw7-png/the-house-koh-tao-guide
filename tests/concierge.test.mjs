@@ -2912,7 +2912,7 @@ test("guest localization supports seven languages and keeps the owner dashboard 
   assert.doesNotMatch(admin, /src="\/i18n\.js"/);
   assert.match(runtime, /exploreContentDeferred/);
   assert.match(runtime, /element\.closest\("\.section,\.footer"\)/);
-  assert.match(runtime, /houseGuideTranslations:v5\.11\.39:/);
+  assert.match(runtime, /houseGuideTranslations:v5\.11\.40:/);
   assert.match(runtime, /MAX_REQUEST_RETRIES = 2/);
   assert.match(runtime, /let flushRunning = false/);
 });
@@ -9772,4 +9772,38 @@ test("v5.11.28 owner operations styles distinguish lifecycle, diagnostics and na
   assert.match(script, /status === "resolved" \? " is-resolved"/);
   assert.match(script, /time\.dataset\.label = "Time"/);
   assert.match(script, /result\.dataset\.label = "Result"/);
+});
+
+test("explicit human request with a cannot-help reason reaches routine House contact during open hours", async () => {
+  const { env, store } = createEnvironment({ OPENAI_API_KEY: "" });
+  const openNow = new Date("2026-08-30T05:57:00.000Z"); // Sunday 12:57 Bangkok
+  const response = await handleConciergeRequest(
+    guestRequest("I need to talk to a human you can not help me"),
+    env,
+    undefined,
+    openNow
+  );
+  const body = await response.json();
+  assert.equal(body.intentId, "generic_human_contact");
+  assert.equal(body.source, "human-contact-policy");
+  assert.match(body.answer, /contact The House team directly/i);
+  assert.doesNotMatch(body.answer, /\bSu\b/i);
+  assert.equal(body.actions.some((action) => action.route === "houseWhatsapp"), true);
+  assert.equal(body.actions.some((action) => action.route === "houseCall"), true);
+  assert.equal(store.alerts.length, 0);
+
+  const closedNow = new Date("2026-08-30T13:00:00.000Z"); // Sunday 20:00 Bangkok
+  const closed = await handleConciergeRequest(
+    guestRequest("I need to talk to a human you can not help me"),
+    env,
+    undefined,
+    closedNow
+  );
+  const closedBody = await closed.json();
+  assert.equal(closedBody.intentId, "generic_human_contact");
+  assert.match(closedBody.answer, /outside normal service hours/i);
+  assert.equal(closedBody.actions.some((action) => action.route === "houseWhatsapp"), false);
+  assert.equal(closedBody.actions.some((action) => action.route === "houseCall"), false);
+  assert.equal(closedBody.actions.some((action) => action.href === "/emergency.html"), true);
+  assert.equal(store.alerts.length, 0);
 });

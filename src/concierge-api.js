@@ -40,7 +40,7 @@ import {
   specialtyChoiceLabels
 } from "./diving-catalog.js";
 
-const RELEASE = "5.11.39";
+const RELEASE = "5.11.40";
 const ROOM_OPTIONS = new Set(["1", "2", "3", "4", "5", "6", "8", "9", "10", "11"]);
 const MAX_HISTORY_ITEMS = 10;
 const MAX_QUESTION_LENGTH = 800;
@@ -204,6 +204,7 @@ const GENERIC_HUMAN_CONTACT_REQUEST = /^(?:(?:please|hello|hi)\s+)?(?:i\s+(?:(?:
 const PROPERTY_HUMAN_CONTACT_REQUEST = /^(?:(?:please\s+)?(?:call|contact)\s+(?:the\s+)?(?:hotel|house|property)|(?:can|could)\s+i\s+(?:call|contact)\s+(?:the\s+)?(?:hotel|house|property))(?:\s+please)?$/;
 const SPECIFIC_STAFF_CONTACT_REQUEST = /^(?:(?:please\s+)?(?:can|could|may)\s+i\s+(?:call|contact|talk\s+to|speak\s+to)\s+(?:the\s+)?(?:housekeeper|su)|please\s+let\s+me\s+(?:call|contact|talk\s+to|speak\s+to)\s+(?:the\s+)?(?:housekeeper|su)|(?:please\s+)?(?:call|contact|talk\s+to|speak\s+to)\s+(?:the\s+)?(?:housekeeper|su)|please\s+call\s+for\s+me)$/;
 const STRONG_HUMAN_CONTACT_REQUEST = /^(?:(?:i\s+)?(?:urgently|really)\s+(?:need|want|would\s+like)\s+(?:(?:a\s+)?(?:human|person|someone|staff|team|reception|housekeeper)|(?:to\s+)?(?:talk|speak)\s+(?:to|with)\s+(?:a\s+)?(?:human|person|someone|staff|team|reception|housekeeper))|i\s+(?:need|want|would\s+like)\s+to\s+personally\s+(?:talk|speak)\s+(?:to|with)\s+(?:them|(?:a\s+)?(?:human|person|someone|staff|team|reception|housekeeper)))(?:\s+please)?$/;
+const DISSATISFIED_HUMAN_CONTACT_REQUEST = /\b(?:i\s+)?(?:need|want|would\s+like)\s+to\s+(?:talk|speak)\s+(?:to|with)\s+(?:a\s+)?(?:human|person|someone|staff|team|reception|housekeeper)\b[\s\S]{0,80}\b(?:you\s+(?:can\s+not|cannot|cant)\s+help(?:\s+me)?|you\s+(?:are|re)\s+not\s+helping(?:\s+me)?|this\s+(?:is\s+not|isnt)\s+helping)\b/;
 const HUMAN_CONTACT_REFERENCE = /\b(?:human|person|someone|staff|team|reception|housekeeper|su|call|talk|speak|contact)\b/;
 const PERSISTENT_HUMAN_CONTACT_REQUEST = /^(?:i\s+)?(?:still|really)\s+(?:need|want|would\s+like)\s+(?:(?:a\s+)?(?:human|person|someone|staff|team|reception|housekeeper)|(?:to\s+)?(?:talk|speak)\s+(?:to|with)\s+(?:a\s+)?(?:human|person|someone|staff|team|reception|housekeeper))(?:\s+please)?$/;
 const LOCAL_INFORMATION_TOPIC = /\b(?:beach|bay|swim|snorkel|sunset|restaurant|dinner|lunch|breakfast|brunch|food|seafood|thai\s+food|bar|nightlife|drink|cocktail|cafe|coffee|bakery|shop|shopping|supermarket|pharmacy|atm|bank|laundry|viewpoint|hike|hiking|activity|activities|things\s+to\s+do|island|koh\s+tao|mae\s+haad|sairee|transport|taxi|ferry|scooter|directions?|distance|how\s+far)\w*\b/i;
@@ -1201,6 +1202,7 @@ function isPersistentHumanContactRequest(question) {
   const normalized = normalizeText(question);
   return PERSISTENT_HUMAN_CONTACT_REQUEST.test(normalized)
     || STRONG_HUMAN_CONTACT_REQUEST.test(normalized)
+    || DISSATISFIED_HUMAN_CONTACT_REQUEST.test(normalized)
     || SPECIFIC_STAFF_CONTACT_REQUEST.test(normalized);
 }
 

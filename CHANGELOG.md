@@ -2,6 +2,19 @@
 
 All notable changes to The House – Koh Tao guest guide are recorded here.
 
+## v5.11.43 — Last-Minute Airbnb Sync + Approved Meta Actions + Manual Passport Details
+
+- Changes the standalone Airbnb reservation trigger from hourly to every five minutes for lightweight recent-mail detection.
+- Removes wording-specific Gmail search terms, broadens safe HM confirmation-code recognition and parses active House/Room listing wording in either order plus common yearless English arrival/departure dates.
+- Fast-posts only trustworthy room-bound reservation records with `complete:false` so a last-minute confirmation code can become usable before Airbnb iCal propagation.
+- Reconciles all ten active Airbnb calendars at least hourly even when Gmail sees no booking change; only the complete 24-hour audit can cancel absent reservations.
+- Activates `house_service_alert_actions_v3`, `house_booking_alert_actions_v2`, `house_luggage_alert_actions_v2`, `house_urgent_alert_actions_v2` and `house_lost_key_alert_actions_v2`; older/partial interactive mappings fail closed to buttonless templates.
+- Preserves visible **Received** / **Resolved** buttons with signed internal `RECEIVED` / `RESOLVE` payloads and all existing recipient, actor-exclusion, escalation and idempotency rules.
+- Enables secure passport Option 2 with exactly passport number, full name, birthday, nationality, gender/sex as shown on passport and phone number. Manual details use the same reservation-bound, expiring, single-use private token, private R2 storage and maximum 14-day deletion lifecycle as image upload.
+- Keeps passport values out of Concierge, WhatsApp, learning data and ordinary operational metadata/logs.
+- Preserves v5.11.42 human/stay-extension behavior, v5.11.41 emergency/mobile fixes, v5.11.39 cleaning/state fixes, 24/7 lost-key security and `EXPLORE_ENABLED=false`.
+- Complete suite: **216 passed, 0 failed**.
+
 ## v5.11.42 — Broad Human Routing + Stay Extension Booking
 
 - Replaces exact-sentence dependence for human contact with a broad deterministic intent family covering human/person/staff/team/reception/front desk/housekeeper/manager/agent/representative/customer-support wording and common speak/call/contact/connect/transfer variants.

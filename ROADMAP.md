@@ -1,6 +1,6 @@
 # Product Roadmap
 
-Baseline: v5.11.42
+Baseline: v5.11.43
 
 ## Completed
 
@@ -311,7 +311,16 @@ Live status: disabled through `EXPLORE_ENABLED=false`. Existing pages, data and 
 - [x] Implement and package v5.11.39 to make clean up/cleanup requests deterministic, retain the cleaning collector in the browser, accept contextual bare-hour replies, auto-submit the service alert, remove false website-chat reply wording, use access-aware initial copy, clear invisible stale history on reload, and block context-free generic request alerts.
 - [x] Implement v5.11.40 as a narrow production correction for explicit human requests that include a clear cannot-help reason, preserving routine contact hours and private staff identity.
 - [x] Implement v5.11.41 as a separate mobile/emergency UX correction: add the generic House emergency-call action, deterministic emergency-contact questions, a more compact in-conversation mobile action grid, and remove drag-to-dismiss so chat scrolling cannot move or close the sheet.
-- [ ] Deploy v5.11.41 and smoke-test fire → **Call The House Emergency Support**, direct emergency-contact question → call actions without an alert, mobile conversation-space compaction, and stable chat scrolling with no sheet drag/accidental close.
+- [x] v5.11.41 was pushed/deployed; fire emergency-call UX, direct emergency-contact routing and mobile sheet stability became the production baseline for later releases.
+
+
+## v5.11.43 release checkpoint
+
+- [x] Harden last-minute Airbnb synchronization with five-minute recent-email polling, trustworthy immediate `complete:false` ingestion, hourly full active-room iCal reconciliation and the existing cancellation-safe 24-hour audit.
+- [x] Activate the five owner-approved human-friendly Meta action templates with exact BODY order and fail-closed all-template gating.
+- [x] Enable secure passport Option 2 with exactly passport number, full name, birthday, nationality, gender/sex as shown on passport and phone number, using the existing private single-use token and retention lifecycle.
+- [ ] After deployment, update the existing standalone Apps Script with `airbnb-sync/Code.gs`, run `installHouseReservationTrigger` once and verify exactly one five-minute trigger.
+- [ ] Smoke-test one non-sensitive alert of each Meta kind and one controlled last-minute reservation.
 
 ## v5.11.42 release checkpoint
 
@@ -319,4 +328,4 @@ Live status: disabled through `EXPLORE_ENABLED=false`. Existing pages, data and 
 - [x] Add a dedicated current-stay extension booking collector for natural “stay longer / extend / extra nights” wording.
 - [x] Collect additional nights and a transient international WhatsApp/phone contact, then route exactly one booking alert to Fah plus both owners.
 - [x] Keep stay-extension wording non-committal: availability, price/payment and final confirmation remain with the team.
-- [ ] Next narrow production fix: harden last-minute Airbnb reservation synchronization so a newly booked guest’s confirmation code becomes usable promptly without manual stay creation. Do not fold that sync change into v5.11.42.
+- [x] The last-minute Airbnb synchronization issue was promoted into v5.11.43 with five-minute email detection, immediate trustworthy partial ingestion and hourly iCal reconciliation.

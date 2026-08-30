@@ -2627,7 +2627,12 @@ test("main and room welcome pages make required registration prominent", async (
   assert.doesNotMatch(registrationEntry, /HOUSE_PRIVATE_REGISTRATION_URL/);
   assert.match(registrationForm, /Option 1 — Upload passport image/);
   assert.match(registrationForm, /Option 2 — Enter the required details/);
-  assert.match(registrationForm, /exact required TM30 fields/);
+  assert.match(registrationForm, /Passport number/);
+  assert.match(registrationForm, /Full name/);
+  assert.match(registrationForm, /Birthday/);
+  assert.match(registrationForm, /Nationality/);
+  assert.match(registrationForm, /Gender \/ sex as shown on passport/);
+  assert.match(registrationForm, /Phone \/ WhatsApp number/);
   assert.match(room, /Please conserve water and electricity/);
   assert.match(room, /undersea grid connection, reducing reliance on local diesel generators/);
   assert.match(room, /switch off the air conditioning and lights when you leave the room/);
@@ -2912,7 +2917,7 @@ test("guest localization supports seven languages and keeps the owner dashboard 
   assert.doesNotMatch(admin, /src="\/i18n\.js"/);
   assert.match(runtime, /exploreContentDeferred/);
   assert.match(runtime, /element\.closest\("\.section,\.footer"\)/);
-  assert.match(runtime, /houseGuideTranslations:v5\.11\.42:/);
+  assert.match(runtime, /houseGuideTranslations:v5\.11\.43:/);
   assert.match(runtime, /MAX_REQUEST_RETRIES = 2/);
   assert.match(runtime, /let flushRunning = false/);
 });
@@ -8453,11 +8458,11 @@ test("the centralized Meta text sanitizer protects service, status and future ac
   };
   const actionMappings = {
     WHATSAPP_STAFF_ACTIONS_ENABLED: "true",
-    WHATSAPP_SERVICE_ACTION_TEMPLATE_NAME: "house_service_alert_actions_v2",
-    WHATSAPP_LUGGAGE_ACTION_TEMPLATE_NAME: "house_luggage_alert_actions_v1",
-    WHATSAPP_BOOKING_ACTION_TEMPLATE_NAME: "house_booking_alert_actions_v1",
-    WHATSAPP_URGENT_ACTION_TEMPLATE_NAME: "house_urgent_alert_actions_v1",
-    WHATSAPP_LOST_KEY_ACTION_TEMPLATE_NAME: "house_lost_key_alert_actions_v1"
+    WHATSAPP_SERVICE_ACTION_TEMPLATE_NAME: "house_service_alert_actions_v3",
+    WHATSAPP_LUGGAGE_ACTION_TEMPLATE_NAME: "house_luggage_alert_actions_v2",
+    WHATSAPP_BOOKING_ACTION_TEMPLATE_NAME: "house_booking_alert_actions_v2",
+    WHATSAPP_URGENT_ACTION_TEMPLATE_NAME: "house_urgent_alert_actions_v2",
+    WHATSAPP_LOST_KEY_ACTION_TEMPLATE_NAME: "house_lost_key_alert_actions_v2"
   };
   const cases = [
     buildWhatsAppTemplatePayload(base, recipient, {}),
@@ -8479,7 +8484,7 @@ test("the centralized Meta text sanitizer protects service, status and future ac
   }
   assert.equal(cases[0].payload.template.components[0].parameters.length, 5);
   assert.equal(cases[0].payload.template.components[0].parameters[4].text, "Please bring new towels to the room. Guest reply: +66812345678");
-  assert.equal(cases[1].payload.template.name, "house_service_alert_actions_v2");
+  assert.equal(cases[1].payload.template.name, "house_service_alert_actions_v3");
   assert.equal(cases[1].payload.template.components[0].parameters.length, 5);
   assert.equal(cases[2].payload.template.components[0].parameters.length, 5);
   assert.equal(cases[2].payload.template.components[0].parameters[3].text, "Su Team");
@@ -8503,11 +8508,11 @@ test("release configuration activates the five exact reviewed staff quick-action
   const vars = wrangler.vars;
   assert.equal(vars.EXPLORE_ENABLED, "false");
   assert.equal(vars.WHATSAPP_STAFF_ACTIONS_ENABLED, "true");
-  assert.equal(vars.WHATSAPP_SERVICE_ACTION_TEMPLATE_NAME, "house_service_alert_actions_v2");
-  assert.equal(vars.WHATSAPP_LUGGAGE_ACTION_TEMPLATE_NAME, "house_luggage_alert_actions_v1");
-  assert.equal(vars.WHATSAPP_BOOKING_ACTION_TEMPLATE_NAME, "house_booking_alert_actions_v1");
-  assert.equal(vars.WHATSAPP_URGENT_ACTION_TEMPLATE_NAME, "house_urgent_alert_actions_v1");
-  assert.equal(vars.WHATSAPP_LOST_KEY_ACTION_TEMPLATE_NAME, "house_lost_key_alert_actions_v1");
+  assert.equal(vars.WHATSAPP_SERVICE_ACTION_TEMPLATE_NAME, "house_service_alert_actions_v3");
+  assert.equal(vars.WHATSAPP_LUGGAGE_ACTION_TEMPLATE_NAME, "house_luggage_alert_actions_v2");
+  assert.equal(vars.WHATSAPP_BOOKING_ACTION_TEMPLATE_NAME, "house_booking_alert_actions_v2");
+  assert.equal(vars.WHATSAPP_URGENT_ACTION_TEMPLATE_NAME, "house_urgent_alert_actions_v2");
+  assert.equal(vars.WHATSAPP_LOST_KEY_ACTION_TEMPLATE_NAME, "house_lost_key_alert_actions_v2");
   assert.equal(whatsappAlertConfiguration(vars).staffQuickActionsEnabled, true);
   assert.equal(Object.values(whatsappAlertConfiguration(vars).staffQuickActionTemplates).length, 5);
   const built = buildWhatsAppTemplatePayload({
@@ -8519,7 +8524,7 @@ test("release configuration activates the five exact reviewed staff quick-action
     createdAt: "2026-08-29T08:00:00.000Z",
     bangkokTime: "29 Aug 2026, 15:00"
   }, { label: "Su", phone: "66640000001" }, vars);
-  assert.equal(built.payload.template.name, "house_service_alert_actions_v2");
+  assert.equal(built.payload.template.name, "house_service_alert_actions_v3");
   assert.equal(built.payload.template.language.code, "en");
   assert.deepEqual(built.payload.template.components.slice(1).map((component) => component.index), ["0", "1"]);
 });
@@ -8536,11 +8541,11 @@ test("staff quick-action templates fail closed and bind both actions to the exac
     summary: "Guest requested assistance."
   };
   const mappings = {
-    WHATSAPP_SERVICE_ACTION_TEMPLATE_NAME: "house_service_alert_actions_v2",
-    WHATSAPP_LUGGAGE_ACTION_TEMPLATE_NAME: "house_luggage_alert_actions_v1",
-    WHATSAPP_BOOKING_ACTION_TEMPLATE_NAME: "house_booking_alert_actions_v1",
-    WHATSAPP_URGENT_ACTION_TEMPLATE_NAME: "house_urgent_alert_actions_v1",
-    WHATSAPP_LOST_KEY_ACTION_TEMPLATE_NAME: "house_lost_key_alert_actions_v1"
+    WHATSAPP_SERVICE_ACTION_TEMPLATE_NAME: "house_service_alert_actions_v3",
+    WHATSAPP_LUGGAGE_ACTION_TEMPLATE_NAME: "house_luggage_alert_actions_v2",
+    WHATSAPP_BOOKING_ACTION_TEMPLATE_NAME: "house_booking_alert_actions_v2",
+    WHATSAPP_URGENT_ACTION_TEMPLATE_NAME: "house_urgent_alert_actions_v2",
+    WHATSAPP_LOST_KEY_ACTION_TEMPLATE_NAME: "house_lost_key_alert_actions_v2"
   };
   const disabled = buildWhatsAppTemplatePayload({ ...base, alertType: "stay_support" }, recipient, mappings);
   assert.equal(disabled.payload.template.name, "house_service_alert_v3");
@@ -8555,11 +8560,11 @@ test("staff quick-action templates fail closed and bind both actions to the exac
 
   const env = { ...mappings, WHATSAPP_STAFF_ACTIONS_ENABLED: "true" };
   const fixtures = [
-    [{ ...base, alertType: "stay_support" }, "house_service_alert_actions_v2", 5],
-    [{ ...base, alertType: "luggage_storage", luggageRequest: { context: "Arrival", requestedDate: "29 Aug 2026", requestedTime: "2:00 PM", bagCount: "3" } }, "house_luggage_alert_actions_v1", 6],
-    [{ ...base, alertType: "booking_request", bookingRequest: { kind: "ferry", activity: "Ferry tickets", preferredDate: "29 Aug 2026", guestCount: "2", pickupLocation: "Koh Tao", destination: "Koh Samui", notes: "Morning preferred" } }, "house_booking_alert_actions_v1", 6],
-    [{ ...base, alertType: "property_emergency", severity: "critical" }, "house_urgent_alert_actions_v1", 5],
-    [{ ...base, alertType: "verified_spare_key_release" }, "house_lost_key_alert_actions_v1", 3]
+    [{ ...base, alertType: "stay_support" }, "house_service_alert_actions_v3", 5],
+    [{ ...base, alertType: "luggage_storage", luggageRequest: { context: "Arrival", requestedDate: "29 Aug 2026", requestedTime: "2:00 PM", bagCount: "3" } }, "house_luggage_alert_actions_v2", 6],
+    [{ ...base, alertType: "booking_request", bookingRequest: { kind: "ferry", activity: "Ferry tickets", preferredDate: "29 Aug 2026", guestCount: "2", pickupLocation: "Koh Tao", destination: "Koh Samui", notes: "Morning preferred" } }, "house_booking_alert_actions_v2", 6],
+    [{ ...base, alertType: "property_emergency", severity: "critical" }, "house_urgent_alert_actions_v2", 5],
+    [{ ...base, alertType: "verified_spare_key_release" }, "house_lost_key_alert_actions_v2", 3]
   ];
   for (const [alert, templateName, bodyCount] of fixtures) {
     const built = buildWhatsAppTemplatePayload(alert, recipient, env);
@@ -9682,7 +9687,7 @@ test("v5.11.28 guest visual contracts keep registration and lost-key consent sca
   assert.match(stayStyles, /#spareKeyViewAction\{[^}]*border-top/);
   assert.match(stayStyles, /@media\(max-width:650px\)[\s\S]*\.stay-access-actions\{display:grid/);
   assert.match(passportStyles, /\.passport-facts\{[^}]*repeat\(3,minmax\(0,1fr\)\)/);
-  assert.match(passportStyles, /@media\(max-width:650px\)[\s\S]*\.passport-facts,\.passport-privacy ul,\.passport-session,\.registration-methods\{grid-template-columns:1fr\}/);
+  assert.match(passportStyles, /@media\(max-width:650px\)[\s\S]*\.passport-facts,\.passport-privacy ul,\.passport-session,\.registration-methods,\.passport-details-grid\{grid-template-columns:1fr\}/);
 });
 
 test("v5.11.28 landing and room hierarchy use safe imagery, exact guidance and accurate actions", async () => {
@@ -10068,4 +10073,346 @@ test("stay extension collects nights then private contact and sends one Fah-and-
   } finally {
     globalThis.fetch = originalFetch;
   }
+});
+
+function appsScriptFormatDate(date, timeZone, format) {
+  const parts = Object.fromEntries(new Intl.DateTimeFormat("en-GB", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).formatToParts(date).filter((part) => part.type !== "literal").map((part) => [part.type, part.value]));
+  if (format === "yyyy") return parts.year;
+  if (format === "yyyy-MM-dd") return `${parts.year}-${parts.month}-${parts.day}`;
+  throw new Error(`unsupported test format ${format}`);
+}
+
+async function loadAirbnbSyncContext(overrides = {}) {
+  const source = await readFile(new URL("../airbnb-sync/Code.gs", import.meta.url), "utf8");
+  const context = vm.createContext({
+    console,
+    Utilities: { formatDate: appsScriptFormatDate },
+    ...overrides
+  });
+  vm.runInContext(source, context, { filename: "airbnb-sync/Code.gs" });
+  return { context, source };
+}
+
+test("v5.11.43 Airbnb parser accepts broader HM codes, either House/Room order and yearless dates", async () => {
+  const { context } = await loadAirbnbSyncContext();
+  assert.equal(context.firstConfirmationCode_("Confirmation HMABC123456789012345"), "HMABC123456789012345");
+  assert.equal(context.firstConfirmationCode_("Too short HMABC12"), "");
+  assert.equal(context.listingFromText_("The House Koh Tao — Room 6"), "1504212652507496103");
+  assert.equal(context.listingFromText_("Room 6 at The House Koh Tao"), "1504212652507496103");
+  assert.equal(context.listingFromText_("The House Koh Tao — Room 7"), "");
+
+  const sameYear = context.datesFromEmail_(
+    "Check-in Sun, Aug 30\nCheckout Tue, Sep 1",
+    new Date("2026-08-30T05:00:00.000Z")
+  );
+  assert.equal(sameYear.checkInDate, "2026-08-30");
+  assert.equal(sameYear.checkOutDate, "2026-09-01");
+
+  const rollover = context.datesFromEmail_(
+    "Check-in Wed, Dec 30\nCheckout Sat, Jan 2",
+    new Date("2026-12-29T05:00:00.000Z")
+  );
+  assert.equal(rollover.checkInDate, "2026-12-30");
+  assert.equal(rollover.checkOutDate, "2027-01-02");
+});
+
+test("v5.11.43 Airbnb Gmail scan does not depend on literal confirmation wording", async () => {
+  let query = "";
+  const message = {
+    getFrom: () => "Airbnb <automated@airbnb.com>",
+    getDate: () => new Date("2026-08-30T05:00:00.000Z"),
+    getSubject: () => "A guest booked The House Koh Tao Room 6",
+    getPlainBody: () => "Guest: Maya\nCode HMFAST123456\nCheck-in Sun, Aug 30\nCheckout Tue, Sep 1",
+    getId: () => "test-message-id"
+  };
+  const { context } = await loadAirbnbSyncContext({
+    GmailApp: {
+      search(value) {
+        query = value;
+        return [{ getMessages: () => [message] }];
+      }
+    }
+  });
+  const records = context.readAirbnbReservationEmails_({ fullAudit: false, since: new Date("2026-08-30T04:30:00.000Z") });
+  assert.match(query, /from:airbnb\.com/);
+  assert.doesNotMatch(query, /confirmation code|reservation code|\(.*confirmation/i);
+  assert.equal(records.HMFAST123456.listingId, "1504212652507496103");
+  assert.equal(records.HMFAST123456.checkInDate, "2026-08-30");
+  assert.equal(records.HMFAST123456.checkOutDate, "2026-09-01");
+  assert.equal(records.HMFAST123456.guestFirstName, "Maya");
+});
+
+test("v5.11.43 Airbnb email fast path posts only trustworthy room-bound partial syncs", async () => {
+  const outbound = [];
+  const { context } = await loadAirbnbSyncContext({
+    UrlFetchApp: {
+      fetch(url, options) {
+        outbound.push({ url, options });
+        return { getResponseCode: () => 200, getContentText: () => "{}" };
+      }
+    }
+  });
+  const count = context.postEmailReservations_("https://guide.example", "sync-token", {
+    HMFAST123456: {
+      listingId: "1504212652507496103",
+      checkInDate: "2026-08-30",
+      checkOutDate: "2026-09-01",
+      guestFirstName: "Maya",
+      status: "confirmed",
+      sourceRef: "gmail:test"
+    },
+    HMINCOMPLETE123: {
+      listingId: "1504212652507496103",
+      checkInDate: "",
+      checkOutDate: "2026-09-01",
+      status: "confirmed"
+    },
+    HMROOM7BLOCKED: {
+      listingId: "not-an-active-listing",
+      checkInDate: "2026-08-30",
+      checkOutDate: "2026-09-01",
+      status: "confirmed"
+    }
+  });
+  assert.equal(count, 1);
+  assert.equal(outbound.length, 1);
+  const payload = JSON.parse(outbound[0].options.payload);
+  assert.equal(payload.room, "6");
+  assert.equal(payload.listingId, "1504212652507496103");
+  assert.equal(payload.complete, false);
+  assert.equal(payload.records.length, 1);
+  assert.equal(payload.records[0].confirmationCode, "HMFAST123456");
+});
+
+test("v5.11.43 Airbnb idle five-minute runs skip calendars while hourly safety net reconciles all active rooms", async () => {
+  const sourceProperties = (calendarAgeMinutes) => {
+    const now = Date.now();
+    const values = new Map([
+      ["HOUSE_WORKER_ORIGIN", "https://guide.example"],
+      ["RESERVATION_SYNC_TOKEN", "sync-token"],
+      ["HOUSE_AIRBNB_LAST_SYNC_AT", new Date(now - 5 * 60_000).toISOString()],
+      ["HOUSE_AIRBNB_LAST_CALENDAR_AT", new Date(now - calendarAgeMinutes * 60_000).toISOString()],
+      ["HOUSE_AIRBNB_LAST_AUDIT_AT", new Date(now - 60 * 60_000).toISOString()]
+    ]);
+    for (const room of ["1", "2", "3", "4", "5", "6", "8", "9", "10", "11"]) values.set(`AIRBNB_ICAL_ROOM_${room}`, `https://calendar.example/${room}.ics`);
+    return values;
+  };
+
+  async function run(calendarAgeMinutes) {
+    const properties = sourceProperties(calendarAgeMinutes);
+    const fetches = [];
+    const { context } = await loadAirbnbSyncContext({
+      LockService: { getScriptLock: () => ({ tryLock: () => true, releaseLock() {} }) },
+      PropertiesService: { getScriptProperties: () => ({ getProperty: (key) => properties.get(key) || "", setProperty: (key, value) => properties.set(key, value) }) },
+      GmailApp: { search: () => [] },
+      UrlFetchApp: {
+        fetch(url, options = {}) {
+          fetches.push({ url, options });
+          if (/\.ics$/.test(url)) return { getResponseCode: () => 200, getContentText: () => "BEGIN:VCALENDAR\nEND:VCALENDAR" };
+          return { getResponseCode: () => 200, getContentText: () => "{}" };
+        }
+      }
+    });
+    context.syncHouseReservationsInternal_(false);
+    return { fetches, properties };
+  }
+
+  const idle = await run(20);
+  assert.equal(idle.fetches.length, 0);
+
+  const due = await run(61);
+  assert.equal(due.fetches.filter((item) => /\.ics$/.test(item.url)).length, 10);
+  assert.equal(due.fetches.filter((item) => item.url.endsWith("/api/reservations/sync")).length, 10);
+  assert.ok(due.properties.get("HOUSE_AIRBNB_LAST_CALENDAR_AT"));
+});
+
+test("v5.11.43 Airbnb trigger installer is five-minute and preserves one handler", async () => {
+  const deleted = [];
+  let everyMinutes = 0;
+  let created = 0;
+  const existing = [
+    { getHandlerFunction: () => "syncHouseReservations" },
+    { getHandlerFunction: () => "anotherJob" }
+  ];
+  const { context, source } = await loadAirbnbSyncContext({
+    ScriptApp: {
+      getProjectTriggers: () => existing,
+      deleteTrigger: (trigger) => deleted.push(trigger),
+      newTrigger: () => ({
+        timeBased: () => ({
+          everyMinutes(value) {
+            everyMinutes = value;
+            return { create() { created += 1; } };
+          }
+        })
+      })
+    }
+  });
+  context.runFullHouseReservationAudit = () => {};
+  context.installHouseReservationTrigger();
+  assert.equal(deleted.length, 1);
+  assert.equal(everyMinutes, 5);
+  assert.equal(created, 1);
+  assert.match(source, /everyMinutes\(5\)/);
+  assert.doesNotMatch(source, /everyHours\(1\)/);
+});
+
+test("v5.11.43 approved Meta action templates use the exact new BODY orders and old mappings fail closed", async () => {
+  const vars = JSON.parse(await readFile(new URL("../wrangler.jsonc", import.meta.url), "utf8")).vars;
+  const recipient = { label: "Team", phone: "66810000002" };
+  const reference = "alert_12345678-1234-1234-1234-123456789143";
+  const base = {
+    id: reference,
+    room: "6",
+    createdAt: "2026-08-30T06:30:00.000Z",
+    bangkokTime: "30 Aug 2026, 13:30",
+    severity: "attention",
+    privateReplyContact: "+66 81 234 5678"
+  };
+  const values = (built) => built.payload.template.components[0].parameters.map((item) => item.text);
+
+  const service = buildWhatsAppTemplatePayload({ ...base, alertType: "stay_support", summary: "Room cleaning requested at 11:00 AM." }, recipient, vars);
+  assert.deepEqual(values(service), ["Room cleaning", "Room 6", "30 Aug 2026, 13:30", "Room cleaning requested at 11:00 AM. Guest reply: +66812345678", reference]);
+
+  const booking = buildWhatsAppTemplatePayload({
+    ...base,
+    alertType: "booking_request",
+    summary: "Ferry booking requested.",
+    bookingRequest: { kind: "ferry", activity: "Ferry tickets", preferredDate: "31 Aug 2026", pickupTime: "9:00 AM", guestCount: "2", pickupLocation: "Koh Tao", destination: "Koh Samui", notes: "Morning" }
+  }, recipient, vars);
+  assert.deepEqual(values(booking).slice(0, 4), ["Ferry tickets", "Room 6", "31 Aug 2026, 9:00 AM", "2"]);
+  assert.equal(values(booking)[5], reference);
+
+  const extension = buildWhatsAppTemplatePayload({
+    ...base,
+    alertType: "booking_request",
+    summary: "Guest would like to extend the current stay.",
+    bookingRequest: { kind: "stay_extension", activity: "Stay extension", extensionNights: "2", option: "2 additional nights", notes: "" }
+  }, recipient, vars);
+  assert.deepEqual(values(extension).slice(0, 4), ["Stay extension", "Room 6", "Current stay", "Not provided"]);
+  assert.match(values(extension)[4], /2 additional nights/);
+  assert.match(values(extension)[4], /Guest reply: \+66812345678/);
+  assert.equal(values(extension)[5], reference);
+
+  const luggage = buildWhatsAppTemplatePayload({ ...base, alertType: "luggage_storage", summary: "Please store luggage.", luggageRequest: { context: "Departure", bagCount: "3", requestedDate: "31 Aug 2026", requestedTime: "1:00 PM" } }, recipient, vars);
+  assert.deepEqual(values(luggage).slice(0, 4), ["Departure", "Room 6", "3", "31 Aug 2026, 1:00 PM"]);
+  assert.equal(values(luggage)[5], reference);
+
+  const urgent = buildWhatsAppTemplatePayload({ ...base, alertType: "property_emergency", severity: "critical", summary: "There is fire in my room." }, recipient, vars);
+  assert.deepEqual(values(urgent).slice(0, 3), ["Fire / smoke", "Room 6", "30 Aug 2026, 13:30"]);
+  assert.equal(values(urgent)[4], reference);
+
+  const lost = buildWhatsAppTemplatePayload({ ...base, alertType: "verified_spare_key_release", summary: "Verified spare-key request." }, recipient, vars);
+  assert.deepEqual(values(lost), ["Room 6", "30 Aug 2026, 13:30", reference]);
+  assert.equal(lost.payload.template.components[1].parameters[0].payload, `HOUSE_ALERT|RECEIVED|${reference}`);
+  assert.equal(lost.payload.template.components[2].parameters[0].payload, `HOUSE_ALERT|RESOLVE|${reference}`);
+
+  const oldMappings = {
+    ...vars,
+    WHATSAPP_SERVICE_ACTION_TEMPLATE_NAME: "house_service_alert_actions_v2",
+    WHATSAPP_BOOKING_ACTION_TEMPLATE_NAME: "house_booking_alert_actions_v1",
+    WHATSAPP_LUGGAGE_ACTION_TEMPLATE_NAME: "house_luggage_alert_actions_v1",
+    WHATSAPP_URGENT_ACTION_TEMPLATE_NAME: "house_urgent_alert_actions_v1",
+    WHATSAPP_LOST_KEY_ACTION_TEMPLATE_NAME: "house_lost_key_alert_actions_v1"
+  };
+  assert.equal(whatsappAlertConfiguration(oldMappings).staffQuickActionsEnabled, false);
+  const fallback = buildWhatsAppTemplatePayload({ ...base, alertType: "stay_support", summary: "Fresh towels please." }, recipient, oldMappings);
+  assert.equal(fallback.payload.template.name, "house_service_alert_v3");
+  assert.equal(fallback.payload.template.components.length, 1);
+});
+
+test("v5.11.43 manual passport details option stores exactly the six required fields privately and consumes the one-time link", async () => {
+  const { env, store, passportBucket } = createEnvironment();
+  const createdResponse = await handleAdminRequest(new Request("https://guide.example/api/concierge/admin/passport-links", {
+    method: "POST",
+    headers: { authorization: "Bearer admin_token_test_5500", "content-type": "application/json" },
+    body: JSON.stringify({ room: "6", expiresHours: 24, nonThaiConfirmed: true })
+  }), env, "/api/concierge/admin/passport-links");
+  const created = await createdResponse.json();
+  const token = new URL(created.uploadUrl).hash.replace("#token=", "");
+
+  const sessionResponse = await handlePassportGuestRequest(new Request("https://guide.example/api/passport-upload/session", {
+    method: "POST",
+    headers: { authorization: `Bearer ${token}` }
+  }), env, "/api/passport-upload/session");
+  const sessionBody = await sessionResponse.json();
+  assert.deepEqual(sessionBody.acceptedMethods, ["passport_image", "passport_details"]);
+  assert.deepEqual(sessionBody.requiredDetailFields, ["passportNumber", "fullName", "birthday", "nationality", "gender", "phoneNumber"]);
+
+  const details = {
+    passportNumber: "TESTP123456",
+    fullName: "Example Guest",
+    birthday: "1990-01-02",
+    nationality: "Exampleland",
+    gender: "M",
+    phoneNumber: "0812345678",
+    authorized: true
+  };
+  const submitted = await handlePassportGuestRequest(new Request("https://guide.example/api/passport-details", {
+    method: "POST",
+    headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+    body: JSON.stringify(details)
+  }), env, "/api/passport-details");
+  const body = await submitted.json();
+  assert.equal(submitted.status, 200);
+  assert.equal(body.submissionType, "passport_details");
+  assert.equal(body.room, "6");
+  assert.equal(store.passportRecords[0].status, "uploaded");
+  assert.equal(store.passportRecords[0].mediaType, "application/json");
+  assert.match(store.passportRecords[0].objectKey, /^passport-details\//);
+  assert.equal(passportBucket.objects.size, 1);
+  const storedBytes = [...passportBucket.objects.values()][0];
+  const stored = JSON.parse(new TextDecoder().decode(storedBytes));
+  assert.deepEqual(Object.keys(stored).sort(), ["birthday", "fullName", "gender", "nationality", "passportNumber", "phoneNumber", "schemaVersion", "submittedAt"].sort());
+  assert.equal(stored.passportNumber, "TESTP123456");
+  assert.equal(stored.fullName, "Example Guest");
+  assert.equal(stored.birthday, "1990-01-02");
+  assert.equal(stored.nationality, "Exampleland");
+  assert.equal(stored.gender, "M");
+  assert.equal(stored.phoneNumber, "0812345678");
+  assert.equal(store.interactions.length, 0);
+  assert.doesNotMatch(JSON.stringify(store.passportRecords), /TESTP123456|Example Guest|Exampleland|0812345678/);
+
+  const reused = await handlePassportGuestRequest(new Request("https://guide.example/api/passport-details", {
+    method: "POST",
+    headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+    body: JSON.stringify(details)
+  }), env, "/api/passport-details");
+  assert.equal(reused.status, 410);
+});
+
+test("v5.11.43 passport details API is reachable from the Worker and validates required fields", async () => {
+  const [indexSource, formSource, scriptSource, adminSource] = await Promise.all([
+    readFile(new URL("../src/index.js", import.meta.url), "utf8"),
+    readFile(new URL("../public/passport-upload.html", import.meta.url), "utf8"),
+    readFile(new URL("../public/passport-upload.js", import.meta.url), "utf8"),
+    readFile(new URL("../public/concierge-admin.js", import.meta.url), "utf8")
+  ]);
+  assert.match(indexSource, /"\/api\/passport-details"/);
+  for (const field of ["passportNumber", "fullName", "birthday", "nationality", "gender", "phoneNumber"]) {
+    assert.match(formSource, new RegExp(`name="${field}"`));
+  }
+  assert.match(scriptSource, /fetch|request\("\/api\/passport-details"/);
+  assert.match(adminSource, /"application\/json": "json"/);
+  assert.match(adminSource, /Passport details/);
+
+  const { env } = createEnvironment();
+  const createdResponse = await handleAdminRequest(new Request("https://guide.example/api/concierge/admin/passport-links", {
+    method: "POST",
+    headers: { authorization: "Bearer admin_token_test_5500", "content-type": "application/json" },
+    body: JSON.stringify({ room: "5", expiresHours: 24, nonThaiConfirmed: true })
+  }), env, "/api/concierge/admin/passport-links");
+  const token = new URL((await createdResponse.json()).uploadUrl).hash.replace("#token=", "");
+  const invalid = await handlePassportGuestRequest(new Request("https://guide.example/api/passport-details", {
+    method: "POST",
+    headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+    body: JSON.stringify({ passportNumber: "TEST123", fullName: "Example Guest", birthday: "1990-01-02", nationality: "Exampleland", gender: "M", phoneNumber: "123", authorized: true })
+  }), env, "/api/passport-details");
+  assert.equal(invalid.status, 400);
+  assert.equal((await invalid.json()).error, "invalid_phone_number");
 });

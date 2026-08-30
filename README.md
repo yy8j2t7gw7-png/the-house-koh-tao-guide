@@ -1,4 +1,4 @@
-# Guest Guide Platform with AI Concierge — The House v5.11.42
+# Guest Guide Platform with AI Concierge — The House v5.11.43
 
 The House – Koh Tao guest guide is a production-oriented, mobile-first digital guest guide and concierge platform. It combines property information, curated island guidance, structured place and activity data, and centralized contact and booking routes.
 
@@ -17,6 +17,14 @@ The House – Koh Tao guest guide is a production-oriented, mobile-first digital
 - Model-powered, room-aware AI Concierge with controlled learning
 
 The Activities module contains 49 structured profiles covering diving, freediving, snorkelling, boat trips, beach experiences, kayaking, paddleboarding, hiking, viewpoints, climbing, yoga, Muay Thai, massage, cooking, wildlife, photography, night activities and rainy-day options.
+
+## v5.11.43 release focus
+
+v5.11.43 is a production-critical synchronization, messaging and registration release on deployed v5.11.42. The Airbnb synchronizer now checks recent Airbnb mail every five minutes, immediately posts trustworthy room/listing/code/date records to the existing protected reservation-sync endpoint, and reconciles all ten active private iCal feeds at least hourly even when no email change is detected. The complete 24-hour audit remains the only absence-based cancellation path, so partial fast/hourly syncs cannot mass-cancel good stays. The standalone Google Apps Script must be updated separately after the Worker is deployed.
+
+The five owner-confirmed approved Meta quick-action templates are now the only interactive mappings accepted by the all-template gate: `house_service_alert_actions_v3`, `house_booking_alert_actions_v2`, `house_luggage_alert_actions_v2`, `house_urgent_alert_actions_v2` and `house_lost_key_alert_actions_v2`. Visible buttons remain **Received** and **Resolved**, while the signed webhook command remains internal `RESOLVE`. Setting `WHATSAPP_STAFF_ACTIONS_ENABLED=false` still returns all alert kinds to the established buttonless templates.
+
+The secure passport form now offers the approved manual alternative to image upload. Option 2 collects exactly **passport number, full name, birthday, nationality, gender/sex as shown on the passport, and phone number**. It uses the same reservation-bound, expiring, single-use private token, stores the submission only in the private `PASSPORT_UPLOADS` bucket, follows the same maximum 14-day deletion lifecycle and never places the values in the AI Concierge, WhatsApp, learning data or normal operational logs.
 
 ## v5.11.42 release focus
 

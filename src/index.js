@@ -130,7 +130,7 @@ export default {
       return handleStayGuestRequest(request, env, url.pathname, ctx);
     }
 
-    if (url.pathname === "/api/passport-upload" || url.pathname === "/api/passport-upload/session") {
+    if (["/api/passport-upload", "/api/passport-upload/session", "/api/passport-details"].includes(url.pathname)) {
       return handlePassportGuestRequest(request, env, url.pathname);
     }
 

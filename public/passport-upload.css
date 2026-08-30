@@ -38,7 +38,7 @@
 .registration-method span{color:var(--passport-muted);font-size:12px;line-height:1.45}
 .registration-method.is-available{border-color:#98c7b4;background:var(--passport-soft)}
 .registration-method.is-pending{background:#f7f7f5;opacity:.75}
-#passportForm{margin-top:13px}
+#passportForm,#passportDetailsForm{margin-top:13px}
 .passport-session{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin-bottom:11px}
 .passport-session span{min-width:0;padding:9px;border:1px solid var(--passport-line);border-radius:10px;background:#fff;color:var(--passport-muted);font-size:11px;font-weight:800;overflow-wrap:anywhere}
 .passport-file{display:grid;gap:6px;padding:18px;border:2px dashed #9ec2b4;border-radius:14px;background:var(--passport-soft);cursor:pointer}
@@ -48,17 +48,25 @@
 .passport-file input{width:100%;margin-top:6px;font:inherit}
 .passport-confirm{display:flex;align-items:flex-start;gap:9px;margin:14px 0;color:var(--passport-muted);font-size:13px;line-height:1.45;cursor:pointer}
 .passport-confirm input{width:19px;height:19px;margin:1px 0 0;flex:0 0 auto;accent-color:var(--passport-accent)}
-#passportSubmit{width:100%;min-height:50px;border:1px solid var(--passport-accent);border-radius:12px;background:var(--passport-accent);color:#fff;font:inherit;font-weight:900;cursor:pointer}
-#passportSubmit:hover{background:#234f45}
-#passportSubmit:disabled{opacity:.55;cursor:wait}
+#passportSubmit,#passportDetailsSubmit{width:100%;min-height:50px;border:1px solid var(--passport-accent);border-radius:12px;background:var(--passport-accent);color:#fff;font:inherit;font-weight:900;cursor:pointer}
+#passportSubmit:hover,#passportDetailsSubmit:hover{background:#234f45}
+#passportSubmit:disabled,#passportDetailsSubmit:disabled{opacity:.55;cursor:wait}
+
+.registration-divider{display:flex;align-items:center;gap:10px;margin:17px 0 3px;color:var(--passport-muted);font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.08em}
+.registration-divider::before,.registration-divider::after{content:"";height:1px;background:var(--passport-line);flex:1}
+.passport-details-form{padding:16px;border:1px solid #b8d5c9;border-radius:14px;background:var(--passport-soft)}
+.passport-details-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.passport-details-grid label{display:grid;gap:6px;min-width:0;color:var(--passport-ink);font-size:13px;font-weight:800}
+.passport-details-grid input,.passport-details-grid select{width:100%;box-sizing:border-box;min-height:46px;padding:10px 11px;border:1px solid #b9cbc4;border-radius:10px;background:#fff;color:var(--passport-ink);font:inherit;font-weight:600}
+.passport-details-grid input::placeholder{color:#8b9893;font-weight:500}
 .passport-help{margin:16px 0 0;padding-top:13px;border-top:1px solid var(--passport-line);color:var(--passport-muted);font-size:12px;line-height:1.5}
 .passport-brand .language-switcher{position:absolute;right:0;top:7px}
-.passport-file:focus-within,.passport-confirm:focus-within,#passportSubmit:focus-visible{outline:3px solid rgba(47,111,95,.25);outline-offset:2px}
+.passport-file:focus-within,.passport-confirm:focus-within,.passport-details-form input:focus-visible,.passport-details-form select:focus-visible,#passportSubmit:focus-visible,#passportDetailsSubmit:focus-visible{outline:3px solid rgba(47,111,95,.25);outline-offset:2px}
 
 @media(max-width:650px){
   .passport-shell{width:min(100% - 18px,780px);padding-top:9px}
   .passport-card{padding:18px;border-radius:17px}
-  .passport-facts,.passport-privacy ul,.passport-session,.registration-methods{grid-template-columns:1fr}
+  .passport-facts,.passport-privacy ul,.passport-session,.registration-methods,.passport-details-grid{grid-template-columns:1fr}
   .passport-brand{padding-right:116px}
   .passport-brand .language-switcher-label{display:none}
   .passport-brand .language-switcher select{max-width:98px}

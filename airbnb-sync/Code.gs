@@ -29,13 +29,14 @@ var HOUSE_SYNC_SETTINGS = {
   timeZone: "Asia/Bangkok",
   fullGmailLookbackDays: 400,
   recentGmailLookbackDays: 2,
-  recentMessageOverlapMinutes: 10,
+  recentMessageOverlapMinutes: 20,
+  routineCalendarHours: 1,
   fullAuditHours: 24,
   futureDays: 400,
   calendarPastDays: 14,
   maximumFullThreads: 500,
   maximumRecentThreads: 100,
-  codePattern: /\b(?:HM|HMA|HMC|HMS|HMW)[A-Z0-9]{6,16}\b/gi,
+  codePattern: /\bHM[A-Z0-9]{6,18}\b/gi,
   datePattern: /^\d{4}-\d{2}-\d{2}$/
 };
 
@@ -60,6 +61,8 @@ function syncHouseReservationsInternal_(forceFullAudit) {
 
     var now = new Date();
     var lastSyncAt = validDate_(properties.getProperty("HOUSE_AIRBNB_LAST_SYNC_AT"));
+    var lastCalendarSyncAt = validDate_(properties.getProperty("HOUSE_AIRBNB_LAST_CALENDAR_AT"))
+      || validDate_(properties.getProperty("HOUSE_AIRBNB_LAST_CALENDAR_SYNC_AT"));
     var lastAuditAt = validDate_(properties.getProperty("HOUSE_AIRBNB_LAST_AUDIT_AT"));
     var fullAuditDue = forceFullAudit === true
       || !lastAuditAt
@@ -68,11 +71,27 @@ function syncHouseReservationsInternal_(forceFullAudit) {
       fullAudit: fullAuditDue,
       since: lastSyncAt
     });
+    var emailCodes = Object.keys(emailReservations);
 
-    // Routine hourly runs stop here when Airbnb has sent no new reservation
-    // message. The ten private calendars are fetched only after a change or
-    // during the complete daily audit, preserving shared Apps Script quota.
-    if (!fullAuditDue && Object.keys(emailReservations).length === 0) {
+    // Fast path for last-minute bookings: if the Airbnb email contains a
+    // confirmation code, listing and dates, write that reservation to the
+    // Worker immediately. This does not wait for Airbnb iCal propagation.
+    // complete=false guarantees an email-only partial update can never cancel
+    // an existing reservation.
+    if (emailCodes.length) {
+      var fastPathPosted = postEmailReservations_(origin, syncToken, emailReservations);
+      if (fastPathPosted > 0) properties.setProperty("HOUSE_AIRBNB_LAST_FAST_PATH_AT", now.toISOString());
+    }
+
+    // Safety net: reconcile all ten iCal feeds at least hourly even when the
+    // Gmail detector sees nothing. A detected Airbnb message also forces an
+    // immediate calendar reconciliation, while the daily full audit is the
+    // only path allowed to mark a feed complete for absence-based cancellation.
+    var calendarReconcileDue = fullAuditDue
+      || emailCodes.length > 0
+      || !lastCalendarSyncAt
+      || now.getTime() - lastCalendarSyncAt.getTime() >= HOUSE_SYNC_SETTINGS.routineCalendarHours * 3600000;
+    if (!calendarReconcileDue) {
       properties.setProperty("HOUSE_AIRBNB_LAST_SYNC_AT", now.toISOString());
       return;
     }
@@ -97,6 +116,9 @@ function syncHouseReservationsInternal_(forceFullAudit) {
       );
     });
     properties.setProperty("HOUSE_AIRBNB_LAST_SYNC_AT", now.toISOString());
+    properties.setProperty("HOUSE_AIRBNB_LAST_CALENDAR_AT", now.toISOString());
+    // Keep the earlier development property updated for a smooth migration.
+    properties.setProperty("HOUSE_AIRBNB_LAST_CALENDAR_SYNC_AT", now.toISOString());
     if (fullAuditDue) {
       properties.setProperty("HOUSE_AIRBNB_LAST_AUDIT_AT", now.toISOString());
       properties.setProperty("HOUSE_AIRBNB_LAST_DIAGNOSTICS", diagnostics.slice(0, 80).join("\n"));
@@ -110,7 +132,7 @@ function installHouseReservationTrigger() {
   ScriptApp.getProjectTriggers().forEach(function (trigger) {
     if (trigger.getHandlerFunction() === "syncHouseReservations") ScriptApp.deleteTrigger(trigger);
   });
-  ScriptApp.newTrigger("syncHouseReservations").timeBased().everyHours(1).create();
+  ScriptApp.newTrigger("syncHouseReservations").timeBased().everyMinutes(5).create();
   runFullHouseReservationAudit();
 }
 
@@ -120,10 +142,12 @@ function readAirbnbReservationEmails_(options) {
   var since = options.since instanceof Date && !isNaN(options.since.getTime())
     ? new Date(options.since.getTime() - HOUSE_SYNC_SETTINGS.recentMessageOverlapMinutes * 60000)
     : null;
+  // Search all recent Airbnb mail instead of relying on specific subject/body
+  // wording. Airbnb can change labels without warning; the code parser below
+  // remains the authoritative filter.
   var query = [
     "newer_than:" + (fullAudit ? HOUSE_SYNC_SETTINGS.fullGmailLookbackDays : HOUSE_SYNC_SETTINGS.recentGmailLookbackDays) + "d",
-    "from:airbnb.com",
-    "(\"confirmation code\" OR \"reservation code\" OR \"confirmation\")"
+    "from:airbnb.com"
   ].join(" ");
   var threads = GmailApp.search(
     query,
@@ -144,7 +168,7 @@ function readAirbnbReservationEmails_(options) {
       });
       if (!codes.length) return;
       var listing = listingFromText_(combined);
-      var dates = datesFromEmail_(combined);
+      var dates = datesFromEmail_(combined, message.getDate());
       var cancelled = /\b(?:cancelled|canceled|reservation was cancelled|booking was cancelled)\b/i.test(combined);
       codes.forEach(function (code) {
       var record = {
@@ -162,6 +186,40 @@ function readAirbnbReservationEmails_(options) {
     });
   });
   return byCode;
+}
+
+function roomFromListingId_(listingId) {
+  var rooms = Object.keys(HOUSE_AIRBNB_LISTINGS);
+  for (var index = 0; index < rooms.length; index += 1) {
+    if (HOUSE_AIRBNB_LISTINGS[rooms[index]] === String(listingId || "")) return rooms[index];
+  }
+  return "";
+}
+
+function postEmailReservations_(origin, token, emailsByCode) {
+  var byRoom = {};
+  Object.keys(emailsByCode || {}).forEach(function (code) {
+    var item = emailsByCode[code] || {};
+    var room = roomFromListingId_(item.listingId);
+    if (!room || !item.checkInDate || !item.checkOutDate) return;
+    if (!byRoom[room]) byRoom[room] = [];
+    byRoom[room].push({
+      confirmationCode: code,
+      guestFirstName: item.guestFirstName || "",
+      checkInDate: item.checkInDate,
+      checkOutDate: item.checkOutDate,
+      status: item.status === "cancelled" ? "cancelled" : "confirmed",
+      sourceRef: item.sourceRef || ""
+    });
+  });
+  var posted = 0;
+  Object.keys(byRoom).forEach(function (room) {
+    var records = dedupeRecords_(byRoom[room]);
+    if (!records.length) return;
+    postRoomSync_(origin, token, room, HOUSE_AIRBNB_LISTINGS[room], records, false);
+    posted += records.length;
+  });
+  return posted;
 }
 
 function readRoomCalendar_(calendarUrl, room, emailsByCode, fullAudit) {
@@ -245,45 +303,126 @@ function postRoomSync_(origin, token, room, listingId, records, complete) {
 }
 
 function listingFromText_(text) {
-  var roomMatch = String(text).match(/\bRoom\s*(1|2|3|4|5|6|8|9|10|11)\b[^\n\r]{0,60}\bThe House\b/i);
+  var source = String(text || "");
+  var roomMatch = source.match(/\bRoom\s*(1|2|3|4|5|6|8|9|10|11)\b[^\n\r]{0,100}\bThe House\b/i)
+    || source.match(/\bThe House\b[^\n\r]{0,100}\bRoom\s*(1|2|3|4|5|6|8|9|10|11)\b/i);
   if (roomMatch) return HOUSE_AIRBNB_LISTINGS[roomMatch[1]] || "";
   var listingIds = Object.keys(HOUSE_AIRBNB_LISTINGS);
   for (var index = 0; index < listingIds.length; index += 1) {
-    if (String(text).indexOf(listingIds[index]) >= 0) return listingIds[index];
+    if (source.indexOf(listingIds[index]) >= 0) return listingIds[index];
   }
   return "";
 }
 
-function datesFromEmail_(text) {
-  var checkIn = String(text).match(/(?:check[- ]?in|arrival)[^\n\r]{0,80}?(\d{4}-\d{2}-\d{2})/i);
-  var checkOut = String(text).match(/(?:check[- ]?out|departure)[^\n\r]{0,80}?(\d{4}-\d{2}-\d{2})/i);
-  if (!checkIn || !checkOut) {
-    checkIn = labeledEnglishDate_(text, /(?:check[- ]?in|arrival)/i);
-    checkOut = labeledEnglishDate_(text, /(?:check[- ]?out|departure)/i);
+function datesFromEmail_(text, referenceDate) {
+  var source = String(text || "");
+  var reference = referenceDate instanceof Date && !isNaN(referenceDate.getTime()) ? referenceDate : new Date();
+  var checkIn = source.match(/(?:check[- ]?in|arrival)[^\n\r]{0,80}?(\d{4}-\d{2}-\d{2})/i);
+  var checkOut = source.match(/(?:check[- ]?out|departure)[^\n\r]{0,80}?(\d{4}-\d{2}-\d{2})/i);
+  var checkInDate = checkIn && HOUSE_SYNC_SETTINGS.datePattern.test(checkIn[1]) ? checkIn[1] : "";
+  var checkOutDate = checkOut && HOUSE_SYNC_SETTINGS.datePattern.test(checkOut[1]) ? checkOut[1] : "";
+  if (!checkInDate) checkInDate = labeledEnglishDate_(source, /(?:check[- ]?in|arrival)/i, reference);
+  if (!checkOutDate) checkOutDate = labeledEnglishDate_(source, /(?:check[- ]?out|departure)/i, reference);
+  if (!checkInDate || !checkOutDate) {
+    var range = englishDateRange_(source, reference);
+    checkInDate = checkInDate || range.checkInDate;
+    checkOutDate = checkOutDate || range.checkOutDate;
   }
-  return {
-    checkInDate: typeof checkIn === "string" ? checkIn : (checkIn && HOUSE_SYNC_SETTINGS.datePattern.test(checkIn[1]) ? checkIn[1] : ""),
-    checkOutDate: typeof checkOut === "string" ? checkOut : (checkOut && HOUSE_SYNC_SETTINGS.datePattern.test(checkOut[1]) ? checkOut[1] : "")
-  };
+  if (checkInDate && checkOutDate && checkOutDate <= checkInDate) {
+    var adjusted = addYearsToIsoDate_(checkOutDate, 1);
+    if (adjusted > checkInDate) checkOutDate = adjusted;
+  }
+  return { checkInDate: checkInDate, checkOutDate: checkOutDate };
 }
 
-function labeledEnglishDate_(text, labelPattern) {
+function englishDateRange_(text, referenceDate) {
+  var monthNames = "Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?";
+  var source = String(text || "").replace(/\s+/g, " ");
+  var reference = referenceDate instanceof Date && !isNaN(referenceDate.getTime()) ? referenceDate : new Date();
+  var monthFirst = source.match(new RegExp("(" + monthNames + ")\\s+(\\d{1,2})(?:st|nd|rd|th)?\\s*(?:-|–|—|to)\\s*(?:(" + monthNames + ")\\s+)?(\\d{1,2})(?:st|nd|rd|th)?(?:,)?(?:\\s+(\\d{4}))?", "i"));
+  if (monthFirst) {
+    var first = monthFirst[5]
+      ? isoDate_(monthFirst[5], monthFirst[1], monthFirst[2])
+      : inferredYearIsoDate_(monthFirst[1], monthFirst[2], reference);
+    var secondMonth = monthFirst[3] || monthFirst[1];
+    var second = monthFirst[5]
+      ? isoDate_(monthFirst[5], secondMonth, monthFirst[4])
+      : inferredYearIsoDate_(secondMonth, monthFirst[4], reference);
+    if (first && second && second <= first) second = addYearsToIsoDate_(second, 1);
+    return { checkInDate: first, checkOutDate: second };
+  }
+  var dayFirst = source.match(new RegExp("(\\d{1,2})(?:st|nd|rd|th)?\\s+(" + monthNames + ")\\s*(?:-|–|—|to)\\s*(\\d{1,2})(?:st|nd|rd|th)?\\s+(" + monthNames + ")(?:,)?(?:\\s+(\\d{4}))?", "i"));
+  if (dayFirst) {
+    var firstDay = dayFirst[5]
+      ? isoDate_(dayFirst[5], dayFirst[2], dayFirst[1])
+      : inferredYearIsoDate_(dayFirst[2], dayFirst[1], reference);
+    var secondDay = dayFirst[5]
+      ? isoDate_(dayFirst[5], dayFirst[4], dayFirst[3])
+      : inferredYearIsoDate_(dayFirst[4], dayFirst[3], reference);
+    if (firstDay && secondDay && secondDay <= firstDay) secondDay = addYearsToIsoDate_(secondDay, 1);
+    return { checkInDate: firstDay, checkOutDate: secondDay };
+  }
+  return { checkInDate: "", checkOutDate: "" };
+}
+
+function labeledEnglishDate_(text, labelPattern, referenceDate) {
   var monthNames = "Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?";
   var source = String(text || "");
   var label = source.search(labelPattern);
   if (label < 0) return "";
   var nearby = source.slice(label, label + 180).replace(/\s+/g, " ");
-  var monthFirst = nearby.match(new RegExp("(" + monthNames + ")\\s+(\\d{1,2})(?:st|nd|rd|th)?(?:,)?\\s+(\\d{4})", "i"));
-  if (monthFirst) return isoDate_(monthFirst[3], monthFirst[1], monthFirst[2]);
-  var dayFirst = nearby.match(new RegExp("(\\d{1,2})(?:st|nd|rd|th)?\\s+(" + monthNames + ")(?:,)?\\s+(\\d{4})", "i"));
-  return dayFirst ? isoDate_(dayFirst[3], dayFirst[2], dayFirst[1]) : "";
+  var reference = referenceDate instanceof Date && !isNaN(referenceDate.getTime()) ? referenceDate : new Date();
+  var weekday = "(?:Mon(?:day)?|Tue(?:sday)?|Wed(?:nesday)?|Thu(?:rsday)?|Fri(?:day)?|Sat(?:urday)?|Sun(?:day)?),?\\s+";
+  var monthFirst = nearby.match(new RegExp("(?:" + weekday + ")?(" + monthNames + ")\\s+(\\d{1,2})(?:st|nd|rd|th)?(?:,)?(?:\\s+(\\d{4}))?", "i"));
+  if (monthFirst) {
+    return monthFirst[3]
+      ? isoDate_(monthFirst[3], monthFirst[1], monthFirst[2])
+      : inferredYearIsoDate_(monthFirst[1], monthFirst[2], reference);
+  }
+  var dayFirst = nearby.match(new RegExp("(?:" + weekday + ")?(\\d{1,2})(?:st|nd|rd|th)?\\s+(" + monthNames + ")(?:,)?(?:\\s+(\\d{4}))?", "i"));
+  if (!dayFirst) return "";
+  return dayFirst[3]
+    ? isoDate_(dayFirst[3], dayFirst[2], dayFirst[1])
+    : inferredYearIsoDate_(dayFirst[2], dayFirst[1], reference);
+}
+
+function inferredYearIsoDate_(monthName, day, referenceDate) {
+  var reference = referenceDate instanceof Date && !isNaN(referenceDate.getTime()) ? referenceDate : new Date();
+  var referenceYear = Number(Utilities.formatDate(reference, HOUSE_SYNC_SETTINGS.timeZone, "yyyy"));
+  var referenceIso = Utilities.formatDate(reference, HOUSE_SYNC_SETTINGS.timeZone, "yyyy-MM-dd");
+  var current = isoDate_(referenceYear, monthName, day);
+  if (!current) return "";
+  // Airbnb can omit the year. Prefer the current-year date unless it is more
+  // than the calendar look-back window behind the message; otherwise use the
+  // next year. This keeps same-day/last-minute bookings immediate and handles
+  // December-to-January stays without guessing a far-past year.
+  var currentTime = Date.parse(current + "T00:00:00Z");
+  var referenceTime = Date.parse(referenceIso + "T00:00:00Z");
+  if (currentTime < referenceTime - HOUSE_SYNC_SETTINGS.calendarPastDays * 86400000) {
+    return isoDate_(referenceYear + 1, monthName, day);
+  }
+  return current;
+}
+
+function addYearsToIsoDate_(value, years) {
+  var match = String(value || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return "";
+  var nextYear = Number(match[1]) + Number(years || 0);
+  return validIsoDateParts_(nextYear, Number(match[2]), Number(match[3]));
+}
+
+function validIsoDateParts_(year, month, day) {
+  if (!Number.isInteger(Number(year)) || !Number.isInteger(Number(month)) || !Number.isInteger(Number(day))) return "";
+  var date = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day)));
+  if (date.getUTCFullYear() !== Number(year) || date.getUTCMonth() + 1 !== Number(month) || date.getUTCDate() !== Number(day)) return "";
+  return String(year).padStart(4, "0") + "-" + String(month).padStart(2, "0") + "-" + String(day).padStart(2, "0");
 }
 
 function isoDate_(year, monthName, day) {
   var months = { jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12 };
   var month = months[String(monthName || "").slice(0, 3).toLowerCase()];
-  if (!month || Number(day) < 1 || Number(day) > 31) return "";
-  return String(year) + "-" + String(month).padStart(2, "0") + "-" + String(day).padStart(2, "0");
+  if (!month) return "";
+  return validIsoDateParts_(Number(year), month, Number(day));
 }
 
 function matchEmailToCalendar_(emailsByCode, listingId, checkInDate, checkOutDate) {

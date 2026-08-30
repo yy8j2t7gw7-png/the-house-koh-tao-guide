@@ -247,17 +247,18 @@
   function renderPassportUploads(items) {
     passportUploads.replaceChildren();
     if (!items.length) {
-      passportUploads.appendChild(element("div", "concierge-admin-empty", "No passport images are stored."));
+      passportUploads.appendChild(element("div", "concierge-admin-empty", "No passport submissions are stored."));
       return;
     }
     items.forEach((item) => {
       const card = element("article", "concierge-admin-registration-item");
       card.dataset.registrationId = item.id;
       const size = `${Math.max(1, Math.round(Number(item.sizeBytes || 0) / 1024))} KB`;
+      const submissionLabel = item.mediaType === "application/json" ? "Passport details" : "Passport image";
       card.append(
         element("strong", "", `Room ${item.room}`),
         element("span", "", `Received: ${bangkokDate(item.uploadedAt)}`),
-        element("span", "", `${item.mediaType} · ${size}`),
+        element("span", "", `${submissionLabel} · ${size}`),
         element("span", "", `Automatic deletion: ${bangkokDate(item.deleteAfter)}`)
       );
       const actions = element("div", "concierge-admin-card-actions");
@@ -945,9 +946,11 @@
         if (!response.ok) throw new Error("download_failed");
         const url = URL.createObjectURL(await response.blob());
         const link = document.createElement("a");
-        const extensions = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/heic": "heic" };
+        const contentType = String(response.headers.get("content-type") || "").split(";")[0].trim().toLowerCase();
+        const extensions = { "application/json": "json", "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/heic": "heic" };
         link.href = url;
-        link.download = `passport-${id}.${extensions[response.headers.get("content-type")] || "image"}`;
+        const extension = extensions[contentType] || "bin";
+        link.download = `${contentType === "application/json" ? "passport-details" : "passport-image"}-${id}.${extension}`;
         link.click();
         window.setTimeout(() => URL.revokeObjectURL(url), 1000);
       } else if (button.dataset.passportAction === "reminded") {

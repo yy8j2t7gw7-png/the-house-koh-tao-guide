@@ -10805,6 +10805,22 @@ test("v5.11.45 approved Meta action templates use the exact new BODY orders and 
   assert.equal(fallback.payload.template.components.length, 1);
 });
 
+test("Owner Admin routes Room 7 direct-stay creation through the real admin router", async () => {
+  const { env, store } = createEnvironment();
+  const response = await handleAdminRequest(new Request("https://guide.example/api/concierge/admin/direct-stays", {
+    method: "POST",
+    headers: { authorization: "Bearer admin_token_test_5500", "content-type": "application/json" },
+    body: JSON.stringify({ room: "7", checkInDate: "2026-08-31", checkOutDate: "2026-09-05" })
+  }), env, "/api/concierge/admin/direct-stays");
+  assert.equal(response.status, 200);
+  const created = await response.json();
+  assert.equal(created.room, "7");
+  assert.match(created.confirmationCode, /^HS[A-Z0-9]{10}$/);
+  assert.equal(created.welcomeUrl, "https://guide.example/room/7");
+  assert.equal(store.stayReservations.at(-1).provider, "direct");
+  assert.equal(store.stayReservations.at(-1).listingId, "house-direct-7");
+});
+
 test("Room 7 is guide-enabled for direct testing while remaining excluded from Airbnb synchronization", async () => {
   assert.equal(Object.values(listingRoomMap).includes("7"), false);
 

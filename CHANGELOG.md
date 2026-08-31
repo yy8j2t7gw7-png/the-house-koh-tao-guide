@@ -12,8 +12,11 @@ All notable changes to The House – Koh Tao guest guide are recorded here.
 - Allows mobile passport image selection through camera, photo library or file picker by removing forced `capture="environment"`.
 - Hardens deterministic routine-pest recognition for common singular/plural terms, one-word reports and conservative typo variants while preserving existing pest messaging and protected alert routing.
 - Makes individual **Recent key-box reset activity** history entries deletable from authenticated Owner Admin; deletion cannot alter key-box code, current rotation-lock state, spare-key release history or lost-key authorization.
-- Preserves unrelated guest-facing Concierge messaging/usability and all other stable workflows.
-- Complete suite: **219 passed, 0 failed**.
+- Adds an authenticated Owner Admin reset for accidental/test `in_person_pending` registration states with zero received passport evidence.
+- Removes the guest-facing in-person passport choice and disables the guest in-person endpoint; non-Thai guest self-service is now secure passport image upload only.
+- Keeps the authenticated Owner Admin in-person exception directly available from reservation operations even before a guest has declared nationality or a non-Thai count; the owner supplies the required non-Thai count (1–10) when starting the exception.
+- Preserves Thai-only exemption, complete non-Thai guest counting, secure upload, existing in-person records/admin completion/reset, and all unrelated guest-facing Concierge messaging/usability and stable workflows.
+- Complete suite: **223 passed, 0 failed**.
 - Commercialization rule: keep new functionality reusable/white-label friendly and avoid new The House-specific core assumptions; defer broad multi-tenant platformization to a deliberate later phase.
 
 ## v5.11.42 — Broad Human Routing + Stay Extension Booking

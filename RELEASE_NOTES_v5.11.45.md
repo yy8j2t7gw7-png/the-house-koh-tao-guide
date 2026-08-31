@@ -72,7 +72,7 @@ This release deliberately leaves the following v5.11.42 behavior unchanged:
 - cleaning workflow and state isolation;
 - luggage and booking collectors;
 - 24/7 protected lost-key flow;
-- passport registration model from v5.11.42;
+- Thai-only exemption, complete non-Thai guest counting, secure passport upload security and authenticated Owner Admin in-person exception handling;
 - Admin and direct/walk-in stays;
 - Wi-Fi, snorkeling and French Kiss Divers behavior;
 - `EXPLORE_ENABLED=false`;
@@ -85,9 +85,16 @@ The same stable-base v5.11.45 branch also includes these narrowly authorized cor
 - removes the guest-facing manual passport-details Option 2 placeholder while preserving Thai-only registration and secure passport image upload;
 - removes forced mobile camera capture so the device/browser can offer camera plus existing photo/file selection;
 - broadens deterministic routine-pest recognition (including common singular/plural and typo variants) while preserving existing pest messages, protected alert delivery and dangerous-animal emergency separation;
-- adds an authenticated **Delete** action for individual **Recent key-box reset activity** history entries in Owner Admin. This history-only deletion cannot alter the current rotation lock, key-box code, spare-key release history or lost-key authorization state.
+- adds an authenticated **Delete** action for individual **Recent key-box reset activity** history entries in Owner Admin. This history-only deletion cannot alter the current rotation lock, key-box code, spare-key release history or lost-key authorization state;
+- adds the owner-only safe reset for a pending in-person registration with zero received passport evidence;
+- removes the guest-facing **Provide passports in person** choice and disables `/api/stay/in-person-passports` for guest self-service;
+- keeps **All overnight guests are Thai** unchanged;
+- keeps the complete non-Thai overnight guest count unchanged;
+- makes secure passport image upload the only guest-facing method for non-Thai registration;
+- keeps an authenticated Owner Admin **Use in-person registration** exception directly available before a guest has declared nationality or a non-Thai count; Owner Admin supplies the required non-Thai overnight guest count (1–10), followed by the existing protected completion/reset controls.
+- blocks starting that exception over received passport evidence or an already completed passport/in-person registration.
 
-Current complete automated suite: **219 passed / 0 failed**.
+Current complete automated suite: **223 passed / 0 failed**.
 
 ### Commercialization / white-label guardrail
 
@@ -95,7 +102,7 @@ The project remains intended for eventual sale/adaptation to other hospitality b
 
 ## Validation
 
-Focused/full automated suite: **219 passed / 0 failed**.
+Focused/full automated suite: **223 passed / 0 failed**.
 
 The two legacy assertions made calendar-independent for repeatable validation are test-only changes: Monday closed-hours housekeeping acknowledgement and the four-letter `Sept` date abbreviation. No runtime behavior was changed for those assertions.
 

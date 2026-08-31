@@ -544,6 +544,18 @@
         extension.append(label, button);
         card.appendChild(extension);
       }
+      if (
+        item.id &&
+        !["passport_complete", "in_person_pending", "in_person_complete"].includes(item.registrationStatus)
+      ) {
+        const actions = element("div", "concierge-admin-card-actions");
+        const startInPerson = element("button", "secondary", "Use in-person registration");
+        startInPerson.type = "button";
+        startInPerson.dataset.inPersonAction = "start";
+        startInPerson.dataset.currentPassportCount = Number(item.requiredPassports) > 0 ? String(item.requiredPassports) : "1";
+        actions.appendChild(startInPerson);
+        card.appendChild(actions);
+      }
       if (item.registrationStatus === "in_person_pending" && item.id) {
         const actions = element("div", "concierge-admin-card-actions");
         const complete = element("button", "secondary", "Confirm in-person registration complete");
@@ -866,6 +878,29 @@
     const card = button.closest("[data-reservation-id]");
     if (button.dataset.inPersonAction) {
       if (!card?.dataset.reservationId) return;
+      if (button.dataset.inPersonAction === "start") {
+        const currentCount = button.dataset.currentPassportCount || "1";
+        const countValue = window.prompt("Number of non-Thai overnight guests whose original passports will be checked in person (1–10):", currentCount);
+        if (countValue === null) return;
+        const nonThaiGuestCount = Number(String(countValue).trim());
+        if (!Number.isInteger(nonThaiGuestCount) || nonThaiGuestCount < 1 || nonThaiGuestCount > 10) {
+          window.alert("Enter a whole number from 1 to 10.");
+          return;
+        }
+        if (!window.confirm(`Use the staff-only in-person registration exception for ${nonThaiGuestCount} non-Thai overnight guest${nonThaiGuestCount === 1 ? "" : "s"}? Continue only when the guest cannot or will not use secure passport upload and the original passports will be checked in person.`)) return;
+        button.disabled = true;
+        try {
+          await api("/api/concierge/admin/in-person-registration/start", {
+            method: "POST",
+            body: JSON.stringify({ reservationId: card.dataset.reservationId, nonThaiGuestCount, confirmed: true })
+          });
+          await loadOverview();
+        } catch (_error) {
+          button.disabled = false;
+          window.alert("The in-person registration exception could not be started.");
+        }
+        return;
+      }
       if (button.dataset.inPersonAction === "reset") {
         if (!window.confirm("Reset this pending in-person registration? The guest will need to choose the registration option again. Continue?")) return;
         button.disabled = true;

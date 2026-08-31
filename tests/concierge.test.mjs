@@ -212,6 +212,24 @@ function createStore() {
       return { ok: true, ...value };
     },
     async getStayRegistrationStatus(reservationId) { return this.registrationStatuses.get(reservationId) || null; },
+    async startInPersonRegistration(reservationId, requiredPassports, updatedAt) {
+      const reservation = this.stayReservations.find((item) => item.id === reservationId && item.status === "confirmed");
+      if (!reservation) return { ok: false, error: "reservation_not_found" };
+      if (!Number.isInteger(requiredPassports) || requiredPassports < 1 || requiredPassports > 10) {
+        return { ok: false, error: "invalid_non_thai_guest_count" };
+      }
+      const current = this.registrationStatuses.get(reservationId) || {};
+      const receivedPassports = this.passportRecords.filter(
+        (item) => item.reservationId === reservationId && item.status === "uploaded"
+      ).length;
+      if (Math.max(Number(current.receivedPassports) || 0, receivedPassports) > 0 || ["passport_complete", "in_person_complete"].includes(current.status)) {
+        return { ok: false, error: "registration_evidence_exists" };
+      }
+      await this.closePendingPassportLinksForReservation(reservationId, updatedAt);
+      const value = { guestType: "foreign", requiredPassports, receivedPassports: 0, status: "in_person_pending", updatedAt };
+      this.registrationStatuses.set(reservationId, value);
+      return { ok: true, ...value };
+    },
     async setInPersonRegistrationStatus(reservationId, status, updatedAt) {
       const current = this.registrationStatuses.get(reservationId);
       if (!current || current.guestType !== "foreign" || Number(current.requiredPassports) < 1) {
@@ -3004,8 +3022,6 @@ test("critical emergency and registration wording is reviewed in every guest lan
     "Thai nationals do not need to complete this registration.",
     "Thai national?",
     "You do not need to upload a passport for this registration. Please tell The House so the unused request can be closed.",
-    "Provide passports in person",
-    "I will provide all passports in person",
     "Your in-person passport handover is noted. Please bring the original passports of every non-Thai adult and child staying overnight. The private room guide will open after our team has checked them and completed the TM30 registration.",
     "Luggage storage",
     "Tuesday–Sunday during office working hours, or at Bamboo Beach Bar from 11:00 AM. No storage is currently available before 11:00 AM.",
@@ -3029,11 +3045,10 @@ test("critical emergency and registration wording is reviewed in every guest lan
     "No passport information is needed when every overnight guest is Thai.",
     "Passport information is required for every non-Thai adult and child staying overnight.",
     "Required for Thailand's TM30 registration. Passport images stay private and are deleted within 14 days—or sooner after processing.",
-    "Choose a passport option",
     "One passport is required for each non-Thai adult and child staying overnight.",
     "Use one private, single-use form per guest. Images are deleted within 14 days—or sooner.",
-    "Bring every required original passport to The House. No upload is needed.",
-    "Used only for TM30 registration. Your room guide opens after all passports are uploaded or checked in person.",
+    "Upload passports securely",
+    "Used only for TM30 registration. Your room guide opens after all required passports are uploaded.",
     "Choice saved. Bring every required original passport to The House. The guide opens after our team completes the check and TM30 registration.",
     "Emergency help remains available without verification.",
     "24-hour spare-key help",
@@ -7626,7 +7641,7 @@ test("private guide stays locked until every declared non-Thai overnight guest p
   assert.equal((await complete.json()).accessGranted, true);
 });
 
-test("foreign guests may present every passport in person and only admin completion unlocks the guide", async () => {
+test("guest in-person passport choice is disabled while authenticated admin can use the in-person exception", async () => {
   const { env, store } = createEnvironment();
   await handleReservationSyncRequest(new Request("https://guide.example/api/reservations/sync", {
     method: "POST",
@@ -7649,35 +7664,43 @@ test("foreign guests may present every passport in person and only admin complet
     headers: { origin: "https://guide.example", cookie, "content-type": "application/json" },
     body: JSON.stringify({ nationality: "foreign", nonThaiGuestCount: 2, allNonThaiGuestsIncluded: true })
   }), env, "/api/stay/nationality");
-  const handover = await handleStayGuestRequest(new Request("https://guide.example/api/stay/in-person-passports", {
+
+  const guestHandover = await handleStayGuestRequest(new Request("https://guide.example/api/stay/in-person-passports", {
     method: "POST",
     headers: { origin: "https://guide.example", cookie, "content-type": "application/json" },
     body: JSON.stringify({ allPassportsInPerson: true })
   }), env, "/api/stay/in-person-passports");
-  const pendingBody = await handover.json();
-  assert.equal(handover.status, 200);
-  assert.equal(pendingBody.registrationStatus, "in_person_pending");
-  assert.equal(pendingBody.requiredPassports, 2);
-  assert.equal(pendingBody.accessGranted, false);
+  assert.equal(guestHandover.status, 404);
+  assert.equal((await guestHandover.json()).error, "not_found");
+
+  const stillUploadPending = await handleStayGuestRequest(new Request("https://guide.example/api/stay/status?room=3", {
+    headers: { origin: "https://guide.example", cookie }
+  }), env, "/api/stay/status");
+  const uploadPendingBody = await stillUploadPending.json();
+  assert.equal(uploadPendingBody.registrationStatus, "passport_pending");
+  assert.equal(uploadPendingBody.accessGranted, false);
+
+  const unauthorizedStart = await handleAdminRequest(new Request("https://guide.example/api/concierge/admin/in-person-registration/start", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ reservationId: store.stayReservations[0].id, nonThaiGuestCount: 2, confirmed: true })
+  }), env, "/api/concierge/admin/in-person-registration/start");
+  assert.equal(unauthorizedStart.status, 401);
+
+  const started = await handleAdminRequest(new Request("https://guide.example/api/concierge/admin/in-person-registration/start", {
+    method: "POST",
+    headers: { authorization: "Bearer admin_token_test_5500", "content-type": "application/json" },
+    body: JSON.stringify({ reservationId: store.stayReservations[0].id, nonThaiGuestCount: 2, confirmed: true })
+  }), env, "/api/concierge/admin/in-person-registration/start");
+  assert.equal(started.status, 200);
+  const startedBody = await started.json();
+  assert.equal(startedBody.status, "in_person_pending");
+  assert.equal(startedBody.requiredPassports, 2);
 
   const locked = await handleStayGuestRequest(new Request("https://guide.example/api/stay/status?room=3", {
     headers: { origin: "https://guide.example", cookie }
   }), env, "/api/stay/status");
   assert.equal((await locked.json()).accessGranted, false);
-
-  const unauthorized = await handleAdminRequest(new Request("https://guide.example/api/concierge/admin/in-person-registration", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ reservationId: store.stayReservations[0].id, registrationCompleted: true })
-  }), env, "/api/concierge/admin/in-person-registration");
-  assert.equal(unauthorized.status, 401);
-
-  const premature = await handleAdminRequest(new Request("https://guide.example/api/concierge/admin/in-person-registration", {
-    method: "POST",
-    headers: { authorization: "Bearer admin_token_test_5500", "content-type": "application/json" },
-    body: JSON.stringify({ reservationId: store.stayReservations[0].id })
-  }), env, "/api/concierge/admin/in-person-registration");
-  assert.equal(premature.status, 400);
 
   const completed = await handleAdminRequest(new Request("https://guide.example/api/concierge/admin/in-person-registration", {
     method: "POST",
@@ -7687,11 +7710,62 @@ test("foreign guests may present every passport in person and only admin complet
   assert.equal(completed.status, 200);
   assert.equal((await completed.json()).status, "in_person_complete");
 
+  const cannotRestartCompleted = await handleAdminRequest(new Request("https://guide.example/api/concierge/admin/in-person-registration/start", {
+    method: "POST",
+    headers: { authorization: "Bearer admin_token_test_5500", "content-type": "application/json" },
+    body: JSON.stringify({ reservationId: store.stayReservations[0].id, nonThaiGuestCount: 2, confirmed: true })
+  }), env, "/api/concierge/admin/in-person-registration/start");
+  assert.equal(cannotRestartCompleted.status, 409);
+
   const unlocked = await handleStayGuestRequest(new Request("https://guide.example/api/stay/status?room=3", {
     headers: { origin: "https://guide.example", cookie }
   }), env, "/api/stay/status");
   assert.equal((await unlocked.json()).accessGranted, true);
   assert.equal(store.registrationStatuses.get(store.stayReservations[0].id).requiredPassports, 2);
+});
+
+
+test("admin can start in-person registration before the guest makes any nationality or guest-count declaration", async () => {
+  const { env, store } = createEnvironment();
+  await handleReservationSyncRequest(new Request("https://guide.example/api/reservations/sync", {
+    method: "POST",
+    headers: { authorization: "Bearer reservation_sync_test_5500", "content-type": "application/json" },
+    body: JSON.stringify({
+      room: "5",
+      listingId: "1504732379219115485",
+      records: [{ confirmationCode: "HMINPERSONFRESH5", checkInDate: "2027-08-13", checkOutDate: "2027-08-16" }]
+    })
+  }), env);
+  const verified = await handleStayGuestRequest(new Request("https://guide.example/api/stay/verify", {
+    method: "POST",
+    headers: { origin: "https://guide.example", "content-type": "application/json" },
+    body: JSON.stringify({ room: "5", confirmationCode: "HMINPERSONFRESH5" })
+  }), env, "/api/stay/verify", null, new Date("2027-08-14T08:00:00.000Z"));
+  const cookie = verified.headers.get("set-cookie").split(";")[0];
+
+  const before = await handleStayGuestRequest(new Request("https://guide.example/api/stay/status?room=5", {
+    headers: { origin: "https://guide.example", cookie }
+  }), env, "/api/stay/status");
+  assert.equal((await before.json()).registrationStatus, "not_started");
+
+  const started = await handleAdminRequest(new Request("https://guide.example/api/concierge/admin/in-person-registration/start", {
+    method: "POST",
+    headers: { authorization: "Bearer admin_token_test_5500", "content-type": "application/json" },
+    body: JSON.stringify({ reservationId: store.stayReservations[0].id, nonThaiGuestCount: 3, confirmed: true })
+  }), env, "/api/concierge/admin/in-person-registration/start");
+  assert.equal(started.status, 200);
+  const startedBody = await started.json();
+  assert.equal(startedBody.status, "in_person_pending");
+  assert.equal(startedBody.guestType, "foreign");
+  assert.equal(startedBody.requiredPassports, 3);
+
+  const after = await handleStayGuestRequest(new Request("https://guide.example/api/stay/status?room=5", {
+    headers: { origin: "https://guide.example", cookie }
+  }), env, "/api/stay/status");
+  const afterBody = await after.json();
+  assert.equal(afterBody.registrationStatus, "in_person_pending");
+  assert.equal(afterBody.requiredPassports, 3);
+  assert.equal(afterBody.accessGranted, false);
 });
 
 
@@ -7718,12 +7792,12 @@ test("admin can reset a pending in-person registration with zero received passpo
     headers: { origin: "https://guide.example", cookie, "content-type": "application/json" },
     body: JSON.stringify({ nationality: "foreign", nonThaiGuestCount: 3, allNonThaiGuestsIncluded: true })
   }), env, "/api/stay/nationality");
-  const handover = await handleStayGuestRequest(new Request("https://guide.example/api/stay/in-person-passports", {
+  const handover = await handleAdminRequest(new Request("https://guide.example/api/concierge/admin/in-person-registration/start", {
     method: "POST",
-    headers: { origin: "https://guide.example", cookie, "content-type": "application/json" },
-    body: JSON.stringify({ allPassportsInPerson: true })
-  }), env, "/api/stay/in-person-passports");
-  assert.equal((await handover.json()).registrationStatus, "in_person_pending");
+    headers: { authorization: "Bearer admin_token_test_5500", "content-type": "application/json" },
+    body: JSON.stringify({ reservationId: store.stayReservations[0].id, nonThaiGuestCount: 3, confirmed: true })
+  }), env, "/api/concierge/admin/in-person-registration/start");
+  assert.equal((await handover.json()).status, "in_person_pending");
 
   const unauthorized = await handleAdminRequest(new Request("https://guide.example/api/concierge/admin/registration-reset", {
     method: "POST",
@@ -7800,8 +7874,13 @@ test("admin registration reset is blocked after passport evidence exists or in-p
   assert.equal((await complete.json()).error, "in_person_handover_not_pending");
 });
 
-test("admin UI exposes registration reset only with the pending in-person action", async () => {
+test("admin UI keeps the in-person exception available before a guest declares a non-Thai count", async () => {
   const script = await readFile(new URL("../public/concierge-admin.js", import.meta.url), "utf8");
+  assert.match(script, /Use in-person registration/);
+  assert.match(script, /Number of non-Thai overnight guests whose original passports will be checked in person/);
+  assert.match(script, /nonThaiGuestCount/);
+  assert.match(script, /dataset\.inPersonAction = "start"/);
+  assert.match(script, /\/api\/concierge\/admin\/in-person-registration\/start/);
   assert.match(script, /item\.registrationStatus === "in_person_pending"/);
   assert.match(script, /Reset guest registration/);
   assert.match(script, /dataset\.inPersonAction = "reset"/);
@@ -7901,6 +7980,39 @@ test("Durable Object SQLite schema initializes every operational table used by a
     "spare_key_room_state",
     "translation_cache"
   ]) assert.ok(tables.includes(required), `${required} was not initialized`);
+
+  await store.syncStayReservations({
+    provider: "airbnb",
+    listingId: "1504732379219115485",
+    room: "5",
+    complete: false,
+    syncId: "schema-in-person",
+    syncedAt: "2027-08-14T08:00:00.000Z",
+    records: [{
+      confirmationCodeHash: "schema-in-person-code-hash",
+      checkInDate: "2027-08-13",
+      checkOutDate: "2027-08-16",
+      sourceRefHash: ""
+    }]
+  });
+  const schemaReservation = database.prepare(
+    "SELECT id FROM stay_reservations WHERE confirmation_code_hash = ?"
+  ).get("schema-in-person-code-hash");
+  const schemaInPerson = await store.startInPersonRegistration(
+    schemaReservation.id,
+    3,
+    "2027-08-14T08:01:00.000Z"
+  );
+  assert.equal(schemaInPerson.ok, true);
+  assert.equal(schemaInPerson.status, "in_person_pending");
+  assert.equal(schemaInPerson.requiredPassports, 3);
+  const schemaRegistration = await store.getStayRegistrationStatus(schemaReservation.id);
+  assert.equal(schemaRegistration.guestType, "foreign");
+  assert.equal(schemaRegistration.requiredPassports, 3);
+  assert.equal(schemaRegistration.status, "in_person_pending");
+  database.prepare("DELETE FROM stay_registration_requirements WHERE reservation_id = ?").run(schemaReservation.id);
+  database.prepare("DELETE FROM stay_registration_status WHERE reservation_id = ?").run(schemaReservation.id);
+  database.prepare("DELETE FROM stay_reservations WHERE id = ?").run(schemaReservation.id);
 
   const overview = await store.getAdminOverview();
   assert.equal(overview.totals.openAlerts, 0);
@@ -8586,14 +8698,16 @@ test("secure guest access uses the shared header and links discreetly to owner l
   assert.doesNotMatch(inlineStyles, /\.nav\s+a\s*\{/);
   assert.match(html, /<a class="admin-login-link admin-footer-link" href="\/concierge-admin">Admin Login<\/a>/);
   assert.match(html, /id="createPassportUpload"/);
-  assert.match(html, /id="providePassportsInPerson"/);
+  assert.doesNotMatch(html, /id="providePassportsInPerson"/);
+  assert.doesNotMatch(html, /Provide passports in person/);
+  assert.doesNotMatch(html, /I will provide all passports in person/);
   assert.match(html, /Enter your stay code to unlock your private room guide/);
   assert.match(html, /Passport information is required for every non-Thai adult and child staying overnight/);
-  assert.match(html, /Bring every required original passport to The House/);
+  assert.match(html, /Used only for TM30 registration\. Your room guide opens after all required passports are uploaded\./);
   assert.doesNotMatch(html, /Room location, arrival photos, Wi-Fi and stay instructions remain protected until this is complete/);
   assert.doesNotMatch(html, /This confirms that this permanent link belongs to your booked room/);
   const entry = await readFile(new URL("../public/registration-entry.js", import.meta.url), "utf8");
-  assert.match(entry, /\/api\/stay\/in-person-passports/);
+  assert.doesNotMatch(entry, /\/api\/stay\/in-person-passports/);
 });
 
 test("Bangkok booking dates normalize without inventing a missing time", () => {

@@ -2,7 +2,7 @@
 
 ## Purpose and current scope
 
-TM30 accommodation registration concerns foreign guests. Thai nationals do not need to complete this registration or upload a passport. For every non-Thai adult or child staying overnight—not only the person who made the Airbnb booking—v5.11.6 requires either one reservation-bound private passport submission per person or presentation of every required original passport to The House in person before private room information opens. The concise seven-language registration flow keeps documents out of the AI Concierge, Airbnb messages and WhatsApp.
+TM30 accommodation registration concerns foreign guests. Thai nationals do not need to complete this registration or upload a passport. For every non-Thai adult or child staying overnight—not only the person who made the Airbnb booking—guest self-service requires one reservation-bound private passport image submission per person before private room information opens. In-person verification remains a staff-authorized exception in Owner Admin only when a guest cannot or will not use secure upload. The concise seven-language registration flow keeps documents out of the AI Concierge, Airbnb messages and WhatsApp.
 
 This scope was checked against the Thai Immigration Bureau TM30 service description, which states that Section 38 notification applies when accommodation is provided to foreign nationals. Operational wording must remain limited to this exemption and must not expand into unsourced legal advice.
 
@@ -14,8 +14,8 @@ The current authoritative House information confirms the passport-photo requirem
 2. The guest enters that code. The Worker verifies it against the protected synchronized listing, room and reservation dates.
 3. A verified guest chooses either **Foreign or mixed group** or **All overnight guests are Thai nationals**. The application does not infer nationality.
 4. For a foreign or mixed group, the guest declares the total number of non-Thai adults and children staying overnight and confirms that the number includes everyone, not only the booking guest.
-5. A foreign or mixed group chooses secure upload or in-person presentation. Each passport-button use creates a new random, reservation- and room-bound, 72-hour, single-use upload link automatically. No owner action is required to create it.
-6. The in-person option stores only the reservation workflow status, declared passport count and timestamps. It closes unused pending upload links and stores no passport details.
+5. A foreign or mixed group uses secure passport upload. Each passport-button use creates a new random, reservation- and room-bound, 72-hour, single-use upload link automatically. No owner action is required to create it.
+6. If a guest cannot or will not use secure upload, an authorized owner may start the in-person registration exception directly from the reservation in Owner Admin, even before the guest has made a nationality/count declaration. The owner supplies the number of non-Thai overnight guests (1–10). This stores only the reservation workflow status, required passport count and timestamps, closes unused pending upload links and stores no passport details.
 7. The private guide remains locked until one passport has been received for every declared non-Thai overnight guest, or until an authorized owner confirms that every required original passport was checked in person and the manual TM30 registration was completed.
 8. Each upload form's 256-bit token is carried only in the URL fragment; fragments are not sent in the initial page request or referrer.
 9. The registration page explains why the information is needed and how it is handled. It does not open WhatsApp.

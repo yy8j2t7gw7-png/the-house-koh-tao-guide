@@ -106,7 +106,7 @@
         "does a thai guest need to register",
         "thai national registration"
       ],
-      "answer": "Thai nationals do not need to complete this TM30 Immigration accommodation registration. After verifying the stay on the permanent Room page, select ‘All overnight guests are Thai nationals’ only if the exemption applies to everyone staying overnight on that reservation. If any non-Thai guest is staying overnight, provide the passport for each one through the secure upload option or present all required passports to The House in person.",
+      "answer": "Thai nationals do not need to complete this TM30 Immigration accommodation registration. After verifying the stay on the permanent Room page, select ‘All overnight guests are Thai nationals’ only if the exemption applies to everyone staying overnight on that reservation. If any non-Thai guest is staying overnight, securely upload one passport image for each non-Thai overnight guest.",
       "actions": []
     },
     {
@@ -508,7 +508,7 @@
         "tm30 registration",
         "send passport information"
       ],
-      "answer": "This TM30 Immigration accommodation registration applies only to non-Thai guests. Thai nationals do not need to complete it. Open your permanent Room welcome page and verify the Airbnb confirmation code shown in your trip details or the private House stay code provided for a direct booking. Passport information is required for every non-Thai person staying overnight—not only the person who made the booking. You may either use one secure upload form per passport, or choose to present the original passports of every non-Thai overnight adult and child to The House in person. Do not send passport information through this chat or WhatsApp. Securely uploaded passport images are automatically deleted 14 days after upload, or sooner after processing. The private room guide opens after all uploads are received, or after the team confirms the in-person passport check and registration are complete.",
+      "answer": "This TM30 Immigration accommodation registration applies only to non-Thai guests. Thai nationals do not need to complete it. Open your permanent Room welcome page and verify the Airbnb confirmation code shown in your trip details or the private House stay code provided for a direct booking. Passport information is required for every non-Thai person staying overnight—not only the person who made the booking. Use one secure upload form per passport. Do not send passport information through this chat or WhatsApp. Securely uploaded passport images are automatically deleted 14 days after upload, or sooner after processing. If you cannot use the secure upload, contact The House team for assistance. The private room guide opens after the required registration is complete.",
       "actions": [
         {
           "label": "Continue Securely",
@@ -530,7 +530,7 @@
         "secure passport link",
         "extra guest"
       ],
-      "answer": "The House needs passport information for every non-Thai overnight visitor so we can complete the required TM30 Immigration accommodation registration. Thai nationals do not need to complete this registration. After verifying the Airbnb confirmation code or private House stay code on the permanent Room page, either use the secure upload option once for each non-Thai overnight guest, or choose to present the original passports of every non-Thai overnight adult and child to The House in person. Do not put passport information in this chat or send it through WhatsApp.",
+      "answer": "The House needs passport information for every non-Thai overnight visitor so we can complete the required TM30 Immigration accommodation registration. Thai nationals do not need to complete this registration. After verifying the Airbnb confirmation code or private House stay code on the permanent Room page, use the secure upload option once for each non-Thai overnight guest. Do not put passport information in this chat or send it through WhatsApp. If you cannot use the secure upload, contact The House team for assistance.",
       "actions": [
         {
           "label": "Continue Securely",

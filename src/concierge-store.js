@@ -1505,6 +1505,63 @@ export class ConciergeStore extends DurableObject {
     ))[0] || null;
   }
 
+  async startInPersonRegistration(reservationId, requiredPassports, nowValue) {
+    const cleanReservationId = cleanText(reservationId, 100);
+    const required = Number(requiredPassports);
+    if (!Number.isInteger(required) || required < 1 || required > 10) {
+      return { ok: false, error: "invalid_non_thai_guest_count" };
+    }
+    const reservation = rows(this.ctx.storage.sql.exec(
+      "SELECT id FROM stay_reservations WHERE id = ? AND status = 'confirmed' LIMIT 1",
+      cleanReservationId
+    ))[0];
+    if (!reservation) return { ok: false, error: "reservation_not_found" };
+
+    const current = rows(this.ctx.storage.sql.exec(
+      `SELECT guest_type AS guestType, required_passports AS requiredPassports,
+              received_passports AS receivedPassports, status
+       FROM stay_registration_requirements WHERE reservation_id = ? LIMIT 1`,
+      cleanReservationId
+    ))[0];
+    const receivedRow = rows(this.ctx.storage.sql.exec(
+      `SELECT COUNT(*) AS total
+       FROM passport_reservation_links l
+       JOIN passport_uploads p ON p.id = l.passport_id
+       WHERE l.reservation_id = ? AND p.status = 'uploaded'`,
+      cleanReservationId
+    ))[0];
+    const received = Math.max(Number(current?.receivedPassports) || 0, Number(receivedRow?.total) || 0);
+    if (received > 0 || current?.status === "passport_complete" || current?.status === "in_person_complete") {
+      return { ok: false, error: "registration_evidence_exists" };
+    }
+
+    const updatedAt = cleanText(nowValue, 40) || new Date().toISOString();
+    await this.closePendingPassportLinksForReservation(cleanReservationId, updatedAt);
+    this.ctx.storage.sql.exec(
+      `INSERT INTO stay_registration_requirements
+       (reservation_id, guest_type, required_passports, received_passports, status, updated_at)
+       VALUES (?, 'foreign', ?, 0, 'in_person_pending', ?)
+       ON CONFLICT(reservation_id) DO UPDATE SET
+         guest_type = 'foreign',
+         required_passports = excluded.required_passports,
+         received_passports = 0,
+         status = 'in_person_pending',
+         updated_at = excluded.updated_at`,
+      cleanReservationId,
+      required,
+      updatedAt
+    );
+    await this.setStayRegistrationStatus(cleanReservationId, "in_person_pending", updatedAt);
+    return {
+      ok: true,
+      guestType: "foreign",
+      requiredPassports: required,
+      receivedPassports: 0,
+      status: "in_person_pending",
+      updatedAt
+    };
+  }
+
   async setInPersonRegistrationStatus(reservationId, status, nowValue) {
     const nextStatus = status === "in_person_complete" ? "in_person_complete"
       : status === "in_person_pending" ? "in_person_pending" : "";

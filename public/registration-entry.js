@@ -13,8 +13,6 @@
   const progressText = document.getElementById("passportProgressText");
   const registrationStatus = document.getElementById("registrationStatus");
   const passportButton = document.getElementById("createPassportUpload");
-  const inPersonButton = document.getElementById("providePassportsInPerson");
-  const inPersonChoice = document.getElementById("inPersonPassportChoice");
   const progressTitle = document.getElementById("passportProgressTitle");
   const thaiButton = document.getElementById("confirmThaiNational");
   const foreignButton = document.getElementById("startForeignRegistration");
@@ -46,10 +44,8 @@
     passportProgress: "{received} of {required} required passport submissions received.",
     allPassportsRequired: "One passport is required for each non-Thai adult and child staying overnight.",
     passportError: "A secure upload form could not be opened. Please try again.",
-    passportOptions: "Choose a passport option",
-    inPersonSaving: "Recording your choice to provide passports in person…",
+    passportOptions: "Upload passports securely",
     inPersonPending: "Choice saved. Bring every required original passport to The House. The guide opens after our team completes the check and TM30 registration.",
-    inPersonError: "The in-person passport option could not be saved. Please try again.",
     nationalityError: "The guest type could not be saved. Please check the information and try again.",
     countError: "Enter the number of non-Thai people who will stay overnight in this room.",
     allGuestsError: "Confirm that the number includes every non-Thai adult and child staying overnight, not only the Airbnb booking guest.",
@@ -121,8 +117,7 @@
       const received = Number(data.receivedPassports) || 0;
       const required = Math.max(1, Number(data.requiredPassports) || 1);
       const inPersonPending = data.registrationStatus === "in_person_pending";
-      if (progressTitle) progressTitle.textContent = inPersonPending ? "Passports will be provided in person" : "Choose a passport option";
-      if (inPersonChoice) inPersonChoice.hidden = inPersonPending;
+      if (progressTitle) progressTitle.textContent = inPersonPending ? "Passports will be provided in person" : "Upload passports securely";
       if (progressText) progressText.textContent = inPersonPending
         ? messages.inPersonPending
         : `${format(messages.passportProgress, { received, required })} ${messages.allPassportsRequired}`;
@@ -261,22 +256,6 @@
     } catch (_error) {
       setStatus(registrationStatus, messages.passportError, "error");
       setBusy(passportButton, false);
-    }
-  });
-
-  inPersonButton?.addEventListener("click", async () => {
-    setBusy(inPersonButton, true);
-    setStatus(registrationStatus, messages.inPersonSaving, "working");
-    try {
-      const data = await api("/api/stay/in-person-passports", {
-        method: "POST",
-        body: JSON.stringify({ allPassportsInPerson: true })
-      });
-      showRegistration(data);
-      setStatus(registrationStatus, messages.inPersonPending, "success");
-    } catch (_error) {
-      setStatus(registrationStatus, messages.inPersonError, "error");
-      setBusy(inPersonButton, false);
     }
   });
 

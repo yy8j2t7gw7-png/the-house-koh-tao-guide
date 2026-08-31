@@ -593,6 +593,7 @@
     if (!rotationActivity.length) keyRotationActivity.appendChild(element("div", "concierge-admin-empty", "No key-box reset activity recorded yet."));
     rotationActivity.forEach((item) => {
       const card = element("article", "concierge-admin-registration-item");
+      card.dataset.rotationActivityId = item.id;
       const description = item.eventType === "rotation_cleared_controlled_test"
         ? "Rotation lock cleared — controlled owner test; existing physical code retained."
         : "Rotation lock cleared — physical key-box code rotated.";
@@ -601,6 +602,12 @@
         element("span", "", description),
         element("span", "", bangkokDate(item.createdAt))
       );
+      const actions = element("div", "concierge-admin-card-actions");
+      const remove = element("button", "danger", "Delete");
+      remove.type = "button";
+      remove.dataset.rotationActivityDelete = "";
+      actions.appendChild(remove);
+      card.appendChild(actions);
       keyRotationActivity.appendChild(card);
     });
   }
@@ -915,6 +922,32 @@
     } catch (_error) {
       buttons.forEach((item) => { item.disabled = false; });
       window.alert("The key-box reset confirmation could not be saved. The rotation lock remains active.");
+    }
+  });
+
+  keyRotationActivity.addEventListener("click", async (event) => {
+    const button = event.target.closest("[data-rotation-activity-delete]");
+    if (!button) return;
+    const card = button.closest("[data-rotation-activity-id]");
+    const eventId = card?.dataset.rotationActivityId || "";
+    if (!eventId) return;
+    const confirmed = await confirmAdminAction({
+      title: "Delete key-box reset activity?",
+      message: "This removes only this admin activity-history entry. It does not change the current key-box code or rotation-lock state.",
+      confirmLabel: "Delete",
+      danger: true
+    });
+    if (!confirmed) return;
+    button.disabled = true;
+    try {
+      await api("/api/concierge/admin/spare-key-rotation-activity/delete", {
+        method: "POST",
+        body: JSON.stringify({ eventId, confirmed: true })
+      });
+      await loadOverview();
+    } catch (_error) {
+      button.disabled = false;
+      window.alert("The key-box reset activity could not be deleted.");
     }
   });
 

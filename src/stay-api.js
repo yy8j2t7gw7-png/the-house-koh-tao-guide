@@ -856,6 +856,20 @@ export async function handleStayAdminRequest(request, env, path, store) {
     return json(result, result.ok ? 200 : 409);
   }
 
+  if (path === "/api/concierge/admin/spare-key-rotation-activity/delete") {
+    if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405, { allow: "POST" });
+    const body = await readJson(request, 2_000);
+    const eventId = String(body?.eventId || "");
+    if (!/^key_reset_[A-Za-z0-9-]{20,}$/.test(eventId) || body?.confirmed !== true) {
+      return json({ error: "invalid_request" }, 400);
+    }
+    if (typeof store.deleteSpareKeyRotationActivity !== "function") {
+      return json({ error: "rotation_activity_delete_unavailable" }, 503);
+    }
+    const result = await store.deleteSpareKeyRotationActivity(eventId);
+    return json(result, result.ok ? 200 : 404);
+  }
+
   if (path === "/api/concierge/admin/spare-key-rotation") {
     if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405, { allow: "POST" });
     const body = await readJson(request, 2_000);

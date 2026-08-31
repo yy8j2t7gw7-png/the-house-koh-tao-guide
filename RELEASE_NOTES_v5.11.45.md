@@ -78,9 +78,24 @@ This release deliberately leaves the following v5.11.42 behavior unchanged:
 - `EXPLORE_ENABLED=false`;
 - all guest-facing HTML/CSS/chat UX.
 
+## Current v5.11.45 follow-up corrections
+
+The same stable-base v5.11.45 branch also includes these narrowly authorized corrections without changing unrelated guest workflows:
+
+- removes the guest-facing manual passport-details Option 2 placeholder while preserving Thai-only registration and secure passport image upload;
+- removes forced mobile camera capture so the device/browser can offer camera plus existing photo/file selection;
+- broadens deterministic routine-pest recognition (including common singular/plural and typo variants) while preserving existing pest messages, protected alert delivery and dangerous-animal emergency separation;
+- adds an authenticated **Delete** action for individual **Recent key-box reset activity** history entries in Owner Admin. This history-only deletion cannot alter the current rotation lock, key-box code, spare-key release history or lost-key authorization state.
+
+Current complete automated suite: **219 passed / 0 failed**.
+
+### Commercialization / white-label guardrail
+
+The project remains intended for eventual sale/adaptation to other hospitality businesses. Narrow fixes should avoid adding new property-specific assumptions to reusable core logic. The current architecture remains suitable for per-property white-label deployments; a later deliberate platformization phase should centralize property-specific branding, rooms, timezone/hours, fees, contacts, integration mappings and local knowledge, and add an explicit tenant/property boundary for true multi-property SaaS.
+
 ## Validation
 
-Focused/full automated suite: **214 passed / 0 failed**.
+Focused/full automated suite: **219 passed / 0 failed**.
 
 The two legacy assertions made calendar-independent for repeatable validation are test-only changes: Monday closed-hours housekeeping acknowledgement and the four-letter `Sept` date abbreviation. No runtime behavior was changed for those assertions.
 

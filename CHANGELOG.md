@@ -4,14 +4,17 @@ All notable changes to The House – Koh Tao guest guide are recorded here.
 
 ## v5.11.45 — Fix Unstable Version
 
-- Rebuilt directly from stable v5.11.42; later passport/registration experiments are excluded.
+- Rebuilt directly from stable v5.11.42; later unstable passport/registration branches are excluded.
 - Airbnb host mail is checked every 5 minutes; trustworthy active-listing + HM-code + stay-date records can immediately create/update the protected stay with `complete:false` without waiting for iCal.
-- All ten active Airbnb calendars (Rooms 1–6 and 8–11) are reconciled at least hourly; Room 7 remains excluded.
-- The 24-hour full audit remains the only cancellation-capable complete-feed path.
-- Activates `house_service_alert_actions_v3`, `house_booking_alert_actions_v2`, `house_luggage_alert_actions_v2`, `house_urgent_alert_actions_v2` and `house_lost_key_alert_actions_v2`.
-- Visible Meta buttons are **Received / Resolved** while internal commands remain `RECEIVED` / `RESOLVE`.
-- No Concierge routing, chat usability, passport behavior, UI, cleaning, luggage, emergency, lost-key or Explore logic changes.
-- Complete suite: **214 passed, 0 failed**.
+- All ten active Airbnb calendars (Rooms 1–6 and 8–11) reconcile at least hourly; Room 7 remains excluded; the 24-hour full audit remains the only cancellation-capable complete-feed path.
+- Activates `house_service_alert_actions_v3`, `house_booking_alert_actions_v2`, `house_luggage_alert_actions_v2`, `house_urgent_alert_actions_v2` and `house_lost_key_alert_actions_v2`; visible buttons remain **Received / Resolved** while internal commands remain `RECEIVED` / `RESOLVE`.
+- Removes the guest-facing manual passport-details Option 2 placeholder while preserving Thai-only registration and secure passport image upload.
+- Allows mobile passport image selection through camera, photo library or file picker by removing forced `capture="environment"`.
+- Hardens deterministic routine-pest recognition for common singular/plural terms, one-word reports and conservative typo variants while preserving existing pest messaging and protected alert routing.
+- Makes individual **Recent key-box reset activity** history entries deletable from authenticated Owner Admin; deletion cannot alter key-box code, current rotation-lock state, spare-key release history or lost-key authorization.
+- Preserves unrelated guest-facing Concierge messaging/usability and all other stable workflows.
+- Complete suite: **219 passed, 0 failed**.
+- Commercialization rule: keep new functionality reusable/white-label friendly and avoid new The House-specific core assumptions; defer broad multi-tenant platformization to a deliberate later phase.
 
 ## v5.11.42 — Broad Human Routing + Stay Extension Booking
 

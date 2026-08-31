@@ -147,7 +147,7 @@ function createStore() {
           .map(([room]) => ({ room, rotationRequired: true })),
         rotationActivity: this.spareKeyEvents
           .filter((item) => ["rotation_cleared_controlled_test", "rotation_cleared_physical"].includes(item.eventType))
-          .map(({ room, eventType, createdAt }) => ({ room, eventType, createdAt }))
+          .map(({ id, room, eventType, createdAt }) => ({ id, room, eventType, createdAt }))
           .reverse()
       };
     },
@@ -295,6 +295,13 @@ function createStore() {
       const index = this.spareKeyEvents.findIndex((item) => item.id === id && !item.codeReleased);
       if (index >= 0) this.spareKeyEvents.splice(index, 1);
       return { ok: true };
+    },
+    async deleteSpareKeyRotationActivity(id) {
+      const index = this.spareKeyEvents.findIndex((item) =>
+        item.id === id && ["rotation_cleared_controlled_test", "rotation_cleared_physical"].includes(item.eventType));
+      if (index < 0) return { ok: false, error: "rotation_activity_not_found" };
+      this.spareKeyEvents.splice(index, 1);
+      return { ok: true, id };
     },
     async confirmSpareKeyRotation(room, rotationConfirmedAt, resetMode) {
       if (!["controlled_test", "physical_rotation"].includes(resetMode)) return { ok: false, error: "invalid_reset_mode" };
@@ -1580,6 +1587,56 @@ test("protected owner reset distinguishes controlled tests from physical rotatio
   } finally {
     globalThis.fetch = originalFetch;
   }
+});
+
+test("admin can delete one key-box reset activity entry without changing rotation state or lost-key history", async () => {
+  const now = new Date("2026-08-31T05:30:00.000Z");
+  const { env, store } = createEnvironment({ CONCIERGE_ADMIN_TOKEN: "owner-admin-token" });
+  store.spareKeyRotations.set("3", true);
+  const activityId = `key_reset_${crypto.randomUUID()}`;
+  const releaseId = `key_reset_${crypto.randomUUID()}`;
+  store.spareKeyEvents.push(
+    {
+      id: releaseId, reservationId: `stay_${crypto.randomUUID()}`, room: "3",
+      eventType: "verified_spare_key_release", feeAccepted: true, codeReleased: true,
+      requestHash: "synthetic-request", alertId: "synthetic-alert", createdAt: now.toISOString()
+    },
+    {
+      id: activityId, reservationId: `stay_${crypto.randomUUID()}`, room: "3",
+      eventType: "rotation_cleared_controlled_test", feeAccepted: false, codeReleased: false,
+      requestHash: "", alertId: "", createdAt: now.toISOString()
+    }
+  );
+
+  const unauthorized = await handleAdminRequest(new Request(
+    "https://guide.example/api/concierge/admin/spare-key-rotation-activity/delete",
+    { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ eventId: activityId, confirmed: true }) }
+  ), env, "/api/concierge/admin/spare-key-rotation-activity/delete");
+  assert.equal(unauthorized.status, 401);
+
+  const invalidTarget = await handleAdminRequest(new Request(
+    "https://guide.example/api/concierge/admin/spare-key-rotation-activity/delete",
+    {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: "Bearer owner-admin-token" },
+      body: JSON.stringify({ eventId: releaseId, confirmed: true })
+    }
+  ), env, "/api/concierge/admin/spare-key-rotation-activity/delete");
+  assert.equal(invalidTarget.status, 404);
+
+  const deleted = await handleAdminRequest(new Request(
+    "https://guide.example/api/concierge/admin/spare-key-rotation-activity/delete",
+    {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: "Bearer owner-admin-token" },
+      body: JSON.stringify({ eventId: activityId, confirmed: true })
+    }
+  ), env, "/api/concierge/admin/spare-key-rotation-activity/delete");
+  assert.equal(deleted.status, 200);
+  assert.equal((await deleted.json()).ok, true);
+  assert.equal(store.spareKeyEvents.some((item) => item.id === activityId), false);
+  assert.equal(store.spareKeyEvents.some((item) => item.id === releaseId), true);
+  assert.equal(store.spareKeyRotations.get("3"), true);
 });
 
 test("medical emergencies offer Koh Tao Rescue first and 1669 second", async () => {
@@ -2883,6 +2940,11 @@ test("owner dashboard major sections are independently collapsible, persistent a
   assert.match(script, /confirmationPhrase = controlledTest \? "KEEP EXISTING CODE" : "CODE ROTATED"/);
   assert.match(script, /rotation_cleared_controlled_test/);
   assert.match(script, /existing physical code retained/);
+  assert.match(script, /dataset\.rotationActivityId = item\.id/);
+  assert.match(script, /dataset\.rotationActivityDelete = ""/);
+  assert.match(script, /Delete key-box reset activity\?/);
+  assert.match(script, /does not change the current key-box code or rotation-lock state/);
+  assert.match(script, /spare-key-rotation-activity\/delete/);
 
   assert.match(styles, /summary:focus-visible/);
   assert.match(styles, /\.concierge-admin-section-head\{[^}]*min-height:52px/);

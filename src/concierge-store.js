@@ -1733,6 +1733,25 @@ export class ConciergeStore extends DurableObject {
     return { ok: true };
   }
 
+  async deleteSpareKeyRotationActivity(id) {
+    const eventId = cleanText(id, 100);
+    const existing = rows(this.ctx.storage.sql.exec(
+      `SELECT id FROM spare_key_events
+       WHERE id = ?
+         AND event_type IN ('rotation_cleared_controlled_test', 'rotation_cleared_physical')
+       LIMIT 1`,
+      eventId
+    ))[0] || null;
+    if (!existing) return { ok: false, error: "rotation_activity_not_found" };
+    this.ctx.storage.sql.exec(
+      `DELETE FROM spare_key_events
+       WHERE id = ?
+         AND event_type IN ('rotation_cleared_controlled_test', 'rotation_cleared_physical')`,
+      eventId
+    );
+    return { ok: true, id: eventId };
+  }
+
   async confirmSpareKeyRotation(room, nowValue, resetMode) {
     const now = cleanText(nowValue, 40) || new Date().toISOString();
     const mode = ["controlled_test", "physical_rotation"].includes(resetMode) ? resetMode : "";
@@ -1836,7 +1855,7 @@ export class ConciergeStore extends DurableObject {
        ORDER BY updated_at DESC`
     )).map((item) => ({ ...item, rotationRequired: Boolean(item.rotationRequired) }));
     const rotationActivity = rows(this.ctx.storage.sql.exec(
-      `SELECT room, event_type AS eventType, created_at AS createdAt
+      `SELECT id, room, event_type AS eventType, created_at AS createdAt
        FROM spare_key_events
        WHERE event_type IN ('rotation_cleared_controlled_test', 'rotation_cleared_physical')
        ORDER BY created_at DESC LIMIT 20`

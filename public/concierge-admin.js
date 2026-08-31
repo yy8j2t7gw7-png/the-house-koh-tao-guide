@@ -549,7 +549,10 @@
         const complete = element("button", "secondary", "Confirm in-person registration complete");
         complete.type = "button";
         complete.dataset.inPersonAction = "complete";
-        actions.appendChild(complete);
+        const reset = element("button", "secondary", "Reset guest registration");
+        reset.type = "button";
+        reset.dataset.inPersonAction = "reset";
+        actions.append(complete, reset);
         card.appendChild(actions);
       }
       container.appendChild(card);
@@ -863,6 +866,21 @@
     const card = button.closest("[data-reservation-id]");
     if (button.dataset.inPersonAction) {
       if (!card?.dataset.reservationId) return;
+      if (button.dataset.inPersonAction === "reset") {
+        if (!window.confirm("Reset this pending in-person registration? The guest will need to choose the registration option again. Continue?")) return;
+        button.disabled = true;
+        try {
+          await api("/api/concierge/admin/registration-reset", {
+            method: "POST",
+            body: JSON.stringify({ reservationId: card.dataset.reservationId, confirmed: true })
+          });
+          await loadOverview();
+        } catch (_error) {
+          button.disabled = false;
+          window.alert("The guest registration could not be reset.");
+        }
+        return;
+      }
       if (!window.confirm("Confirm only after every required non-Thai overnight guest passport has been checked in person and the TM30 registration has been completed. Continue?")) return;
       button.disabled = true;
       try {

@@ -1541,6 +1541,37 @@ export class ConciergeStore extends DurableObject {
     };
   }
 
+  async resetPendingInPersonRegistration(reservationId, nowValue) {
+    const cleanReservationId = cleanText(reservationId, 100);
+    const current = rows(this.ctx.storage.sql.exec(
+      `SELECT guest_type AS guestType, required_passports AS requiredPassports,
+              received_passports AS receivedPassports, status
+       FROM stay_registration_requirements WHERE reservation_id = ? LIMIT 1`,
+      cleanReservationId
+    ))[0];
+    if (!current || current.status !== "in_person_pending") {
+      return { ok: false, error: "in_person_handover_not_pending" };
+    }
+    const receivedRow = rows(this.ctx.storage.sql.exec(
+      `SELECT COUNT(*) AS total
+       FROM passport_reservation_links l
+       JOIN passport_uploads p ON p.id = l.passport_id
+       WHERE l.reservation_id = ? AND p.status = 'uploaded'`,
+      cleanReservationId
+    ))[0];
+    const received = Math.max(Number(current.receivedPassports) || 0, Number(receivedRow?.total) || 0);
+    if (received > 0) return { ok: false, error: "registration_reset_requires_staff_review" };
+
+    const updatedAt = cleanText(nowValue, 40) || new Date().toISOString();
+    await this.closePendingPassportLinksForReservation(cleanReservationId, updatedAt);
+    this.ctx.storage.sql.exec(
+      "DELETE FROM stay_registration_requirements WHERE reservation_id = ?",
+      cleanReservationId
+    );
+    await this.setStayRegistrationStatus(cleanReservationId, "not_started", updatedAt);
+    return { ok: true, status: "not_started", updatedAt };
+  }
+
   async closePendingPassportLinksForReservation(reservationId, nowValue) {
     const now = cleanText(nowValue, 40) || new Date().toISOString();
     this.ctx.storage.sql.exec(

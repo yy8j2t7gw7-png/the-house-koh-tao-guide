@@ -227,6 +227,21 @@ function createStore() {
       this.registrationStatuses.set(reservationId, value);
       return { ok: true, ...value };
     },
+    async resetPendingInPersonRegistration(reservationId, updatedAt) {
+      const current = this.registrationStatuses.get(reservationId);
+      if (!current || current.status !== "in_person_pending") {
+        return { ok: false, error: "in_person_handover_not_pending" };
+      }
+      const receivedPassports = this.passportRecords.filter(
+        (item) => item.reservationId === reservationId && item.status === "uploaded"
+      ).length;
+      if (Math.max(Number(current.receivedPassports) || 0, receivedPassports) > 0) {
+        return { ok: false, error: "registration_reset_requires_staff_review" };
+      }
+      await this.closePendingPassportLinksForReservation(reservationId, updatedAt);
+      this.registrationStatuses.set(reservationId, { status: "not_started", updatedAt });
+      return { ok: true, status: "not_started", updatedAt };
+    },
     async closePendingPassportLinksForReservation(reservationId, updatedAt) {
       this.passportRecords
         .filter((item) => item.reservationId === reservationId && item.status === "pending")
@@ -7677,6 +7692,121 @@ test("foreign guests may present every passport in person and only admin complet
   }), env, "/api/stay/status");
   assert.equal((await unlocked.json()).accessGranted, true);
   assert.equal(store.registrationStatuses.get(store.stayReservations[0].id).requiredPassports, 2);
+});
+
+
+test("admin can reset a pending in-person registration with zero received passports back to not started", async () => {
+  const { env, store } = createEnvironment();
+  await handleReservationSyncRequest(new Request("https://guide.example/api/reservations/sync", {
+    method: "POST",
+    headers: { authorization: "Bearer reservation_sync_test_5500", "content-type": "application/json" },
+    body: JSON.stringify({
+      room: "5",
+      listingId: "1504732379219115485",
+      records: [{ confirmationCode: "HMRESETREG5", checkInDate: "2027-08-13", checkOutDate: "2027-08-16" }]
+    })
+  }), env);
+  const verified = await handleStayGuestRequest(new Request("https://guide.example/api/stay/verify", {
+    method: "POST",
+    headers: { origin: "https://guide.example", "content-type": "application/json" },
+    body: JSON.stringify({ room: "5", confirmationCode: "HMRESETREG5" })
+  }), env, "/api/stay/verify", null, new Date("2027-08-14T08:00:00.000Z"));
+  const cookie = verified.headers.get("set-cookie").split(";")[0];
+
+  await handleStayGuestRequest(new Request("https://guide.example/api/stay/nationality", {
+    method: "POST",
+    headers: { origin: "https://guide.example", cookie, "content-type": "application/json" },
+    body: JSON.stringify({ nationality: "foreign", nonThaiGuestCount: 3, allNonThaiGuestsIncluded: true })
+  }), env, "/api/stay/nationality");
+  const handover = await handleStayGuestRequest(new Request("https://guide.example/api/stay/in-person-passports", {
+    method: "POST",
+    headers: { origin: "https://guide.example", cookie, "content-type": "application/json" },
+    body: JSON.stringify({ allPassportsInPerson: true })
+  }), env, "/api/stay/in-person-passports");
+  assert.equal((await handover.json()).registrationStatus, "in_person_pending");
+
+  const unauthorized = await handleAdminRequest(new Request("https://guide.example/api/concierge/admin/registration-reset", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ reservationId: store.stayReservations[0].id, confirmed: true })
+  }), env, "/api/concierge/admin/registration-reset");
+  assert.equal(unauthorized.status, 401);
+
+  const reset = await handleAdminRequest(new Request("https://guide.example/api/concierge/admin/registration-reset", {
+    method: "POST",
+    headers: { authorization: "Bearer admin_token_test_5500", "content-type": "application/json" },
+    body: JSON.stringify({ reservationId: store.stayReservations[0].id, confirmed: true })
+  }), env, "/api/concierge/admin/registration-reset");
+  assert.equal(reset.status, 200);
+  assert.equal((await reset.json()).status, "not_started");
+
+  const afterReset = await handleStayGuestRequest(new Request("https://guide.example/api/stay/status?room=5", {
+    headers: { origin: "https://guide.example", cookie }
+  }), env, "/api/stay/status");
+  const afterResetBody = await afterReset.json();
+  assert.equal(afterResetBody.registrationStatus, "not_started");
+  assert.equal(afterResetBody.registrationIncomplete, true);
+  assert.equal(afterResetBody.accessGranted, false);
+
+  const reselect = await handleStayGuestRequest(new Request("https://guide.example/api/stay/nationality", {
+    method: "POST",
+    headers: { origin: "https://guide.example", cookie, "content-type": "application/json" },
+    body: JSON.stringify({ nationality: "foreign", nonThaiGuestCount: 1, allNonThaiGuestsIncluded: true })
+  }), env, "/api/stay/nationality");
+  assert.equal(reselect.status, 200);
+  assert.equal((await reselect.json()).requiredPassports, 1);
+});
+
+test("admin registration reset is blocked after passport evidence exists or in-person registration is complete", async () => {
+  const { env, store } = createEnvironment();
+  const reservationId = "stay_resetguard-12345678901234567890";
+
+  store.registrationStatuses.set(reservationId, {
+    guestType: "foreign",
+    requiredPassports: 2,
+    receivedPassports: 1,
+    status: "in_person_pending",
+    updatedAt: "2027-08-14T08:00:00.000Z"
+  });
+  store.passportRecords.push({
+    id: "pass_reset_guard_1",
+    reservationId,
+    status: "uploaded",
+    objectKey: "passport/test.jpg"
+  });
+
+  const withEvidence = await handleAdminRequest(new Request("https://guide.example/api/concierge/admin/registration-reset", {
+    method: "POST",
+    headers: { authorization: "Bearer admin_token_test_5500", "content-type": "application/json" },
+    body: JSON.stringify({ reservationId, confirmed: true })
+  }), env, "/api/concierge/admin/registration-reset");
+  assert.equal(withEvidence.status, 409);
+  assert.equal((await withEvidence.json()).error, "registration_reset_requires_staff_review");
+
+  store.passportRecords.length = 0;
+  store.registrationStatuses.set(reservationId, {
+    guestType: "foreign",
+    requiredPassports: 2,
+    receivedPassports: 0,
+    status: "in_person_complete",
+    updatedAt: "2027-08-14T08:00:00.000Z"
+  });
+  const complete = await handleAdminRequest(new Request("https://guide.example/api/concierge/admin/registration-reset", {
+    method: "POST",
+    headers: { authorization: "Bearer admin_token_test_5500", "content-type": "application/json" },
+    body: JSON.stringify({ reservationId, confirmed: true })
+  }), env, "/api/concierge/admin/registration-reset");
+  assert.equal(complete.status, 409);
+  assert.equal((await complete.json()).error, "in_person_handover_not_pending");
+});
+
+test("admin UI exposes registration reset only with the pending in-person action", async () => {
+  const script = await readFile(new URL("../public/concierge-admin.js", import.meta.url), "utf8");
+  assert.match(script, /item\.registrationStatus === "in_person_pending"/);
+  assert.match(script, /Reset guest registration/);
+  assert.match(script, /dataset\.inPersonAction = "reset"/);
+  assert.match(script, /\/api\/concierge\/admin\/registration-reset/);
+  assert.match(script, /The guest will need to choose the registration option again/);
 });
 
 test("Worker routing keeps the room guide, photos and private knowledge behind completed registration", async () => {

@@ -838,6 +838,23 @@ export async function handleStayAdminRequest(request, env, path, store) {
     return json(result, result.ok ? 200 : 400);
   }
 
+  if (path === "/api/concierge/admin/registration-reset") {
+    if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405, { allow: "POST" });
+    const body = await readJson(request, 2_000);
+    const reservationId = String(body?.reservationId || "");
+    if (!/^stay_[A-Za-z0-9-]{20,}$/.test(reservationId) || body?.confirmed !== true) {
+      return json({ error: "invalid_request" }, 400);
+    }
+    if (typeof store.resetPendingInPersonRegistration !== "function") {
+      return json({ error: "registration_reset_unavailable" }, 503);
+    }
+    const result = await store.resetPendingInPersonRegistration(
+      reservationId,
+      new Date().toISOString()
+    );
+    return json(result, result.ok ? 200 : 409);
+  }
+
   if (path === "/api/concierge/admin/in-person-registration") {
     if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405, { allow: "POST" });
     const body = await readJson(request, 2_000);

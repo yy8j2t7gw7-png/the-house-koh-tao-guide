@@ -3982,7 +3982,7 @@ export async function handleAdminRequest(request, env, path) {
     if (maintenanceResponse) return maintenanceResponse;
   }
 
-  if (path.includes("/stays") || path.includes("/stay-extension") || path.includes("/in-person-registration") || path.includes("/spare-key-rotation")) {
+  if (path.includes("/stays") || path.includes("/stay-extension") || path.includes("/in-person-registration") || path.includes("/registration-reset") || path.includes("/spare-key-rotation")) {
     const stayResponse = await handleStayAdminRequest(request, env, path, store);
     if (stayResponse) return stayResponse;
   }

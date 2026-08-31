@@ -37,32 +37,28 @@ Add these as **Production secrets** on the existing Worker. Never put the values
 
 The official WhatsApp Business Platform alert secrets and the derived `lost_key_team` recipients (Su and both owners) must also be configured before automatic key release will activate. The system automatically sends the protected lost-key alert, and a key code is never released unless WhatsApp accepts at least one team-message submission. The guest does not approve this notification.
 
-## 2. Install the automatic reservation synchronizer
+## 2. Update the automatic reservation synchronizer
 
-1. Open [script.google.com](https://script.google.com) using the Google account that receives the Airbnb host emails.
-2. Create a new standalone project named `The House Airbnb Reservation Sync`.
-3. Replace the starter code with the full contents of `airbnb-sync/Code.gs`.
-4. Open **Project Settings → Script Properties**.
-5. Add `HOUSE_WORKER_ORIGIN` with `https://the-house-koh-tao-guide.7mf56yd45g.workers.dev`.
-6. Add `RESERVATION_SYNC_TOKEN` with exactly the same secret value stored in Cloudflare.
-7. In Airbnb, export the private calendar for each listing and add the URLs as:
+The production synchronizer is the existing standalone Google Apps Script project **The House Airbnb Reservation Sync**. Do not create a second project. Worker deployment does not update this script automatically.
 
-   - `AIRBNB_ICAL_ROOM_1`
-   - `AIRBNB_ICAL_ROOM_2`
-   - `AIRBNB_ICAL_ROOM_3`
-   - `AIRBNB_ICAL_ROOM_4`
-   - `AIRBNB_ICAL_ROOM_5`
-   - `AIRBNB_ICAL_ROOM_6`
-   - `AIRBNB_ICAL_ROOM_8`
-   - `AIRBNB_ICAL_ROOM_9`
-   - `AIRBNB_ICAL_ROOM_10`
-   - `AIRBNB_ICAL_ROOM_11`
+1. Open the existing Apps Script project under the Google account that receives the Airbnb host emails.
+2. Replace the project code with the full contents of v5.11.45 `airbnb-sync/Code.gs` and save.
+3. Keep the existing Script Properties and private iCal URLs. Required properties are `HOUSE_WORKER_ORIGIN`, `RESERVATION_SYNC_TOKEN`, and `AIRBNB_ICAL_ROOM_1` through `AIRBNB_ICAL_ROOM_6` plus `AIRBNB_ICAL_ROOM_8` through `AIRBNB_ICAL_ROOM_11`. Room 7 remains inactive.
+4. In the Apps Script function selector choose `installHouseReservationTrigger`, then **Run** once. Authorize only if Google asks again.
+5. The installer deletes any existing `syncHouseReservations` trigger, creates exactly one five-minute time trigger, and immediately performs a full audit. Confirm there is only one `syncHouseReservations` trigger afterward.
+6. Confirm the Script Properties `HOUSE_AIRBNB_LAST_SYNC_AT`, `HOUSE_AIRBNB_LAST_CALENDAR_AT` and `HOUSE_AIRBNB_LAST_AUDIT_AT` update. `HOUSE_AIRBNB_LAST_FAST_PATH_AT` updates when a trustworthy email-only reservation is successfully posted. `HOUSE_AIRBNB_LAST_DIAGNOSTICS` should remain blank before relying on absence-based cancellation.
 
-8. In the Apps Script function selector, choose `installHouseReservationTrigger`, then select **Run**.
-9. Approve the Gmail, external-request and trigger permissions. The script reads only Airbnb reservation emails and transmits room, listing ID, confirmation code, stay dates, reservation status and—when it can be extracted safely—the guest's first name only. Full names, email bodies, phone numbers, email addresses and payment information are never transmitted.
-10. Return to **Project Settings → Script Properties** and check `HOUSE_AIRBNB_LAST_SYNC_AT` and `HOUSE_AIRBNB_LAST_AUDIT_AT`. `HOUSE_AIRBNB_LAST_DIAGNOSTICS` must be blank before relying on automatic cancellation detection.
+### v5.11.45 sync behavior
 
-The script runs once per hour to protect the Apps Script quota shared with the existing housekeeping-calendar automation. Most runs inspect only new Airbnb email since the preceding run and finish without fetching calendars when nothing changed. Once every 24 hours it performs a complete audit using the longer email history and all ten private calendars. If that audit cannot match a calendar event to a confirmation code, it records a diagnostic and sends only safe additions/updates; it does not cancel missing reservations.
+- Every five minutes the script searches only a small recent window of mail from Airbnb. The Gmail query does not depend on literal subject/body phrases such as **confirmation code** or **reservation code**.
+- If a message contains a valid active listing, an HM confirmation code, check-in date and check-out date, that single reservation is immediately sent to `/api/reservations/sync` with `complete:false`; it does not wait for iCal propagation.
+- A reservation email also triggers an immediate calendar reconciliation.
+- Even when Gmail detects nothing, all ten active private iCal feeds are reconciled at least once every 60 minutes.
+- Between those hourly reconciliations an idle five-minute run performs no calendar or Worker fetches.
+- The full 24-hour audit remains the only path allowed to mark a room feed complete for absence-based cancellation. Fast-path and ordinary hourly syncs can add/update/cancel an explicitly identified code but cannot mass-cancel a good stay merely because a feed is incomplete.
+- The Worker still fixes each Airbnb listing ID to one room and HMAC-hashes the readable confirmation code immediately on ingestion. Readable codes are never stored or logged by the Worker.
+
+This structure keeps quota usage low: the frequent operation is the lightweight Gmail scan, while the ten private calendars are fetched at most hourly unless a booking email or full audit makes an earlier reconciliation necessary.
 
 ## 3. Add the Airbnb scheduled messages
 

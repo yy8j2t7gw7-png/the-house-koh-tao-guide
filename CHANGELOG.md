@@ -2,6 +2,17 @@
 
 All notable changes to The House – Koh Tao guest guide are recorded here.
 
+## v5.11.45 — Fix Unstable Version
+
+- Rebuilt directly from stable v5.11.42; later passport/registration experiments are excluded.
+- Airbnb host mail is checked every 5 minutes; trustworthy active-listing + HM-code + stay-date records can immediately create/update the protected stay with `complete:false` without waiting for iCal.
+- All ten active Airbnb calendars (Rooms 1–6 and 8–11) are reconciled at least hourly; Room 7 remains excluded.
+- The 24-hour full audit remains the only cancellation-capable complete-feed path.
+- Activates `house_service_alert_actions_v3`, `house_booking_alert_actions_v2`, `house_luggage_alert_actions_v2`, `house_urgent_alert_actions_v2` and `house_lost_key_alert_actions_v2`.
+- Visible Meta buttons are **Received / Resolved** while internal commands remain `RECEIVED` / `RESOLVE`.
+- No Concierge routing, chat usability, passport behavior, UI, cleaning, luggage, emergency, lost-key or Explore logic changes.
+- Complete suite: **214 passed, 0 failed**.
+
 ## v5.11.42 — Broad Human Routing + Stay Extension Booking
 
 - Replaces exact-sentence dependence for human contact with a broad deterministic intent family covering human/person/staff/team/reception/front desk/housekeeper/manager/agent/representative/customer-support wording and common speak/call/contact/connect/transfer variants.

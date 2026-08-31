@@ -993,6 +993,65 @@ export function housekeepingServiceResult(question, now = new Date()) {
   };
 }
 
+const ROUTINE_PEST_EXACT = /\b(?:cockroach(?:es)?|cock roach(?:es)?|roach(?:es)?|rats?|mice|mouse|ants?|spiders?|termites?|fleas?|bed ?bugs?|mosquito(?:es|s)?|insects?|bugs?|bees?|wasps?|hornets?|fl(?:y|ies)|fruit fl(?:y|ies)|sand ?fl(?:y|ies)|gnats?|moths?|beetles?|silver ?fish|centipedes?|millipedes?|scorpions?|ticks?|mites?|geckos?|lizards?|crickets?|grasshoppers?|earwigs?|weevils?|maggots?|larva(?:e)?|worms?|caterpillars?|mantis(?:es)?|tokays?)\b/;
+const ROUTINE_PEST_WHOLE = /^(?:cockroach(?:es)?|cock roach(?:es)?|roach(?:es)?|rats?|mice|mouse|ants?|spiders?|termites?|fleas?|bed ?bugs?|mosquito(?:es|s)?|insects?|bugs?|bees?|wasps?|hornets?|fl(?:y|ies)|fruit fl(?:y|ies)|sand ?fl(?:y|ies)|gnats?|moths?|beetles?|silver ?fish|centipedes?|millipedes?|scorpions?|ticks?|mites?|geckos?|lizards?|crickets?|grasshoppers?|earwigs?|weevils?|maggots?|larva(?:e)?|worms?|caterpillars?|mantis(?:es)?|tokays?)$/;
+const ROUTINE_PEST_DISTINCT = /\b(?:cockroach(?:es)?|cock roach(?:es)?|roach(?:es)?|spiders?|termites?|bed ?bugs?|mosquito(?:es|s)?|insects?|wasps?|hornets?|gnats?|moths?|silver ?fish|centipedes?|millipedes?|scorpions?|geckos?|lizards?|grasshoppers?|earwigs?|weevils?|maggots?|larva(?:e)?|caterpillars?|mantis(?:es)?|tokays?)\b/;
+const ROUTINE_PEST_CONTEXT = /\b(?:there (?:is|are|s)|i (?:have|see|saw|found|noticed|hear|heard)|we (?:have|see|saw|found|noticed|hear|heard)|my (?:room|bathroom|bed)|our (?:room|bathroom|bed)|room|bathroom|bed|wall|walls|ceiling|roof|floor|shower|toilet|inside|under|behind|everywhere|all over|infestation|nest|biting|bites|stung|sting|remove|catch|get rid of|take away|help|pest)\b/;
+const ROUTINE_PEST_SHORT_TYPO = /\b(?:roch|roah|raoch|roachs|ratt|rta|annt|annts|atns|anst|mose|moues|flees|fela|bed ?bugg|bed ?buggs|fliy|flys|waps|mtoh|tik|tck|miet|wrom|criket|betle|beelte|insectt|insekts?|lizzard|gekko)\b/;
+const ROUTINE_PEST_FUZZY_TARGETS = Object.freeze([
+  "cockroach", "mosquito", "spider", "termite", "bedbug", "hornet", "silverfish",
+  "centipede", "millipede", "scorpion", "gecko", "lizard", "grasshopper", "earwig",
+  "weevil", "maggot", "caterpillar"
+]);
+
+function pestTypoDistance(left, right) {
+  if (left === right) return 0;
+  const a = String(left || "");
+  const b = String(right || "");
+  if (!a || !b) return Math.max(a.length, b.length);
+  const matrix = Array.from({ length: a.length + 1 }, () => Array(b.length + 1).fill(0));
+  for (let i = 0; i <= a.length; i += 1) matrix[i][0] = i;
+  for (let j = 0; j <= b.length; j += 1) matrix[0][j] = j;
+  for (let i = 1; i <= a.length; i += 1) {
+    for (let j = 1; j <= b.length; j += 1) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      matrix[i][j] = Math.min(
+        matrix[i - 1][j] + 1,
+        matrix[i][j - 1] + 1,
+        matrix[i - 1][j - 1] + cost
+      );
+      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) {
+        matrix[i][j] = Math.min(matrix[i][j], matrix[i - 2][j - 2] + 1);
+      }
+    }
+  }
+  return matrix[a.length][b.length];
+}
+
+function hasLikelyPestTypo(normalized) {
+  const tokens = String(normalized || "").split(/\s+/).filter(Boolean);
+  if (!tokens.length) return false;
+  const candidates = [...tokens];
+  for (let i = 0; i < tokens.length - 1; i += 1) candidates.push(`${tokens[i]}${tokens[i + 1]}`);
+  const canUseTypoMatch = tokens.length <= 2 || ROUTINE_PEST_CONTEXT.test(normalized);
+  if (!canUseTypoMatch) return false;
+  return candidates.some((candidate) => ROUTINE_PEST_FUZZY_TARGETS.some((target) => {
+    const maxDistance = target.length >= 8 ? 2 : 1;
+    if (candidate[0] !== target[0] || Math.abs(candidate.length - target.length) > maxDistance) return false;
+    return pestTypoDistance(candidate, target) <= maxDistance;
+  }));
+}
+
+function hasRoutinePestReference(normalized) {
+  if (!normalized) return false;
+  if (/\b(?:website|web site|app|page|chat|concierge|software|system)\b.{0,45}\bbugs?\b|\bbugs?\b.{0,45}\b(?:website|web site|app|page|chat|concierge|software|system)\b/.test(normalized)) return false;
+  if (ROUTINE_PEST_SHORT_TYPO.test(normalized) && (String(normalized).split(/\s+/).length <= 2 || ROUTINE_PEST_CONTEXT.test(normalized))) return true;
+  if (ROUTINE_PEST_WHOLE.test(normalized)) return true;
+  if (ROUTINE_PEST_DISTINCT.test(normalized)) return true;
+  if (ROUTINE_PEST_CONTEXT.test(normalized) && ROUTINE_PEST_EXACT.test(normalized)) return true;
+  return hasLikelyPestTypo(normalized);
+}
+
 function propertyIssueClassification(question, workflowState = null) {
   const normalized = normalizeText(question);
   if (!normalized) return null;
@@ -1009,14 +1068,10 @@ function propertyIssueClassification(question, workflowState = null) {
   const informationalControl = /\b(?:what animals live|which animals live|animals (?:are|is) (?:there|common)|are mosquitoes common|are insects common|how does (?:the )?(?:ac|air con|air conditioner|fan|fridge|tv|wifi|internet) work|how do i (?:use|turn on|operate) (?:the )?(?:ac|air con|air conditioner|fan|fridge|tv)|what is (?:the )?(?:wifi|wi fi) password|where (?:is|can i find) (?:the )?(?:wifi|wi fi) password)\b/.test(normalized);
   if (informationalControl) return null;
 
-  const pestPresence = /\b(?:there (?:is|are)|i (?:can )?(?:see|saw|hear|heard|found|noticed)|we (?:can )?(?:see|saw|hear|heard|found|noticed)|(?:my|our|the) (?:room|bathroom|roof|ceiling|wall|bed) (?:has|have)|(?:we|i) have)\b.{0,90}\b(?:rats?|mice|mouse|cockroaches?|roaches?|ants?|spiders?|termites?|fleas?|bed ?bugs?|bees?|wasps?)\b/.test(normalized)
-    || /\b(?:rats?|mice|mouse|cockroaches?|roaches?|ants?|spiders?|termites?|fleas?|bed ?bugs?|bees?|wasps?)\b.{0,80}\b(?:in|inside|under|above|behind|all over|everywhere|nest|problem|infestation)\b/.test(normalized)
+  const pestPresence = hasRoutinePestReference(normalized)
     || /\b(?:hear|hearing|heard)\b.{0,45}\b(?:scratching|scraping|animal movement)\b.{0,55}\b(?:wall|walls|roof|ceiling|above|room)\b/.test(normalized)
     || /\b(?:scratching|scraping)\b.{0,45}\b(?:wall|walls|roof|ceiling|above)\b/.test(normalized)
-    || /\b(?:droppings|animal nest|bird nest|wasp nest|bee nest)\b/.test(normalized)
-    || /\b(?:mosquito|mosquitoes|insect|insects|bugs)\b.{0,55}\b(?:problem|infestation|everywhere|all over|too many|lots of|biting|bites|inside (?:my|our|the) room)\b/.test(normalized)
-    || /\b(?:help|remove|catch|get rid of|take away)\b.{0,45}\b(?:gecko|lizard)\b/.test(normalized)
-    || /\b(?:gecko|lizard)\b.{0,45}\b(?:help|remove|catch|get rid of|take away)\b/.test(normalized);
+    || /\b(?:droppings|animal nest|bird nest|wasp nest|bee nest)\b/.test(normalized);
   if (pestPresence) return { category: "pest", label: "pest or animal issue" };
 
   const odorSource = /\b(?:bathroom|toilet|shower|drain|sink|room|ac|air con|air conditioner|fan|fridge|refrigerator)\b/.test(normalized);

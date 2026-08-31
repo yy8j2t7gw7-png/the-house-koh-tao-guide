@@ -4765,6 +4765,185 @@ test("natural routine room and property reports create one protected Su-and-owne
   }
 });
 
+test("routine pest names, plurals and likely typos send the existing protected service alert with current Meta actions", async () => {
+  const exactTerms = [
+    "cockroach", "cockroaches", "roach", "roaches", "rat", "rats", "mouse", "mice", "ant", "ants",
+    "spider", "spiders", "termite", "termites", "flea", "fleas", "bed bug", "bed bugs", "bedbug", "bedbugs",
+    "mosquito", "mosquitoes", "mosquitos", "insect", "insects", "bug", "bugs", "bee", "bees", "wasp", "wasps",
+    "hornet", "hornets", "fly", "flies", "fruit fly", "fruit flies", "sand fly", "sand flies", "sandfly", "sandflies",
+    "gnat", "gnats", "moth", "moths", "beetle", "beetles", "silverfish", "silver fish", "centipede", "centipedes",
+    "millipede", "millipedes", "scorpion", "scorpions", "tick", "ticks", "mite", "mites", "gecko", "geckos",
+    "lizard", "lizards", "cricket", "crickets", "grasshopper", "grasshoppers", "earwig", "earwigs", "weevil", "weevils",
+    "maggot", "maggots", "larva", "larvae", "worm", "worms", "caterpillar", "caterpillars", "mantis", "mantises", "tokay", "tokays"
+  ];
+  const typoTerms = [
+    "cocroach", "cokroach", "cockraoch", "cockroch", "roch", "roah", "raoch", "ratt", "rta", "annts", "atns", "anst", "mose", "moues",
+    "spidr", "sipder", "termte", "termiet", "bed bugg", "mosqito", "mosqutio", "mosqueto",
+    "hormet", "fliy", "flys", "waps", "mtoh", "tik", "miet", "wrom", "criket", "betle", "insectt", "silvrfish", "centepede", "milipede", "scorpian", "gekko", "lizzard",
+    "grasshoper", "earwigg", "wevil", "maggott", "caterpilar"
+  ];
+  const { env, store } = createEnvironment({
+    OPENAI_API_KEY: "model-must-not-be-used-for-pests",
+    WHATSAPP_ACCESS_TOKEN: "meta-test-token",
+    WHATSAPP_PHONE_NUMBER_ID: "1234567890",
+    WHATSAPP_WEBHOOK_VERIFY_TOKEN: "verify-test",
+    META_APP_SECRET: "app-secret-test",
+    WHATSAPP_ALERT_RECIPIENTS: JSON.stringify({
+      support: [{ label: "Su", phone: "+66 64 000 0001" }],
+      emergency: [
+        { label: "Owner 1", phone: "+66 81 000 0002" },
+        { label: "Owner 2", phone: "+66 82 000 0003" }
+      ]
+    }),
+    WHATSAPP_STAFF_ACTIONS_ENABLED: "true",
+    WHATSAPP_SERVICE_ACTION_TEMPLATE_NAME: "house_service_alert_actions_v3",
+    WHATSAPP_LUGGAGE_ACTION_TEMPLATE_NAME: "house_luggage_alert_actions_v2",
+    WHATSAPP_BOOKING_ACTION_TEMPLATE_NAME: "house_booking_alert_actions_v2",
+    WHATSAPP_URGENT_ACTION_TEMPLATE_NAME: "house_urgent_alert_actions_v2",
+    WHATSAPP_LOST_KEY_ACTION_TEMPLATE_NAME: "house_lost_key_alert_actions_v2"
+  });
+  const originalFetch = globalThis.fetch;
+  const outbound = [];
+  globalThis.fetch = async (url, options) => {
+    if (String(url).includes("api.openai.com")) throw new Error("Pest reports must not reach the model.");
+    outbound.push(JSON.parse(options.body));
+    return new Response(JSON.stringify({ messages: [{ id: `wamid.pest-${outbound.length}` }] }), {
+      status: 200,
+      headers: { "content-type": "application/json" }
+    });
+  };
+  try {
+    const cases = [...exactTerms, ...typoTerms];
+    for (const [index, term] of cases.entries()) {
+      const alertCount = store.alerts.length;
+      const outboundCount = outbound.length;
+      const response = await handleConciergeRequest(guestRequest(term, {
+        sessionId: `session_pest_term_${index}_${crypto.randomUUID()}`
+      }), env, undefined, new Date("2026-08-31T03:55:00.000Z"));
+      const body = await response.json();
+      assert.equal(response.status, 200, term);
+      assert.equal(body.source, "service-policy", term);
+      assert.equal(body.intentId, "property_issue_pest", term);
+      assert.equal(body.workflow?.type, "property_issue", term);
+      assert.equal(body.workflow?.issueCategory, "pest", term);
+      assert.equal(body.workflow?.status, "monitoring", term);
+      assert.equal(body.workflow?.notified, true, term);
+      assert.match(body.answer, /Thank you for letting us know.*sent this to The House team.*check it as soon as possible/is, term);
+      assert.doesNotMatch(body.answer, /Monday|housekeeping|urgent room issue|cannot confirm|still on|still here/i, term);
+      assert.equal(store.alerts.length, alertCount + 1, term);
+      const alert = store.alerts.at(-1);
+      assert.equal(alert.alertType, "stay_support", term);
+      assert.equal(alert.recipientGroup, "support_with_owners", term);
+      const deliveries = outbound.slice(outboundCount);
+      assert.equal(deliveries.length, 3, term);
+      assert.deepEqual(deliveries.map((payload) => payload.to).sort(), ["66640000001", "66810000002", "66820000003"], term);
+      for (const payload of deliveries) {
+        assert.equal(payload.template.name, "house_service_alert_actions_v3", term);
+        assert.equal(payload.template.language.code, "en", term);
+        assert.equal(payload.template.components[1].parameters[0].payload, `HOUSE_ALERT|RECEIVED|${alert.id}`, term);
+        assert.equal(payload.template.components[2].parameters[0].payload, `HOUSE_ALERT|RESOLVE|${alert.id}`, term);
+      }
+    }
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("expanded pest recognition leaves informational and ambiguous non-pest server wording operationally inert", async () => {
+  for (const question of [
+    "Are mosquitoes common?",
+    "What animals live on Koh Tao?",
+    "Can I fly to Bangkok tomorrow?",
+    "Is there a flea market on Koh Tao?",
+    "My computer mouse is not working",
+    "Where can I watch cricket?",
+    "There is a bug in the website"
+  ]) {
+    const { env, store } = createEnvironment({ OPENAI_API_KEY: "" });
+    const response = await handleConciergeRequest(guestRequest(question), env);
+    const body = await response.json();
+    assert.notEqual(body.intentId, "property_issue_pest", question);
+    assert.notEqual(body.workflow?.type, "property_issue", question);
+    assert.equal(store.alerts.length, 0, question);
+  }
+});
+
+test("the production cockroach sequence stays in the pest workflow on Monday and does not drift into urgent or housekeeping routing", async () => {
+  const { env, store } = createEnvironment({
+    OPENAI_API_KEY: "model-must-not-be-used-for-pests",
+    WHATSAPP_ACCESS_TOKEN: "meta-test-token",
+    WHATSAPP_PHONE_NUMBER_ID: "1234567890",
+    WHATSAPP_ALERT_RECIPIENTS: JSON.stringify({
+      support: [{ label: "Su", phone: "+66 64 000 0001" }],
+      emergency: [
+        { label: "Owner 1", phone: "+66 81 000 0002" },
+        { label: "Owner 2", phone: "+66 82 000 0003" }
+      ]
+    })
+  });
+  const originalFetch = globalThis.fetch;
+  let outbound = 0;
+  globalThis.fetch = async (url) => {
+    if (String(url).includes("api.openai.com")) throw new Error("Cockroach flow must not reach the model.");
+    outbound += 1;
+    return new Response(JSON.stringify({ messages: [{ id: `wamid.cockroach-${outbound}` }] }), { status: 200 });
+  };
+  try {
+    const monday = new Date("2026-08-31T03:53:00.000Z");
+    const first = await handleConciergeRequest(guestRequest("I have a cockroach on the bed"), env, undefined, monday);
+    const firstBody = await first.json();
+    assert.equal(firstBody.intentId, "property_issue_pest");
+    assert.equal(firstBody.workflow.issueCategory, "pest");
+    assert.equal(firstBody.workflow.status, "monitoring");
+    assert.equal(firstBody.workflow.notified, true);
+    assert.match(firstBody.answer, /I’ve sent this to The House team so they can check it as soon as possible/i);
+    assert.doesNotMatch(firstBody.answer, /Is the cockroach still|Monday|housekeeping|urgent/i);
+    assert.equal(store.alerts.length, 1);
+    assert.equal(store.alerts[0].recipientGroup, "support_with_owners");
+    assert.equal(outbound, 3);
+
+    const followup = await handleConciergeRequest(guestRequest("Yes it’s still here please send someone", {
+      workflowState: firstBody.workflow
+    }), env, undefined, new Date(monday.getTime() + 60_000));
+    const followupBody = await followup.json();
+    assert.equal(followupBody.intentId, "property_issue_pest");
+    assert.equal(followupBody.workflow.issueCategory, "pest");
+    assert.match(followupBody.answer, /The House team has already been contacted.*check the issue as soon as possible/i);
+    assert.doesNotMatch(followupBody.answer, /Monday|housekeeping|urgent room issue|cannot confirm/i);
+    assert.equal(store.alerts.length, 1);
+    assert.equal(outbound, 3);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("browser protected routing mirrors the pest matcher without turning informational or ambiguous non-pest wording into pest reports", async () => {
+  const script = await readFile(new URL("../public/ai-concierge.js", import.meta.url), "utf8");
+  const start = script.indexOf("  const ROUTINE_PEST_EXACT");
+  const end = script.indexOf("  function requiresProtectedServer(question)");
+  assert.ok(start >= 0 && end > start);
+  const helperSource = script.slice(start, end).replace(/^  /gm, "");
+  const browserPestMatcher = Function(`${helperSource}\nreturn hasRoutinePestReference;`)();
+  const normalize = (value) => String(value || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+
+  for (const phrase of [
+    "cockroach", "cockroaches", "roach", "ants", "mosquito", "bed bug", "gecko", "silverfish",
+    "cocroach", "cockraoch", "mosqito", "sipder", "termte", "centepede", "milipede", "lizzard",
+    "I have a cockroach on the bed", "Please help cocroach", "There are fruit flies in the bathroom", "I found a bug in my room"
+  ]) {
+    assert.equal(browserPestMatcher(normalize(phrase)), true, phrase);
+  }
+  for (const phrase of [
+    "Are mosquitoes common?", "What animals live on Koh Tao?", "Can I fly to Bangkok tomorrow?",
+    "Is there a flea market on Koh Tao?", "My computer mouse is not working", "Where can I watch cricket?",
+    "There is a bug in the website"
+  ]) {
+    const normalized = normalize(phrase);
+    const informational = /\b(?:what animals live|animals (?:are|is) (?:there|common)|are mosquitoes common|how does (?:the )?(?:ac|air con|air conditioner) work|what is (?:the )?wifi password)\b/.test(normalized);
+    assert.equal(!informational && browserPestMatcher(normalized), false, phrase);
+  }
+});
+
 test("an added detail for the same ongoing property issue continues naturally without a duplicate alert", async () => {
   const { env, store } = createEnvironment({
     OPENAI_API_KEY: "",

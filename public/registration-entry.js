@@ -18,6 +18,10 @@
   const foreignButton = document.getElementById("startForeignRegistration");
   const foreignCount = document.getElementById("nonThaiGuestCount");
   const allForeignGuestsConfirmed = document.getElementById("confirmAllNonThaiGuests");
+  const arrivalAccess = document.getElementById("arrivalAccess");
+  const arrivalAccessEntrancePhoto = document.getElementById("arrivalAccessEntrancePhoto");
+  const arrivalAccessRoomPhoto = document.getElementById("arrivalAccessRoomPhoto");
+  const arrivalAccessCaption = document.getElementById("arrivalAccessCaption");
   const spareKeyTrigger = document.getElementById("openSpareKeyAccess");
   const spareKeyClose = document.getElementById("closeSpareKeyAccess");
   const spareKeySection = document.getElementById("spareKeyAccess");
@@ -99,6 +103,20 @@
     return data;
   }
 
+  async function loadVerifiedArrivalAccess() {
+    if (!arrivalAccess) return;
+    try {
+      const data = await api(`/api/stay/arrival-content?room=${encodeURIComponent(room)}`);
+      if (arrivalAccessEntrancePhoto) arrivalAccessEntrancePhoto.src = data.entrancePhotoUrl;
+      if (arrivalAccessRoomPhoto) arrivalAccessRoomPhoto.src = data.roomPhotoUrl;
+      if (arrivalAccessCaption) arrivalAccessCaption.innerHTML = `<strong>Step 2.</strong> ${String(data.note || "Follow the room-specific picture.")}`;
+      arrivalAccess.hidden = false;
+      window.HOUSE_I18N?.localize?.(arrivalAccess);
+    } catch (_error) {
+      arrivalAccess.hidden = true;
+    }
+  }
+
   function showRegistration(data) {
     window.dispatchEvent(new CustomEvent("house:stay-access-updated", {
       detail: {
@@ -111,6 +129,7 @@
     }));
     if (verificationFields) verificationFields.hidden = true;
     setStatus(verificationStatus, messages.verified, "success");
+    void loadVerifiedArrivalAccess();
     if (data.guestType === "foreign" || ["passport_pending", "passport_complete", "in_person_pending", "in_person_complete"].includes(data.registrationStatus)) {
       if (nationalityPanel) nationalityPanel.hidden = true;
       if (progressPanel) progressPanel.hidden = false;

@@ -2790,7 +2790,8 @@ test("Concierge room header, menu and registration reminder refresh from one aut
   assert.match(script, /await fetch\("\/api\/stay\/status"/);
   assert.match(script, /status\?\.conciergeAccess === "verified"/);
   assert.match(script, /registrationIncomplete: Boolean\(verified && statusKnown && status\?\.registrationIncomplete === true\)/);
-  assert.match(script, /const availableQuickActions = isPublicAccess \? \(cfg\.publicQuickActions \|\| \[\]\) : \(cfg\.quickActions \|\| \[\]\)/);
+  assert.match(script, /const pendingArrivalActions = \[/);
+  assert.match(script, /const availableQuickActions = isPublicAccess[\s\S]*conciergeAccessState\.registrationIncomplete[\s\S]*pendingArrivalActions[\s\S]*cfg\.quickActions/);
   assert.match(script, /panel\.dataset\.stayAccess = nextState\.verified \? "verified" : "unverified"/);
   assert.match(script, /registrationReminder\.hidden = !nextState\.registrationIncomplete/);
   assert.match(script, /selectedRoom = String\(status\.room\);[\s\S]*updateRoomContext\(\)/);
@@ -10043,7 +10044,7 @@ test("browser starts a visible fresh conversation on reload and uses access-awar
   assert.match(script, /function initialConciergeMessage\(\)/);
   assert.match(script, /if \(!conciergeAccessState\.verified\)/);
   assert.match(script, /Your guest access is active/);
-  assert.match(script, /Your stay is verified[\s\S]*Guest registration is still incomplete/);
+  assert.match(script, /Your stay is verified[\s\S]*Find my room[\s\S]*(?:passport image|Guest registration|in-person guest registration)/);
   assert.match(script, /appendMessage\("concierge", initialConciergeMessage\(\)\)/);
   assert.match(script, /activeCleaningWorkflow = result\.workflow\?\.type === "cleaning"[\s\S]*result\.workflow\?\.status === "collecting"/);
   assert.match(script, /const activeWorkflow = activePrivateWorkflow[\s\S]*\|\| activeCleaningWorkflow/);
@@ -10885,4 +10886,82 @@ test("Room 7 is guide-enabled for direct testing while remaining excluded from A
 
   const room7Photo = await readFile(new URL("../public/assets/room-07-location.jpeg", import.meta.url));
   assert.ok(room7Photo.length > 100_000);
+});
+
+test("verified registration-pending guests receive arrival directions but not the full room guide", async () => {
+  const now = new Date("2026-08-31T07:30:00.000Z");
+  const { env } = createEnvironment({ GUEST_ACCESS_ENFORCEMENT: "true" });
+  const cookie = await syncAndVerifyStay(env, { room: "11", confirmationCode: "HMARRIVAL11", checkInDate: "2026-08-31", checkOutDate: "2026-09-05", now });
+
+  const arrival = await handleStayGuestRequest(new Request("https://guide.example/api/stay/arrival-content?room=11", {
+    headers: { origin: "https://guide.example", cookie }
+  }), env, "/api/stay/arrival-content", null, now);
+  assert.equal(arrival.status, 200);
+  const arrivalBody = await arrival.json();
+  assert.equal(arrivalBody.room, "11");
+  assert.match(arrivalBody.note, /Room 11 is downstairs/i);
+  assert.equal(arrivalBody.roomPhotoUrl, "/api/stay/arrival-room-photo?room=11");
+  assert.equal(arrivalBody.entrancePhotoUrl, "/api/stay/arrival-entrance-photo?room=11");
+
+  const fullRoom = await handleStayGuestRequest(new Request("https://guide.example/api/stay/room-content?room=11", {
+    headers: { origin: "https://guide.example", cookie }
+  }), env, "/api/stay/room-content", null, now);
+  assert.equal(fullRoom.status, 403);
+  assert.equal((await fullRoom.json()).error, "guest_registration_required");
+});
+
+test("registration-pending concierge allows find-my-room and reminds about passport registration", async () => {
+  const now = new Date("2026-08-31T07:31:00.000Z");
+  const { env } = createEnvironment({ GUEST_ACCESS_ENFORCEMENT: "true", OPENAI_API_KEY: "not-used" });
+  const cookie = await syncAndVerifyStay(env, { room: "11", confirmationCode: "HMARRIVAL12", checkInDate: "2026-08-31", checkOutDate: "2026-09-05", now });
+  await markForeignRegistrationPending(env, cookie, 2, now);
+
+  const response = await handleConciergeRequest(verifiedConciergeRequest("find my room", cookie), env, undefined, now);
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.equal(body.intentId, "find_room");
+  assert.equal(body.source, "verified-arrival-policy");
+  assert.match(body.answer, /Room 11 is downstairs/i);
+  assert.match(body.answer, /upload the remaining required passport image/i);
+  assert.ok(body.actions.some((action) => action.href === "/room/11#arrivalAccess"));
+  assert.ok(body.actions.some((action) => action.href === "/room/11#verifiedStayAccess"));
+});
+
+test("registration-pending guests cannot create service, cleaning, luggage or booking alerts", async () => {
+  const now = new Date("2026-08-31T07:32:00.000Z");
+  const { env, store } = createEnvironment({ GUEST_ACCESS_ENFORCEMENT: "true", OPENAI_API_KEY: "not-used" });
+  const cookie = await syncAndVerifyStay(env, { room: "11", confirmationCode: "HMARRIVAL13", checkInDate: "2026-08-31", checkOutDate: "2026-09-05", now });
+  await markForeignRegistrationPending(env, cookie, 1, now);
+
+  for (const question of [
+    "I need fresh towels.",
+    "Please clean my room at 3 PM.",
+    "Please store my luggage after checkout.",
+    "I want to book diving tomorrow for 2 people."
+  ]) {
+    const response = await handleConciergeRequest(verifiedConciergeRequest(question, cookie, {
+      sessionId: `session_pending_${crypto.randomUUID().replaceAll("-", "_")}`
+    }), env, undefined, now);
+    const body = await response.json();
+    assert.match(body.intentId, /passport_registration_pending|nationality_selection_required/);
+    assert.match(body.answer, /passport registration is not complete|registration/i);
+  }
+  assert.equal(store.alerts.length, 0);
+});
+
+test("pending-access UI exposes only registration, find-room and emergency quick actions", async () => {
+  const [script, entry, html] = await Promise.all([
+    readFile(new URL("../public/ai-concierge.js", import.meta.url), "utf8"),
+    readFile(new URL("../public/registration-entry.js", import.meta.url), "utf8"),
+    readFile(new URL("../public/room-access.html", import.meta.url), "utf8")
+  ]);
+  assert.match(script, /const pendingArrivalActions = \[/);
+  assert.match(script, /label: "Find my room"/);
+  assert.match(script, /conciergeAccessState\.registrationIncomplete\s*\? pendingArrivalActions/);
+  assert.match(script, /contextPrompts\.hidden = nextState\.registrationIncomplete/);
+  assert.match(script, /serviceHours\.hidden = isPublicAccess \|\| nextState\.registrationIncomplete/);
+  assert.match(entry, /\/api\/stay\/arrival-content\?room=/);
+  assert.match(html, /id="arrivalAccess" hidden/);
+  assert.match(html, /Please complete guest registration to unlock the full guest guide and service requests/);
+  assert.doesNotMatch(html.match(/id="arrivalAccess"[\s\S]*?<\/section>/)?.[0] || "", /Wi-Fi password|Fresh towels|Room cleaning|key-box code/i);
 });

@@ -1219,6 +1219,28 @@ function roomLocationResult(question, room) {
   };
 }
 
+function pendingArrivalRoomLocationResult(question, access, room) {
+  if (!access?.verified || access.accessGranted) return null;
+  const result = roomLocationResult(question, room);
+  if (!result) return null;
+  const registrationHref = `/room/${room}#verifiedStayAccess`;
+  const arrivalHref = `/room/${room}#arrivalAccess`;
+  const reminder = access.registrationStatus === "passport_pending"
+    ? "Please upload the remaining required passport image(s) to complete guest registration and unlock the full guest guide and service requests."
+    : access.registrationStatus === "in_person_pending"
+      ? "Your in-person guest registration is still pending. The full guest guide and service requests unlock after registration is complete."
+      : "Please complete Guest registration to unlock the full guest guide and service requests. Non-Thai overnight guests will need to upload their passport image.";
+  return {
+    ...result,
+    answer: `${result.answer.replace("Open Your Room to see the arrival photos and directions to your room.", "Your verified arrival directions and photos are available now.")} ${reminder}`,
+    actions: [
+      { label: "Find my room", type: "link", href: arrivalHref },
+      { label: "Complete guest registration", type: "link", href: registrationHref }
+    ],
+    source: "verified-arrival-policy"
+  };
+}
+
 function lostKeyPolicyResult(question, access, room, now = new Date()) {
   if (!LOST_KEY_REQUEST.test(String(question || ""))) return null;
   const registrationHref = room ? `/room/${room}#verifiedStayAccess` : "/rooms.html";
@@ -3529,13 +3551,16 @@ export async function handleConciergeRequest(request, env, ctx, now = new Date()
   const accessAcknowledgementResult = classifiedSafetyResult || lostKeyResult || humanContactResult
     ? null
     : verifiedAccessAcknowledgementResult(question, access, room);
-  const urgentClarificationActive = humanContactResult || accessAcknowledgementResult ? false : activeUrgentClarification(history, workflowState);
+  const pendingArrivalResult = classifiedSafetyResult || lostKeyResult || humanContactResult || accessAcknowledgementResult
+    ? null
+    : pendingArrivalRoomLocationResult(question, access, room);
+  const urgentClarificationActive = humanContactResult || accessAcknowledgementResult || pendingArrivalResult ? false : activeUrgentClarification(history, workflowState);
   const needsUrgentClarification = !classifiedSafetyResult
     && !humanContactResult
     && (isVagueUrgentMessage(question)
       || (urgentClarificationActive && !hasMeaningfulIncidentDescription(question)));
   const safetyResult = classifiedSafetyResult || (needsUrgentClarification ? urgentClarificationResult(room) : null);
-  let earlyPolicyResult = humanContactResult || accessAcknowledgementResult || (access.accessGranted || (lostKeyResult && access.verified)
+  let earlyPolicyResult = humanContactResult || accessAcknowledgementResult || pendingArrivalResult || (access.accessGranted || (lostKeyResult && access.verified)
     ? null
     : (lostKeyResult || publicAccessResult(question, access, room, safetyResult)));
   if (earlyPolicyResult) {

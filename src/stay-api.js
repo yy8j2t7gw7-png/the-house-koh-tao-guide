@@ -335,6 +335,18 @@ async function protectedRoomAsset(request, env, access, assetName) {
   return new Response(response.body, { status: response.status, headers });
 }
 
+async function verifiedArrivalAsset(request, env, access, assetName) {
+  if (!access.verified || !assetName) return json({ error: "stay_verification_required" }, 401);
+  const assetUrl = new URL(`/assets/${assetName}`, request.url);
+  const response = await env.ASSETS.fetch(new Request(assetUrl, { headers: request.headers }));
+  const headers = new Headers(response.headers);
+  headers.set("cache-control", "private, no-store, max-age=0");
+  headers.set("x-content-type-options", "nosniff");
+  headers.set("cross-origin-resource-policy", "same-origin");
+  headers.set("referrer-policy", "no-referrer");
+  return new Response(response.body, { status: response.status, headers });
+}
+
 function parseKeyCodes(env) {
   let values;
   try {
@@ -605,6 +617,30 @@ export async function handleStayGuestRequest(request, env, path, ctx, now = new 
       await store.setStayRegistrationStatus(session.reservationId, "thai_exempt", updatedAt);
     }
     return json({ ok: true, registrationStatus: "thai_exempt" });
+  }
+
+  if (path === "/api/stay/arrival-content") {
+    if (request.method !== "GET") return json({ error: "method_not_allowed" }, 405, { allow: "GET" });
+    const room = new URL(request.url).searchParams.get("room") || "";
+    const access = await getGuestAccess(request, env, room);
+    if (!access.verified) return json({ error: "stay_verification_required" }, 401);
+    const details = ROOM_DETAILS[room];
+    if (!details) return json({ error: "invalid_room" }, 400);
+    return json({
+      room,
+      floor: details.floor,
+      note: details.note,
+      roomPhotoUrl: `/api/stay/arrival-room-photo?room=${encodeURIComponent(room)}`,
+      entrancePhotoUrl: `/api/stay/arrival-entrance-photo?room=${encodeURIComponent(room)}`
+    });
+  }
+
+  if (path === "/api/stay/arrival-room-photo" || path === "/api/stay/arrival-entrance-photo") {
+    if (request.method !== "GET") return json({ error: "method_not_allowed" }, 405, { allow: "GET" });
+    const room = new URL(request.url).searchParams.get("room") || "";
+    const access = await getGuestAccess(request, env, room);
+    const assetName = path.endsWith("arrival-entrance-photo") ? "photo-04.jpeg" : ROOM_DETAILS[room]?.photo;
+    return verifiedArrivalAsset(request, env, access, assetName);
   }
 
   if (path === "/api/stay/room-content") {

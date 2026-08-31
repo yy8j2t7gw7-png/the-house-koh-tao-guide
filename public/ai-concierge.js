@@ -141,7 +141,9 @@
     return {
       verified,
       registrationIncomplete: Boolean(verified && statusKnown && status?.registrationIncomplete === true),
-      registrationStatus: verified ? String(status?.registrationStatus || "not_started") : "not_started"
+      registrationStatus: verified ? String(status?.registrationStatus || "not_started") : "not_started",
+      requiredPassports: verified ? Number(status?.requiredPassports) || 0 : 0,
+      receivedPassports: verified ? Number(status?.receivedPassports) || 0 : 0
     };
   }
 
@@ -213,7 +215,13 @@
       return cfg.initialMessage || "Hello. What can I help you with?";
     }
     if (conciergeAccessState.registrationIncomplete) {
-      return `Hello. Your stay is verified${selectedRoom ? ` for Room ${selectedRoom}` : ""}. Guest registration is still incomplete; you can finish it using Guest registration above, or ask me for help.`;
+      if (conciergeAccessState.registrationStatus === "passport_pending") {
+        return `Hello. Your stay is verified${selectedRoom ? ` for Room ${selectedRoom}` : ""}. You can already use Find my room for arrival directions. Please upload the required passport image${conciergeAccessState.requiredPassports > 1 ? "s" : ""} to complete guest registration and unlock the full guest guide and service requests.`;
+      }
+      if (conciergeAccessState.registrationStatus === "in_person_pending") {
+        return `Hello. Your stay is verified${selectedRoom ? ` for Room ${selectedRoom}` : ""}. You can already use Find my room for arrival directions. Your in-person guest registration is still pending; the full guest guide and service requests unlock after registration is complete.`;
+      }
+      return `Hello. Your stay is verified${selectedRoom ? ` for Room ${selectedRoom}` : ""}. You can already use Find my room for arrival directions. Please complete Guest registration to unlock the full guest guide and service requests; non-Thai overnight guests will need to upload their passport image.`;
     }
     return `Hello. Your guest access is active${selectedRoom ? ` for Room ${selectedRoom}` : ""}. I can help with check-in, Wi-Fi, towels, cleaning, lost keys, bookings and questions about Koh Tao.`;
   }
@@ -365,7 +373,16 @@
   panel.setAttribute("aria-label", "AI Concierge");
 
   function quickActionsMarkup() {
-    const availableQuickActions = isPublicAccess ? (cfg.publicQuickActions || []) : (cfg.quickActions || []);
+    const pendingArrivalActions = [
+      { label: "Guest registration", icon: "🛂", type: "registration" },
+      { label: "Find my room", icon: "🧭", type: "prompt", prompt: "Find my room" },
+      { label: "Emergency help", icon: "🚨", type: "link", href: "/emergency.html" }
+    ];
+    const availableQuickActions = isPublicAccess
+      ? (cfg.publicQuickActions || [])
+      : conciergeAccessState.registrationIncomplete
+        ? pendingArrivalActions
+        : (cfg.quickActions || []);
     return availableQuickActions.map((action) => {
       if (action.type === "registration" && selectedRoom) {
         return `<a class="ai-concierge-action" href="/room/${selectedRoom}#verifiedStayAccess">
@@ -394,7 +411,7 @@
   }
 
   const promptHtml = pagePrompts.length
-    ? `<div class="ai-concierge-context">
+    ? `<div class="ai-concierge-context" ${conciergeAccessState.registrationIncomplete ? "hidden" : ""}>
          <h4>Common questions</h4>
          ${pagePrompts.map((prompt) =>
            `<button class="ai-concierge-prompt" type="button" data-prompt="${prompt.replace(/"/g, "&quot;")}">${prompt}</button>`
@@ -423,7 +440,7 @@
       </div>
       <p class="ai-concierge-registration-status" role="status" ${conciergeAccessState.registrationIncomplete ? "" : "hidden"}>Registration incomplete</p>
       <div class="ai-concierge-actions">${quickActionsMarkup()}</div>
-      <p class="ai-concierge-service-hours" ${isPublicAccess ? "hidden" : ""}>Housekeeping &amp; service hours: Tuesday–Sunday, 10:30 AM–7:30 PM. Housekeeping is unavailable on Mondays.</p>
+      <p class="ai-concierge-service-hours" ${isPublicAccess || conciergeAccessState.registrationIncomplete ? "hidden" : ""}>Housekeeping &amp; service hours: Tuesday–Sunday, 10:30 AM–7:30 PM. Housekeeping is unavailable on Mondays.</p>
       ${promptHtml}
       <div class="ai-concierge-room-selector" ${selectedRoom ? "hidden" : ""}>
         <div class="ai-concierge-room-selector-head">
@@ -457,6 +474,7 @@
   const roomSelector = panel.querySelector(".ai-concierge-room-selector");
   const quickActionsContainer = panel.querySelector(".ai-concierge-actions");
   const registrationReminder = panel.querySelector(".ai-concierge-registration-status");
+  const contextPrompts = panel.querySelector(".ai-concierge-context");
   const serviceHours = panel.querySelector(".ai-concierge-service-hours");
   const dragHandle = panel.querySelector(".ai-concierge-drag-handle");
 
@@ -548,7 +566,8 @@
     quickActionsContainer.innerHTML = quickActionsMarkup();
     registrationReminder.textContent = window.HOUSE_I18N?.t("Registration incomplete") || "Registration incomplete";
     registrationReminder.hidden = !nextState.registrationIncomplete;
-    serviceHours.hidden = isPublicAccess;
+    if (contextPrompts) contextPrompts.hidden = nextState.registrationIncomplete;
+    serviceHours.hidden = isPublicAccess || nextState.registrationIncomplete;
     updateRoomContext();
     if (selectedRoom) roomSelector.hidden = true;
     window.HOUSE_I18N?.localize?.(quickActionsContainer);

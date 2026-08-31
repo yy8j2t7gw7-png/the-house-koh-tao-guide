@@ -115,10 +115,11 @@ Internal booking contact:
 
 Public interface rules:
 
-- Generic labels such as “Book with Us”, “Call Us” and “WhatsApp Us” are approved.
+- **Book with Us** opens the AI Concierge with the relevant service context.
+- Do not expose a routine page-level booking call or personal WhatsApp shortcut.
 - Fah does not need to be named publicly.
 - Never discuss internal commercial arrangements, referral terms, revenue or how The House may benefit from a booking in guest-facing content.
-- Every booking call or WhatsApp action must use Fah’s number above.
+- Every completed protected booking alert must use the established Fah-plus-owner route.
 - Never use “Book Direct”, “Call Operator”, “Contact Operator” or equivalent direct-booking actions.
 - Do not expose an operator telephone number, website or social channel as a booking action for records marked `the-house-concierge`.
 - Operator details may remain in structured data for verification and internal AI context.
@@ -155,7 +156,7 @@ Public interface rules:
 
 ## Current baseline
 
-Current release: v5.11.33 (presentation-only: a stable 148×52 px mobile **💬 AI Concierge** pill with safe-area placement, no scroll/collision/lift movement, and launcher visibility suppressed while the Concierge panel is open. The v5.11.32 232 px Room hero with Room 11-specific marked-entrance crop remains authoritative. v5.11.31 header-owned language access, denser Room spacing, verified/TM30 wording and **Open Concierge** label remain authoritative. v5.11.30 generic-human routing and routine Contact/Call gates, 24/7 protected lost-key access, RAID-and-Roctopus policy and every fee, notification, code-display, rotation, privacy and delivery safeguard are unchanged).
+Current release: v5.11.42 (narrow Concierge routing and stay-extension workflow release on deployed v5.11.41: broad deterministic human-contact recognition; routine Contact Us / Call Us remains Tuesday–Sunday 10:30–19:30 Bangkok only; stay-extension requests collect additional nights plus an international reply contact and send exactly one booking alert to Fah plus both owners; no availability/confirmation promise; preserve v5.11.41 mobile/emergency stability, v5.11.39 cleaning/state safeguards, privacy boundaries and inactive pending Meta replacements).
 
 Explore is intentionally disabled in the live v5.11.6 release. Do not delete its pages, structured records or media. Restore it only after the planned Explore rebuild and review by changing the protected deployment feature variable. Do not expose internal Explore detail paths in live concierge answers while the feature remains disabled; use approved external actions where supplied.
 

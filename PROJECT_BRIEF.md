@@ -20,9 +20,9 @@ The product should feel like a competent hotel concierge in a guest’s pocket, 
 
 ### Current state
 
-Current release: v5.11.33.
+Current release: v5.11.42.
 
-The live release prioritizes the operational guest journey and AI Concierge. v5.11.33 is a presentation-only simplification built directly from deployed v5.11.32. Below 768 px the Concierge is a stable 148×52 px **💬 AI Concierge** bottom-right pill with iPhone safe-area offsets; the rejected v5.11.32 scroll/collision/lift controller is removed, so the launcher does not collapse or jump while scrolling. When the Concierge panel opens, the floating launcher is hidden completely and is restored on close. The approved 232 px Room 11 marked-entrance crop remains unchanged. The v5.11.31 language, spacing, verified/TM30 and **Open Concierge** corrections remain authoritative. v5.11.30 current-message generic-human routing and hard routine-contact gates remain unchanged. Routine House contact follows Tuesday–Sunday 10:30–19:30 Bangkok time with Monday closed; Emergency help remains separate, and lost-key self-service remains protected and available 24/7. The v5.11.26 PADI/SSI/RAID catalog, mixed-party collector, RAID safety/buoyancy-control recommendation and preferred Roctopus guidance remain authoritative. Every Meta sanitizer, retry, contact, booking schema, recipient, property, cleaning, urgent-console and secure lost-key safeguard remains intact. Explore remains disabled through its reversible deployment feature switch.
+The live release prioritizes the operational guest journey and AI Concierge. v5.11.42 is a narrow routing and booking-workflow release on deployed v5.11.41: human-contact requests are recognized through a broad deterministic intent family rather than a small exact-phrase list, while routine direct contact remains gated to Tuesday–Sunday 10:30–19:30 Bangkok and no private staff identity is shown. Natural stay-extension requests now collect only additional nights plus an international WhatsApp/phone contact and send one existing booking alert to Fah plus both owners, without promising availability or confirmation. v5.11.41 remains the mobile/emergency UX correction, v5.11.40 remains the persistent-human correction, and v5.11.39 remains the cleaning/state correction. All earlier Wi-Fi, snorkeling, French Kiss Divers, lost-key, emergency, booking, luggage, passport, Admin, privacy and security safeguards remain authoritative. Airbnb synchronization is unchanged in v5.11.42; the separately observed last-minute sync delay is tracked for the next narrow release. The five newer human-friendly Meta replacement templates remain inactive unless separately approved for activation.
 
 Existing content areas:
 
@@ -38,7 +38,7 @@ Activities cover diving, freediving, snorkelling, boat trips, beach experiences,
 
 ### Concierge booking rule
 
-Activities and services marked for House-arranged booking must use The House booking routes. Public labels may be generic. The underlying booking telephone and WhatsApp number must be +66 96 274 1424, which is managed by Fah.
+Activities and services marked for House-arranged booking must use The House structured Concierge route. Public pages use **Book with Us** and must not expose a direct booking call or personal WhatsApp shortcut. The protected completed-booking alert route is managed by Fah.
 
 Guest-facing content must never discuss internal commercial arrangements, referral terms, revenue or how The House may benefit from a booking.
 

@@ -76,7 +76,7 @@ v5.11.26 adds visibility controls without rewriting delivery history. **Dismiss*
 
 `house_alert_status_v1` is non-recursive. An authorized `RECEIVED`, `ACK` or `RESOLVE` reply updates the original alert and sends one status message only to the other recipients assigned to that alert. The actor and unrelated roles are excluded; duplicate webhook delivery is suppressed by the original alert state. Status messages create no alert and no escalation.
 
-The code-ready but default-off path introduced in v5.11.20 remains available for five separately reviewed Utility templates with **Received** and **Resolve** quick replies. Their exact Meta setup, payload strategy, activation gate and one-variable rollback are documented in `META_STAFF_QUICK_ACTIONS_v5.11.20.md`. The intended service template is `house_service_alert_actions_v2`; the accidentally created `house_service_alert_actions_v1` has no buttons and must never be mapped. Typed `RECEIVED`, `ACK` and `RESOLVE` remain available before and after activation.
+v5.11.35 activates the five reviewed Utility templates with **Received** and **Resolve** quick replies. Their exact Meta setup, payload strategy, fail-closed gate and one-variable rollback are documented in `META_STAFF_QUICK_ACTIONS_v5.11.20.md`. The active service template is `house_service_alert_actions_v2`; the accidentally created `house_service_alert_actions_v1` has no buttons and must never be mapped. Typed `RECEIVED`, `ACK` and `RESOLVE` remain available.
 
 ## Cloudflare secrets
 
@@ -148,7 +148,7 @@ WHATSAPP_ALERT_ESCALATION_MINUTES=10
 
 `WHATSAPP_ALERT_TEMPLATE_LANGUAGE` remains present for compatibility and does not need a Cloudflare change for v5.11.17. Every mapped production or rollback template now uses the language attached to its immutable schema entry.
 
-The optional action templates are intentionally absent from `wrangler.jsonc`, so deploying v5.11.26 cannot activate unapproved Meta definitions. After all five intended templates are Active, configure these exact non-secret variables and then enable the gate in a separate authorized activation release:
+All five action templates were confirmed reviewed and Active before v5.11.35. `wrangler.jsonc` therefore contains these exact non-secret mappings and enables the fail-closed gate:
 
 ```text
 WHATSAPP_SERVICE_ACTION_TEMPLATE_NAME=house_service_alert_actions_v2
@@ -163,15 +163,18 @@ If the flag is false, missing or any required action-template mapping is absent,
 
 Review Meta's supported Graph API versions before changing the version. The Worker checks once per minute for overdue escalations.
 
-## v5.11.26 deployment and changed-function verification
+## v5.11.35 activation / v5.11.37 preservation verification
 
-Deploy the verified v5.11.26 bundle to the existing Worker without changing the six production template mappings, languages, BODY counts/order, routes, secrets, recipients, webhook settings, `SPARE_KEY_CODES` or `WHATSAPP_STAFF_ACTIONS_ENABLED=false` state.
+v5.11.37 preserves the verified v5.11.35 Meta production configuration without changing secrets, recipients, webhook settings, routes, BODY counts/order or `SPARE_KEY_CODES`. The currently active action-template names and `WHATSAPP_STAFF_ACTIONS_ENABLED=true` remain exactly as activated in v5.11.35. Five newer human-friendly replacements (`house_service_alert_actions_v3`, `house_booking_alert_actions_v2`, `house_luggage_alert_actions_v2`, `house_urgent_alert_actions_v2`, `house_lost_key_alert_actions_v2`) are under Meta review and must not be mapped until all five are Active and a separate activation release is explicitly authorized.
 
-Run one non-sensitive mixed-diving production booking smoke test:
+Run one non-sensitive alert of each action-template kind:
 
-1. Create one fresh three-person diving request with two or more participant groups and complete it normally using non-sensitive test details.
-2. Confirm exactly one booking alert record, three attempted recipients, at least one accepted delivery, a received compact subgroup summary and the normal pending-booking guest confirmation.
-3. If Meta rejects the request, capture only the new sanitized owner diagnostic and stop; do not guess or change configuration.
+1. Confirm the selected template name, generic-English language, expected BODY count and both buttons.
+2. Press **Received** and verify one ACKNOWLEDGED transition, actor exclusion, status fanout and escalation stop.
+3. Replay the same webhook and verify no duplicate transition or status message.
+4. Press **Resolve** and verify one RESOLVED transition and status fanout to the other assigned recipients.
+5. Confirm typed `RECEIVED`, `ACK` and `RESOLVE` still work.
+6. If Meta rejects a request, capture only the sanitized owner diagnostic and roll back with `WHATSAPP_STAFF_ACTIONS_ENABLED=false`; do not guess or change mappings.
 
 Quick-action activation is a separate post-approval change. Follow `META_STAFF_QUICK_ACTIONS_v5.11.20.md` only after every intended template is Active; never map service v1.
 

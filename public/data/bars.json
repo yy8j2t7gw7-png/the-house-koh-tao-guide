@@ -14,6 +14,7 @@
       "type": "bar",
       "status": "active",
       "featured": true,
+      "preferred": true,
       "displayOrder": 1,
       "name": "Bamboo Beach Bar",
       "area": "Mae Haad (Songserm Pier Street, steps from the main ferry pier)",

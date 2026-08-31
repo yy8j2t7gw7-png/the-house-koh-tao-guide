@@ -2626,8 +2626,8 @@ test("main and room welcome pages make required registration prominent", async (
   assert.match(registrationEntry, /spareKeyTrigger\?\.addEventListener\("click", \(event\) =>/);
   assert.doesNotMatch(registrationEntry, /HOUSE_PRIVATE_REGISTRATION_URL/);
   assert.match(registrationForm, /Option 1 — Upload passport image/);
-  assert.match(registrationForm, /Option 2 — Enter the required details/);
-  assert.match(registrationForm, /exact required TM30 fields/);
+  assert.doesNotMatch(registrationForm, /Option 2 — Enter the required details/);
+  assert.doesNotMatch(registrationForm, /exact required TM30 fields/);
   assert.match(room, /Please conserve water and electricity/);
   assert.match(room, /undersea grid connection, reducing reliance on local diesel generators/);
   assert.match(room, /switch off the air conditioning and lights when you leave the room/);

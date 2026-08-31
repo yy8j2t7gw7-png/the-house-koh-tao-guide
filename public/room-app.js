@@ -1,5 +1,5 @@
 (async function () {
-  const match = window.location.pathname.match(/^\/room\/(1|2|3|4|5|6|8|9|10|11)\/?$/);
+  const match = window.location.pathname.match(/^\/room\/(1|2|3|4|5|6|7|8|9|10|11)\/?$/);
   const room = match?.[1] || "";
   const titleElement = document.getElementById("roomTitle");
   const noteElement = document.getElementById("roomNote");

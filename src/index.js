@@ -19,11 +19,11 @@ export { ConciergeStore } from "./concierge-store.js";
 
 const EXPLORE_PAGE_PATTERN = /^\/(?:explore|activities|activity|diving|bars|bar|beaches|beach|cafes|cafe|restaurants|restaurant|shopping|shop)(?:\.html)?\/?$/;
 const EXPLORE_MODULE_PATTERN = /^\/modules\/(?:explore|activities|diving|bars|beaches|cafes|restaurants|shopping)\//;
-const ACTIVE_ROOM_PATH = /^\/room\/(1|2|3|4|5|6|8|9|10|11)\/?$/;
+const ACTIVE_ROOM_PATH = /^\/room\/(1|2|3|4|5|6|7|8|9|10|11)\/?$/;
 const PRIVATE_PAGE_PATH = /^\/(?:house|practical|checkout|report-problem)(?:\.html)?\/?$/;
 const PRIVATE_MODULE_PATH = /^\/modules\/(?:house|practical|departure)\//;
 const PRIVATE_DIRECT_ASSET = /^\/(?:room\.html|room-data\.js|modules\/house\/(?:room\.html|room-data\.js))$/;
-const PRIVATE_ROOM_PHOTO = /^\/assets\/(?:photo-(?:0[1-9]|10)\.jpeg|room-07-placeholder\.svg)$/;
+const PRIVATE_ROOM_PHOTO = /^\/assets\/(?:photo-(?:0[1-9]|10)\.jpeg|room-07-placeholder\.svg|room-07-location\.jpeg)$/;
 const PRIVATE_KNOWLEDGE_PATH = "/data/concierge-knowledge.json";
 
 function exploreEnabled(env) {
@@ -159,10 +159,6 @@ export default {
 
     const legalPage = await servePublicLegalPage(request, env);
     if (legalPage) return legalPage;
-
-    if (/^\/room\/7\/?$/.test(url.pathname)) {
-      return Response.redirect(new URL("/rooms.html", request.url).toString(), 302);
-    }
 
     const roomMatch = url.pathname.match(ACTIVE_ROOM_PATH);
     if (roomMatch) {

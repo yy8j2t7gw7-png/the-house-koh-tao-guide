@@ -2,22 +2,22 @@ window.HOUSE_ROOMS = {
   "1": {
     "floor": "Upstairs",
     "photo": "photo-06.jpeg",
-    "note": "Room 1 is upstairs and marked clearly in the building photo."
+    "note": "Room 1 is upstairs. Follow the path around the side of the house to the staircase at the back."
   },
   "2": {
     "floor": "Upstairs",
     "photo": "photo-05.jpeg",
-    "note": "Room 2 is upstairs and marked clearly in the building photo."
+    "note": "Room 2 is upstairs. Follow the path around the side of the house to the staircase at the back."
   },
   "3": {
     "floor": "Upstairs",
     "photo": "photo-09.jpeg",
-    "note": "Room 3 is upstairs and marked clearly in the building photo."
+    "note": "Room 3 is upstairs. Follow the path around the side of the house to the staircase at the back."
   },
   "4": {
     "floor": "Upstairs",
     "photo": "photo-02.jpeg",
-    "note": "Room 4 is upstairs and marked clearly in the building photo."
+    "note": "Room 4 is upstairs. Follow the path around the side of the house to the staircase at the back."
   },
   "5": {
     "floor": "Upstairs",
@@ -31,9 +31,8 @@ window.HOUSE_ROOMS = {
   },
   "7": {
     "floor": "Downstairs",
-    "photo": "room-07-placeholder.svg",
-    "note": "Room 7 is reserved for future use and is not currently active.",
-    "photoStatus": "placeholder"
+    "photo": "room-07-location.jpeg",
+    "note": "Room 7 is downstairs. Follow the building around the corner to reach it."
   },
   "8": {
     "floor": "Downstairs",

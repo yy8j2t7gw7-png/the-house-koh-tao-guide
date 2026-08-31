@@ -41,7 +41,7 @@ import {
 } from "./diving-catalog.js";
 
 const RELEASE = "5.11.45";
-const ROOM_OPTIONS = new Set(["1", "2", "3", "4", "5", "6", "8", "9", "10", "11"]);
+const ROOM_OPTIONS = new Set(["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11"]);
 const MAX_HISTORY_ITEMS = 10;
 const MAX_QUESTION_LENGTH = 800;
 const FALLBACK_MINIMUM_SCORE = 0.62;
@@ -1197,8 +1197,12 @@ function propertyIssuePolicy(question, workflowState = null) {
 function roomLocationResult(question, room) {
   if (!room || !/\b(?:find my room|where is my room|room location|which floor is my room|arrival photos)\b/i.test(String(question || ""))) return null;
   const descriptions = {
-    "1": "upstairs", "2": "upstairs", "3": "upstairs", "4": "upstairs",
+    "1": "upstairs. Follow the path around the side of the house to the staircase at the back",
+    "2": "upstairs. Follow the path around the side of the house to the staircase at the back",
+    "3": "upstairs. Follow the path around the side of the house to the staircase at the back",
+    "4": "upstairs. Follow the path around the side of the house to the staircase at the back",
     "5": "upstairs, around the corner", "6": "upstairs, around the corner",
+    "7": "downstairs. Follow the building around the corner to reach it",
     "8": "downstairs", "9": "downstairs", "10": "downstairs", "11": "downstairs"
   };
   return {

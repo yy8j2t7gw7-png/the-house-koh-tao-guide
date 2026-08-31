@@ -70,7 +70,7 @@ Baseline: v5.11.42
 - [x] Registration page presents image-upload and manual-entry choices without activating unverified fields
 - [x] Working structured Concierge v1 question-and-answer engine
 - [x] Room-aware concierge context and room selection
-- [x] Room 7 preserved as a future room but removed from the active guest release
+- [x] Room 7 enabled for the guest guide and direct-stay testing while remaining excluded from Airbnb synchronization until its listing is active
 - [x] Concierge-first public Contact Us actions
 - [x] Separate urgent property-emergency classification
 - [x] Safe unsupported-question and deferred-Explore fallbacks
@@ -220,7 +220,7 @@ Guests may continue using ordinary WhatsApp handoffs. Automated internal alerts 
 - [ ] Test a direct/walk-in stay and an active-stay extension in production
 - [ ] Test all seven languages on guest phones and review real guest feedback for wording refinements
 - [ ] Verify the protected `/concierge-admin` review workflow
-- [x] Verify the active permanent room links; Room 7 remains inactive
+- [x] Verify the permanent room-link architecture; Room 7 is guide-enabled for direct testing and remains Airbnb-disabled until its listing is active
 - [x] Test cross-room confirmation-code rejection
 - [x] Test a non-sensitive reservation-linked passport upload
 - [ ] Test the all-Thai exemption on a suitable test reservation

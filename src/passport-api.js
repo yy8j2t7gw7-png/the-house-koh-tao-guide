@@ -1,4 +1,4 @@
-const ROOM_OPTIONS = new Set(["1", "2", "3", "4", "5", "6", "8", "9", "10", "11"]);
+const ROOM_OPTIONS = new Set(["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11"]);
 const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 const MIN_UPLOAD_BYTES = 512;
 const TOKEN_PATTERN = /^[A-Za-z0-9_-]{40,100}$/;

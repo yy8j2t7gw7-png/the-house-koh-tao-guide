@@ -206,7 +206,7 @@
         "upstairs or downstairs",
         "arrival photos"
       ],
-      "answer": "Rooms 1–6 are upstairs, and active Rooms 8–11 are downstairs. Room 7 is not currently active. Select your room to see its arrival information.",
+      "answer": "Rooms 1–6 are upstairs. Rooms 7–11 are downstairs. Room 7 is available in the guest guide and for direct stays, but it is not yet connected to Airbnb. Select your room to see its arrival information.",
       "actions": [
         {
           "label": "Select My Room",

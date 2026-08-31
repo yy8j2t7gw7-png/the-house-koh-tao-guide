@@ -6,7 +6,7 @@ All notable changes to The House – Koh Tao guest guide are recorded here.
 
 - Rebuilt directly from stable v5.11.42; later unstable passport/registration branches are excluded.
 - Airbnb host mail is checked every 5 minutes; trustworthy active-listing + HM-code + stay-date records can immediately create/update the protected stay with `complete:false` without waiting for iCal.
-- All ten active Airbnb calendars (Rooms 1–6 and 8–11) reconcile at least hourly; Room 7 remains excluded; the 24-hour full audit remains the only cancellation-capable complete-feed path.
+- All ten active Airbnb calendars (Rooms 1–6 and 8–11) reconcile at least hourly; Room 7 remains excluded from Airbnb synchronization; the 24-hour full audit remains the only cancellation-capable complete-feed path.
 - Activates `house_service_alert_actions_v3`, `house_booking_alert_actions_v2`, `house_luggage_alert_actions_v2`, `house_urgent_alert_actions_v2` and `house_lost_key_alert_actions_v2`; visible buttons remain **Received / Resolved** while internal commands remain `RECEIVED` / `RESOLVE`.
 - Removes the guest-facing manual passport-details Option 2 placeholder while preserving Thai-only registration and secure passport image upload.
 - Allows mobile passport image selection through camera, photo library or file picker by removing forced `capture="environment"`.
@@ -16,7 +16,8 @@ All notable changes to The House – Koh Tao guest guide are recorded here.
 - Removes the guest-facing in-person passport choice and disables the guest in-person endpoint; non-Thai guest self-service is now secure passport image upload only.
 - Keeps the authenticated Owner Admin in-person exception directly available from reservation operations even before a guest has declared nationality or a non-Thai count; the owner supplies the required non-Thai count (1–10) when starting the exception.
 - Preserves Thai-only exemption, complete non-Thai guest counting, secure upload, existing in-person records/admin completion/reset, and all unrelated guest-facing Concierge messaging/usability and stable workflows.
-- Complete suite: **223 passed, 0 failed**.
+- Enables Room 7 as a guest-guide/property room and Owner Admin direct-stay test room without adding any Airbnb listing mapping or iCal feed; adds the supplied Room 7 location photo and clearer arrival directions for Rooms 1–4 and Room 7.
+- Complete suite: **224 passed, 0 failed**.
 - Commercialization rule: keep new functionality reusable/white-label friendly and avoid new The House-specific core assumptions; defer broad multi-tenant platformization to a deliberate later phase.
 
 ## v5.11.42 — Broad Human Routing + Stay Extension Booking

@@ -17,7 +17,7 @@ const ACTIVE_LISTINGS = Object.freeze({
   "1384311481900170410": "11"
 });
 
-const ACTIVE_ROOMS = new Set(Object.values(ACTIVE_LISTINGS));
+const PROPERTY_ROOMS = new Set(["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11"]);
 const CONFIRMATION_CODE_PATTERN = /^[A-Z0-9]{8,20}$/;
 const SESSION_COOKIE = "house_verified_stay";
 const MAX_SYNC_RECORDS = 250;
@@ -26,12 +26,13 @@ const LOST_KEY_REQUEST_TTL_MS = 15 * 60_000;
 const SPARE_KEY_VIEW_TTL_MS = 15 * 60_000;
 const REGISTRATION_COMPLETE_STATUSES = new Set(["thai_exempt", "passport_complete", "in_person_complete"]);
 const ROOM_DETAILS = Object.freeze({
-  "1": { floor: "Upstairs", photo: "photo-06.jpeg", note: "Room 1 is upstairs and marked clearly in the building photo." },
-  "2": { floor: "Upstairs", photo: "photo-05.jpeg", note: "Room 2 is upstairs and marked clearly in the building photo." },
-  "3": { floor: "Upstairs", photo: "photo-09.jpeg", note: "Room 3 is upstairs and marked clearly in the building photo." },
-  "4": { floor: "Upstairs", photo: "photo-02.jpeg", note: "Room 4 is upstairs and marked clearly in the building photo." },
+  "1": { floor: "Upstairs", photo: "photo-06.jpeg", note: "Room 1 is upstairs. Follow the path around the side of the house to the staircase at the back." },
+  "2": { floor: "Upstairs", photo: "photo-05.jpeg", note: "Room 2 is upstairs. Follow the path around the side of the house to the staircase at the back." },
+  "3": { floor: "Upstairs", photo: "photo-09.jpeg", note: "Room 3 is upstairs. Follow the path around the side of the house to the staircase at the back." },
+  "4": { floor: "Upstairs", photo: "photo-02.jpeg", note: "Room 4 is upstairs. Follow the path around the side of the house to the staircase at the back." },
   "5": { floor: "Upstairs", photo: "photo-01.jpeg", note: "Rooms 5 and 6 are upstairs around the corner." },
   "6": { floor: "Upstairs", photo: "photo-01.jpeg", note: "Rooms 5 and 6 are upstairs around the corner." },
+  "7": { floor: "Downstairs", photo: "room-07-location.jpeg", note: "Room 7 is downstairs. Follow the building around the corner to reach it." },
   "8": { floor: "Downstairs", photo: "photo-10.jpeg", note: "Room 8 is downstairs and marked clearly in the building photo." },
   "9": { floor: "Downstairs", photo: "photo-03.jpeg", note: "Room 9 is downstairs and marked clearly in the building photo." },
   "10": { floor: "Downstairs", photo: "photo-08.jpeg", note: "Room 10 is downstairs and marked clearly in the building photo." },
@@ -342,7 +343,7 @@ function parseKeyCodes(env) {
     return {};
   }
   const result = {};
-  for (const room of ACTIVE_ROOMS) {
+  for (const room of PROPERTY_ROOMS) {
     const code = String(values?.[room] || "").trim();
     if (/^[A-Za-z0-9*#-]{3,20}$/.test(code)) result[room] = code;
   }
@@ -359,7 +360,7 @@ export function stayConfiguration(env) {
     secureSpareKeyEnabled: Boolean(env.STAY_TOKEN_PEPPER && Object.keys(keyCodes).length && urgentNotificationsReady),
     urgentNotificationsReady,
     configuredKeyRooms: Object.keys(keyCodes).sort((left, right) => Number(left) - Number(right)),
-    activeRooms: [...ACTIVE_ROOMS].sort((left, right) => Number(left) - Number(right))
+    activeRooms: [...PROPERTY_ROOMS].sort((left, right) => Number(left) - Number(right))
   };
 }
 
@@ -417,7 +418,7 @@ export async function handleStayGuestRequest(request, env, path, ctx, now = new 
   if (path === "/api/stay/status") {
     if (request.method !== "GET") return json({ error: "method_not_allowed" }, 405, { allow: "GET" });
     const requestedRoom = new URL(request.url).searchParams.get("room") || "";
-    if (requestedRoom && !ACTIVE_ROOMS.has(requestedRoom)) return json({ error: requestedRoom === "7" ? "room_not_active" : "invalid_room" }, 400);
+    if (requestedRoom && !PROPERTY_ROOMS.has(requestedRoom)) return json({ error: "invalid_room" }, 400);
     const session = await verifiedSession(request, env, store, now);
     if (!session || (requestedRoom && session.room !== requestedRoom)) {
       return json({
@@ -461,7 +462,7 @@ export async function handleStayGuestRequest(request, env, path, ctx, now = new 
     const body = await readJson(request, 2_000);
     const room = String(body?.room || "");
     const confirmationCode = normalizeConfirmationCode(body?.confirmationCode);
-    if (!ACTIVE_ROOMS.has(room)) return json({ error: room === "7" ? "room_not_active" : "invalid_room" }, 400);
+    if (!PROPERTY_ROOMS.has(room)) return json({ error: "invalid_room" }, 400);
     if (!confirmationCode) return json({ error: "invalid_confirmation_code" }, 400);
     const codeHash = await hmac(`reservation:${confirmationCode}`, env.STAY_TOKEN_PEPPER);
     const reservation = await store.getStayReservationByCodeHash(codeHash, room);
@@ -777,7 +778,7 @@ export async function handleStayAdminRequest(request, env, path, store) {
     const room = String(body?.room || "");
     const checkInDate = validDate(body?.checkInDate);
     const checkOutDate = validDate(body?.checkOutDate);
-    if (!ACTIVE_ROOMS.has(room) || !checkInDate || !checkOutDate || checkOutDate <= checkInDate) {
+    if (!PROPERTY_ROOMS.has(room) || !checkInDate || !checkOutDate || checkOutDate <= checkInDate) {
       return json({ error: "invalid_request" }, 400);
     }
     const confirmationCode = randomDirectStayCode();
@@ -894,7 +895,7 @@ export async function handleStayAdminRequest(request, env, path, store) {
     const room = String(body?.room || "");
     const resetMode = ["controlled_test", "physical_rotation"].includes(body?.resetMode) ? body.resetMode : "";
     const requiredConfirmation = resetMode === "controlled_test" ? "KEEP EXISTING CODE" : "CODE ROTATED";
-    if (!ACTIVE_ROOMS.has(room) || !resetMode || body?.confirmed !== true || body?.confirmation !== requiredConfirmation) {
+    if (!PROPERTY_ROOMS.has(room) || !resetMode || body?.confirmed !== true || body?.confirmation !== requiredConfirmation) {
       return json({ error: "invalid_request" }, 400);
     }
     const result = await store.confirmSpareKeyRotation(room, new Date().toISOString(), resetMode);

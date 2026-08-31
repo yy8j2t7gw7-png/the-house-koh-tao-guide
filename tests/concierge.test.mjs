@@ -10804,3 +10804,69 @@ test("v5.11.45 approved Meta action templates use the exact new BODY orders and 
   assert.equal(fallback.payload.template.name, "house_service_alert_v3");
   assert.equal(fallback.payload.template.components.length, 1);
 });
+
+test("Room 7 is guide-enabled for direct testing while remaining excluded from Airbnb synchronization", async () => {
+  assert.equal(Object.values(listingRoomMap).includes("7"), false);
+
+  const { env, store } = createEnvironment();
+  const created = await handleStayAdminRequest(new Request("https://guide.example/api/concierge/admin/direct-stays", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ room: "7", checkInDate: "2027-08-14", checkOutDate: "2027-08-16" })
+  }), env, "/api/concierge/admin/direct-stays", store);
+  assert.equal(created.status, 200);
+  const direct = await created.json();
+  assert.equal(direct.room, "7");
+  assert.equal(direct.welcomeUrl, "https://guide.example/room/7");
+  assert.equal(store.stayReservations[0].provider, "direct");
+  assert.equal(store.stayReservations[0].listingId, "house-direct-7");
+
+  const verified = await handleStayGuestRequest(new Request("https://guide.example/api/stay/verify", {
+    method: "POST",
+    headers: { origin: "https://guide.example", "content-type": "application/json" },
+    body: JSON.stringify({ room: "7", confirmationCode: direct.confirmationCode })
+  }), env, "/api/stay/verify", null, new Date("2027-08-14T08:00:00.000Z"));
+  assert.equal(verified.status, 200);
+  const cookie = verified.headers.get("set-cookie").split(";")[0];
+
+  const thai = await handleStayGuestRequest(new Request("https://guide.example/api/stay/nationality", {
+    method: "POST",
+    headers: { origin: "https://guide.example", cookie, "content-type": "application/json" },
+    body: JSON.stringify({ nationality: "thai", allGuestsThai: true })
+  }), env, "/api/stay/nationality", null, new Date("2027-08-14T08:01:00.000Z"));
+  assert.equal(thai.status, 200);
+
+  const content = await handleStayGuestRequest(new Request("https://guide.example/api/stay/room-content?room=7", {
+    headers: { origin: "https://guide.example", cookie }
+  }), env, "/api/stay/room-content", null, new Date("2027-08-14T08:02:00.000Z"));
+  assert.equal(content.status, 200);
+  const roomContent = await content.json();
+  assert.equal(roomContent.floor, "Downstairs");
+  assert.equal(roomContent.note, "Room 7 is downstairs. Follow the building around the corner to reach it.");
+  assert.equal(roomContent.roomPhotoUrl, "/api/stay/room-photo?room=7");
+
+  const [roomsHtml, adminHtml, roomApp, registrationEntry, config, indexSource, roomData] = await Promise.all([
+    readFile(new URL("../public/rooms.html", import.meta.url), "utf8"),
+    readFile(new URL("../public/concierge-admin.html", import.meta.url), "utf8"),
+    readFile(new URL("../public/room-app.js", import.meta.url), "utf8"),
+    readFile(new URL("../public/registration-entry.js", import.meta.url), "utf8"),
+    readFile(new URL("../public/ai-concierge-config.js", import.meta.url), "utf8"),
+    readFile(new URL("../src/index.js", import.meta.url), "utf8"),
+    readFile(new URL("../public/room-data.js", import.meta.url), "utf8")
+  ]);
+  assert.match(roomsHtml, /href="\/room\/7" data-room="7">Room 7/);
+  const directSelect = adminHtml.match(/<select id="directStayRoom"[\s\S]*?<\/select>/)?.[0] || "";
+  const manualAirbnbSelect = adminHtml.match(/<select id="manualStayRoom"[\s\S]*?<\/select>/)?.[0] || "";
+  assert.match(directSelect, /value="7">Room 7/);
+  assert.doesNotMatch(manualAirbnbSelect, /value="7">Room 7/);
+  assert.match(roomApp, /1\|2\|3\|4\|5\|6\|7\|8\|9\|10\|11/);
+  assert.match(registrationEntry, /1\|2\|3\|4\|5\|6\|7\|8\|9\|10\|11/);
+  assert.match(config, /"roomOptions": \["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11"\]/);
+  assert.ok(indexSource.includes("const ACTIVE_ROOM_PATH = /^\\/room\\/(1|2|3|4|5|6|7|8|9|10|11)\\/?$/;"));
+  assert.match(roomData, /"photo": "room-07-location\.jpeg"/);
+  assert.match(roomData, /Room 1 is upstairs\. Follow the path around the side of the house to the staircase at the back\./);
+  assert.match(roomData, /Room 4 is upstairs\. Follow the path around the side of the house to the staircase at the back\./);
+
+  const room7Photo = await readFile(new URL("../public/assets/room-07-location.jpeg", import.meta.url));
+  assert.ok(room7Photo.length > 100_000);
+});

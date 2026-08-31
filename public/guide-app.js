@@ -26,7 +26,7 @@
 
 (function markCurrentNavigationItem() {
   const pathname = window.location.pathname.replace(/\/+$/, "") || "/";
-  const currentHref = /^\/room\/(?:1|2|3|4|5|6|8|9|10|11)$/.test(pathname)
+  const currentHref = /^\/room\/(?:1|2|3|4|5|6|7|8|9|10|11)$/.test(pathname)
     ? "/rooms.html"
     : pathname.endsWith(".html") ? pathname
     : pathname === "/rooms" ? "/rooms.html"

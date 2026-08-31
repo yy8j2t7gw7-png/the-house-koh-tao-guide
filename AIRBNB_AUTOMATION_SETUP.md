@@ -8,7 +8,7 @@ Every active room has one permanent guest URL. Guests enter the Airbnb confirmat
 - an exemption option when all overnight guests are Thai nationals;
 - protected 24/7 spare-key access during the active stay.
 
-The House does not create a guest link for each booking. Room 7 is reserved in the source but is not active or shown to guests.
+The House does not create a guest link for each booking. Room 7 is already enabled in the guest guide and for direct-stay testing, but it has no Airbnb listing integration yet and must remain absent from the Airbnb synchronization mapping until the genuine listing is active.
 
 ## Permanent Room URLs
 
@@ -43,7 +43,7 @@ The production synchronizer is the existing standalone Google Apps Script projec
 
 1. Open the existing Apps Script project under the Google account that receives the Airbnb host emails.
 2. Replace the project code with the full contents of v5.11.45 `airbnb-sync/Code.gs` and save.
-3. Keep the existing Script Properties and private iCal URLs. Required properties are `HOUSE_WORKER_ORIGIN`, `RESERVATION_SYNC_TOKEN`, and `AIRBNB_ICAL_ROOM_1` through `AIRBNB_ICAL_ROOM_6` plus `AIRBNB_ICAL_ROOM_8` through `AIRBNB_ICAL_ROOM_11`. Room 7 remains inactive.
+3. Keep the existing Script Properties and private iCal URLs. Required properties are `HOUSE_WORKER_ORIGIN`, `RESERVATION_SYNC_TOKEN`, and `AIRBNB_ICAL_ROOM_1` through `AIRBNB_ICAL_ROOM_6` plus `AIRBNB_ICAL_ROOM_8` through `AIRBNB_ICAL_ROOM_11`. Room 7 remains excluded from Airbnb synchronization until its genuine Airbnb listing and private iCal feed are available; do not add a placeholder listing ID or iCal URL.
 4. In the Apps Script function selector choose `installHouseReservationTrigger`, then **Run** once. Authorize only if Google asks again.
 5. The installer deletes any existing `syncHouseReservations` trigger, creates exactly one five-minute time trigger, and immediately performs a full audit. Confirm there is only one `syncHouseReservations` trigger afterward.
 6. Confirm the Script Properties `HOUSE_AIRBNB_LAST_SYNC_AT`, `HOUSE_AIRBNB_LAST_CALENDAR_AT` and `HOUSE_AIRBNB_LAST_AUDIT_AT` update. `HOUSE_AIRBNB_LAST_FAST_PATH_AT` updates when a trustworthy email-only reservation is successfully posted. `HOUSE_AIRBNB_LAST_DIAGNOSTICS` should remain blank before relying on absence-based cancellation.

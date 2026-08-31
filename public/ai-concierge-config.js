@@ -14,7 +14,7 @@ window.AI_CONCIERGE_CONFIG = {
   "engineScriptUrl": "/ai-concierge-engine.js",
   "knowledgeUrl": "/data/concierge-knowledge.json",
   "minimumMatchScore": 0.62,
-  "roomOptions": ["1", "2", "3", "4", "5", "6", "8", "9", "10", "11"],
+  "roomOptions": ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11"],
   "translationApprovedRuntimeText": [
     "I'm here to help. What has happened in your room? Please briefly tell me what the problem is.",
     "I'm here to help. What has happened? Please briefly tell me what the problem is.",

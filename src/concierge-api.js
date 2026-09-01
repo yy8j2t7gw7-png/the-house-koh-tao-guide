@@ -12,6 +12,8 @@ import {
 } from "./concierge-core.js";
 import { handlePassportAdminRequest } from "./passport-api.js";
 import { handleMaintenanceAdminRequest } from "./maintenance-api.js";
+import { handleExpenseAdminRequest } from "./expense-api.js";
+import { handleFinanceAdminRequest } from "./finance-api.js";
 import { housekeepingAvailability, parseBangkokRequestedDate } from "./alert-policy.js";
 import { retrieveApprovedProjectKnowledge } from "./project-knowledge.js";
 import { LANGUAGE_NAMES, translateApprovedTexts, validLanguage } from "./i18n-api.js";
@@ -4011,7 +4013,17 @@ export async function handleAdminRequest(request, env, path) {
     if (maintenanceResponse) return maintenanceResponse;
   }
 
-  if (path.includes("/stays") || path.includes("/direct-stays") || path.includes("/stay-extension") || path.includes("/in-person-registration") || path.includes("/registration-reset") || path.includes("/spare-key-rotation")) {
+  if (path.includes("/expenses") || path.includes("/expense-files/")) {
+    const expenseResponse = await handleExpenseAdminRequest(request, env, path, store, actorHash);
+    if (expenseResponse) return expenseResponse;
+  }
+
+  if (path.includes("/finance") || path.includes("/income")) {
+    const financeResponse = await handleFinanceAdminRequest(request, env, path, store, actorHash);
+    if (financeResponse) return financeResponse;
+  }
+
+  if (path.includes("/stays") || path.includes("/direct-stays") || path.includes("/direct-stay-code") || path.includes("/stay-extension") || path.includes("/in-person-registration") || path.includes("/registration-reset") || path.includes("/spare-key-rotation")) {
     const stayResponse = await handleStayAdminRequest(request, env, path, store);
     if (stayResponse) return stayResponse;
   }

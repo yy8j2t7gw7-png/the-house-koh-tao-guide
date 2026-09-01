@@ -89,6 +89,95 @@
         <div class="concierge-admin-operations-block"><h3>Recent key-box reset activity</h3><div id="keyRotationActivity" class="concierge-admin-queue"></div></div>
       </details>
 
+      <details class="concierge-admin-section" data-admin-section="finance">
+        <summary class="concierge-admin-section-head">
+          <div>
+            <p class="concierge-admin-kicker">Owner accounting</p>
+            <h2>Finance — income &amp; expenses</h2>
+          </div>
+          <span class="concierge-admin-section-summary"><span class="concierge-admin-section-count" data-section-count>0</span><span data-section-state>Collapsed</span><span class="concierge-admin-section-chevron" aria-hidden="true"></span></span>
+        </summary>
+        <p>Track confirmed income and expenses in one private owner view. Income is entered manually and expenses can be prepared from a receipt, but every record is reviewed and confirmed by the owner before it is saved.</p>
+        <div class="concierge-admin-expense-toolbar">
+          <div class="concierge-admin-field">
+            <label for="expenseMonth">Month</label>
+            <input id="expenseMonth" type="month">
+          </div>
+          <button type="button" class="secondary" id="expenseExport">Export finance CSV</button>
+        </div>
+        <div class="concierge-admin-expense-summary" id="financeSummary" aria-label="Monthly finance summary"></div>
+        <div class="concierge-admin-expense-category-summary" id="financeLocationSummary" aria-label="Room and area operating results"></div>
+
+        <div class="concierge-admin-operations-block">
+          <h3>Add income</h3>
+          <p>Record money actually earned or received. Enter gross income and any platform/processing fees; net income and the monthly operating result are calculated automatically.</p>
+          <form id="incomeForm" class="concierge-admin-expense-form">
+            <div class="concierge-admin-expense-fields">
+              <div class="concierge-admin-field"><label for="incomeDate">Date</label><input id="incomeDate" type="date" required></div>
+              <div class="concierge-admin-field"><label for="incomeCategory">Source / category</label><select id="incomeCategory" required><option value="">Select source</option></select></div>
+              <div class="concierge-admin-field"><label for="incomeGross" id="incomeGrossLabel">Gross income</label><input id="incomeGross" type="number" min="0.01" max="100000000" step="0.01" inputmode="decimal" required></div>
+              <div class="concierge-admin-field"><label for="incomeFees" id="incomeFeesLabel">Fees / commission</label><input id="incomeFees" type="number" min="0" max="100000000" step="0.01" inputmode="decimal" value="0"></div>
+              <div class="concierge-admin-field"><label for="incomeNet">Net income</label><input id="incomeNet" type="text" readonly></div>
+              <div class="concierge-admin-field"><label for="incomeUnit">Room / unit</label><input id="incomeUnit" type="text" maxlength="80" list="financeRoomOptions" placeholder="Optional, e.g. Room 7"></div>
+              <div class="concierge-admin-field full"><label for="incomeDescription">Description</label><input id="incomeDescription" type="text" maxlength="240" required placeholder="e.g. 3-night direct stay"></div>
+              <div class="concierge-admin-field"><label for="incomePaymentMethod">Payment method</label><select id="incomePaymentMethod"><option value="">Not specified</option><option>Cash</option><option>Card</option><option>Bank transfer</option><option>Other</option></select></div>
+              <div class="concierge-admin-field"><label for="incomeReference">Booking / payment reference</label><input id="incomeReference" type="text" maxlength="120" placeholder="Optional"></div>
+              <div class="concierge-admin-field full"><label for="incomeNotes">Notes</label><textarea id="incomeNotes" maxlength="500" rows="2"></textarea></div>
+            </div>
+            <div class="concierge-admin-card-actions">
+              <button type="submit" id="incomeSave">Save income</button>
+              <button type="button" class="secondary" id="incomeReset">Clear form</button>
+            </div>
+          </form>
+          <div class="concierge-admin-operations-block">
+            <h3>Saved income</h3>
+            <div id="incomeEntries" class="concierge-admin-queue"></div>
+          </div>
+        </div>
+
+        <div class="concierge-admin-operations-block">
+          <h3>Expenses &amp; private receipts</h3>
+          <p>Photograph or upload a receipt to prepare an expense draft automatically, then review every field before saving. Receipt files stay private and are not added to Concierge history, learning data, WhatsApp or public pages.</p>
+          <div class="concierge-admin-expense-summary" id="expenseSummary" aria-label="Expense summary"></div>
+          <div class="concierge-admin-expense-category-summary" id="expenseCategorySummary" aria-label="Expense category totals"></div>
+          <form id="expenseForm" class="concierge-admin-expense-form">
+            <div class="concierge-admin-expense-receipt">
+              <label for="expenseReceipt"><strong>Receipt photo or PDF</strong></label>
+              <p>On a phone you can take a new picture or choose an existing photo/file. Maximum 10 MB.</p>
+              <input id="expenseReceipt" name="receipt" type="file" accept="image/jpeg,image/png,image/webp,image/heic,application/pdf">
+              <div class="concierge-admin-card-actions">
+                <button type="button" id="expenseAnalyze">Analyze receipt</button>
+                <button type="button" class="secondary" id="expenseClearReceipt">Clear receipt</button>
+              </div>
+              <p id="expenseAnalysisStatus" role="status">Upload is optional. You can also enter an expense manually.</p>
+            </div>
+            <div class="concierge-admin-expense-fields">
+              <div class="concierge-admin-field"><label for="expenseDate">Date</label><input id="expenseDate" name="date" type="date" required></div>
+              <div class="concierge-admin-field"><label for="expenseAmount" id="expenseAmountLabel">Amount</label><input id="expenseAmount" name="amount" type="number" min="0.01" max="100000000" step="0.01" inputmode="decimal" required></div>
+              <div class="concierge-admin-field"><label for="expenseCategory">Category</label><select id="expenseCategory" name="category" required><option value="">Select category</option></select></div>
+              <div class="concierge-admin-field"><label for="expenseVendor">Supplier / vendor</label><input id="expenseVendor" name="vendor" type="text" maxlength="160" autocomplete="organization"></div>
+              <div class="concierge-admin-field full"><label for="expenseDescription">Description</label><input id="expenseDescription" name="description" type="text" maxlength="240" required></div>
+              <div class="concierge-admin-field"><label for="expensePaymentMethod">Payment method</label><select id="expensePaymentMethod" name="paymentMethod"><option value="">Not specified</option><option>Cash</option><option>Card</option><option>Bank transfer</option><option>Other</option></select></div>
+              <div class="concierge-admin-field"><label for="expenseRoomArea">Room / area</label><input id="expenseRoomArea" name="roomArea" type="text" maxlength="80" list="financeRoomOptions" placeholder="Optional, e.g. Room 2 or office"></div>
+              <div class="concierge-admin-field full"><label for="expenseNotes">Notes</label><textarea id="expenseNotes" name="notes" maxlength="500" rows="2"></textarea></div>
+            </div>
+            <div class="concierge-admin-card-actions">
+              <button type="submit" id="expenseSave">Save expense</button>
+              <button type="button" class="secondary" id="expenseReset">Clear form</button>
+            </div>
+          </form>
+          <div class="concierge-admin-operations-block">
+            <h3>Saved expenses</h3>
+            <div id="expenseEntries" class="concierge-admin-queue"></div>
+          </div>
+        </div>
+        <datalist id="financeRoomOptions">
+          <option value="Room 1"></option><option value="Room 2"></option><option value="Room 3"></option><option value="Room 4"></option>
+          <option value="Room 5"></option><option value="Room 6"></option><option value="Room 7"></option><option value="Room 8"></option>
+          <option value="Room 9"></option><option value="Room 10"></option><option value="Room 11"></option>
+        </datalist>
+      </details>
+
       <details class="concierge-admin-section" data-admin-section="alerts" open>
         <summary class="concierge-admin-section-head">
           <div>

@@ -251,6 +251,52 @@ export class ConciergeStore extends DurableObject {
         CREATE INDEX IF NOT EXISTS maintenance_reports_alert
           ON maintenance_reports(alert_id);
 
+        CREATE TABLE IF NOT EXISTS expense_records (
+          id TEXT PRIMARY KEY,
+          expense_date TEXT NOT NULL,
+          category TEXT NOT NULL,
+          description TEXT NOT NULL,
+          amount_minor INTEGER NOT NULL,
+          currency TEXT NOT NULL DEFAULT 'THB',
+          vendor TEXT NOT NULL DEFAULT '',
+          payment_method TEXT NOT NULL DEFAULT '',
+          room_area TEXT NOT NULL DEFAULT '',
+          notes TEXT NOT NULL DEFAULT '',
+          receipt_object_key TEXT NOT NULL DEFAULT '',
+          receipt_media_type TEXT NOT NULL DEFAULT '',
+          receipt_extension TEXT NOT NULL DEFAULT '',
+          receipt_size_bytes INTEGER NOT NULL DEFAULT 0,
+          created_by_hash TEXT NOT NULL DEFAULT '',
+          created_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS expense_records_date
+          ON expense_records(expense_date, created_at);
+        CREATE INDEX IF NOT EXISTS expense_records_category
+          ON expense_records(category, expense_date);
+
+        CREATE TABLE IF NOT EXISTS income_records (
+          id TEXT PRIMARY KEY,
+          income_date TEXT NOT NULL,
+          category TEXT NOT NULL,
+          description TEXT NOT NULL,
+          gross_minor INTEGER NOT NULL,
+          fees_minor INTEGER NOT NULL DEFAULT 0,
+          net_minor INTEGER NOT NULL,
+          currency TEXT NOT NULL DEFAULT 'THB',
+          unit TEXT NOT NULL DEFAULT '',
+          payment_method TEXT NOT NULL DEFAULT '',
+          reference TEXT NOT NULL DEFAULT '',
+          notes TEXT NOT NULL DEFAULT '',
+          created_by_hash TEXT NOT NULL DEFAULT '',
+          created_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS income_records_date
+          ON income_records(income_date, created_at);
+        CREATE INDEX IF NOT EXISTS income_records_category
+          ON income_records(category, income_date);
+        CREATE INDEX IF NOT EXISTS income_records_unit
+          ON income_records(unit, income_date);
+
         CREATE TABLE IF NOT EXISTS admin_operation_audit (
           id TEXT PRIMARY KEY,
           action TEXT NOT NULL,
@@ -956,6 +1002,178 @@ export class ConciergeStore extends DurableObject {
       "DELETE FROM maintenance_reports WHERE status = 'resolved' AND julianday(resolved_at) < julianday('now', '-30 days')"
     );
     return { records };
+  }
+
+  async createExpense(record) {
+    this.ctx.storage.sql.exec(
+      `INSERT INTO expense_records
+       (id, expense_date, category, description, amount_minor, currency, vendor, payment_method,
+        room_area, notes, receipt_object_key, receipt_media_type, receipt_extension,
+        receipt_size_bytes, created_by_hash, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      cleanText(record.id, 100),
+      cleanText(record.expenseDate, 10),
+      cleanText(record.category, 40),
+      cleanText(record.description, 240),
+      Math.max(1, Math.round(Number(record.amountMinor) || 0)),
+      cleanText(record.currency, 3) || "THB",
+      cleanText(record.vendor, 160),
+      cleanText(record.paymentMethod, 40),
+      cleanText(record.roomArea, 80),
+      cleanText(record.notes, 500),
+      cleanText(record.receiptObjectKey, 400),
+      cleanText(record.receiptMediaType, 80),
+      cleanText(record.receiptExtension, 12),
+      Math.max(0, Math.round(Number(record.receiptSizeBytes) || 0)),
+      cleanText(record.actorHash, 100),
+      cleanText(record.createdAt, 40) || new Date().toISOString()
+    );
+    await this.recordAdminAudit("expense_created", `expense:${cleanText(record.id, 100)}`, record.createdAt);
+    return { ok: true };
+  }
+
+  async listExpenses(month) {
+    const prefix = cleanText(month, 7);
+    return rows(this.ctx.storage.sql.exec(
+      `SELECT id, expense_date AS expenseDate, category, description,
+              amount_minor AS amountMinor, currency, vendor, payment_method AS paymentMethod,
+              room_area AS roomArea, notes, receipt_object_key AS receiptObjectKey,
+              receipt_media_type AS receiptMediaType, receipt_extension AS receiptExtension,
+              receipt_size_bytes AS receiptSizeBytes, created_at AS createdAt
+       FROM expense_records
+       WHERE substr(expense_date, 1, 7) = ?
+       ORDER BY expense_date DESC, created_at DESC
+       LIMIT 1000`,
+      prefix
+    )).map((record) => ({ ...record, hasReceipt: Boolean(record.receiptObjectKey) }));
+  }
+
+  async getExpense(id) {
+    const record = rows(this.ctx.storage.sql.exec(
+      `SELECT id, expense_date AS expenseDate, category, description,
+              amount_minor AS amountMinor, currency, vendor, payment_method AS paymentMethod,
+              room_area AS roomArea, notes, receipt_object_key AS receiptObjectKey,
+              receipt_media_type AS receiptMediaType, receipt_extension AS receiptExtension,
+              receipt_size_bytes AS receiptSizeBytes, created_at AS createdAt
+       FROM expense_records WHERE id = ? LIMIT 1`,
+      cleanText(id, 100)
+    ))[0] || null;
+    return record ? { ...record, hasReceipt: Boolean(record.receiptObjectKey) } : null;
+  }
+
+  async findExpenseDuplicates(expenseDate, amountMinor, vendor, currency = "THB") {
+    const date = cleanText(expenseDate, 10);
+    const amount = Math.round(Number(amountMinor) || 0);
+    const vendorValue = cleanText(vendor, 160).toLowerCase();
+    const currencyValue = cleanText(currency, 3) || "THB";
+    if (!date || !amount) return [];
+    return rows(this.ctx.storage.sql.exec(
+      `SELECT id, expense_date AS expenseDate, category, description,
+              amount_minor AS amountMinor, currency, vendor, created_at AS createdAt
+       FROM expense_records
+       WHERE expense_date = ? AND amount_minor = ? AND currency = ?
+         AND (? = '' OR lower(vendor) = ?)
+       ORDER BY created_at DESC
+       LIMIT 5`,
+      date,
+      amount,
+      currencyValue,
+      vendorValue,
+      vendorValue
+    ));
+  }
+
+  async deleteExpense(id, actorHash, nowValue) {
+    const expenseId = cleanText(id, 100);
+    const exists = rows(this.ctx.storage.sql.exec(
+      "SELECT id FROM expense_records WHERE id = ? LIMIT 1",
+      expenseId
+    ))[0];
+    if (!exists) return { ok: false, error: "not_found" };
+    this.ctx.storage.sql.exec("DELETE FROM expense_records WHERE id = ?", expenseId);
+    await this.recordAdminAudit("expense_deleted", `expense:${expenseId}`, nowValue);
+    return { ok: true, deleted: true };
+  }
+
+  async createIncome(record) {
+    this.ctx.storage.sql.exec(
+      `INSERT INTO income_records
+       (id, income_date, category, description, gross_minor, fees_minor, net_minor, currency,
+        unit, payment_method, reference, notes, created_by_hash, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      cleanText(record.id, 100),
+      cleanText(record.incomeDate, 10),
+      cleanText(record.category, 40),
+      cleanText(record.description, 240),
+      Math.max(1, Math.round(Number(record.grossMinor) || 0)),
+      Math.max(0, Math.round(Number(record.feesMinor) || 0)),
+      Math.max(0, Math.round(Number(record.netMinor) || 0)),
+      cleanText(record.currency, 3) || "THB",
+      cleanText(record.unit, 80),
+      cleanText(record.paymentMethod, 40),
+      cleanText(record.reference, 120),
+      cleanText(record.notes, 500),
+      cleanText(record.actorHash, 100),
+      cleanText(record.createdAt, 40) || new Date().toISOString()
+    );
+    await this.recordAdminAudit("income_created", `income:${cleanText(record.id, 100)}`, record.createdAt);
+    return { ok: true };
+  }
+
+  async listIncome(month) {
+    const prefix = cleanText(month, 7);
+    return rows(this.ctx.storage.sql.exec(
+      `SELECT id, income_date AS incomeDate, category, description,
+              gross_minor AS grossMinor, fees_minor AS feesMinor, net_minor AS netMinor, currency,
+              unit, payment_method AS paymentMethod, reference, notes, created_at AS createdAt
+       FROM income_records
+       WHERE substr(income_date, 1, 7) = ?
+       ORDER BY income_date DESC, created_at DESC
+       LIMIT 1000`,
+      prefix
+    ));
+  }
+
+  async getIncome(id) {
+    return rows(this.ctx.storage.sql.exec(
+      `SELECT id, income_date AS incomeDate, category, description,
+              gross_minor AS grossMinor, fees_minor AS feesMinor, net_minor AS netMinor, currency,
+              unit, payment_method AS paymentMethod, reference, notes, created_at AS createdAt
+       FROM income_records WHERE id = ? LIMIT 1`,
+      cleanText(id, 100)
+    ))[0] || null;
+  }
+
+  async findIncomeDuplicates(incomeDate, grossMinor, unit, reference, currency = "THB") {
+    const date = cleanText(incomeDate, 10);
+    const gross = Math.round(Number(grossMinor) || 0);
+    const unitValue = cleanText(unit, 80).toLowerCase();
+    const referenceValue = cleanText(reference, 120).toLowerCase();
+    const currencyValue = cleanText(currency, 3) || "THB";
+    if (!date || !gross) return [];
+    return rows(this.ctx.storage.sql.exec(
+      `SELECT id, income_date AS incomeDate, category, description,
+              gross_minor AS grossMinor, fees_minor AS feesMinor, net_minor AS netMinor, currency, unit, reference, created_at AS createdAt
+       FROM income_records
+       WHERE income_date = ? AND gross_minor = ? AND currency = ?
+         AND (? = '' OR lower(unit) = ?)
+         AND (? = '' OR lower(reference) = ?)
+       ORDER BY created_at DESC
+       LIMIT 5`,
+      date, gross, currencyValue, unitValue, unitValue, referenceValue, referenceValue
+    ));
+  }
+
+  async deleteIncome(id, actorHash, nowValue) {
+    const incomeId = cleanText(id, 100);
+    const exists = rows(this.ctx.storage.sql.exec(
+      "SELECT id FROM income_records WHERE id = ? LIMIT 1",
+      incomeId
+    ))[0];
+    if (!exists) return { ok: false, error: "not_found" };
+    this.ctx.storage.sql.exec("DELETE FROM income_records WHERE id = ?", incomeId);
+    await this.recordAdminAudit("income_deleted", `income:${incomeId}`, nowValue);
+    return { ok: true, deleted: true };
   }
 
   async recordAdminAudit(action, reference, nowValue) {
@@ -1872,6 +2090,31 @@ export class ConciergeStore extends DurableObject {
       cleanText(room, 4)
     );
     return { ok: true, room, resetMode: mode, rotationConfirmedAt: now };
+  }
+
+  async replaceDirectStayConfirmationCode(reservationId, confirmationCodeHash, updatedAt) {
+    const id = cleanText(reservationId, 100);
+    const codeHash = cleanText(confirmationCodeHash, 100);
+    const now = cleanText(updatedAt, 40) || new Date().toISOString();
+    if (!id || !codeHash) return { ok: false, error: "invalid_request" };
+    const reservation = rows(this.ctx.storage.sql.exec(
+      "SELECT id, provider, room, status FROM stay_reservations WHERE id = ? LIMIT 1",
+      id
+    ))[0];
+    if (!reservation) return { ok: false, error: "reservation_not_found" };
+    if (reservation.provider !== "direct") return { ok: false, error: "direct_stay_required" };
+    if (reservation.status !== "confirmed") return { ok: false, error: "reservation_not_active" };
+    try {
+      this.ctx.storage.sql.exec(
+        "UPDATE stay_reservations SET confirmation_code_hash = ?, updated_at = ? WHERE id = ?",
+        codeHash,
+        now,
+        id
+      );
+    } catch (_error) {
+      return { ok: false, error: "code_collision" };
+    }
+    return { ok: true, reservationId: id, room: cleanText(reservation.room, 4), updatedAt: now };
   }
 
   async extendStayReservation(reservationId, checkOutDate, nowValue) {

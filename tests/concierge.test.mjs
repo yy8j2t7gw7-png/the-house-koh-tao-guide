@@ -17,6 +17,8 @@ import {
   listingRoomMap
 } from "../src/stay-api.js";
 import { handleMaintenanceAdminRequest, handleMaintenanceGuestRequest } from "../src/maintenance-api.js";
+import { handleExpenseAdminRequest } from "../src/expense-api.js";
+import { handleFinanceAdminRequest } from "../src/finance-api.js";
 import {
   learningClusterKey,
   matchKnowledge,
@@ -91,6 +93,8 @@ function createStore() {
     spareKeyEvents: [],
     spareKeyRotations: new Map(),
     maintenanceReports: [],
+    expenseRecords: [],
+    incomeRecords: [],
     alerts: [],
     alertDeliveries: [],
     bookingRetrySnapshots: [],
@@ -132,6 +136,60 @@ function createStore() {
         queue: [], approved: [], alerts, recent: [], deliveryDiagnostics,
         maintenanceReports: this.maintenanceReports.map((item) => ({ ...item, hasPhoto: Boolean(item.photoObjectKey), photoObjectKey: undefined }))
       };
+    },
+    async createExpense(record) {
+      this.expenseRecords.push({ ...record, hasReceipt: Boolean(record.receiptObjectKey) });
+      this.adminAudit.push({ action: "expense_created", reference: `expense:${record.id}`, createdAt: record.createdAt });
+      return { ok: true };
+    },
+    async listExpenses(month) {
+      return this.expenseRecords
+        .filter((item) => item.expenseDate.startsWith(month))
+        .map((item) => ({ ...item, hasReceipt: Boolean(item.receiptObjectKey) }))
+        .sort((a, b) => b.expenseDate.localeCompare(a.expenseDate));
+    },
+    async getExpense(id) {
+      const item = this.expenseRecords.find((record) => record.id === id);
+      return item ? { ...item, hasReceipt: Boolean(item.receiptObjectKey) } : null;
+    },
+    async findExpenseDuplicates(expenseDate, amountMinor, vendor, currency = "THB") {
+      const vendorValue = String(vendor || "").toLowerCase();
+      return this.expenseRecords.filter((item) => item.expenseDate === expenseDate && item.amountMinor === amountMinor && item.currency === currency && (!vendorValue || String(item.vendor || "").toLowerCase() === vendorValue));
+    },
+    async deleteExpense(id, actorHash, now) {
+      const index = this.expenseRecords.findIndex((item) => item.id === id);
+      if (index < 0) return { ok: false, error: "not_found" };
+      this.expenseRecords.splice(index, 1);
+      this.adminAudit.push({ action: "expense_deleted", reference: `expense:${id}`, actorHash, createdAt: now });
+      return { ok: true, deleted: true };
+    },
+    async createIncome(record) {
+      this.incomeRecords.push({ ...record });
+      this.adminAudit.push({ action: "income_created", reference: `income:${record.id}`, createdAt: record.createdAt });
+      return { ok: true };
+    },
+    async listIncome(month) {
+      return this.incomeRecords
+        .filter((item) => item.incomeDate.startsWith(month))
+        .map((item) => ({ ...item }))
+        .sort((a, b) => b.incomeDate.localeCompare(a.incomeDate));
+    },
+    async getIncome(id) {
+      return this.incomeRecords.find((item) => item.id === id) || null;
+    },
+    async findIncomeDuplicates(incomeDate, grossMinor, unit, reference, currency = "THB") {
+      const unitValue = String(unit || "").toLowerCase();
+      const referenceValue = String(reference || "").toLowerCase();
+      return this.incomeRecords.filter((item) => item.incomeDate === incomeDate && item.grossMinor === grossMinor && item.currency === currency
+        && (!unitValue || String(item.unit || "").toLowerCase() === unitValue)
+        && (!referenceValue || String(item.reference || "").toLowerCase() === referenceValue));
+    },
+    async deleteIncome(id, actorHash, now) {
+      const index = this.incomeRecords.findIndex((item) => item.id === id);
+      if (index < 0) return { ok: false, error: "not_found" };
+      this.incomeRecords.splice(index, 1);
+      this.adminAudit.push({ action: "income_deleted", reference: `income:${id}`, actorHash, createdAt: now });
+      return { ok: true, deleted: true };
     },
     async getStayOperationsOverview() {
       return {
@@ -182,6 +240,18 @@ function createStore() {
       const session = this.staySessions.find((item) => item.tokenHash === tokenHash);
       if (session) session.revokedAt = now;
       return { ok: true };
+    },
+    async replaceDirectStayConfirmationCode(reservationId, confirmationCodeHash, updatedAt) {
+      const reservation = this.stayReservations.find((item) => item.id === reservationId);
+      if (!reservation) return { ok: false, error: "reservation_not_found" };
+      if (reservation.provider !== "direct") return { ok: false, error: "direct_stay_required" };
+      if (reservation.status !== "confirmed") return { ok: false, error: "reservation_not_active" };
+      if (this.stayReservations.some((item) => item.id !== reservationId && item.confirmationCodeHash === confirmationCodeHash)) {
+        return { ok: false, error: "code_collision" };
+      }
+      reservation.confirmationCodeHash = confirmationCodeHash;
+      reservation.updatedAt = updatedAt;
+      return { ok: true, reservationId, room: reservation.room, updatedAt };
     },
     async extendStayReservation(reservationId, checkOutDate, updatedAt) {
       const reservation = this.stayReservations.find((item) => item.id === reservationId && item.status === "confirmed");
@@ -2938,7 +3008,7 @@ test("owner dashboard major sections are independently collapsible, persistent a
     readFile(new URL("../public/concierge-admin.css", import.meta.url), "utf8")
   ]);
   const sections = [...html.matchAll(/<details class="concierge-admin-section" data-admin-section="([^"]+)"( open)?>/g)];
-  assert.deepEqual(sections.map((match) => match[1]), ["stays", "alerts", "maintenance", "passports", "learning", "approved", "recent"]);
+  assert.deepEqual(sections.map((match) => match[1]), ["stays", "finance", "alerts", "maintenance", "passports", "learning", "approved", "recent"]);
   assert.deepEqual(sections.filter((match) => match[2]).map((match) => match[1]), ["stays", "alerts"]);
   assert.equal((html.match(/<summary class="concierge-admin-section-head">/g) || []).length, sections.length);
   assert.equal((html.match(/data-section-count/g) || []).length, sections.length);
@@ -4313,7 +4383,7 @@ test("routine housekeeping supplies always create one Su-and-owner service alert
       const response = await handleConciergeRequest(guestRequest(question), env);
       const body = await response.json();
       assert.equal(response.status, 200, question);
-      assert.match(body.answer, /I’ve sent (?:your )?request for/i, question);
+      assert.match(body.answer, /I’ve sent (?:a |your )?request for/i, question);
       assert.match(body.answer, itemPattern, question);
       assert.doesNotMatch(body.answer, /request (?:it|them) again|Call Us/i, question);
       assert.deepEqual(body.actions, [], question);
@@ -8196,6 +8266,78 @@ test("direct and walk-in stays receive a one-time House code and active stays ca
   assert.equal(store.stayReservations[0].checkOutDate, "2027-08-19");
 });
 
+test("owner can replace a forgotten direct-stay code without storing plaintext or disturbing an existing verified session", async () => {
+  const { env, store } = createEnvironment();
+  const created = await handleStayAdminRequest(new Request("https://guide.example/api/concierge/admin/direct-stays", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ room: "7", checkInDate: "2027-08-14", checkOutDate: "2027-08-19" })
+  }), env, "/api/concierge/admin/direct-stays", store);
+  const original = await created.json();
+
+  const verified = await handleStayGuestRequest(new Request("https://guide.example/api/stay/verify", {
+    method: "POST",
+    headers: { origin: "https://guide.example", "content-type": "application/json" },
+    body: JSON.stringify({ room: "7", confirmationCode: original.confirmationCode })
+  }), env, "/api/stay/verify", null, new Date("2027-08-14T08:00:00.000Z"));
+  assert.equal(verified.status, 200);
+  const cookie = verified.headers.get("set-cookie").split(";")[0];
+
+  const replaced = await handleStayAdminRequest(new Request("https://guide.example/api/concierge/admin/direct-stay-code", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ reservationId: store.stayReservations[0].id, confirmed: true })
+  }), env, "/api/concierge/admin/direct-stay-code", store);
+  assert.equal(replaced.status, 200);
+  const replacement = await replaced.json();
+  assert.match(replacement.confirmationCode, /^HS[23456789A-HJ-NP-Z]{10}$/);
+  assert.notEqual(replacement.confirmationCode, original.confirmationCode);
+  assert.equal(replacement.welcomeUrl, "https://guide.example/room/7");
+  assert.notEqual(store.stayReservations[0].confirmationCodeHash, replacement.confirmationCode);
+
+  const oldCode = await handleStayGuestRequest(new Request("https://guide.example/api/stay/verify", {
+    method: "POST",
+    headers: { origin: "https://guide.example", "content-type": "application/json" },
+    body: JSON.stringify({ room: "7", confirmationCode: original.confirmationCode })
+  }), env, "/api/stay/verify", null, new Date("2027-08-14T08:02:00.000Z"));
+  assert.equal(oldCode.status, 404);
+
+  const newCode = await handleStayGuestRequest(new Request("https://guide.example/api/stay/verify", {
+    method: "POST",
+    headers: { origin: "https://guide.example", "content-type": "application/json" },
+    body: JSON.stringify({ room: "7", confirmationCode: replacement.confirmationCode })
+  }), env, "/api/stay/verify", null, new Date("2027-08-14T08:03:00.000Z"));
+  assert.equal(newCode.status, 200);
+
+  const existingSession = await handleStayGuestRequest(new Request("https://guide.example/api/stay/status?room=7", {
+    headers: { origin: "https://guide.example", cookie }
+  }), env, "/api/stay/status", null, new Date("2027-08-14T08:04:00.000Z"));
+  assert.equal(existingSession.status, 200);
+  assert.equal((await existingSession.json()).verified, true);
+});
+
+test("direct-stay code replacement is owner-routed and refuses Airbnb reservations", async () => {
+  const { env, store } = createEnvironment();
+  store.stayReservations.push({
+    id: `stay_${crypto.randomUUID()}`,
+    provider: "airbnb",
+    listingId: "1384311481900170410",
+    room: "3",
+    confirmationCodeHash: "synthetic_airbnb_hash",
+    checkInDate: "2027-08-14",
+    checkOutDate: "2027-08-19",
+    status: "confirmed",
+    updatedAt: "2027-08-14T00:00:00.000Z"
+  });
+  const response = await handleAdminRequest(new Request("https://guide.example/api/concierge/admin/direct-stay-code", {
+    method: "POST",
+    headers: { authorization: "Bearer admin_token_test_5500", "content-type": "application/json" },
+    body: JSON.stringify({ reservationId: store.stayReservations[0].id, confirmed: true })
+  }), env, "/api/concierge/admin/direct-stay-code");
+  assert.equal(response.status, 409);
+  assert.equal((await response.json()).error, "direct_stay_required");
+});
+
 test("owner operations separates active and upcoming stays and labels manual recovery clearly", async () => {
   const html = await readFile(new URL("../public/concierge-admin.html", import.meta.url), "utf8");
   const script = await readFile(new URL("../public/concierge-admin.js", import.meta.url), "utf8");
@@ -8207,6 +8349,8 @@ test("owner operations separates active and upcoming stays and labels manual rec
   assert.doesNotMatch(html, /Upcoming and active reservations|Add fallback stay/);
   assert.match(script, /data-extension-action/);
   assert.match(script, /\/api\/concierge\/admin\/direct-stays/);
+  assert.match(script, /Generate new stay code/);
+  assert.match(script, /\/api\/concierge\/admin\/direct-stay-code/);
   assert.match(script, /\/api\/concierge\/admin\/stay-extension/);
   assert.match(script, /function maintenanceReference\(room, createdAt\)/);
   assert.match(script, /item\.checkOutDate === today && nowMinutes < 660/);
@@ -10964,4 +11108,440 @@ test("pending-access UI exposes only registration, find-room and emergency quick
   assert.match(html, /id="arrivalAccess" hidden/);
   assert.match(html, /Please complete guest registration to unlock the full guest guide and service requests/);
   assert.doesNotMatch(html.match(/id="arrivalAccess"[\s\S]*?<\/section>/)?.[0] || "", /Wi-Fi password|Fresh towels|Room cleaning|key-box code/i);
+});
+
+test("expense receipt analysis creates an owner-review draft without storing the receipt", async () => {
+  const { env, store, passportBucket } = createEnvironment({ OPENAI_API_KEY: "openai-expense-test" });
+  const png = new Uint8Array(220);
+  png.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  const form = new FormData();
+  form.set("receipt", new Blob([png], { type: "image/png" }), "receipt.png");
+  const originalFetch = globalThis.fetch;
+  let requestBody;
+  globalThis.fetch = async (_url, options) => {
+    requestBody = JSON.parse(options.body);
+    return new Response(JSON.stringify({
+      output: [{ type: "message", content: [{ type: "output_text", text: JSON.stringify({
+        date: "2026-08-23",
+        amount: 8190,
+        vendor: "Island Hardware",
+        description: "Stair construction materials",
+        category: "Maintenance",
+        paymentMethod: "Cash",
+        roomArea: "",
+        confidence: 0.93,
+        notes: ""
+      }) }] }]
+    }), { status: 200, headers: { "content-type": "application/json" } });
+  };
+  let response;
+  try {
+    response = await handleExpenseAdminRequest(new Request("https://guide.example/api/concierge/admin/expenses/analyze", {
+      method: "POST",
+      body: form
+    }), env, "/api/concierge/admin/expenses/analyze", store, "actor_hash_test");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.equal(body.draft.amount, 8190);
+  assert.equal(body.draft.category, "Maintenance");
+  assert.equal(body.draft.vendor, "Island Hardware");
+  assert.equal(requestBody.store, false);
+  assert.equal(requestBody.model, "gpt-5.6");
+  assert.equal(requestBody.input[0].content[1].type, "input_image");
+  assert.match(requestBody.input[0].content[1].image_url, /^data:image\/png;base64,/);
+  assert.equal(passportBucket.objects.size, 0, "analysis must not create an orphaned stored receipt");
+  assert.equal(store.expenseRecords.length, 0, "analysis remains a draft until owner confirmation");
+});
+
+test("owner expense save stores private receipt, reports monthly totals, warns duplicates and exports CSV", async () => {
+  const { env, store, passportBucket } = createEnvironment();
+  const makeForm = (confirmDuplicate = false) => {
+    const form = new FormData();
+    form.set("date", "2026-08-23");
+    form.set("amount", "8190");
+    form.set("category", "Maintenance");
+    form.set("description", "Stair construction / repair");
+    form.set("vendor", "Island Hardware");
+    form.set("paymentMethod", "Cash");
+    form.set("roomArea", "Room 7");
+    form.set("notes", "Owner-confirmed test expense");
+    form.set("confirmDuplicate", confirmDuplicate ? "true" : "false");
+    const png = new Uint8Array(240);
+    png.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+    form.set("receipt", new Blob([png], { type: "image/png" }), "bill.png");
+    return form;
+  };
+
+  const saved = await handleExpenseAdminRequest(new Request("https://guide.example/api/concierge/admin/expenses", {
+    method: "POST", body: makeForm(false)
+  }), env, "/api/concierge/admin/expenses", store, "actor_hash_test");
+  assert.equal(saved.status, 201);
+  assert.equal(store.expenseRecords.length, 1);
+  assert.equal(store.expenseRecords[0].amountMinor, 819000);
+  assert.equal(store.expenseRecords[0].currency, "THB");
+  assert.equal(store.expenseRecords[0].roomArea, "Room 7");
+  assert.ok([...passportBucket.objects.keys()].some((key) => key.startsWith("expenses/2026-08/")));
+
+  const duplicate = await handleExpenseAdminRequest(new Request("https://guide.example/api/concierge/admin/expenses", {
+    method: "POST", body: makeForm(false)
+  }), env, "/api/concierge/admin/expenses", store, "actor_hash_test");
+  assert.equal(duplicate.status, 409);
+  const duplicateBody = await duplicate.json();
+  assert.equal(duplicateBody.error, "possible_duplicate");
+  assert.equal(duplicateBody.duplicates[0].amount, 8190);
+  assert.equal(store.expenseRecords.length, 1);
+
+  const list = await handleExpenseAdminRequest(new Request("https://guide.example/api/concierge/admin/expenses?month=2026-08"), env, "/api/concierge/admin/expenses", store, "actor_hash_test");
+  const listBody = await list.json();
+  assert.equal(listBody.configuration.currency, "THB");
+  assert.equal(listBody.totals.amount, 8190);
+  assert.equal(listBody.totals.entries, 1);
+  assert.equal(listBody.totals.receipts, 1);
+  assert.equal(listBody.totals.categories.Maintenance, 8190);
+  assert.equal(listBody.records[0].hasReceipt, true);
+  assert.equal("receiptObjectKey" in listBody.records[0], false);
+
+  const csv = await handleExpenseAdminRequest(new Request("https://guide.example/api/concierge/admin/expenses/export.csv?month=2026-08"), env, "/api/concierge/admin/expenses/export.csv", store, "actor_hash_test");
+  assert.equal(csv.status, 200);
+  const text = await csv.text();
+  assert.match(text, /Date,Category,Description,Amount \(THB\)/);
+  assert.match(text, /2026-08-23,Maintenance,Stair construction \/ repair,8190\.00,Island Hardware,Cash,Room 7/);
+});
+
+test("owner can privately download and delete an expense receipt without exposing it publicly", async () => {
+  const { env, store, passportBucket } = createEnvironment();
+  const objectKey = "expenses/2026-08/private-expense.png";
+  await passportBucket.put(objectKey, new Uint8Array([0x89, 0x50, 0x4e, 0x47, 1, 2, 3, 4]));
+  const id = "exp_private-expense-record-1234567890";
+  store.expenseRecords.push({
+    id, expenseDate: "2026-08-31", category: "Utilities", description: "Water bill",
+    amountMinor: 4275000, currency: "THB", vendor: "Water supplier", paymentMethod: "Bank transfer", roomArea: "", notes: "",
+    receiptObjectKey: objectKey, receiptMediaType: "image/png", receiptExtension: "png", receiptSizeBytes: 8,
+    createdAt: "2026-08-31T08:00:00.000Z"
+  });
+
+  const download = await handleExpenseAdminRequest(new Request(`https://guide.example/api/concierge/admin/expense-files/${id}`), env, `/api/concierge/admin/expense-files/${id}`, store, "actor_hash_test");
+  assert.equal(download.status, 200);
+  assert.equal(download.headers.get("cache-control"), "no-store, max-age=0");
+  assert.match(download.headers.get("content-disposition"), /expense-2026-08-31/);
+
+  const removed = await handleExpenseAdminRequest(new Request("https://guide.example/api/concierge/admin/expenses/delete", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ id, confirmation: "DELETE EXPENSE" })
+  }), env, "/api/concierge/admin/expenses/delete", store, "actor_hash_test");
+  assert.equal(removed.status, 200);
+  assert.equal(store.expenseRecords.length, 0);
+  assert.equal(passportBucket.objects.has(objectKey), false);
+  assert.ok(store.adminAudit.some((entry) => entry.action === "expense_deleted"));
+});
+
+test("expense admin module is isolated, mobile-friendly and routes only through owner admin", async () => {
+  const html = await readFile(new URL("../public/concierge-admin.html", import.meta.url), "utf8");
+  const script = await readFile(new URL("../public/concierge-admin.js", import.meta.url), "utf8");
+  const apiSource = await readFile(new URL("../src/concierge-api.js", import.meta.url), "utf8");
+  assert.match(html, /Expenses &amp; private receipts/);
+  assert.match(html, /id="expenseReceipt"[^>]+accept="image\/jpeg,image\/png,image\/webp,image\/heic,application\/pdf"/);
+  assert.doesNotMatch(html, /id="expenseReceipt"[^>]+capture=/);
+  assert.match(html, />Analyze receipt</);
+  assert.match(html, />Export finance CSV</);
+  assert.match(script, /\/api\/concierge\/admin\/expenses\/analyze/);
+  assert.match(script, /Possible duplicate expense/);
+  assert.match(apiSource, /handleExpenseAdminRequest/);
+  assert.match(apiSource, /path\.includes\("\/expenses"\) \|\| path\.includes\("\/expense-files\/"\)/);
+  assert.doesNotMatch(apiSource, /dispatchConciergeAlert\([^)]*expense/i);
+});
+
+test("Owner Admin router exposes expense management only after admin authorization", async () => {
+  const { env, store } = createEnvironment();
+  store.expenseRecords.push({
+    id: "exp_admin-router-expense-1234567890",
+    expenseDate: "2026-09-01",
+    category: "Cleaning",
+    description: "Cleaning supplies",
+    amountMinor: 15800,
+    currency: "THB",
+    vendor: "Local shop",
+    paymentMethod: "Cash",
+    roomArea: "",
+    notes: "",
+    receiptObjectKey: "",
+    receiptMediaType: "",
+    receiptExtension: "",
+    receiptSizeBytes: 0,
+    createdAt: "2026-09-01T07:00:00.000Z"
+  });
+  const path = "/api/concierge/admin/expenses";
+  const denied = await handleAdminRequest(new Request("https://guide.example/api/concierge/admin/expenses?month=2026-09"), env, path);
+  assert.equal(denied.status, 401);
+  const allowed = await handleAdminRequest(new Request("https://guide.example/api/concierge/admin/expenses?month=2026-09", {
+    headers: { authorization: "Bearer admin_token_test_5500" }
+  }), env, path);
+  assert.equal(allowed.status, 200);
+  const body = await allowed.json();
+  assert.equal(body.totals.entries, 1);
+  assert.equal(body.records[0].description, "Cleaning supplies");
+});
+
+test("expense module keeps property currency, timezone and categories configurable for white-label deployments", async () => {
+  const { env, store } = createEnvironment({
+    EXPENSE_CURRENCY: "EUR",
+    PROPERTY_TIME_ZONE: "Europe/Berlin",
+    EXPENSE_CATEGORIES: JSON.stringify(["Operations", "Payroll", "Other"])
+  });
+
+  const configurationResponse = await handleExpenseAdminRequest(
+    new Request("https://guide.example/api/concierge/admin/expenses?month=2026-09"),
+    env,
+    "/api/concierge/admin/expenses",
+    store,
+    "actor_hash_test"
+  );
+  assert.equal(configurationResponse.status, 200);
+  const configurationBody = await configurationResponse.json();
+  assert.equal(configurationBody.configuration.currency, "EUR");
+  assert.equal(configurationBody.configuration.timeZone, "Europe/Berlin");
+  assert.deepEqual(configurationBody.configuration.categories, ["Operations", "Payroll", "Other"]);
+  assert.equal(configurationBody.configuration.minorUnitDigits, 2);
+
+  const form = new FormData();
+  form.set("date", "2026-09-01");
+  form.set("amount", "12.34");
+  form.set("category", "Operations");
+  form.set("description", "Generic property supplies");
+  form.set("vendor", "Example Vendor");
+  form.set("paymentMethod", "Card");
+  form.set("roomArea", "Reception");
+  form.set("notes", "White-label configuration regression");
+  const saved = await handleExpenseAdminRequest(new Request("https://guide.example/api/concierge/admin/expenses", {
+    method: "POST",
+    body: form
+  }), env, "/api/concierge/admin/expenses", store, "actor_hash_test");
+  assert.equal(saved.status, 201);
+  assert.equal(store.expenseRecords[0].currency, "EUR");
+  assert.equal(store.expenseRecords[0].amountMinor, 1234);
+
+  const csv = await handleExpenseAdminRequest(
+    new Request("https://guide.example/api/concierge/admin/expenses/export.csv?month=2026-09"),
+    env,
+    "/api/concierge/admin/expenses/export.csv",
+    store,
+    "actor_hash_test"
+  );
+  assert.equal(csv.status, 200);
+  assert.match(await csv.text(), /Amount \(EUR\)/);
+});
+
+test("owner income entry calculates net, warns duplicates and combines with expenses in the finance overview", async () => {
+  const { env, store } = createEnvironment();
+  store.expenseRecords.push({
+    id: "exp_finance-expense-record-1234567890",
+    expenseDate: "2026-09-01",
+    category: "Maintenance",
+    description: "Room 7 repair",
+    amountMinor: 819000,
+    currency: "THB",
+    vendor: "Island Hardware",
+    paymentMethod: "Cash",
+    roomArea: "Room 7",
+    notes: "",
+    receiptObjectKey: "",
+    receiptMediaType: "",
+    receiptExtension: "",
+    receiptSizeBytes: 0,
+    createdAt: "2026-09-01T07:00:00.000Z"
+  });
+
+  const payload = {
+    date: "2026-09-01",
+    category: "Airbnb",
+    gross: "3200",
+    fees: "480",
+    unit: "Room 5",
+    description: "3-night Airbnb stay",
+    paymentMethod: "Bank transfer",
+    reference: "TEST-BOOKING-REF",
+    notes: "Owner-confirmed test income"
+  };
+  const saved = await handleFinanceAdminRequest(new Request("https://guide.example/api/concierge/admin/income", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(payload)
+  }), env, "/api/concierge/admin/income", store, "actor_hash_test");
+  assert.equal(saved.status, 201);
+  assert.equal((await saved.json()).net, 2720);
+  assert.equal(store.incomeRecords.length, 1);
+  assert.equal(store.incomeRecords[0].grossMinor, 320000);
+  assert.equal(store.incomeRecords[0].feesMinor, 48000);
+  assert.equal(store.incomeRecords[0].netMinor, 272000);
+  assert.equal(store.incomeRecords[0].currency, "THB");
+  assert.equal(store.incomeRecords[0].unit, "Room 5");
+
+  const duplicate = await handleFinanceAdminRequest(new Request("https://guide.example/api/concierge/admin/income", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(payload)
+  }), env, "/api/concierge/admin/income", store, "actor_hash_test");
+  assert.equal(duplicate.status, 409);
+  const duplicateBody = await duplicate.json();
+  assert.equal(duplicateBody.error, "possible_duplicate");
+  assert.equal(duplicateBody.duplicates[0].gross, 3200);
+  assert.equal(duplicateBody.duplicates[0].net, 2720);
+  assert.equal(store.incomeRecords.length, 1);
+
+  const invalidFees = await handleFinanceAdminRequest(new Request("https://guide.example/api/concierge/admin/income", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ ...payload, reference: "DIFFERENT", fees: "4000" })
+  }), env, "/api/concierge/admin/income", store, "actor_hash_test");
+  assert.equal(invalidFees.status, 400);
+
+  const overview = await handleFinanceAdminRequest(
+    new Request("https://guide.example/api/concierge/admin/finance?month=2026-09"),
+    env,
+    "/api/concierge/admin/finance",
+    store,
+    "actor_hash_test"
+  );
+  assert.equal(overview.status, 200);
+  const body = await overview.json();
+  assert.equal(body.totals.grossIncome, 3200);
+  assert.equal(body.totals.fees, 480);
+  assert.equal(body.totals.netIncome, 2720);
+  assert.equal(body.totals.expenses, 8190);
+  assert.equal(body.totals.operatingResult, -5470);
+  assert.equal(body.totals.incomeEntries, 1);
+  assert.equal(body.totals.expenseEntries, 1);
+  assert.equal(body.totals.locations["Room 5"].netIncome, 2720);
+  assert.equal(body.totals.locations["Room 7"].expenses, 8190);
+  assert.equal(body.income[0].net, 2720);
+
+  const csv = await handleFinanceAdminRequest(
+    new Request("https://guide.example/api/concierge/admin/finance/export.csv?month=2026-09"),
+    env,
+    "/api/concierge/admin/finance/export.csv",
+    store,
+    "actor_hash_test"
+  );
+  assert.equal(csv.status, 200);
+  const csvText = await csv.text();
+  assert.match(csvText, /Type,Date,Category \/ source,Description,Gross income \(THB\),Fees \(THB\),Net income \(THB\),Expense \(THB\),Operating effect \(THB\)/);
+  assert.match(csvText, /Income,2026-09-01,Airbnb,3-night Airbnb stay,3200\.00,480\.00,2720\.00,,2720\.00,TEST-BOOKING-REF,Bank transfer,Room 5/);
+  assert.match(csvText, /Expense,2026-09-01,Maintenance,Room 7 repair,,,,8190\.00,-8190\.00,Island Hardware,Cash,Room 7/);
+
+  const incomeId = store.incomeRecords[0].id;
+  const removed = await handleFinanceAdminRequest(new Request("https://guide.example/api/concierge/admin/income/delete", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ id: incomeId, confirmation: "DELETE INCOME" })
+  }), env, "/api/concierge/admin/income/delete", store, "actor_hash_test");
+  assert.equal(removed.status, 200);
+  assert.equal(store.incomeRecords.length, 0);
+  assert.ok(store.adminAudit.some((entry) => entry.action === "income_deleted"));
+});
+
+test("finance admin UI and routes stay owner-only and keep income separate from guest operations", async () => {
+  const [html, script, apiSource] = await Promise.all([
+    readFile(new URL("../public/concierge-admin.html", import.meta.url), "utf8"),
+    readFile(new URL("../public/concierge-admin.js", import.meta.url), "utf8"),
+    readFile(new URL("../src/concierge-api.js", import.meta.url), "utf8")
+  ]);
+  assert.match(html, /Finance — income &amp; expenses/);
+  assert.match(html, /id="incomeForm"/);
+  assert.match(html, /id="incomeGross"/);
+  assert.match(html, /id="incomeFees"/);
+  assert.match(html, /id="incomeNet"[^>]+readonly/);
+  assert.match(html, /id="financeLocationSummary"/);
+  assert.match(html, />Export finance CSV</);
+  assert.match(script, /\/api\/concierge\/admin\/income/);
+  assert.match(script, /\/api\/concierge\/admin\/finance\?month=/);
+  assert.match(script, /Operating result/);
+  assert.match(apiSource, /handleFinanceAdminRequest/);
+  assert.match(apiSource, /path\.includes\("\/finance"\) \|\| path\.includes\("\/income"\)/);
+  assert.doesNotMatch(apiSource, /dispatchConciergeAlert\([^)]*income/i);
+
+  const { env, store } = createEnvironment();
+  store.incomeRecords.push({
+    id: "inc_admin-router-income-1234567890",
+    incomeDate: "2026-09-01",
+    category: "Direct booking",
+    description: "Direct stay",
+    grossMinor: 300000,
+    feesMinor: 0,
+    netMinor: 300000,
+    currency: "THB",
+    unit: "Room 7",
+    paymentMethod: "Cash",
+    reference: "",
+    notes: "",
+    createdAt: "2026-09-01T08:00:00.000Z"
+  });
+  const path = "/api/concierge/admin/finance";
+  const denied = await handleAdminRequest(new Request("https://guide.example/api/concierge/admin/finance?month=2026-09"), env, path);
+  assert.equal(denied.status, 401);
+  const allowed = await handleAdminRequest(new Request("https://guide.example/api/concierge/admin/finance?month=2026-09", {
+    headers: { authorization: "Bearer admin_token_test_5500" }
+  }), env, path);
+  assert.equal(allowed.status, 200);
+  const body = await allowed.json();
+  assert.equal(body.totals.netIncome, 3000);
+  assert.equal(body.income[0].unit, "Room 7");
+});
+
+test("finance module keeps income sources, property currency and timezone configurable for white-label deployments", async () => {
+  const { env, store } = createEnvironment({
+    EXPENSE_CURRENCY: "EUR",
+    PROPERTY_TIME_ZONE: "Europe/Berlin",
+    EXPENSE_CATEGORIES: JSON.stringify(["Operations", "Payroll", "Other"]),
+    INCOME_CATEGORIES: JSON.stringify(["OTA", "Direct", "Other income"])
+  });
+
+  const initial = await handleFinanceAdminRequest(
+    new Request("https://guide.example/api/concierge/admin/finance?month=2026-09"),
+    env,
+    "/api/concierge/admin/finance",
+    store,
+    "actor_hash_test"
+  );
+  assert.equal(initial.status, 200);
+  const initialBody = await initial.json();
+  assert.equal(initialBody.configuration.currency, "EUR");
+  assert.equal(initialBody.configuration.timeZone, "Europe/Berlin");
+  assert.deepEqual(initialBody.configuration.categories, ["OTA", "Direct", "Other income"]);
+
+  const saved = await handleFinanceAdminRequest(new Request("https://guide.example/api/concierge/admin/income", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      date: "2026-09-01",
+      category: "Direct",
+      gross: "12.34",
+      fees: "1.34",
+      unit: "Suite A",
+      description: "Generic direct accommodation income",
+      paymentMethod: "Card",
+      reference: "GENERIC-REF",
+      notes: "White-label finance regression"
+    })
+  }), env, "/api/concierge/admin/income", store, "actor_hash_test");
+  assert.equal(saved.status, 201);
+  assert.equal(store.incomeRecords[0].currency, "EUR");
+  assert.equal(store.incomeRecords[0].grossMinor, 1234);
+  assert.equal(store.incomeRecords[0].feesMinor, 134);
+  assert.equal(store.incomeRecords[0].netMinor, 1100);
+
+  const csv = await handleFinanceAdminRequest(
+    new Request("https://guide.example/api/concierge/admin/finance/export.csv?month=2026-09"),
+    env,
+    "/api/concierge/admin/finance/export.csv",
+    store,
+    "actor_hash_test"
+  );
+  assert.equal(csv.status, 200);
+  const text = await csv.text();
+  assert.match(text, /Gross income \(EUR\),Fees \(EUR\),Net income \(EUR\),Expense \(EUR\)/);
+  assert.match(text, /Suite A/);
 });

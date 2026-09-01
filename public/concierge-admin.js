@@ -16,6 +16,22 @@
   const alerts = document.getElementById("conciergeAlerts");
   const whatsappDeliveryDiagnostics = document.getElementById("whatsappDeliveryDiagnostics");
   const maintenanceReports = document.getElementById("maintenanceReports");
+  const expenseMonth = document.getElementById("expenseMonth");
+  const expenseSummary = document.getElementById("expenseSummary");
+  const expenseCategorySummary = document.getElementById("expenseCategorySummary");
+  const expenseForm = document.getElementById("expenseForm");
+  const expenseReceipt = document.getElementById("expenseReceipt");
+  const expenseAnalyze = document.getElementById("expenseAnalyze");
+  const expenseClearReceipt = document.getElementById("expenseClearReceipt");
+  const expenseAnalysisStatus = document.getElementById("expenseAnalysisStatus");
+  const expenseEntries = document.getElementById("expenseEntries");
+  const expenseExport = document.getElementById("expenseExport");
+  const expenseReset = document.getElementById("expenseReset");
+  const financeSummary = document.getElementById("financeSummary");
+  const financeLocationSummary = document.getElementById("financeLocationSummary");
+  const incomeForm = document.getElementById("incomeForm");
+  const incomeEntries = document.getElementById("incomeEntries");
+  const incomeReset = document.getElementById("incomeReset");
   const alertStatus = document.getElementById("whatsappAlertStatus");
   const activeStayReservations = document.getElementById("activeStayReservations");
   const upcomingStayReservations = document.getElementById("upcomingStayReservations");
@@ -35,6 +51,11 @@
   const adminSections = [...document.querySelectorAll("details[data-admin-section]")];
   const sectionStateKey = "houseConciergeAdminSections:v5.11.27";
   let token = "";
+  let expenseCurrency = "THB";
+  let expenseTimeZone = "Asia/Bangkok";
+  let expenseCategories = [];
+  let incomeCategories = [];
+  let expenseMinorUnitDigits = 2;
 
   function savedAdminSectionState() {
     try {
@@ -123,6 +144,7 @@
     setAdminSectionCount("stays", (stayOperations.reservations || []).length + (stayOperations.rotations || []).length);
     setAdminSectionCount("alerts", (data.alerts || []).length);
     setAdminSectionCount("maintenance", (data.maintenanceReports || []).length);
+    setAdminSectionCount("finance", Number(expenseEntries?.dataset.count || 0) + Number(incomeEntries?.dataset.count || 0));
     setAdminSectionCount("passports", (data.pendingRegistrations || []).length + (data.passportUploads || []).length);
     setAdminSectionCount("learning", (data.queue || []).length);
     setAdminSectionCount("approved", (data.approved || []).length);
@@ -173,6 +195,22 @@
     if (!response.ok) {
       const error = new Error(data.error || "Request failed");
       error.status = response.status;
+      throw error;
+    }
+    return data;
+  }
+
+  async function apiForm(path, form) {
+    const response = await fetch(path, {
+      method: "POST",
+      headers: { authorization: `Bearer ${token}` },
+      body: form
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const error = new Error(data.error || "Request failed");
+      error.status = response.status;
+      error.data = data;
       throw error;
     }
     return data;
@@ -527,6 +565,14 @@
         element("span", "", registrationDetail),
         element("span", "", `Status: ${item.status} · updated ${bangkokDate(item.updatedAt)}`)
       );
+      if (item.provider === "direct" && item.id) {
+        const actions = element("div", "concierge-admin-card-actions");
+        const newCode = element("button", "secondary", "Generate new stay code");
+        newCode.type = "button";
+        newCode.dataset.directCodeAction = "generate";
+        actions.appendChild(newCode);
+        card.appendChild(actions);
+      }
       if (isActive && item.id) {
         const nextCheckout = new Date(`${item.checkOutDate}T00:00:00Z`);
         nextCheckout.setUTCDate(nextCheckout.getUTCDate() + 1);
@@ -733,6 +779,259 @@
     });
   }
 
+  function currentPropertyDateParts() {
+    const parts = new Intl.DateTimeFormat("en-CA", {
+      timeZone: expenseTimeZone, year: "numeric", month: "2-digit", day: "2-digit"
+    }).formatToParts(new Date());
+    const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+    return { date: `${values.year}-${values.month}-${values.day}`, month: `${values.year}-${values.month}` };
+  }
+
+  function formatExpenseAmount(value) {
+    return new Intl.NumberFormat("en", { style: "currency", currency: expenseCurrency, maximumFractionDigits: expenseMinorUnitDigits }).format(Number(value) || 0);
+  }
+
+  function resetExpenseForm({ keepReceipt = false } = {}) {
+    const file = keepReceipt ? expenseReceipt.files?.[0] : null;
+    expenseForm.reset();
+    document.getElementById("expenseDate").value = currentPropertyDateParts().date;
+    if (!keepReceipt) expenseAnalysisStatus.textContent = "Upload is optional. You can also enter an expense manually.";
+    if (file) expenseAnalysisStatus.textContent = `Receipt selected: ${file.name}`;
+  }
+
+  function renderExpenseSummary(totals = {}) {
+    const summaryCards = [
+      [formatExpenseAmount(totals.amount), "Month total"],
+      [String(Number(totals.entries) || 0), "Saved expenses"],
+      [String(Number(totals.receipts) || 0), "Receipts attached"]
+    ].map(([value, label]) => {
+      const card = element("article", "concierge-admin-expense-stat");
+      card.append(element("strong", "", value), element("span", "", label));
+      return card;
+    });
+    expenseSummary.replaceChildren(...summaryCards);
+    const categories = totals.categories || {};
+    const entries = Object.entries(categories).filter(([, value]) => Number(value) > 0).sort((a, b) => Number(b[1]) - Number(a[1]));
+    expenseCategorySummary.replaceChildren();
+    entries.forEach(([category, value]) => expenseCategorySummary.appendChild(element("span", "", `${category}: ${formatExpenseAmount(value)}`)));
+  }
+
+  function renderExpenses(records = []) {
+    expenseEntries.replaceChildren();
+    expenseEntries.dataset.count = String(records.length);
+    updateFinanceSectionCount();
+    if (!records.length) {
+      expenseEntries.appendChild(element("div", "concierge-admin-empty", "No expenses recorded for this month."));
+      return;
+    }
+    records.forEach((item) => {
+      const card = element("article", "concierge-admin-expense-item");
+      card.dataset.expenseId = item.id;
+      const head = element("div", "concierge-admin-expense-item-head");
+      const copy = element("div");
+      copy.append(
+        element("strong", "", `${item.expenseDate} · ${item.category}`),
+        element("p", "concierge-admin-expense-description", item.description || "Expense")
+      );
+      head.append(copy, element("span", "concierge-admin-expense-amount", formatExpenseAmount(item.amount)));
+      const meta = element("div", "concierge-admin-expense-meta");
+      if (item.vendor) meta.appendChild(element("span", "", item.vendor));
+      if (item.paymentMethod) meta.appendChild(element("span", "", item.paymentMethod));
+      if (item.roomArea) meta.appendChild(element("span", "", item.roomArea));
+      if (item.notes) meta.appendChild(element("span", "", item.notes));
+      meta.appendChild(element("span", "", item.hasReceipt ? "Receipt attached" : "No receipt"));
+      const actions = element("div", "concierge-admin-card-actions");
+      if (item.hasReceipt) {
+        const receipt = element("button", "secondary", "Download receipt");
+        receipt.type = "button";
+        receipt.dataset.expenseReceiptId = item.id;
+        actions.appendChild(receipt);
+      }
+      const remove = element("button", "danger", "Delete expense");
+      remove.type = "button";
+      remove.dataset.expenseDeleteId = item.id;
+      actions.appendChild(remove);
+      card.append(head, meta, actions);
+      expenseEntries.appendChild(card);
+    });
+  }
+
+  function applyExpenseConfiguration(configuration = {}) {
+    expenseCurrency = /^[A-Z]{3}$/.test(String(configuration.currency || "")) ? configuration.currency : "THB";
+    expenseTimeZone = String(configuration.timeZone || "Asia/Bangkok");
+    expenseCategories = Array.isArray(configuration.categories) ? configuration.categories : [];
+    expenseMinorUnitDigits = Math.max(0, Math.min(3, Number(configuration.minorUnitDigits) || 0));
+    const amountInput = document.getElementById("expenseAmount");
+    const minimumAmount = expenseMinorUnitDigits > 0 ? 1 / (10 ** expenseMinorUnitDigits) : 1;
+    amountInput.step = String(minimumAmount);
+    amountInput.min = String(minimumAmount);
+    document.getElementById("expenseAmountLabel").textContent = `Amount (${expenseCurrency})`;
+    const select = document.getElementById("expenseCategory");
+    const current = select.value;
+    select.replaceChildren();
+    const placeholder = document.createElement("option");
+    placeholder.value = "";
+    placeholder.textContent = "Select category";
+    select.appendChild(placeholder);
+    expenseCategories.forEach((category) => {
+      const option = document.createElement("option");
+      option.value = category;
+      option.textContent = category;
+      select.appendChild(option);
+    });
+    if (expenseCategories.includes(current)) select.value = current;
+  }
+
+  function updateFinanceSectionCount() {
+    setAdminSectionCount("finance", Number(expenseEntries?.dataset.count || 0) + Number(incomeEntries?.dataset.count || 0));
+  }
+
+  function resetIncomeForm() {
+    incomeForm.reset();
+    document.getElementById("incomeDate").value = currentPropertyDateParts().date;
+    document.getElementById("incomeFees").value = "0";
+    updateIncomeNetPreview();
+  }
+
+  function updateIncomeNetPreview() {
+    const gross = Math.max(0, Number(document.getElementById("incomeGross").value) || 0);
+    const fees = Math.max(0, Number(document.getElementById("incomeFees").value) || 0);
+    document.getElementById("incomeNet").value = formatExpenseAmount(Math.max(0, gross - fees));
+  }
+
+  function applyIncomeConfiguration(configuration = {}) {
+    if (/^[A-Z]{3}$/.test(String(configuration.currency || ""))) expenseCurrency = configuration.currency;
+    if (configuration.timeZone) expenseTimeZone = String(configuration.timeZone);
+    if (Number.isFinite(Number(configuration.minorUnitDigits))) expenseMinorUnitDigits = Math.max(0, Math.min(3, Number(configuration.minorUnitDigits) || 0));
+    incomeCategories = Array.isArray(configuration.categories) ? configuration.categories : [];
+    const step = expenseMinorUnitDigits > 0 ? 1 / (10 ** expenseMinorUnitDigits) : 1;
+    ["incomeGross", "incomeFees"].forEach((id) => {
+      const input = document.getElementById(id);
+      input.step = String(step);
+      input.min = id === "incomeGross" ? String(step) : "0";
+    });
+    document.getElementById("incomeGrossLabel").textContent = `Gross income (${expenseCurrency})`;
+    document.getElementById("incomeFeesLabel").textContent = `Fees / commission (${expenseCurrency})`;
+    const select = document.getElementById("incomeCategory");
+    const current = select.value;
+    select.replaceChildren();
+    const placeholder = document.createElement("option");
+    placeholder.value = "";
+    placeholder.textContent = "Select source";
+    select.appendChild(placeholder);
+    incomeCategories.forEach((category) => {
+      const option = document.createElement("option");
+      option.value = category;
+      option.textContent = category;
+      select.appendChild(option);
+    });
+    if (incomeCategories.includes(current)) select.value = current;
+    updateIncomeNetPreview();
+  }
+
+  function renderFinanceSummary(totals = {}) {
+    const result = Number(totals.operatingResult) || 0;
+    const cards = [
+      [formatExpenseAmount(totals.netIncome), "Net income"],
+      [formatExpenseAmount(totals.expenses), "Expenses"],
+      [formatExpenseAmount(result), "Operating result"],
+      [String(Number(totals.entries) || 0), "Saved finance entries"]
+    ].map(([value, label]) => {
+      const card = element("article", "concierge-admin-expense-stat");
+      card.append(element("strong", "", value), element("span", "", label));
+      return card;
+    });
+    financeSummary.replaceChildren(...cards);
+    financeLocationSummary.replaceChildren();
+    Object.entries(totals.locations || {})
+      .filter(([name, values]) => name !== "Unassigned" && (Number(values.netIncome) || Number(values.expenses)))
+      .sort((a, b) => Math.abs(Number(b[1].operatingResult) || 0) - Math.abs(Number(a[1].operatingResult) || 0))
+      .forEach(([name, values]) => {
+        financeLocationSummary.appendChild(element("span", "", `${name}: income ${formatExpenseAmount(values.netIncome)} · expenses ${formatExpenseAmount(values.expenses)} · result ${formatExpenseAmount(values.operatingResult)}`));
+      });
+  }
+
+  function renderIncome(records = []) {
+    incomeEntries.replaceChildren();
+    incomeEntries.dataset.count = String(records.length);
+    updateFinanceSectionCount();
+    if (!records.length) {
+      incomeEntries.appendChild(element("div", "concierge-admin-empty", "No income recorded for this month."));
+      return;
+    }
+    records.forEach((item) => {
+      const card = element("article", "concierge-admin-expense-item");
+      card.dataset.incomeId = item.id;
+      const head = element("div", "concierge-admin-expense-item-head");
+      const copy = element("div");
+      copy.append(
+        element("strong", "", `${item.incomeDate} · ${item.category}`),
+        element("p", "concierge-admin-expense-description", item.description || "Income")
+      );
+      head.append(copy, element("span", "concierge-admin-expense-amount", formatExpenseAmount(item.net)));
+      const meta = element("div", "concierge-admin-expense-meta");
+      meta.appendChild(element("span", "", `Gross ${formatExpenseAmount(item.gross)}`));
+      if (Number(item.fees) > 0) meta.appendChild(element("span", "", `Fees ${formatExpenseAmount(item.fees)}`));
+      if (item.unit) meta.appendChild(element("span", "", item.unit));
+      if (item.paymentMethod) meta.appendChild(element("span", "", item.paymentMethod));
+      if (item.reference) meta.appendChild(element("span", "", `Ref: ${item.reference}`));
+      if (item.notes) meta.appendChild(element("span", "", item.notes));
+      const actions = element("div", "concierge-admin-card-actions");
+      const remove = element("button", "danger", "Delete income");
+      remove.type = "button";
+      remove.dataset.incomeDeleteId = item.id;
+      actions.appendChild(remove);
+      card.append(head, meta, actions);
+      incomeEntries.appendChild(card);
+    });
+  }
+
+  async function loadExpenses() {
+    if (!expenseMonth.value) expenseMonth.value = currentPropertyDateParts().month;
+    const data = await api(`/api/concierge/admin/expenses?month=${encodeURIComponent(expenseMonth.value)}`);
+    applyExpenseConfiguration(data.configuration || {});
+    renderExpenseSummary(data.totals || {});
+    renderExpenses(data.records || []);
+  }
+
+  async function loadFinance() {
+    if (!expenseMonth.value) expenseMonth.value = currentPropertyDateParts().month;
+    const [financeData] = await Promise.all([
+      api(`/api/concierge/admin/finance?month=${encodeURIComponent(expenseMonth.value)}`),
+      loadExpenses()
+    ]);
+    applyIncomeConfiguration(financeData.configuration || {});
+    renderFinanceSummary(financeData.totals || {});
+    renderIncome(financeData.income || []);
+  }
+
+  function fillExpenseDraft(draft = {}) {
+    if (draft.date) document.getElementById("expenseDate").value = draft.date;
+    document.getElementById("expenseAmount").value = Number(draft.amount) > 0 ? String(draft.amount) : "";
+    document.getElementById("expenseCategory").value = draft.category || "Other";
+    document.getElementById("expenseVendor").value = draft.vendor || "";
+    document.getElementById("expenseDescription").value = draft.description || "";
+    document.getElementById("expensePaymentMethod").value = draft.paymentMethod || "";
+    document.getElementById("expenseRoomArea").value = draft.roomArea || "";
+    document.getElementById("expenseNotes").value = draft.notes || "";
+  }
+
+  function expenseFormData(confirmDuplicate = false) {
+    const form = new FormData();
+    form.set("date", document.getElementById("expenseDate").value);
+    form.set("amount", document.getElementById("expenseAmount").value);
+    form.set("category", document.getElementById("expenseCategory").value);
+    form.set("vendor", document.getElementById("expenseVendor").value);
+    form.set("description", document.getElementById("expenseDescription").value);
+    form.set("paymentMethod", document.getElementById("expensePaymentMethod").value);
+    form.set("roomArea", document.getElementById("expenseRoomArea").value);
+    form.set("notes", document.getElementById("expenseNotes").value);
+    form.set("confirmDuplicate", confirmDuplicate ? "true" : "false");
+    const file = expenseReceipt.files?.[0];
+    if (file) form.set("receipt", file, file.name);
+    return form;
+  }
+
   async function loadOverview() {
     const data = await api("/api/concierge/admin/overview");
     renderStats(data.totals || {});
@@ -746,6 +1045,7 @@
     renderStayOperations(data.stayOperations || {});
     renderRecent(data.recent || []);
     updateAdminSectionSummaries(data);
+    await loadFinance();
     login.hidden = true;
     workspace.hidden = false;
   }
@@ -873,9 +1173,29 @@
   });
 
   async function stayOperationAction(event) {
-    const button = event.target.closest("[data-extension-action],[data-in-person-action]");
+    const button = event.target.closest("[data-extension-action],[data-in-person-action],[data-direct-code-action]");
     if (!button) return;
     const card = button.closest("[data-reservation-id]");
+    if (button.dataset.directCodeAction) {
+      if (!card?.dataset.reservationId) return;
+      if (!window.confirm("Generate a new private stay code for this direct stay? The previous code will stop working. Existing verified guest access will remain active.")) return;
+      button.disabled = true;
+      try {
+        const data = await api("/api/concierge/admin/direct-stay-code", {
+          method: "POST",
+          body: JSON.stringify({ reservationId: card.dataset.reservationId, confirmed: true })
+        });
+        directStayCodeResult.value = data.confirmationCode;
+        directStayUrlResult.value = data.welcomeUrl;
+        directStayResult.hidden = false;
+        directStayResult.scrollIntoView({ behavior: "smooth", block: "center" });
+        await loadOverview();
+      } catch (_error) {
+        button.disabled = false;
+        window.alert("A new stay code could not be generated.");
+      }
+      return;
+    }
     if (button.dataset.inPersonAction) {
       if (!card?.dataset.reservationId) return;
       if (button.dataset.inPersonAction === "start") {
@@ -1108,6 +1428,227 @@
       button.disabled = false;
     }
   });
+  expenseAnalyze.addEventListener("click", async () => {
+    const file = expenseReceipt.files?.[0];
+    if (!file) {
+      window.alert("Choose or photograph a receipt first.");
+      return;
+    }
+    expenseAnalyze.disabled = true;
+    expenseAnalysisStatus.textContent = "Analyzing receipt… Please review every field before saving.";
+    try {
+      const form = new FormData();
+      form.set("receipt", file, file.name);
+      const result = await apiForm("/api/concierge/admin/expenses/analyze", form);
+      fillExpenseDraft(result.draft || {});
+      const confidence = Math.round((Number(result.draft?.confidence) || 0) * 100);
+      expenseAnalysisStatus.textContent = `Draft prepared (${confidence}% extraction confidence). Check the date, total, category and description before saving.`;
+    } catch (error) {
+      expenseAnalysisStatus.textContent = error.message === "expense_extraction_unavailable"
+        ? "Automatic receipt analysis is not configured. Enter the expense manually; the receipt can still be attached."
+        : "The receipt could not be analyzed automatically. Enter or correct the expense manually; the receipt can still be attached.";
+    } finally {
+      expenseAnalyze.disabled = false;
+    }
+  });
+
+  expenseClearReceipt.addEventListener("click", () => {
+    expenseReceipt.value = "";
+    expenseAnalysisStatus.textContent = "Receipt cleared. You can save the expense without an attachment or choose another receipt.";
+  });
+
+  expenseReset.addEventListener("click", () => resetExpenseForm());
+
+  ["incomeGross", "incomeFees"].forEach((id) => document.getElementById(id).addEventListener("input", updateIncomeNetPreview));
+  incomeReset.addEventListener("click", () => resetIncomeForm());
+
+  incomeForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const submit = document.getElementById("incomeSave");
+    submit.disabled = true;
+    const payload = (confirmDuplicate = false) => ({
+      date: document.getElementById("incomeDate").value,
+      category: document.getElementById("incomeCategory").value,
+      gross: document.getElementById("incomeGross").value,
+      fees: document.getElementById("incomeFees").value || "0",
+      unit: document.getElementById("incomeUnit").value,
+      description: document.getElementById("incomeDescription").value,
+      paymentMethod: document.getElementById("incomePaymentMethod").value,
+      reference: document.getElementById("incomeReference").value,
+      notes: document.getElementById("incomeNotes").value,
+      confirmDuplicate
+    });
+    const save = async (confirmDuplicate = false) => {
+      const response = await authorizedFetch("/api/concierge/admin/income", { method: "POST", body: JSON.stringify(payload(confirmDuplicate)) });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        const error = new Error(data.error || "income_save_failed");
+        error.status = response.status;
+        error.data = data;
+        throw error;
+      }
+      return data;
+    };
+    try {
+      try {
+        await save(false);
+      } catch (error) {
+        if (error.status !== 409 || error.message !== "possible_duplicate") throw error;
+        const duplicate = error.data?.duplicates?.[0];
+        const confirmed = await confirmAdminAction({
+          title: "Possible duplicate income",
+          message: duplicate
+            ? `A ${formatExpenseAmount(duplicate.gross)} gross income entry on ${duplicate.incomeDate} is already recorded${duplicate.unit ? ` for ${duplicate.unit}` : ""}. Save this as a separate income entry anyway?`
+            : "A matching income entry may already be recorded. Save this as a separate entry anyway?",
+          confirmLabel: "Save anyway",
+          danger: true
+        });
+        if (!confirmed) return;
+        await save(true);
+      }
+      const savedMonth = document.getElementById("incomeDate").value.slice(0, 7);
+      resetIncomeForm();
+      if (savedMonth) expenseMonth.value = savedMonth;
+      await loadFinance();
+    } catch (error) {
+      window.alert(error.message === "invalid_income"
+        ? "Check the date, source, gross amount, fees and description. Fees cannot exceed gross income."
+        : "The income entry could not be saved.");
+    } finally {
+      submit.disabled = false;
+    }
+  });
+
+  incomeEntries.addEventListener("click", async (event) => {
+    const deleteButton = event.target.closest("[data-income-delete-id]");
+    if (!deleteButton) return;
+    const confirmed = await confirmAdminAction({
+      title: "Delete income?",
+      message: "Permanently remove this income record?",
+      confirmLabel: "Delete income",
+      danger: true
+    });
+    if (!confirmed) return;
+    deleteButton.disabled = true;
+    try {
+      await api("/api/concierge/admin/income/delete", {
+        method: "POST",
+        body: JSON.stringify({ id: deleteButton.dataset.incomeDeleteId, confirmation: "DELETE INCOME" })
+      });
+      await loadFinance();
+    } catch (_error) {
+      deleteButton.disabled = false;
+      window.alert("The income entry could not be deleted.");
+    }
+  });
+
+  expenseMonth.addEventListener("change", () => {
+    if (!expenseMonth.value) expenseMonth.value = currentPropertyDateParts().month;
+    loadFinance().catch(() => window.alert("Finance records for that month could not be loaded."));
+  });
+
+  expenseForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const submit = document.getElementById("expenseSave");
+    submit.disabled = true;
+    const save = async (confirmDuplicate = false) => apiForm("/api/concierge/admin/expenses", expenseFormData(confirmDuplicate));
+    try {
+      try {
+        await save(false);
+      } catch (error) {
+        if (error.status !== 409 || error.message !== "possible_duplicate") throw error;
+        const duplicate = error.data?.duplicates?.[0];
+        const confirmed = await confirmAdminAction({
+          title: "Possible duplicate expense",
+          message: duplicate
+            ? `A ${formatExpenseAmount(duplicate.amount)} expense on ${duplicate.expenseDate} is already recorded${duplicate.vendor ? ` for ${duplicate.vendor}` : ""}. Save this as a separate expense anyway?`
+            : "A matching expense may already be recorded. Save this as a separate expense anyway?",
+          confirmLabel: "Save anyway",
+          danger: true
+        });
+        if (!confirmed) return;
+        await save(true);
+      }
+      const savedMonth = document.getElementById("expenseDate").value.slice(0, 7);
+      resetExpenseForm();
+      if (savedMonth) expenseMonth.value = savedMonth;
+      await loadFinance();
+    } catch (error) {
+      const messages = {
+        invalid_expense: "Check the date, amount, category and description.",
+        unsupported_file_type: "Use a JPEG, PNG, WebP, HEIC or PDF receipt.",
+        file_too_large: "The receipt must be 10 MB or smaller.",
+        receipt_storage_unavailable: "Private receipt storage is currently unavailable."
+      };
+      window.alert(messages[error.message] || "The expense could not be saved.");
+    } finally {
+      submit.disabled = false;
+    }
+  });
+
+  expenseEntries.addEventListener("click", async (event) => {
+    const receiptButton = event.target.closest("[data-expense-receipt-id]");
+    if (receiptButton) {
+      receiptButton.disabled = true;
+      try {
+        const response = await authorizedFetch(`/api/concierge/admin/expense-files/${receiptButton.dataset.expenseReceiptId}`);
+        if (!response.ok) throw new Error("download_failed");
+        const url = URL.createObjectURL(await response.blob());
+        const link = document.createElement("a");
+        const disposition = response.headers.get("content-disposition") || "";
+        const filename = disposition.match(/filename="([^"]+)"/)?.[1] || `expense-receipt-${receiptButton.dataset.expenseReceiptId}`;
+        link.href = url;
+        link.download = filename;
+        link.click();
+        window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      } catch (_error) {
+        window.alert("The private receipt could not be downloaded.");
+      } finally {
+        receiptButton.disabled = false;
+      }
+      return;
+    }
+    const deleteButton = event.target.closest("[data-expense-delete-id]");
+    if (!deleteButton) return;
+    const confirmed = await confirmAdminAction({
+      title: "Delete expense?",
+      message: "Permanently remove this expense record and its private receipt attachment, if present?",
+      confirmLabel: "Delete expense",
+      danger: true
+    });
+    if (!confirmed) return;
+    deleteButton.disabled = true;
+    try {
+      await api("/api/concierge/admin/expenses/delete", {
+        method: "POST",
+        body: JSON.stringify({ id: deleteButton.dataset.expenseDeleteId, confirmation: "DELETE EXPENSE" })
+      });
+      await loadFinance();
+    } catch (_error) {
+      deleteButton.disabled = false;
+      window.alert("The expense could not be deleted.");
+    }
+  });
+
+  expenseExport.addEventListener("click", async () => {
+    if (!expenseMonth.value) expenseMonth.value = currentPropertyDateParts().month;
+    expenseExport.disabled = true;
+    try {
+      const response = await authorizedFetch(`/api/concierge/admin/finance/export.csv?month=${encodeURIComponent(expenseMonth.value)}`);
+      if (!response.ok) throw new Error("export_failed");
+      const url = URL.createObjectURL(await response.blob());
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `finance-${expenseMonth.value}.csv`;
+      link.click();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (_error) {
+      window.alert("The finance export could not be created.");
+    } finally {
+      expenseExport.disabled = false;
+    }
+  });
+
   whatsappDeliveryDiagnostics.addEventListener("click", async (event) => {
     const button = event.target.closest("[data-diagnostic-action]");
     if (!button) return;
@@ -1214,6 +1755,10 @@
       window.alert("The approved knowledge export could not be created.");
     }
   });
+
+  expenseMonth.value = currentPropertyDateParts().month;
+  resetExpenseForm();
+  resetIncomeForm();
 
   const storedToken = window.sessionStorage.getItem(tokenKey);
   if (storedToken) loginWith(storedToken);

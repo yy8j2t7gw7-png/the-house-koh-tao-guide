@@ -200,3 +200,25 @@ tr:last-child td{border-bottom:0}
 @media(prefers-reduced-motion:reduce){
   .concierge-admin-section-chevron,button{transition-duration:.01ms}
 }
+
+/* Expense management module */
+.concierge-admin-expense-toolbar{display:flex;flex-wrap:wrap;align-items:end;gap:10px;margin-bottom:12px}
+.concierge-admin-expense-toolbar .concierge-admin-field{min-width:180px}
+.concierge-admin-expense-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;margin:12px 0}
+.concierge-admin-expense-stat{padding:12px;border:1px solid var(--admin-line);border-radius:12px;background:var(--admin-soft)}
+.concierge-admin-expense-stat strong{display:block;color:var(--admin-ink);font-size:18px}
+.concierge-admin-expense-stat span{display:block;margin-top:3px;color:var(--admin-muted);font-size:11px}
+.concierge-admin-expense-form{display:grid;gap:13px;padding:14px;border:1px solid var(--admin-line);border-radius:13px;background:var(--admin-soft)}
+.concierge-admin-expense-receipt{padding:12px;border:1px dashed var(--admin-line-strong);border-radius:11px;background:#fff}
+.concierge-admin-expense-receipt p{margin:4px 0 9px}
+.concierge-admin-expense-receipt input[type="file"]{width:100%;box-sizing:border-box;padding:10px;border:1px solid var(--admin-line);border-radius:9px;background:#fff;color:var(--admin-ink);font:inherit}
+.concierge-admin-expense-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+.concierge-admin-expense-item{padding:14px;border:1px solid var(--admin-line);border-radius:12px;background:#fff}
+.concierge-admin-expense-item-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.concierge-admin-expense-item-head strong{font-size:15px;color:var(--admin-ink)}
+.concierge-admin-expense-amount{font-size:17px;font-weight:900;color:var(--admin-ink);white-space:nowrap}
+.concierge-admin-expense-meta{display:flex;flex-wrap:wrap;gap:6px;margin-top:7px;color:var(--admin-muted);font-size:11px}
+.concierge-admin-expense-description{margin:7px 0 0;color:var(--admin-ink);font-weight:700;line-height:1.4}
+.concierge-admin-expense-category-summary{display:flex;flex-wrap:wrap;gap:6px;margin:2px 0 12px}
+.concierge-admin-expense-category-summary span{padding:6px 8px;border-radius:999px;background:var(--admin-soft);color:var(--admin-muted);font-size:10px;font-weight:800}
+@media(max-width:760px){.concierge-admin-expense-summary{grid-template-columns:1fr}.concierge-admin-expense-fields{grid-template-columns:1fr}.concierge-admin-expense-item-head{flex-direction:column}.concierge-admin-expense-amount{white-space:normal}}

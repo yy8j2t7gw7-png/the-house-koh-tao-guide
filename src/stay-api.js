@@ -839,6 +839,38 @@ export async function handleStayAdminRequest(request, env, path, store) {
     });
   }
 
+  if (path === "/api/concierge/admin/direct-stay-code") {
+    if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405, { allow: "POST" });
+    if (!env.STAY_TOKEN_PEPPER) return json({ error: "stay_verification_unavailable" }, 503);
+    const body = await readJson(request, 2_000);
+    const reservationId = String(body?.reservationId || "");
+    if (!/^stay_[A-Za-z0-9-]{20,}$/.test(reservationId) || body?.confirmed !== true) {
+      return json({ error: "invalid_request" }, 400);
+    }
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const confirmationCode = randomDirectStayCode();
+      const confirmationCodeHash = await hmac(`reservation:${confirmationCode}`, env.STAY_TOKEN_PEPPER);
+      const result = await store.replaceDirectStayConfirmationCode(
+        reservationId,
+        confirmationCodeHash,
+        new Date().toISOString()
+      );
+      if (result?.ok) {
+        return json({
+          ok: true,
+          room: result.room,
+          confirmationCode,
+          welcomeUrl: `${new URL(request.url).origin}/room/${encodeURIComponent(result.room)}`
+        });
+      }
+      if (result?.error !== "code_collision") {
+        const status = result?.error === "reservation_not_found" ? 404 : 409;
+        return json({ error: result?.error || "stay_code_reset_failed" }, status);
+      }
+    }
+    return json({ error: "stay_code_reset_failed" }, 503);
+  }
+
   if (path === "/api/concierge/admin/stay-extension") {
     if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405, { allow: "POST" });
     const body = await readJson(request, 2_000);

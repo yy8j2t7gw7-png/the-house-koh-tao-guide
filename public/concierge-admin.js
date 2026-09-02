@@ -239,8 +239,8 @@
       stat(totals.pending, "Awaiting review"),
       stat(totals.gaps30d, "Knowledge gaps in 30 days"),
       stat(`${totals.positive}/${totals.negative}`, "Helpful / not helpful"),
-      stat(totals.pendingRegistrations, "Passport requests pending"),
-      stat(totals.storedPassportFiles, "Passport files stored"),
+      stat(totals.pendingRegistrations, "Identity document requests pending"),
+      stat(totals.storedPassportFiles, "Identity documents stored"),
       stat(totals.openMaintenanceReports, "Open maintenance reports"),
       stat(totals.openAlerts, "Open concierge alerts"),
       stat(totals.criticalAlerts, "Critical alerts open")
@@ -255,16 +255,18 @@
   function renderPendingRegistrations(items) {
     pendingRegistrations.replaceChildren();
     if (!items.length) {
-      pendingRegistrations.appendChild(element("div", "concierge-admin-empty", "No active passport requests."));
+      pendingRegistrations.appendChild(element("div", "concierge-admin-empty", "No active secure identity-document requests."));
       return;
     }
     items.forEach((item) => {
       const card = element("article", "concierge-admin-registration-item");
       card.dataset.registrationId = item.id;
+      const documentType = item.documentType === "thai_id" ? "Thai ID card" : "Foreign passport";
       const arrival = item.arrivalAt ? new Date(item.arrivalAt) : null;
       const urgency = arrival && arrival.getTime() <= Date.now() ? "Arrival time has passed—remind now." : `Expected arrival: ${bangkokDate(item.arrivalAt)}`;
       card.append(
         element("strong", "", `Room ${item.room}`),
+        element("span", "", `Document: ${documentType}`),
         element("span", "", urgency),
         element("span", "", `Link expires: ${bangkokDate(item.expiresAt)}`),
         element("span", "", item.reminderSentAt ? `Reminder marked sent: ${bangkokDate(item.reminderSentAt)}` : "Reminder not marked as sent")
@@ -285,27 +287,39 @@
   function renderPassportUploads(items) {
     passportUploads.replaceChildren();
     if (!items.length) {
-      passportUploads.appendChild(element("div", "concierge-admin-empty", "No passport images are stored."));
+      passportUploads.appendChild(element("div", "concierge-admin-empty", "No guest identity documents are stored."));
       return;
     }
     items.forEach((item) => {
       const card = element("article", "concierge-admin-registration-item");
       card.dataset.registrationId = item.id;
       const size = `${Math.max(1, Math.round(Number(item.sizeBytes || 0) / 1024))} KB`;
+      const documentType = item.documentType === "thai_id" ? "thai_id" : "passport";
       card.append(
         element("strong", "", `Room ${item.room}`),
+        element("span", "", documentType === "thai_id" ? "Document: Thai ID card" : "Document: Foreign passport"),
         element("span", "", `Received: ${bangkokDate(item.uploadedAt)}`),
         element("span", "", `${item.mediaType} · ${size}`),
-        element("span", "", `Automatic deletion: ${bangkokDate(item.deleteAfter)}`)
+        element("span", "", `Automatic deletion: ${bangkokDate(item.deleteAfter)}`),
+        element("span", "", documentType === "thai_id"
+          ? "TM30: not applicable to Thai ID evidence"
+          : item.tm30RegisteredAt ? `TM30 registered: ${bangkokDate(item.tm30RegisteredAt)}` : "TM30: not yet marked registered")
       );
       const actions = element("div", "concierge-admin-card-actions");
       const download = element("button", "secondary", "Download securely");
       download.type = "button";
       download.dataset.passportAction = "download";
+      if (documentType === "passport") {
+        const tm30 = element("button", "secondary", item.tm30RegisteredAt ? "Undo TM30 registered" : "Mark TM30 registered");
+        tm30.type = "button";
+        tm30.dataset.passportAction = item.tm30RegisteredAt ? "tm30-unregister" : "tm30-register";
+        actions.appendChild(tm30);
+      }
       const remove = element("button", "danger", "Delete now");
       remove.type = "button";
       remove.dataset.passportAction = "delete";
-      actions.append(download, remove);
+      actions.prepend(download);
+      actions.append(remove);
       card.appendChild(actions);
       passportUploads.appendChild(card);
     });
@@ -1352,12 +1366,20 @@
         const url = URL.createObjectURL(await response.blob());
         const link = document.createElement("a");
         const extensions = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/heic": "heic" };
+        const contentDisposition = response.headers.get("content-disposition") || "";
+        const isThaiId = contentDisposition.includes("thai-id-image");
         link.href = url;
-        link.download = `passport-${id}.${extensions[response.headers.get("content-type")] || "image"}`;
+        link.download = `${isThaiId ? "thai-id" : "passport"}-${id}.${extensions[response.headers.get("content-type")] || "image"}`;
         link.click();
         window.setTimeout(() => URL.revokeObjectURL(url), 1000);
       } else if (button.dataset.passportAction === "reminded") {
         await api("/api/concierge/admin/passport-reminder", { method: "POST", body: JSON.stringify({ id }) });
+        await loadOverview();
+      } else if (button.dataset.passportAction === "tm30-register" || button.dataset.passportAction === "tm30-unregister") {
+        const registered = button.dataset.passportAction === "tm30-register";
+        if (registered && !window.confirm("Mark this foreign passport as already registered in TM30?")) return;
+        if (!registered && !window.confirm("Remove the TM30 registered mark from this passport?")) return;
+        await api("/api/concierge/admin/passport-tm30", { method: "POST", body: JSON.stringify({ id, registered }) });
         await loadOverview();
       } else {
         await api("/api/concierge/admin/passport-delete", { method: "POST", body: JSON.stringify({ id }) });

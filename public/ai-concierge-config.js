@@ -5,7 +5,7 @@ window.AI_CONCIERGE_CONFIG = {
   "buttonLabel": "Concierge",
   "welcomeTitle": "Welcome",
   "welcomeText": "Ask naturally in your preferred language about your room, check-in, Wi-Fi, house rules or help during your stay.",
-  "initialMessage": "Hello. Booked guests must verify their stay using the Airbnb confirmation code or private House stay code. Thai-only stays need no passport upload. If any foreign guests are staying overnight, passport information is required for every non-Thai guest—not only the booking guest. I can guide you through this or help with an emergency.",
+  "initialMessage": "Hello. Booked guests must verify their stay using the Airbnb confirmation code or private House stay code. Thai-only stays need no passport, but one Thai ID-card image is required to confirm the Thai-only declaration. If any foreign guests are staying overnight, passport information is required for every non-Thai guest—not only the booking guest. I can guide you through this or help with an emergency.",
   "placeholder": "Ask about your stay…",
   "apiUrl": "/api/concierge",
   "feedbackUrl": "/api/concierge/feedback",

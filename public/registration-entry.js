@@ -14,6 +14,10 @@
   const registrationStatus = document.getElementById("registrationStatus");
   const passportButton = document.getElementById("createPassportUpload");
   const progressTitle = document.getElementById("passportProgressTitle");
+  const documentRequirement = document.getElementById("registrationDocumentRequirement");
+  const uploadChoiceTitle = document.getElementById("registrationUploadChoiceTitle");
+  const uploadChoiceText = document.getElementById("registrationUploadChoiceText");
+  const registrationPrivacyText = document.getElementById("registrationPrivacyText");
   const thaiButton = document.getElementById("confirmThaiNational");
   const foreignButton = document.getElementById("startForeignRegistration");
   const foreignCount = document.getElementById("nonThaiGuestCount");
@@ -36,6 +40,7 @@
   const keyLocation = document.getElementById("spareKeyLocation");
   let lostKeyRequestToken = "";
   let spareKeyViewToken = "";
+  let registrationDocumentType = "passport";
 
   const messages = {
     verifying: "Verifying your stay…",
@@ -49,6 +54,9 @@
     allPassportsRequired: "One passport is required for each non-Thai adult and child staying overnight.",
     passportError: "A secure upload form could not be opened. Please try again.",
     passportOptions: "Upload passports securely",
+    thaiIdPending: "Thai-only stay selected. Upload one clear Thai ID-card image to complete guest registration.",
+    thaiIdCreating: "Opening a private one-time Thai ID form…",
+    thaiIdError: "A secure Thai ID upload form could not be opened. Please try again.",
     inPersonPending: "Choice saved. Bring every required original passport to The House. The guide opens after our team completes the check and TM30 registration.",
     nationalityError: "The guest type could not be saved. Please check the information and try again.",
     countError: "Enter the number of non-Thai people who will stay overnight in this room.",
@@ -130,7 +138,26 @@
     if (verificationFields) verificationFields.hidden = true;
     setStatus(verificationStatus, messages.verified, "success");
     void loadVerifiedArrivalAccess();
+    if (data.guestType === "thai" || ["thai_id_pending", "thai_id_complete"].includes(data.registrationStatus)) {
+      registrationDocumentType = "thai_id";
+      if (nationalityPanel) nationalityPanel.hidden = true;
+      if (progressPanel) progressPanel.hidden = false;
+      if (progressTitle) progressTitle.textContent = data.registrationStatus === "thai_id_complete" ? "Thai ID received" : "Upload Thai ID securely";
+      if (progressText) progressText.textContent = data.registrationStatus === "thai_id_complete"
+        ? "Thai ID evidence was received securely."
+        : messages.thaiIdPending;
+      if (documentRequirement) documentRequirement.textContent = "One clear Thai ID-card image is required for a Thai-only reservation before the private guest guide opens.";
+      if (uploadChoiceTitle) uploadChoiceTitle.textContent = "Upload Thai ID securely";
+      if (uploadChoiceText) uploadChoiceText.textContent = "Use one private, single-use form for one clear Thai ID-card image. The image is deleted within 14 days—or sooner after processing.";
+      if (passportButton) passportButton.textContent = "Upload Thai ID securely";
+      if (registrationPrivacyText) registrationPrivacyText.textContent = "Used only to verify the Thai-only registration declaration. It is not sent through WhatsApp or the AI Concierge. Your room guide opens after the Thai ID image is received.";
+      setStatus(registrationStatus, data.registrationStatus === "thai_id_complete" ? "Thai ID registration complete." : messages.thaiIdPending,
+        data.registrationStatus === "thai_id_complete" ? "success" : "attention");
+      window.HOUSE_I18N?.localize?.(progressPanel);
+      return;
+    }
     if (data.guestType === "foreign" || ["passport_pending", "passport_complete", "in_person_pending", "in_person_complete"].includes(data.registrationStatus)) {
+      registrationDocumentType = "passport";
       if (nationalityPanel) nationalityPanel.hidden = true;
       if (progressPanel) progressPanel.hidden = false;
       const received = Number(data.receivedPassports) || 0;
@@ -140,6 +167,11 @@
       if (progressText) progressText.textContent = inPersonPending
         ? messages.inPersonPending
         : `${format(messages.passportProgress, { received, required })} ${messages.allPassportsRequired}`;
+      if (documentRequirement) documentRequirement.textContent = "One passport is required for each non-Thai adult and child staying overnight.";
+      if (uploadChoiceTitle) uploadChoiceTitle.textContent = "Upload passports securely";
+      if (uploadChoiceText) uploadChoiceText.textContent = "Use one private, single-use form per guest. Images are deleted within 14 days—or sooner.";
+      if (passportButton) passportButton.textContent = "Upload next passport securely";
+      if (registrationPrivacyText) registrationPrivacyText.textContent = "Used only for TM30 registration. Your room guide opens after all required passports are uploaded.";
       setStatus(registrationStatus, inPersonPending
         ? messages.inPersonPending
         : format(messages.passportProgress, { received, required }),
@@ -233,8 +265,10 @@
     setBusy(thaiButton, true);
     setStatus(registrationStatus, messages.nationalitySaving, "working");
     try {
-      await api("/api/stay/nationality", { method: "POST", body: JSON.stringify({ nationality: "thai", allGuestsThai: true }) });
-      window.location.reload();
+      const data = await api("/api/stay/nationality", { method: "POST", body: JSON.stringify({ nationality: "thai", allGuestsThai: true }) });
+      showRegistration(data);
+      setStatus(registrationStatus, messages.thaiIdPending, "attention");
+      setBusy(thaiButton, false);
     } catch (_error) {
       setStatus(registrationStatus, messages.nationalityError, "error");
       setBusy(thaiButton, false);
@@ -268,12 +302,13 @@
 
   passportButton?.addEventListener("click", async () => {
     setBusy(passportButton, true);
-    setStatus(registrationStatus, messages.passportCreating, "working");
+    const thaiRegistration = registrationDocumentType === "thai_id";
+    setStatus(registrationStatus, thaiRegistration ? messages.thaiIdCreating : messages.passportCreating, "working");
     try {
-      const data = await api("/api/stay/passport-link", { method: "POST", body: "{}" });
+      const data = await api(thaiRegistration ? "/api/stay/thai-id-link" : "/api/stay/passport-link", { method: "POST", body: "{}" });
       window.location.assign(data.uploadUrl);
     } catch (_error) {
-      setStatus(registrationStatus, messages.passportError, "error");
+      setStatus(registrationStatus, thaiRegistration ? messages.thaiIdError : messages.passportError, "error");
       setBusy(passportButton, false);
     }
   });

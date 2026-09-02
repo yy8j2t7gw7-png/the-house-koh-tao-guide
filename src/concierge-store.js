@@ -92,6 +92,7 @@ export class ConciergeStore extends DurableObject {
           id TEXT PRIMARY KEY,
           token_hash TEXT NOT NULL UNIQUE,
           room TEXT NOT NULL,
+          document_type TEXT NOT NULL DEFAULT 'passport',
           status TEXT NOT NULL DEFAULT 'pending',
           object_key TEXT NOT NULL DEFAULT '',
           media_type TEXT NOT NULL DEFAULT '',
@@ -103,6 +104,7 @@ export class ConciergeStore extends DurableObject {
           reminder_sent_at TEXT NOT NULL DEFAULT '',
           uploaded_at TEXT NOT NULL DEFAULT '',
           delete_after TEXT NOT NULL DEFAULT '',
+          tm30_registered_at TEXT NOT NULL DEFAULT '',
           deleted_at TEXT NOT NULL DEFAULT ''
         );
         CREATE INDEX IF NOT EXISTS passport_uploads_status ON passport_uploads(status, arrival_at, expires_at);
@@ -401,6 +403,16 @@ export class ConciergeStore extends DurableObject {
       } catch (_error) {
         // Fresh databases and upgraded deployments already have this release-bound request column.
       }
+      try {
+        this.ctx.storage.sql.exec("ALTER TABLE passport_uploads ADD COLUMN document_type TEXT NOT NULL DEFAULT 'passport'");
+      } catch (_error) {
+        // Fresh databases and upgraded deployments already have the identity-document type column.
+      }
+      try {
+        this.ctx.storage.sql.exec("ALTER TABLE passport_uploads ADD COLUMN tm30_registered_at TEXT NOT NULL DEFAULT ''");
+      } catch (_error) {
+        // Fresh databases and upgraded deployments already have the TM30 processing marker.
+      }
       this.ctx.storage.sql.exec(
         "CREATE UNIQUE INDEX IF NOT EXISTS spare_key_events_request ON spare_key_events(request_hash) WHERE request_hash <> ''"
       );
@@ -559,7 +571,7 @@ export class ConciergeStore extends DurableObject {
       FROM passport_uploads
     `))[0] || {};
     const pendingRegistrations = rows(this.ctx.storage.sql.exec(`
-      SELECT id, room, created_at AS createdAt, arrival_at AS arrivalAt,
+      SELECT id, room, document_type AS documentType, created_at AS createdAt, arrival_at AS arrivalAt,
              expires_at AS expiresAt, reminder_sent_at AS reminderSentAt
       FROM passport_uploads
       WHERE status = 'pending' AND julianday(expires_at) > julianday('now')
@@ -567,8 +579,9 @@ export class ConciergeStore extends DurableObject {
       LIMIT 100
     `));
     const passportUploads = rows(this.ctx.storage.sql.exec(`
-      SELECT id, room, media_type AS mediaType, extension, size_bytes AS sizeBytes,
-             uploaded_at AS uploadedAt, delete_after AS deleteAfter
+      SELECT id, room, document_type AS documentType, media_type AS mediaType, extension, size_bytes AS sizeBytes,
+             uploaded_at AS uploadedAt, delete_after AS deleteAfter,
+             tm30_registered_at AS tm30RegisteredAt
       FROM passport_uploads
       WHERE status = 'uploaded'
       ORDER BY uploaded_at DESC
@@ -1619,13 +1632,15 @@ export class ConciergeStore extends DurableObject {
   }
 
   async createAutomaticPassportUpload(record) {
+    const documentType = record.documentType === "thai_id" ? "thai_id" : "passport";
     const existing = rows(this.ctx.storage.sql.exec(
       `SELECT p.id, p.status, p.expires_at AS expiresAt
        FROM passport_uploads p
        JOIN passport_reservation_links l ON l.passport_id = p.id
-       WHERE l.reservation_id = ? AND p.status = 'pending' AND p.expires_at > ?
+       WHERE l.reservation_id = ? AND p.document_type = ? AND p.status = 'pending' AND p.expires_at > ?
        ORDER BY p.created_at DESC LIMIT 1`,
       cleanText(record.reservationId, 100),
+      documentType,
       cleanText(record.createdAt, 40)
     ))[0];
     if (existing) {
@@ -1642,12 +1657,14 @@ export class ConciergeStore extends DurableObject {
       `SELECT COUNT(*) AS total
        FROM passport_reservation_links l
        JOIN passport_uploads p ON p.id = l.passport_id
-       WHERE l.reservation_id = ? AND p.status IN ('pending', 'uploaded')`,
-      cleanText(record.reservationId, 100)
+       WHERE l.reservation_id = ? AND p.document_type = ? AND p.status IN ('pending', 'uploaded')`,
+      cleanText(record.reservationId, 100),
+      documentType
     ))[0];
-    if ((Number(count?.total) || 0) >= 10) return { ok: false, error: "registration_limit_reached" };
+    const limit = documentType === "thai_id" ? 1 : 10;
+    if ((Number(count?.total) || 0) >= limit) return { ok: false, error: "registration_limit_reached" };
 
-    await this.createPassportUpload(record);
+    await this.createPassportUpload({ ...record, documentType });
     this.ctx.storage.sql.exec(
       `INSERT INTO passport_reservation_links (passport_id, reservation_id, created_at)
        VALUES (?, ?, ?)`,
@@ -1680,12 +1697,12 @@ export class ConciergeStore extends DurableObject {
       `SELECT COUNT(*) AS total
        FROM passport_reservation_links l
        JOIN passport_uploads p ON p.id = l.passport_id
-       WHERE l.reservation_id = ? AND p.status = 'uploaded'`,
+       WHERE l.reservation_id = ? AND p.document_type = 'passport' AND p.status = 'uploaded'`,
       cleanText(reservationId, 100)
     ))[0];
     const received = cleanGuestType === "thai" ? 0 : Number(receivedRow?.total) || 0;
     const status = cleanGuestType === "thai"
-      ? "thai_exempt"
+      ? "thai_id_pending"
       : received >= required ? "passport_complete" : "passport_pending";
     const updatedAt = cleanText(nowValue, 40) || new Date().toISOString();
     this.ctx.storage.sql.exec(
@@ -2237,13 +2254,15 @@ export class ConciergeStore extends DurableObject {
   }
 
   async createPassportUpload(record) {
+    const documentType = record.documentType === "thai_id" ? "thai_id" : "passport";
     this.ctx.storage.sql.exec(
       `INSERT INTO passport_uploads
-       (id, token_hash, room, status, created_at, arrival_at, expires_at)
-       VALUES (?, ?, ?, 'pending', ?, ?, ?)`,
+       (id, token_hash, room, document_type, status, created_at, arrival_at, expires_at)
+       VALUES (?, ?, ?, ?, 'pending', ?, ?, ?)`,
       cleanText(record.id, 100),
       cleanText(record.tokenHash, 100),
       cleanText(record.room, 4),
+      documentType,
       cleanText(record.createdAt, 40),
       cleanText(record.arrivalAt, 40),
       cleanText(record.expiresAt, 40)
@@ -2253,7 +2272,7 @@ export class ConciergeStore extends DurableObject {
 
   async getPassportUploadByTokenHash(tokenHash) {
     return rows(this.ctx.storage.sql.exec(
-      `SELECT id, room, status, arrival_at AS arrivalAt, expires_at AS expiresAt
+      `SELECT id, room, document_type AS documentType, status, arrival_at AS arrivalAt, expires_at AS expiresAt
        FROM passport_uploads WHERE token_hash = ? LIMIT 1`,
       cleanText(tokenHash, 100)
     ))[0] || null;
@@ -2262,7 +2281,7 @@ export class ConciergeStore extends DurableObject {
   async completePassportUpload(record) {
     const now = cleanText(record.uploadedAt, 40);
     const session = rows(this.ctx.storage.sql.exec(
-      `SELECT id, room FROM passport_uploads
+      `SELECT id, room, document_type AS documentType FROM passport_uploads
        WHERE token_hash = ? AND status = 'pending' AND expires_at > ? LIMIT 1`,
       cleanText(record.tokenHash, 100),
       now
@@ -2280,12 +2299,15 @@ export class ConciergeStore extends DurableObject {
       cleanText(record.deleteAfter, 40),
       session.id
     );
-    return { ok: true, id: session.id, room: session.room };
+    return { ok: true, id: session.id, room: session.room, documentType: session.documentType || "passport" };
   }
 
-  async markRegistrationFromPassport(passportId, nowValue) {
+  async markRegistrationFromDocument(passportId, nowValue) {
     const linked = rows(this.ctx.storage.sql.exec(
-      "SELECT reservation_id AS reservationId FROM passport_reservation_links WHERE passport_id = ? LIMIT 1",
+      `SELECT l.reservation_id AS reservationId, p.document_type AS documentType
+       FROM passport_reservation_links l
+       JOIN passport_uploads p ON p.id = l.passport_id
+       WHERE l.passport_id = ? LIMIT 1`,
       cleanText(passportId, 100)
     ))[0];
     if (!linked) return { ok: false };
@@ -2298,14 +2320,19 @@ export class ConciergeStore extends DurableObject {
       `SELECT COUNT(*) AS total
        FROM passport_reservation_links l
        JOIN passport_uploads p ON p.id = l.passport_id
-       WHERE l.reservation_id = ? AND p.status = 'uploaded'`,
+       WHERE l.reservation_id = ? AND p.document_type = 'passport' AND p.status = 'uploaded'`,
       cleanText(linked.reservationId, 100)
     ))[0];
     const received = Number(receivedRow?.total) || 0;
     const required = Number(requirement?.requiredPassports) || 0;
-    const status = requirement?.guestType === "foreign" && required > 0 && received >= required
-      ? "passport_complete"
-      : "passport_pending";
+    let status = "passport_pending";
+    if (linked.documentType === "thai_id") {
+      status = requirement?.guestType === "thai" ? "thai_id_complete" : (requirement?.status || "not_started");
+    } else {
+      status = requirement?.guestType === "foreign" && required > 0 && received >= required
+        ? "passport_complete"
+        : "passport_pending";
+    }
     const updatedAt = cleanText(nowValue, 40) || new Date().toISOString();
     if (requirement) {
       this.ctx.storage.sql.exec(
@@ -2322,20 +2349,43 @@ export class ConciergeStore extends DurableObject {
     return {
       ok: true,
       reservationId: linked.reservationId,
+      documentType: linked.documentType || "passport",
       status,
       requiredPassports: required,
       receivedPassports: received
     };
   }
 
+  async markRegistrationFromPassport(passportId, nowValue) {
+    return this.markRegistrationFromDocument(passportId, nowValue);
+  }
+
   async getPassportUpload(id) {
     return rows(this.ctx.storage.sql.exec(
-      `SELECT id, room, status, object_key AS objectKey, media_type AS mediaType,
+      `SELECT id, room, document_type AS documentType, status, object_key AS objectKey, media_type AS mediaType,
               extension, size_bytes AS sizeBytes, uploaded_at AS uploadedAt,
-              delete_after AS deleteAfter
+              delete_after AS deleteAfter, tm30_registered_at AS tm30RegisteredAt
        FROM passport_uploads WHERE id = ? LIMIT 1`,
       cleanText(id, 100)
     ))[0] || null;
+  }
+
+  async setPassportTm30Registered(id, registered, nowValue) {
+    const cleanId = cleanText(id, 100);
+    const record = rows(this.ctx.storage.sql.exec(
+      `SELECT id, document_type AS documentType, status FROM passport_uploads WHERE id = ? LIMIT 1`,
+      cleanId
+    ))[0];
+    if (!record || record.status !== "uploaded") return { ok: false, error: "not_found" };
+    if ((record.documentType || "passport") !== "passport") return { ok: false, error: "tm30_not_applicable" };
+    const tm30RegisteredAt = registered ? (cleanText(nowValue, 40) || new Date().toISOString()) : "";
+    this.ctx.storage.sql.exec(
+      "UPDATE passport_uploads SET tm30_registered_at = ? WHERE id = ? AND status = 'uploaded'",
+      tm30RegisteredAt,
+      cleanId
+    );
+    await this.recordAdminAudit(registered ? "passport_tm30_registered" : "passport_tm30_unregistered", `passport:${cleanId}`, tm30RegisteredAt || nowValue);
+    return { ok: true, tm30RegisteredAt };
   }
 
   async markPassportReminderSent(id) {

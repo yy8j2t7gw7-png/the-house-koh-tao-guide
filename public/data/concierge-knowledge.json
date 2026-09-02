@@ -106,7 +106,7 @@
         "does a thai guest need to register",
         "thai national registration"
       ],
-      "answer": "Thai nationals do not need to complete this TM30 Immigration accommodation registration. After verifying the stay on the permanent Room page, select ‘All overnight guests are Thai nationals’ only if the exemption applies to everyone staying overnight on that reservation. If any non-Thai guest is staying overnight, securely upload one passport image for each non-Thai overnight guest.",
+      "answer": "Thai nationals do not need to complete the TM30 passport-registration flow. After verifying the stay on the permanent Room page, select ‘All overnight guests are Thai nationals’ only if that is true for everyone staying overnight. To confirm the Thai-only declaration, upload one clear Thai ID-card image for the reservation. If any non-Thai guest is staying overnight, choose the foreign/mixed option instead and securely upload one passport image for each non-Thai overnight guest.",
       "actions": []
     },
     {
@@ -508,7 +508,7 @@
         "tm30 registration",
         "send passport information"
       ],
-      "answer": "This TM30 Immigration accommodation registration applies only to non-Thai guests. Thai nationals do not need to complete it. Open your permanent Room welcome page and verify the Airbnb confirmation code shown in your trip details or the private House stay code provided for a direct booking. Passport information is required for every non-Thai person staying overnight—not only the person who made the booking. Use one secure upload form per passport. Do not send passport information through this chat or WhatsApp. Securely uploaded passport images are automatically deleted 14 days after upload, or sooner after processing. If you cannot use the secure upload, contact The House team for assistance. The private room guide opens after the required registration is complete.",
+      "answer": "The TM30 Immigration passport-registration flow applies to non-Thai guests. Open your permanent Room welcome page and verify the Airbnb confirmation code shown in your trip details or the private House stay code provided for a direct booking. Passport information is required for every non-Thai person staying overnight—not only the person who made the booking. If every overnight guest is Thai, no passport is required, but one clear Thai ID-card image must be uploaded to confirm the Thai-only declaration. Use one secure upload form per non-Thai passport, or the Thai ID upload when the reservation is Thai-only. Do not send passport or Thai ID information through this chat or WhatsApp. Securely uploaded identity images are automatically deleted 14 days after upload, or sooner after processing. If you cannot use the secure upload, contact The House team for assistance. The private room guide opens after the required registration is complete.",
       "actions": [
         {
           "label": "Continue Securely",
@@ -530,7 +530,7 @@
         "secure passport link",
         "extra guest"
       ],
-      "answer": "The House needs passport information for every non-Thai overnight visitor so we can complete the required TM30 Immigration accommodation registration. Thai nationals do not need to complete this registration. After verifying the Airbnb confirmation code or private House stay code on the permanent Room page, use the secure upload option once for each non-Thai overnight guest. Do not put passport information in this chat or send it through WhatsApp. If you cannot use the secure upload, contact The House team for assistance.",
+      "answer": "The House needs passport information for every non-Thai overnight visitor so we can complete the required TM30 Immigration accommodation registration. Thai nationals do not need the TM30 passport-registration flow, but a Thai-only reservation requires one Thai ID-card image to confirm the Thai-only declaration. After verifying the Airbnb confirmation code or private House stay code on the permanent Room page, use the secure upload option once for each non-Thai overnight guest, or upload the one Thai ID image if every overnight guest is Thai. Do not put passport or Thai ID information in this chat or send it through WhatsApp. If you cannot use the secure upload, contact The House team for assistance.",
       "actions": [
         {
           "label": "Continue Securely",

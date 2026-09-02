@@ -67,9 +67,22 @@ function publicAccessResult(question, access, room, safetyResult = null) {
       source: "access-policy"
     };
   }
+  if (access.verified && access.guestType === "thai") {
+    return {
+      answer: "Your stay is verified and the Thai-only option is selected. No passport is required for this TM30 flow, but one clear Thai ID-card image must be uploaded to confirm the Thai-only declaration before the private guide and service requests unlock. Open your secure Room page to upload it.",
+      intentId: "thai_id_registration_pending",
+      category: "arrival",
+      confidence: 1,
+      needsHuman: false,
+      handoff: "none",
+      learningGap: false,
+      actions: [registrationAction],
+      source: "access-policy"
+    };
+  }
   if (access.verified) {
     return {
-      answer: "Your stay is verified. Before the private guide opens, choose whether all overnight guests are Thai nationals or whether any foreign guests are staying. Thai-only stays need no passport upload. For a foreign or mixed group, passport information is required for every non-Thai overnight guest—not only the booking guest.",
+      answer: "Your stay is verified. Before the private guide opens, choose whether all overnight guests are Thai nationals or whether any foreign guests are staying. Thai-only stays need no passport, but one Thai ID-card image is required to confirm the Thai-only declaration. For a foreign or mixed group, passport information is required for every non-Thai overnight guest—not only the booking guest.",
       intentId: "nationality_selection_required",
       category: "arrival",
       confidence: 1,
@@ -81,7 +94,7 @@ function publicAccessResult(question, access, room, safetyResult = null) {
     };
   }
   return {
-    answer: "Please verify your stay from the permanent Room link in your arrival message using the Airbnb confirmation code or private House stay code provided to you. After verification, Thai-only stays need no passport upload. If any foreign guests are staying overnight, passport information is required for every non-Thai guest—not only the person who made the booking. The private guide opens after the required registration is complete.",
+    answer: "Please verify your stay from the permanent Room link in your arrival message using the Airbnb confirmation code or private House stay code provided to you. After verification, Thai-only stays need one Thai ID-card image to confirm the Thai-only declaration; no passport is required for that Thai-only flow. If any foreign guests are staying overnight, passport information is required for every non-Thai guest—not only the person who made the booking. The private guide opens after the required registration is complete.",
     intentId: "stay_verification_required",
     category: "arrival",
     confidence: 1,
@@ -1229,6 +1242,8 @@ function pendingArrivalRoomLocationResult(question, access, room) {
   const arrivalHref = `/room/${room}#arrivalAccess`;
   const reminder = access.registrationStatus === "passport_pending"
     ? "Please upload the remaining required passport image(s) to complete guest registration and unlock the full guest guide and service requests."
+    : access.registrationStatus === "thai_id_pending"
+      ? "Please upload one clear Thai ID-card image to confirm the Thai-only registration declaration and unlock the full guest guide and service requests."
     : access.registrationStatus === "in_person_pending"
       ? "Your in-person guest registration is still pending. The full guest guide and service requests unlock after registration is complete."
       : "Please complete Guest registration to unlock the full guest guide and service requests. Non-Thai overnight guests will need to upload their passport image.";

@@ -218,6 +218,9 @@
       if (conciergeAccessState.registrationStatus === "passport_pending") {
         return `Hello. Your stay is verified${selectedRoom ? ` for Room ${selectedRoom}` : ""}. You can already use Find my room for arrival directions. Please upload the required passport image${conciergeAccessState.requiredPassports > 1 ? "s" : ""} to complete guest registration and unlock the full guest guide and service requests.`;
       }
+      if (conciergeAccessState.registrationStatus === "thai_id_pending") {
+        return `Hello. Your stay is verified${selectedRoom ? ` for Room ${selectedRoom}` : ""}. You can already use Find my room for arrival directions. Please upload one clear Thai ID-card image to confirm the Thai-only registration declaration and unlock the full guest guide and service requests.`;
+      }
       if (conciergeAccessState.registrationStatus === "in_person_pending") {
         return `Hello. Your stay is verified${selectedRoom ? ` for Room ${selectedRoom}` : ""}. You can already use Find my room for arrival directions. Your in-person guest registration is still pending; the full guest guide and service requests unlock after registration is complete.`;
       }
@@ -697,7 +700,7 @@
   async function fallbackAnswer(question) {
     if (isPublicAccess) {
       return {
-        answer: "Please complete guest access from your permanent Room link. Thai-only stays need only the Airbnb confirmation code or private House stay code and the Thai-national selection. If any foreign guests are staying overnight, securely submit passport information for every non-Thai guest—not only the booking guest. Emergency help remains available without verification.",
+        answer: "Please complete guest access from your permanent Room link. Thai-only stays need no passport, but one clear Thai ID-card image is required to confirm the Thai-only declaration. If any foreign guests are staying overnight, securely submit passport information for every non-Thai guest—not only the booking guest. Emergency help remains available without verification.",
         actions: [{ label: "Complete guest access", type: "registration" }],
         source: "public-fallback",
         interactionId: null

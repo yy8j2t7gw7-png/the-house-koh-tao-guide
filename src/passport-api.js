@@ -150,9 +150,10 @@ function detectImage(bytes) {
 }
 
 function privateDownload(object, record) {
+  const baseName = record.documentType === "thai_id" ? "thai-id-image" : "passport-image";
   const headers = new Headers({
     "content-type": record.mediaType || "application/octet-stream",
-    "content-disposition": `attachment; filename="passport-image.${record.extension || "bin"}"`,
+    "content-disposition": `attachment; filename="${baseName}.${record.extension || "bin"}"`,
     "cache-control": "no-store, max-age=0",
     "content-security-policy": "default-src 'none'; sandbox",
     "cross-origin-resource-policy": "same-origin",
@@ -176,6 +177,7 @@ export async function handlePassportGuestRequest(request, env, path) {
     return json({
       ok: true,
       room: result.session.room,
+      documentType: result.session.documentType || "passport",
       expiresAt: result.session.expiresAt,
       retentionDays: retentionDays(env),
       maximumBytes: MAX_UPLOAD_BYTES,
@@ -201,7 +203,9 @@ export async function handlePassportGuestRequest(request, env, path) {
 
     const uploadedAt = new Date().toISOString();
     const deleteAfter = new Date(Date.now() + (retentionDays(env) * 86_400_000)).toISOString();
-    const objectKey = `passport/${uploadedAt.slice(0, 7)}/${crypto.randomUUID()}.${detected.extension}`;
+    const documentType = result.session.documentType === "thai_id" ? "thai_id" : "passport";
+    const objectPrefix = documentType === "thai_id" ? "thai-id" : "passport";
+    const objectKey = `${objectPrefix}/${uploadedAt.slice(0, 7)}/${crypto.randomUUID()}.${detected.extension}`;
     try {
       await env.PASSPORT_UPLOADS.put(objectKey, bytes, {
         httpMetadata: { contentType: detected.mediaType },
@@ -231,17 +235,20 @@ export async function handlePassportGuestRequest(request, env, path) {
       return json({ error: "link_already_used" }, 409);
     }
     let registration = null;
-    if (typeof store.markRegistrationFromPassport === "function") {
+    if (typeof store.markRegistrationFromDocument === "function") {
+      registration = await store.markRegistrationFromDocument(completed.id, uploadedAt).catch(() => null);
+    } else if (typeof store.markRegistrationFromPassport === "function") {
       registration = await store.markRegistrationFromPassport(completed.id, uploadedAt).catch(() => null);
     }
     return json({
       ok: true,
       room: completed.room,
+      documentType,
       deleteAfter,
-      registrationStatus: registration?.status || "passport_pending",
+      registrationStatus: registration?.status || (documentType === "thai_id" ? "thai_id_pending" : "passport_pending"),
       requiredPassports: Number(registration?.requiredPassports) || 1,
       receivedPassports: Number(registration?.receivedPassports) || 1,
-      accessGranted: registration?.status === "passport_complete"
+      accessGranted: ["passport_complete", "thai_id_complete"].includes(registration?.status)
     });
   }
 
@@ -270,6 +277,7 @@ export async function handlePassportAdminRequest(request, env, path, store) {
       id,
       tokenHash: digest,
       room,
+      documentType: "passport",
       createdAt,
       arrivalAt: arrivalDate?.toISOString() || "",
       expiresAt
@@ -332,6 +340,17 @@ export async function handlePassportAdminRequest(request, env, path, store) {
     }
     await store.deletePassportUpload(id);
     return json({ ok: true });
+  }
+
+  if (path === "/api/concierge/admin/passport-tm30") {
+    if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405, { allow: "POST" });
+    const body = await readJson(request);
+    const id = String(body?.id || "");
+    if (!ID_PATTERN.test(id) || typeof body?.registered !== "boolean") return json({ error: "invalid_request" }, 400);
+    if (typeof store.setPassportTm30Registered !== "function") return json({ error: "tm30_tracking_unavailable" }, 503);
+    const result = await store.setPassportTm30Registered(id, body.registered, new Date().toISOString());
+    if (!result?.ok) return json({ error: result?.error || "tm30_tracking_unavailable" }, result?.error === "tm30_not_applicable" ? 409 : 404);
+    return json(result);
   }
 
   return null;

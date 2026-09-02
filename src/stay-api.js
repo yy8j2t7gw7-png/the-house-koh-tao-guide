@@ -24,7 +24,7 @@ const MAX_SYNC_RECORDS = 250;
 const LOST_KEY_FEE_THB = 500;
 const LOST_KEY_REQUEST_TTL_MS = 15 * 60_000;
 const SPARE_KEY_VIEW_TTL_MS = 15 * 60_000;
-const REGISTRATION_COMPLETE_STATUSES = new Set(["thai_exempt", "passport_complete", "in_person_complete"]);
+const REGISTRATION_COMPLETE_STATUSES = new Set(["thai_exempt", "thai_id_complete", "passport_complete", "in_person_complete"]);
 const ROOM_DETAILS = Object.freeze({
   "1": { floor: "Upstairs", photo: "photo-06.jpeg", note: "Room 1 is upstairs. Follow the path around the side of the house to the staircase at the back." },
   "2": { floor: "Upstairs", photo: "photo-05.jpeg", note: "Room 2 is upstairs. Follow the path around the side of the house to the staircase at the back." },
@@ -317,7 +317,7 @@ export async function getGuestAccess(request, env, requestedRoom = "") {
     room: session.room,
     session,
     registrationStatus,
-    guestType: registration?.guestType || (registrationStatus === "thai_exempt" ? "thai" : ""),
+    guestType: registration?.guestType || (["thai_exempt", "thai_id_pending", "thai_id_complete"].includes(registrationStatus) ? "thai" : ""),
     requiredPassports: Number(registration?.requiredPassports) || 0,
     receivedPassports: Number(registration?.receivedPassports) || (registrationStatus === "passport_received" ? 1 : 0)
   };
@@ -457,7 +457,7 @@ export async function handleStayGuestRequest(request, env, path, ctx, now = new 
       accessGranted: registrationComplete(registrationStatus),
       registrationIncomplete: !registrationComplete(registrationStatus),
       guestFirstName: session.guestFirstName || "",
-      guestType: registration?.guestType || (registrationStatus === "thai_exempt" ? "thai" : ""),
+      guestType: registration?.guestType || (["thai_exempt", "thai_id_pending", "thai_id_complete"].includes(registrationStatus) ? "thai" : ""),
       requiredPassports: Number(registration?.requiredPassports) || 0,
       receivedPassports: Number(registration?.receivedPassports) || (registrationStatus === "passport_received" ? 1 : 0),
       lostKeyFeeThb: LOST_KEY_FEE_THB,
@@ -522,6 +522,9 @@ export async function handleStayGuestRequest(request, env, path, ctx, now = new 
     const body = await readJson(request, 2_000);
     if (body?.nationality === "thai") {
       if (body?.allGuestsThai !== true) return json({ error: "all_thai_confirmation_required" }, 400);
+      if (registrationStatus === "thai_id_complete" && registration?.guestType === "thai") {
+        return json({ ok: true, accessGranted: true, registrationStatus, guestType: "thai" });
+      }
       if (registration?.guestType === "foreign" || Number(registration?.receivedPassports) > 0) {
         return json({ error: "guest_type_change_requires_staff" }, 409);
       }
@@ -529,11 +532,14 @@ export async function handleStayGuestRequest(request, env, path, ctx, now = new 
       await store.closePendingPassportLinksForReservation(session.reservationId, updatedAt);
       const result = typeof store.setStayRegistrationRequirement === "function"
         ? await store.setStayRegistrationRequirement(session.reservationId, "thai", 0, updatedAt)
-        : await store.setStayRegistrationStatus(session.reservationId, "thai_exempt", updatedAt).then(() => ({ status: "thai_exempt" }));
-      return json({ ok: true, accessGranted: true, registrationStatus: result.status, guestType: "thai" });
+        : await store.setStayRegistrationStatus(session.reservationId, "thai_id_pending", updatedAt).then(() => ({ status: "thai_id_pending" }));
+      return json({ ok: true, accessGranted: false, registrationStatus: result.status, guestType: "thai" });
     }
     if (body?.nationality === "foreign") {
       const requiredPassports = Number(body?.nonThaiGuestCount);
+      if (registrationStatus === "thai_id_complete") {
+        return json({ error: "guest_type_change_requires_staff" }, 409);
+      }
       if (body?.allNonThaiGuestsIncluded !== true) {
         return json({ error: "all_non_thai_guests_confirmation_required" }, 400);
       }
@@ -588,12 +594,42 @@ export async function handleStayGuestRequest(request, env, path, ctx, now = new 
       id,
       tokenHash,
       room: session.room,
+      documentType: "passport",
       reservationId: session.reservationId,
       createdAt,
       arrivalAt: `${session.checkInDate}T14:00:00+07:00`,
       expiresAt
     });
     if (!result?.ok) return json({ error: result?.error || "passport_request_unavailable" }, 409);
+    const origin = new URL(request.url).origin;
+    return json({ ok: true, uploadUrl: `${origin}/passport-upload#token=${token}`, expiresAt });
+  }
+
+  if (path === "/api/stay/thai-id-link") {
+    if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405, { allow: "POST" });
+    if (!env.PASSPORT_UPLOADS || !env.PASSPORT_TOKEN_PEPPER) return json({ error: "passport_upload_unavailable" }, 503);
+    if (registration?.guestType !== "thai" || !["thai_id_pending", "thai_id_complete"].includes(registrationStatus)) {
+      return json({ error: "thai_registration_required" }, 409);
+    }
+    if (registrationStatus === "thai_id_complete") {
+      return json({ error: "registration_already_complete" }, 409);
+    }
+    const token = randomToken();
+    const tokenHash = await hmac(token, env.PASSPORT_TOKEN_PEPPER);
+    const createdAt = new Date().toISOString();
+    const expiresAt = new Date(Date.now() + (72 * 3_600_000)).toISOString();
+    const id = `pass_${crypto.randomUUID()}`;
+    const result = await store.createAutomaticPassportUpload({
+      id,
+      tokenHash,
+      room: session.room,
+      documentType: "thai_id",
+      reservationId: session.reservationId,
+      createdAt,
+      arrivalAt: `${session.checkInDate}T14:00:00+07:00`,
+      expiresAt
+    });
+    if (!result?.ok) return json({ error: result?.error || "thai_id_request_unavailable" }, 409);
     const origin = new URL(request.url).origin;
     return json({ ok: true, uploadUrl: `${origin}/passport-upload#token=${token}`, expiresAt });
   }
@@ -606,17 +642,18 @@ export async function handleStayGuestRequest(request, env, path, ctx, now = new 
     if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405, { allow: "POST" });
     const body = await readJson(request, 2_000);
     if (body?.allGuestsThai !== true) return json({ error: "all_thai_confirmation_required" }, 400);
+    if (registrationStatus === "thai_id_complete" && registration?.guestType === "thai") {
+      return json({ ok: true, accessGranted: true, registrationStatus, guestType: "thai" });
+    }
     if (registration?.guestType === "foreign" || Number(registration?.receivedPassports) > 0 || registrationStatus === "passport_complete") {
       return json({ error: "guest_type_change_requires_staff" }, 409);
     }
     const updatedAt = new Date().toISOString();
     await store.closePendingPassportLinksForReservation(session.reservationId, updatedAt);
-    if (typeof store.setStayRegistrationRequirement === "function") {
-      await store.setStayRegistrationRequirement(session.reservationId, "thai", 0, updatedAt);
-    } else {
-      await store.setStayRegistrationStatus(session.reservationId, "thai_exempt", updatedAt);
-    }
-    return json({ ok: true, registrationStatus: "thai_exempt" });
+    const result = typeof store.setStayRegistrationRequirement === "function"
+      ? await store.setStayRegistrationRequirement(session.reservationId, "thai", 0, updatedAt)
+      : await store.setStayRegistrationStatus(session.reservationId, "thai_id_pending", updatedAt).then(() => ({ status: "thai_id_pending" }));
+    return json({ ok: true, accessGranted: false, registrationStatus: result.status, guestType: "thai" });
   }
 
   if (path === "/api/stay/arrival-content") {

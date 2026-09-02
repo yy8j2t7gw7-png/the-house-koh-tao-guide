@@ -49,9 +49,9 @@ body{margin:0;color:var(--text);background:linear-gradient(180deg,#fbfaf7,#f7f3e
       <div class="choice">
         <h3>Thai nationals only</h3>
         <p class="thai-exemption-th" lang="th" data-i18n-skip>เฉพาะผู้มีสัญชาติไทยเท่านั้น</p>
-        <p>No passport information is needed when every overnight guest is Thai.</p>
-        <p class="thai-exemption-th" lang="th" data-i18n-skip>ไม่ต้องส่งข้อมูลหนังสือเดินทาง หากผู้เข้าพักค้างคืนทุกคนมีสัญชาติไทย</p>
-        <button class="btn secondary" id="confirmThaiNational" type="button"><span>All overnight guests are Thai</span><span class="thai-button-label" lang="th" data-i18n-skip>ผู้เข้าพักค้างคืนทุกคนมีสัญชาติไทย</span></button>
+        <p>No passport is required for Thai-only stays. To prevent an incorrect Thai-only declaration, please upload one clear Thai ID-card image for the reservation.</p>
+        <p class="thai-exemption-th" lang="th" data-i18n-skip>ไม่ต้องใช้หนังสือเดินทางสำหรับการเข้าพักที่มีเฉพาะผู้มีสัญชาติไทย แต่กรุณาอัปโหลดรูปบัตรประชาชนไทยที่ชัดเจนอย่างน้อย 1 รูปสำหรับการจองนี้</p>
+        <button class="btn secondary" id="confirmThaiNational" type="button"><span>All overnight guests are Thai — continue</span><span class="thai-button-label" lang="th" data-i18n-skip>ผู้เข้าพักค้างคืนทุกคนมีสัญชาติไทย — ดำเนินการต่อ</span></button>
       </div>
       <div class="choice">
         <h3>Foreign guest(s)</h3>
@@ -68,15 +68,15 @@ body{margin:0;color:var(--text);background:linear-gradient(180deg,#fbfaf7,#f7f3e
   <div id="passportProgressPanel" hidden>
     <h3 id="passportProgressTitle">Upload passports securely</h3>
     <p id="passportProgressText"></p>
-    <p>One passport is required for each non-Thai adult and child staying overnight.</p>
+    <p id="registrationDocumentRequirement">One passport is required for each non-Thai adult and child staying overnight.</p>
     <div class="choice-grid">
       <div class="choice" id="secureUploadChoice">
-        <h3>Upload passports securely</h3>
-        <p>Use one private, single-use form per guest. Images are deleted within 14 days—or sooner.</p>
+        <h3 id="registrationUploadChoiceTitle">Upload passports securely</h3>
+        <p id="registrationUploadChoiceText">Use one private, single-use form per guest. Images are deleted within 14 days—or sooner.</p>
         <button class="btn" id="createPassportUpload" type="button">Upload next passport securely</button>
       </div>
     </div>
-    <p class="stay-privacy">Used only for TM30 registration. Your room guide opens after all required passports are uploaded.</p>
+    <p class="stay-privacy" id="registrationPrivacyText">Used only for TM30 registration. Your room guide opens after all required passports are uploaded.</p>
   </div>
   <p class="stay-access-status" id="registrationStatus" role="status" aria-live="polite" hidden></p>
 </section>

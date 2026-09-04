@@ -1,3 +1,4 @@
+import { financeBusinessProfile, HOUSE_FINANCE_BUSINESS_ID, resolveFinanceBusinessId } from "./finance-businesses.js";
 const MAX_RECEIPT_BYTES = 10 * 1024 * 1024;
 const MIN_RECEIPT_BYTES = 32;
 const EXPENSE_ID_PATTERN = /^exp_[A-Za-z0-9-]{20,80}$/;
@@ -5,12 +6,12 @@ const DEFAULT_EXPENSE_CATEGORIES = [
   "Maintenance", "Cleaning", "Laundry", "Bedroom", "Equipment",
   "Utilities", "Legal Fees", "Salary", "Other"
 ];
-const PAYMENT_METHODS = ["", "Cash", "Card", "Bank transfer", "Other"];
 
-function expenseConfiguration(env) {
-  const currencyValue = String(env.EXPENSE_CURRENCY || "THB").trim().toUpperCase();
+function expenseConfiguration(env, businessId = HOUSE_FINANCE_BUSINESS_ID) {
+  const profile = financeBusinessProfile(env, businessId) || financeBusinessProfile(env, HOUSE_FINANCE_BUSINESS_ID);
+  const currencyValue = String(profile?.currency || env.EXPENSE_CURRENCY || "THB").trim().toUpperCase();
   const currency = /^[A-Z]{3}$/.test(currencyValue) ? currencyValue : "THB";
-  const timeZoneValue = String(env.PROPERTY_TIME_ZONE || "Asia/Bangkok").trim();
+  const timeZoneValue = String(profile?.timeZone || env.PROPERTY_TIME_ZONE || "Asia/Bangkok").trim();
   let timeZone = "Asia/Bangkok";
   try {
     new Intl.DateTimeFormat("en", { timeZone: timeZoneValue }).format(new Date());
@@ -18,15 +19,17 @@ function expenseConfiguration(env) {
   } catch (_error) {
     timeZone = "Asia/Bangkok";
   }
-  let categories = DEFAULT_EXPENSE_CATEGORIES;
-  try {
-    const parsed = JSON.parse(String(env.EXPENSE_CATEGORIES || "[]"));
-    if (Array.isArray(parsed)) {
-      const cleaned = [...new Set(parsed.map((item) => cleanText(item, 40)).filter(Boolean))].slice(0, 30);
-      if (cleaned.length >= 2) categories = cleaned;
+  let categories = Array.isArray(profile?.expenseCategories) ? [...profile.expenseCategories] : DEFAULT_EXPENSE_CATEGORIES;
+  if (!profile?.expenseCategories) {
+    try {
+      const parsed = JSON.parse(String(env.EXPENSE_CATEGORIES || "[]"));
+      if (Array.isArray(parsed)) {
+        const cleaned = [...new Set(parsed.map((item) => cleanText(item, 40)).filter(Boolean))].slice(0, 30);
+        if (cleaned.length >= 2) categories = cleaned;
+      }
+    } catch (_error) {
+      categories = DEFAULT_EXPENSE_CATEGORIES;
     }
-  } catch (_error) {
-    categories = DEFAULT_EXPENSE_CATEGORIES;
   }
   let minorUnitDigits = 2;
   try {
@@ -35,10 +38,19 @@ function expenseConfiguration(env) {
     minorUnitDigits = 2;
   }
   minorUnitDigits = Math.max(0, Math.min(3, Number(minorUnitDigits) || 0));
-  return { currency, timeZone, categories, minorUnitDigits, maxReceiptMb: MAX_RECEIPT_BYTES / (1024 * 1024) };
+  return {
+    businessId: profile?.id || HOUSE_FINANCE_BUSINESS_ID,
+    businessName: profile?.name || "The House – Koh Tao",
+    businessType: profile?.businessType || "guesthouse",
+    locationLabel: profile?.locationLabel || "Room / area",
+    incomeUnitLabel: profile?.incomeUnitLabel || "Room / unit",
+    locationExamples: profile?.locationExamples || [],
+    paymentMethods: Array.isArray(profile?.paymentMethods) ? [...profile.paymentMethods] : ["", "Cash", "Card", "Bank transfer", "Other"],
+    currency, timeZone, categories, minorUnitDigits, maxReceiptMb: MAX_RECEIPT_BYTES / (1024 * 1024)
+  };
 }
 
-function extractionSchema(categories) {
+function extractionSchema(categories, paymentMethods) {
   return {
   type: "object",
   additionalProperties: false,
@@ -49,7 +61,7 @@ function extractionSchema(categories) {
     vendor: { type: "string", maxLength: 160 },
     description: { type: "string", maxLength: 240 },
     category: { type: "string", enum: categories },
-    paymentMethod: { type: "string", enum: PAYMENT_METHODS },
+    paymentMethod: { type: "string", enum: paymentMethods },
     roomArea: { type: "string", maxLength: 80 },
     confidence: { type: "number", minimum: 0, maximum: 1 },
     notes: { type: "string", maxLength: 240 }
@@ -156,9 +168,9 @@ async function readReceiptFile(form) {
   return { file, bytes, detected };
 }
 
-async function analyzeReceipt(env, bytes, detected) {
+async function analyzeReceipt(env, bytes, detected, businessId = HOUSE_FINANCE_BUSINESS_ID) {
   if (!env.OPENAI_API_KEY) return { ok: false, error: "expense_extraction_unavailable" };
-  const configuration = expenseConfiguration(env);
+  const configuration = expenseConfiguration(env, businessId);
   const base64 = bytesToBase64(bytes);
   const fileContent = detected.kind === "image"
     ? { type: "input_image", image_url: `data:${detected.mediaType};base64,${base64}`, detail: "high" }
@@ -172,7 +184,7 @@ async function analyzeReceipt(env, bytes, detected) {
     body: JSON.stringify({
       model: env.EXPENSE_EXTRACTION_MODEL || env.OPENAI_MODEL || "gpt-5.6",
       store: false,
-      instructions: `Extract expense information from a receipt, invoice or bill for a hospitality business.\n\nRULES\n- Never invent unreadable values.\n- amount must be the final total actually payable/paid in ${configuration.currency} when clearly shown, not a subtotal. If no reliable ${configuration.currency} total is visible, use 0 and explain briefly in notes.\n- date must be YYYY-MM-DD or empty.\n- Choose exactly one supplied category. Use Other when it is available and the category is genuinely uncertain; otherwise choose the closest supplied category.\n- roomArea is optional free text. Populate it only when the document explicitly identifies a room or property area; otherwise return an empty string.\n- Payment method must be returned only when visible or unambiguous; otherwise empty.\n- Keep description short and accounting-friendly.\n- This output is only a draft. The owner will confirm or correct every field before saving.`,
+      instructions: `Extract expense information from a receipt, invoice or bill for ${configuration.businessName}, a ${configuration.businessType} business.\n\nRULES\n- Never invent unreadable values.\n- amount must be the final total actually payable/paid in ${configuration.currency} when clearly shown, not a subtotal. If no reliable ${configuration.currency} total is visible, use 0 and explain briefly in notes.\n- date must be YYYY-MM-DD or empty.\n- Choose exactly one supplied category. Use Other when it is available and the category is genuinely uncertain; otherwise choose the closest supplied category.\n- roomArea is optional free text. Populate it only when the document explicitly identifies a room or property area; otherwise return an empty string.\n- Payment method must be returned only when visible or unambiguous; otherwise empty.\n- Keep description short and accounting-friendly.\n- This output is only a draft. The owner will confirm or correct every field before saving.`,
       input: [{
         role: "user",
         content: [
@@ -187,7 +199,7 @@ async function analyzeReceipt(env, bytes, detected) {
           type: "json_schema",
           name: "expense_receipt_draft",
           strict: true,
-          schema: extractionSchema(configuration.categories)
+          schema: extractionSchema(configuration.categories, configuration.paymentMethods)
         }
       }
     })
@@ -204,7 +216,7 @@ async function analyzeReceipt(env, bytes, detected) {
         vendor: cleanText(draft.vendor, 160),
         description: cleanText(draft.description, 240),
         category: configuration.categories.includes(draft.category) ? draft.category : (configuration.categories.includes("Other") ? "Other" : configuration.categories[0]),
-        paymentMethod: PAYMENT_METHODS.includes(draft.paymentMethod) ? draft.paymentMethod : "",
+        paymentMethod: configuration.paymentMethods.includes(draft.paymentMethod) ? draft.paymentMethod : "",
         roomArea: cleanText(draft.roomArea, 80),
         confidence: Math.max(0, Math.min(1, Number(draft.confidence) || 0)),
         notes: cleanText(draft.notes, 240)
@@ -236,8 +248,10 @@ function csvEscape(value) {
   return /[",\r\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
 }
 
-function expenseCsv(records, currency, minorUnitDigits = 2) {
-  const rows = [["Date", "Category", "Description", `Amount (${currency})`, "Vendor", "Payment method", "Room / area", "Notes", "Receipt"]];
+function expenseCsv(records, configuration) {
+  const currency = configuration.currency;
+  const minorUnitDigits = configuration.minorUnitDigits;
+  const rows = [["Date", "Category", "Description", `Amount (${currency})`, "Vendor", "Payment method", configuration.locationLabel || "Room / area", "Notes", "Receipt"]];
   records.forEach((item) => rows.push([
     item.expenseDate,
     item.category,
@@ -252,11 +266,32 @@ function expenseCsv(records, currency, minorUnitDigits = 2) {
   return `\uFEFF${rows.map((row) => row.map(csvEscape).join(",")).join("\r\n")}`;
 }
 
-export async function handleExpenseAdminRequest(request, env, path, store, actorHash = "") {
+function scopedBusinessId(value, access = {}, fallback = HOUSE_FINANCE_BUSINESS_ID) {
+  const businessId = resolveFinanceBusinessId(value || fallback);
+  if (!businessId) return { error: "invalid_business", status: 400 };
+  if (access?.businessId && businessId !== access.businessId) return { error: "forbidden", status: 403 };
+  return { businessId };
+}
+
+function requestBusinessScope(request, access = {}, fallback = HOUSE_FINANCE_BUSINESS_ID) {
+  const value = new URL(request.url).searchParams.get("business") || fallback;
+  return scopedBusinessId(value, access, fallback);
+}
+
+function ownerOnly(access = {}) {
+  return access?.role === "staff" ? json({ error: "owner_access_required" }, 403) : null;
+}
+
+export async function handleExpenseAdminRequest(request, env, path, store, actorHash = "", access = {}) {
   const downloadMatch = path.match(/^\/api\/concierge\/admin\/expense-files\/(exp_[A-Za-z0-9-]{20,80})$/);
   if (downloadMatch) {
     if (request.method !== "GET") return json({ error: "method_not_allowed" }, 405, { allow: "GET" });
-    const record = await store.getExpense?.(downloadMatch[1]);
+    const denied = ownerOnly(access);
+    if (denied) return denied;
+    const scope = requestBusinessScope(request, access);
+    if (scope.error) return json({ error: scope.error }, scope.status);
+    const businessId = scope.businessId;
+    const record = await store.getExpense?.(downloadMatch[1], businessId);
     const bucket = expenseBucket(env);
     if (!record?.receiptObjectKey || !bucket?.get) return json({ error: "not_found" }, 404);
     const object = await bucket.get(record.receiptObjectKey);
@@ -267,23 +302,31 @@ export async function handleExpenseAdminRequest(request, env, path, store, actor
     if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405, { allow: "POST" });
     let form;
     try { form = await request.formData(); } catch (_error) { return json({ error: "invalid_form" }, 400); }
+    const scope = scopedBusinessId(form.get("business") || HOUSE_FINANCE_BUSINESS_ID, access);
+    if (scope.error) return json({ error: scope.error }, scope.status);
+    const businessId = scope.businessId;
     let receipt;
     try { receipt = await readReceiptFile(form); } catch (response) { return response instanceof Response ? response : json({ error: "invalid_file" }, 400); }
     if (!receipt.bytes || !receipt.detected) return json({ error: "receipt_required" }, 400);
-    const result = await analyzeReceipt(env, receipt.bytes, receipt.detected);
+    const result = await analyzeReceipt(env, receipt.bytes, receipt.detected, businessId);
     return result.ok ? json(result) : json(result, result.error === "expense_extraction_unavailable" ? 503 : 502);
   }
 
   if (path === "/api/concierge/admin/expenses/export.csv") {
     if (request.method !== "GET") return json({ error: "method_not_allowed" }, 405, { allow: "GET" });
+    const denied = ownerOnly(access);
+    if (denied) return denied;
     const month = new URL(request.url).searchParams.get("month") || "";
     if (!validMonth(month)) return json({ error: "invalid_month" }, 400);
-    const records = await store.listExpenses?.(month) || [];
-    const configuration = expenseConfiguration(env);
-    return new Response(expenseCsv(records, configuration.currency, configuration.minorUnitDigits), {
+    const scope = requestBusinessScope(request, access);
+    if (scope.error) return json({ error: scope.error }, scope.status);
+    const businessId = scope.businessId;
+    const records = await store.listExpenses?.(month, businessId) || [];
+    const configuration = expenseConfiguration(env, businessId);
+    return new Response(expenseCsv(records, configuration), {
       headers: {
         "content-type": "text/csv; charset=utf-8",
-        "content-disposition": `attachment; filename="expenses-${month}.csv"`,
+        "content-disposition": `attachment; filename="${configuration.businessId === HOUSE_FINANCE_BUSINESS_ID ? `expenses-${month}.csv` : `expenses-${configuration.businessId}-${month}.csv`}"`,
         "cache-control": "no-store",
         "x-content-type-options": "nosniff"
       }
@@ -292,26 +335,36 @@ export async function handleExpenseAdminRequest(request, env, path, store, actor
 
   if (path === "/api/concierge/admin/expenses/delete") {
     if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405, { allow: "POST" });
+    const denied = ownerOnly(access);
+    if (denied) return denied;
     const body = await request.json().catch(() => ({}));
     const id = String(body.id || "");
+    const scope = scopedBusinessId(body.business || HOUSE_FINANCE_BUSINESS_ID, access);
+    if (scope.error) return json({ error: scope.error }, scope.status);
+    const businessId = scope.businessId;
     if (!EXPENSE_ID_PATTERN.test(id) || body.confirmation !== "DELETE EXPENSE") return json({ error: "confirmation_required" }, 400);
-    const record = await store.getExpense?.(id);
+    const record = await store.getExpense?.(id, businessId);
     if (!record) return json({ error: "not_found" }, 404);
     const bucket = expenseBucket(env);
     if (record.receiptObjectKey && bucket?.delete) {
       try { await bucket.delete(record.receiptObjectKey); } catch (_error) { return json({ error: "storage_unavailable" }, 503); }
     }
-    const outcome = await store.deleteExpense?.(id, actorHash, new Date().toISOString());
+    const outcome = await store.deleteExpense?.(id, actorHash, new Date().toISOString(), businessId);
     return outcome?.ok ? json(outcome) : json({ error: outcome?.error || "not_found" }, 404);
   }
 
   if (path !== "/api/concierge/admin/expenses") return null;
 
   if (request.method === "GET") {
+    const denied = ownerOnly(access);
+    if (denied) return denied;
     const month = new URL(request.url).searchParams.get("month") || "";
     if (!validMonth(month)) return json({ error: "invalid_month" }, 400);
-    const records = await store.listExpenses?.(month) || [];
-    const configuration = expenseConfiguration(env);
+    const scope = requestBusinessScope(request, access);
+    if (scope.error) return json({ error: scope.error }, scope.status);
+    const businessId = scope.businessId;
+    const records = await store.listExpenses?.(month, businessId) || [];
+    const configuration = expenseConfiguration(env, businessId);
     const categoryTotals = {};
     let totalMinor = 0;
     let receipts = 0;
@@ -338,7 +391,10 @@ export async function handleExpenseAdminRequest(request, env, path, store, actor
   let form;
   try { form = await request.formData(); } catch (_error) { return json({ error: "invalid_form" }, 400); }
 
-  const configuration = expenseConfiguration(env);
+  const scope = scopedBusinessId(form.get("business") || HOUSE_FINANCE_BUSINESS_ID, access);
+  if (scope.error) return json({ error: scope.error }, scope.status);
+  const businessId = scope.businessId;
+  const configuration = expenseConfiguration(env, businessId);
   const expenseDate = cleanText(form.get("date"), 10);
   const amountMinor = amountToMinorUnits(form.get("amount"), configuration.minorUnitDigits);
   const category = cleanText(form.get("category"), 40);
@@ -351,10 +407,11 @@ export async function handleExpenseAdminRequest(request, env, path, store, actor
   if (!validDate(expenseDate) || !amountMinor || !configuration.categories.includes(category) || description.length < 2) {
     return json({ error: "invalid_expense" }, 400);
   }
-  if (!PAYMENT_METHODS.includes(paymentMethod)) return json({ error: "invalid_expense" }, 400);
+  if (!configuration.paymentMethods.includes(paymentMethod)) return json({ error: "invalid_expense" }, 400);
 
-  const duplicates = await store.findExpenseDuplicates?.(expenseDate, amountMinor, vendor, configuration.currency) || [];
+  const duplicates = await store.findExpenseDuplicates?.(expenseDate, amountMinor, vendor, configuration.currency, businessId) || [];
   if (duplicates.length && !confirmDuplicate) {
+    if (access?.role === "staff") return json({ error: "possible_duplicate" }, 409);
     return json({
       error: "possible_duplicate",
       duplicates: duplicates.map((item) => ({
@@ -377,11 +434,12 @@ export async function handleExpenseAdminRequest(request, env, path, store, actor
   if (receipt.bytes) {
     const bucket = expenseBucket(env);
     if (!bucket?.put) return json({ error: "receipt_storage_unavailable" }, 503);
-    receiptObjectKey = `expenses/${expenseDate.slice(0, 7)}/${crypto.randomUUID()}.${receipt.detected.extension}`;
+    const prefix = businessId === HOUSE_FINANCE_BUSINESS_ID ? "expenses" : `finance/${businessId}/expenses`;
+    receiptObjectKey = `${prefix}/${expenseDate.slice(0, 7)}/${crypto.randomUUID()}.${receipt.detected.extension}`;
     try {
       await bucket.put(receiptObjectKey, receipt.bytes, {
         httpMetadata: { contentType: receipt.detected.mediaType },
-        customMetadata: { expenseId: id, expenseDate }
+        customMetadata: { expenseId: id, expenseDate, businessId }
       });
     } catch (_error) {
       return json({ error: "receipt_storage_unavailable" }, 503);
@@ -391,6 +449,7 @@ export async function handleExpenseAdminRequest(request, env, path, store, actor
   try {
     await store.createExpense?.({
       id,
+      businessId,
       expenseDate,
       category,
       description,
@@ -405,6 +464,7 @@ export async function handleExpenseAdminRequest(request, env, path, store, actor
       receiptExtension: receipt.detected?.extension || "",
       receiptSizeBytes: receipt.bytes?.byteLength || 0,
       actorHash,
+      createdByRole: access?.role === "staff" ? "staff" : "owner",
       createdAt
     });
   } catch (_error) {

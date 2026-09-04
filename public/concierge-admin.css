@@ -42,7 +42,9 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-vis
 .concierge-admin-toolbar strong,.concierge-admin-toolbar span{display:block}
 .concierge-admin-toolbar span{margin-top:2px;color:var(--admin-muted);font-size:12px}
 .concierge-admin-toolbar-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:7px}
-.concierge-admin-toolbar-actions button{min-height:40px;padding:8px 11px;font-size:12px}
+.concierge-admin-toolbar-actions button,.concierge-admin-toolbar-actions .admin-toolbar-link{min-height:40px;padding:8px 11px;font-size:12px}
+.concierge-admin-toolbar-actions .admin-toolbar-link{display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;border:1px solid var(--admin-line-strong);border-radius:10px;background:#fff;color:var(--admin-accent-dark);font-weight:800;text-decoration:none}
+.concierge-admin-toolbar-actions .admin-toolbar-link:hover{border-color:var(--admin-accent);background:var(--admin-soft)}
 .concierge-admin-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:14px}
 .concierge-admin-stat{min-width:0;padding:15px;border:1px solid var(--admin-line);border-radius:14px;background:#fff;box-shadow:0 2px 9px rgba(24,59,52,.035)}
 .concierge-admin-stat strong{display:block;color:var(--admin-ink);font-size:25px;line-height:1.1}

@@ -1,0 +1,16 @@
+.bamboo-finance-shell{max-width:980px}
+.bamboo-finance-header{align-items:center}
+.bamboo-finance-wordmark{min-width:116px;font-weight:950;letter-spacing:.08em;line-height:.88;font-size:25px;color:var(--admin-ink)}
+.bamboo-finance-wordmark span{font-size:11px;letter-spacing:.2em}
+.bamboo-finance-panel{padding:18px;border:1px solid var(--admin-line);border-radius:16px;background:#fff}
+.bamboo-finance-title-row{padding:0;border:0;background:transparent}
+.bamboo-finance-link{display:inline-flex;align-items:center;justify-content:center;text-decoration:none}
+@media(max-width:760px){.bamboo-finance-header{align-items:flex-start}.bamboo-finance-wordmark{min-width:90px;font-size:21px}.bamboo-finance-panel{padding:13px}}
+.bamboo-entry-status{min-height:1.35em;font-weight:700}
+@media print{
+  body{background:#fff}
+  .concierge-admin-login,.concierge-admin-toolbar,.concierge-admin-expense-form,.concierge-admin-card-actions,.legal-footer{display:none!important}
+  .bamboo-finance-panel{border:0;padding:0}
+  .concierge-admin-shell{max-width:none;margin:0;padding:0}
+  .concierge-admin-operations-block{break-inside:avoid}
+}

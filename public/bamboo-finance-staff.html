@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex,nofollow,noarchive">
+  <title>Bamboo Beach Bar | Staff Finance Entry</title>
+  <link rel="stylesheet" href="/design-system.css">
+  <link rel="stylesheet" href="/concierge-admin.css">
+  <link rel="stylesheet" href="/bamboo-finance.css">
+</head>
+<body>
+  <main class="concierge-admin-shell bamboo-finance-shell">
+    <header class="concierge-admin-header bamboo-finance-header">
+      <div class="bamboo-finance-wordmark" aria-label="Bamboo Beach Bar">BAMBOO<br><span>BEACH BAR</span></div>
+      <div>
+        <p class="concierge-admin-kicker">Staff entry</p>
+        <h1>Bamboo Beach Bar</h1>
+        <p>Enter daily income and bills without access to owner totals, history or reports.</p>
+      </div>
+    </header>
+
+    <section class="concierge-admin-login" id="staffLogin">
+      <form id="staffLoginForm">
+        <label for="staffToken">Staff password</label>
+        <div class="concierge-admin-login-row">
+          <input id="staffToken" name="token" type="password" autocomplete="current-password" required>
+          <button type="submit">Open staff entry</button>
+        </div>
+        <p id="loginStatus" role="status">Use the Bamboo staff password. It is kept only in this browser tab.</p>
+      </form>
+    </section>
+
+    <div id="staffWorkspace" hidden>
+      <section class="concierge-admin-toolbar">
+        <div>
+          <strong>Staff finance entry</strong>
+          <span>You can submit records, but cannot see financial history, totals, receipts or reports.</span>
+        </div>
+        <div class="concierge-admin-toolbar-actions">
+          <button type="button" class="secondary" id="staffLogout">Lock</button>
+        </div>
+      </section>
+
+      <section class="concierge-admin-section bamboo-finance-panel">
+        <div class="concierge-admin-section-head bamboo-finance-title-row">
+          <div>
+            <p class="concierge-admin-kicker">Daily takings</p>
+            <h2>Add income</h2>
+          </div>
+        </div>
+        <p>Enter the amount received and choose how the customer paid. Cash and QR code are separate payment methods.</p>
+        <form id="incomeForm" class="concierge-admin-expense-form">
+          <div class="concierge-admin-expense-fields">
+            <div class="concierge-admin-field"><label for="incomeDate">Date</label><input id="incomeDate" type="date" required></div>
+            <div class="concierge-admin-field"><label for="incomeCategory">Source / category</label><select id="incomeCategory" required><option value="">Select source</option></select></div>
+            <div class="concierge-admin-field"><label for="incomeGross" id="incomeGrossLabel">Gross income</label><input id="incomeGross" type="number" min="0.01" max="100000000" step="0.01" inputmode="decimal" required></div>
+            <div class="concierge-admin-field"><label for="incomeFees" id="incomeFeesLabel">Fees / commission</label><input id="incomeFees" type="number" min="0" max="100000000" step="0.01" inputmode="decimal" value="0"></div>
+            <div class="concierge-admin-field"><label for="incomeNet">Net income</label><input id="incomeNet" type="text" readonly></div>
+            <div class="concierge-admin-field"><label for="incomePaymentMethod">Payment method</label><select id="incomePaymentMethod" required><option value="">Choose payment method</option><option>Cash</option><option>QR code</option><option>Card</option><option>Bank transfer</option><option>Other</option></select></div>
+            <div class="concierge-admin-field"><label for="incomeUnit" id="incomeUnitLabel">Area / revenue stream</label><input id="incomeUnit" type="text" maxlength="80" list="financeLocationOptions" placeholder="Optional, e.g. Bar or Events"></div>
+            <div class="concierge-admin-field full"><label for="incomeDescription">Description</label><input id="incomeDescription" type="text" maxlength="240" required value="Daily bar sales"></div>
+            <div class="concierge-admin-field"><label for="incomeReference">Payment / settlement reference</label><input id="incomeReference" type="text" maxlength="120" placeholder="Optional"></div>
+            <div class="concierge-admin-field full"><label for="incomeNotes">Notes</label><textarea id="incomeNotes" maxlength="500" rows="2"></textarea></div>
+          </div>
+          <div class="concierge-admin-card-actions">
+            <button type="submit" id="incomeSave">Submit income</button>
+            <button type="button" class="secondary" id="incomeReset">Clear form</button>
+          </div>
+          <p id="incomeStatus" class="bamboo-entry-status" role="status"></p>
+        </form>
+      </section>
+
+      <section class="concierge-admin-section bamboo-finance-panel">
+        <div class="concierge-admin-section-head bamboo-finance-title-row">
+          <div>
+            <p class="concierge-admin-kicker">Bills &amp; costs</p>
+            <h2>Add expense</h2>
+          </div>
+        </div>
+        <p>Upload a receipt/bill or enter the expense manually. Receipt analysis only prepares a draft; check it before submitting.</p>
+        <form id="expenseForm" class="concierge-admin-expense-form">
+          <div class="concierge-admin-expense-receipt">
+            <label for="expenseReceipt"><strong>Receipt photo or PDF</strong></label>
+            <p>Take a new picture or choose an existing photo/file. Maximum 10 MB.</p>
+            <input id="expenseReceipt" name="receipt" type="file" accept="image/jpeg,image/png,image/webp,image/heic,application/pdf">
+            <div class="concierge-admin-card-actions">
+              <button type="button" id="expenseAnalyze">Analyze receipt</button>
+              <button type="button" class="secondary" id="expenseClearReceipt">Clear receipt</button>
+            </div>
+            <p id="expenseAnalysisStatus" role="status">Upload is optional. You can also enter the bill manually.</p>
+          </div>
+          <div class="concierge-admin-expense-fields">
+            <div class="concierge-admin-field"><label for="expenseDate">Date</label><input id="expenseDate" type="date" required></div>
+            <div class="concierge-admin-field"><label for="expenseAmount" id="expenseAmountLabel">Amount</label><input id="expenseAmount" type="number" min="0.01" max="100000000" step="0.01" inputmode="decimal" required></div>
+            <div class="concierge-admin-field"><label for="expenseCategory">Category</label><select id="expenseCategory" required><option value="">Select category</option></select></div>
+            <div class="concierge-admin-field"><label for="expenseVendor">Supplier / vendor</label><input id="expenseVendor" type="text" maxlength="160" autocomplete="organization"></div>
+            <div class="concierge-admin-field full"><label for="expenseDescription">Description</label><input id="expenseDescription" type="text" maxlength="240" required></div>
+            <div class="concierge-admin-field"><label for="expensePaymentMethod">Payment method</label><select id="expensePaymentMethod"><option value="">Not specified</option><option>Cash</option><option>QR code</option><option>Card</option><option>Bank transfer</option><option>Other</option></select></div>
+            <div class="concierge-admin-field"><label for="expenseRoomArea" id="expenseLocationLabel">Area / department</label><input id="expenseRoomArea" type="text" maxlength="80" list="financeLocationOptions" placeholder="Optional, e.g. Bar or Storage"></div>
+            <div class="concierge-admin-field full"><label for="expenseNotes">Notes</label><textarea id="expenseNotes" maxlength="500" rows="2"></textarea></div>
+          </div>
+          <div class="concierge-admin-card-actions">
+            <button type="submit" id="expenseSave">Submit expense</button>
+            <button type="button" class="secondary" id="expenseReset">Clear form</button>
+          </div>
+          <p id="expenseStatus" class="bamboo-entry-status" role="status"></p>
+        </form>
+        <datalist id="financeLocationOptions"></datalist>
+      </section>
+    </div>
+
+    <footer class="legal-footer">
+      <nav class="legal-footer-links" aria-label="Legal information"><a href="/privacy">Privacy</a><a href="/data-deletion">Data Protection</a><a href="/terms">Terms</a></nav>
+    </footer>
+  </main>
+  <script src="/bamboo-finance-staff.js" defer></script>
+</body>
+</html>

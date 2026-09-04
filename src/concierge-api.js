@@ -14,6 +14,7 @@ import { handlePassportAdminRequest } from "./passport-api.js";
 import { handleMaintenanceAdminRequest } from "./maintenance-api.js";
 import { handleExpenseAdminRequest } from "./expense-api.js";
 import { handleFinanceAdminRequest } from "./finance-api.js";
+import { BAMBOO_FINANCE_BUSINESS_ID, HOUSE_FINANCE_BUSINESS_ID } from "./finance-businesses.js";
 import { housekeepingAvailability, parseBangkokRequestedDate } from "./alert-policy.js";
 import { retrieveApprovedProjectKnowledge } from "./project-knowledge.js";
 import { LANGUAGE_NAMES, translateApprovedTexts, validLanguage } from "./i18n-api.js";
@@ -4005,18 +4006,34 @@ export async function handleFeedbackRequest(request, env) {
   return json({ ok: true });
 }
 
-function authorizedAdmin(request, env) {
-  if (!env.CONCIERGE_ADMIN_TOKEN) return false;
+function adminAccess(request, env) {
   const authorization = request.headers.get("authorization") || "";
-  const token = authorization.startsWith("Bearer ") ? authorization.slice(7) : "";
-  return constantTimeEqual(token, env.CONCIERGE_ADMIN_TOKEN);
+  const token = authorization.startsWith("Bearer ") ? authorization.slice(7).trim() : "";
+  if (!token) return null;
+  const candidates = [
+    env.CONCIERGE_ADMIN_TOKEN ? { token: env.CONCIERGE_ADMIN_TOKEN, scope: "house", role: "owner", businessId: HOUSE_FINANCE_BUSINESS_ID } : null,
+    env.BAMBOO_FINANCE_OWNER_TOKEN ? { token: env.BAMBOO_FINANCE_OWNER_TOKEN, scope: "bamboo", role: "owner", businessId: BAMBOO_FINANCE_BUSINESS_ID } : null,
+    env.BAMBOO_FINANCE_STAFF_TOKEN ? { token: env.BAMBOO_FINANCE_STAFF_TOKEN, scope: "bamboo", role: "staff", businessId: BAMBOO_FINANCE_BUSINESS_ID } : null
+  ].filter(Boolean);
+  const matches = candidates.filter((candidate) => constantTimeEqual(token, candidate.token));
+  // Fail closed when secrets are accidentally duplicated across roles/businesses.
+  return matches.length === 1 ? matches[0] : null;
+}
+
+function bambooFinanceAdminPath(path) {
+  return path.includes("/finance") || path.includes("/income") || path.includes("/expenses") || path.includes("/expense-files/");
 }
 
 export async function handleAdminRequest(request, env, path) {
-  if (!authorizedAdmin(request, env)) return json({ error: "unauthorized" }, 401);
+  const access = adminAccess(request, env);
+  if (!access) return json({ error: "unauthorized" }, 401);
+  if (access.scope === "bamboo" && !bambooFinanceAdminPath(path)) return json({ error: "forbidden" }, 403);
   const store = getStore(env);
   if (!store) return json({ error: "learning_store_unavailable" }, 503);
-  const actorHash = await hashSession(`admin:${request.headers.get("authorization") || ""}`, env.CONCIERGE_HASH_SALT);
+  const authorization = request.headers.get("authorization") || "";
+  const actorHash = access.scope === "house"
+    ? await hashSession(`admin:${authorization}`, env.CONCIERGE_HASH_SALT)
+    : await hashSession(`bamboo-finance:${access.role}:${authorization}`, env.CONCIERGE_HASH_SALT);
 
   if (path.includes("/passport-")) {
     const passportResponse = await handlePassportAdminRequest(request, env, path, store);
@@ -4029,12 +4046,12 @@ export async function handleAdminRequest(request, env, path) {
   }
 
   if (path.includes("/expenses") || path.includes("/expense-files/")) {
-    const expenseResponse = await handleExpenseAdminRequest(request, env, path, store, actorHash);
+    const expenseResponse = await handleExpenseAdminRequest(request, env, path, store, actorHash, access);
     if (expenseResponse) return expenseResponse;
   }
 
   if (path.includes("/finance") || path.includes("/income")) {
-    const financeResponse = await handleFinanceAdminRequest(request, env, path, store, actorHash);
+    const financeResponse = await handleFinanceAdminRequest(request, env, path, store, actorHash, access);
     if (financeResponse) return financeResponse;
   }
 

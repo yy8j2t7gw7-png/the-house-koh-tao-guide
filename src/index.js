@@ -202,6 +202,14 @@ export default {
       return privateAsset(request, env, "/concierge-admin.html");
     }
 
+    if (url.pathname === "/bamboo-finance" || url.pathname === "/bamboo-finance/" || url.pathname === "/bamboo-finance.html") {
+      return privateAsset(request, env, "/bamboo-finance.html");
+    }
+
+    if (url.pathname === "/bamboo-finance/staff" || url.pathname === "/bamboo-finance/staff/" || url.pathname === "/bamboo-finance-staff.html") {
+      return privateAsset(request, env, "/bamboo-finance-staff.html");
+    }
+
     if (url.pathname === "/passport-upload" || url.pathname === "/passport-upload/" || url.pathname === "/passport-upload.html") {
       return privateAsset(request, env, "/passport-upload.html");
     }

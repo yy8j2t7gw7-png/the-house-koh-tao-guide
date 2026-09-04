@@ -1,4 +1,5 @@
 import { DurableObject } from "cloudflare:workers";
+const HOUSE_FINANCE_BUSINESS_ID = "the-house-koh-tao";
 
 function rows(cursor) {
   return Array.from(cursor || []);
@@ -255,6 +256,7 @@ export class ConciergeStore extends DurableObject {
 
         CREATE TABLE IF NOT EXISTS expense_records (
           id TEXT PRIMARY KEY,
+          business_id TEXT NOT NULL DEFAULT 'the-house-koh-tao',
           expense_date TEXT NOT NULL,
           category TEXT NOT NULL,
           description TEXT NOT NULL,
@@ -269,6 +271,7 @@ export class ConciergeStore extends DurableObject {
           receipt_extension TEXT NOT NULL DEFAULT '',
           receipt_size_bytes INTEGER NOT NULL DEFAULT 0,
           created_by_hash TEXT NOT NULL DEFAULT '',
+          created_by_role TEXT NOT NULL DEFAULT 'owner',
           created_at TEXT NOT NULL
         );
         CREATE INDEX IF NOT EXISTS expense_records_date
@@ -278,6 +281,7 @@ export class ConciergeStore extends DurableObject {
 
         CREATE TABLE IF NOT EXISTS income_records (
           id TEXT PRIMARY KEY,
+          business_id TEXT NOT NULL DEFAULT 'the-house-koh-tao',
           income_date TEXT NOT NULL,
           category TEXT NOT NULL,
           description TEXT NOT NULL,
@@ -290,6 +294,7 @@ export class ConciergeStore extends DurableObject {
           reference TEXT NOT NULL DEFAULT '',
           notes TEXT NOT NULL DEFAULT '',
           created_by_hash TEXT NOT NULL DEFAULT '',
+          created_by_role TEXT NOT NULL DEFAULT 'owner',
           created_at TEXT NOT NULL
         );
         CREATE INDEX IF NOT EXISTS income_records_date
@@ -413,6 +418,32 @@ export class ConciergeStore extends DurableObject {
       } catch (_error) {
         // Fresh databases and upgraded deployments already have the TM30 processing marker.
       }
+      try {
+        this.ctx.storage.sql.exec("ALTER TABLE expense_records ADD COLUMN business_id TEXT NOT NULL DEFAULT 'the-house-koh-tao'");
+      } catch (_error) {
+        // Fresh databases and upgraded deployments already have finance business scoping.
+      }
+      try {
+        this.ctx.storage.sql.exec("ALTER TABLE income_records ADD COLUMN business_id TEXT NOT NULL DEFAULT 'the-house-koh-tao'");
+      } catch (_error) {
+        // Fresh databases and upgraded deployments already have finance business scoping.
+      }
+      try {
+        this.ctx.storage.sql.exec("ALTER TABLE expense_records ADD COLUMN created_by_role TEXT NOT NULL DEFAULT 'owner'");
+      } catch (_error) {
+        // Fresh databases and upgraded deployments already have finance creator-role auditing.
+      }
+      try {
+        this.ctx.storage.sql.exec("ALTER TABLE income_records ADD COLUMN created_by_role TEXT NOT NULL DEFAULT 'owner'");
+      } catch (_error) {
+        // Fresh databases and upgraded deployments already have finance creator-role auditing.
+      }
+      this.ctx.storage.sql.exec(
+        "CREATE INDEX IF NOT EXISTS expense_records_business_date ON expense_records(business_id, expense_date, created_at)"
+      );
+      this.ctx.storage.sql.exec(
+        "CREATE INDEX IF NOT EXISTS income_records_business_date ON income_records(business_id, income_date, created_at)"
+      );
       this.ctx.storage.sql.exec(
         "CREATE UNIQUE INDEX IF NOT EXISTS spare_key_events_request ON spare_key_events(request_hash) WHERE request_hash <> ''"
       );
@@ -1020,11 +1051,12 @@ export class ConciergeStore extends DurableObject {
   async createExpense(record) {
     this.ctx.storage.sql.exec(
       `INSERT INTO expense_records
-       (id, expense_date, category, description, amount_minor, currency, vendor, payment_method,
+       (id, business_id, expense_date, category, description, amount_minor, currency, vendor, payment_method,
         room_area, notes, receipt_object_key, receipt_media_type, receipt_extension,
-        receipt_size_bytes, created_by_hash, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        receipt_size_bytes, created_by_hash, created_by_role, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       cleanText(record.id, 100),
+      cleanText(record.businessId, 80) || HOUSE_FINANCE_BUSINESS_ID,
       cleanText(record.expenseDate, 10),
       cleanText(record.category, 40),
       cleanText(record.description, 240),
@@ -1039,55 +1071,62 @@ export class ConciergeStore extends DurableObject {
       cleanText(record.receiptExtension, 12),
       Math.max(0, Math.round(Number(record.receiptSizeBytes) || 0)),
       cleanText(record.actorHash, 100),
+      cleanText(record.createdByRole, 20) === "staff" ? "staff" : "owner",
       cleanText(record.createdAt, 40) || new Date().toISOString()
     );
     await this.recordAdminAudit("expense_created", `expense:${cleanText(record.id, 100)}`, record.createdAt);
     return { ok: true };
   }
 
-  async listExpenses(month) {
+  async listExpenses(month, businessId = HOUSE_FINANCE_BUSINESS_ID) {
     const prefix = cleanText(month, 7);
+    const business = cleanText(businessId, 80) || HOUSE_FINANCE_BUSINESS_ID;
     return rows(this.ctx.storage.sql.exec(
       `SELECT id, expense_date AS expenseDate, category, description,
               amount_minor AS amountMinor, currency, vendor, payment_method AS paymentMethod,
               room_area AS roomArea, notes, receipt_object_key AS receiptObjectKey,
               receipt_media_type AS receiptMediaType, receipt_extension AS receiptExtension,
-              receipt_size_bytes AS receiptSizeBytes, created_at AS createdAt
+              receipt_size_bytes AS receiptSizeBytes, created_by_role AS createdByRole, created_at AS createdAt
        FROM expense_records
-       WHERE substr(expense_date, 1, 7) = ?
+       WHERE business_id = ? AND substr(expense_date, 1, 7) = ?
        ORDER BY expense_date DESC, created_at DESC
        LIMIT 1000`,
+      business,
       prefix
     )).map((record) => ({ ...record, hasReceipt: Boolean(record.receiptObjectKey) }));
   }
 
-  async getExpense(id) {
+  async getExpense(id, businessId = HOUSE_FINANCE_BUSINESS_ID) {
+    const business = cleanText(businessId, 80) || HOUSE_FINANCE_BUSINESS_ID;
     const record = rows(this.ctx.storage.sql.exec(
       `SELECT id, expense_date AS expenseDate, category, description,
               amount_minor AS amountMinor, currency, vendor, payment_method AS paymentMethod,
               room_area AS roomArea, notes, receipt_object_key AS receiptObjectKey,
               receipt_media_type AS receiptMediaType, receipt_extension AS receiptExtension,
-              receipt_size_bytes AS receiptSizeBytes, created_at AS createdAt
-       FROM expense_records WHERE id = ? LIMIT 1`,
-      cleanText(id, 100)
+              receipt_size_bytes AS receiptSizeBytes, created_by_role AS createdByRole, created_at AS createdAt
+       FROM expense_records WHERE id = ? AND business_id = ? LIMIT 1`,
+      cleanText(id, 100),
+      business
     ))[0] || null;
     return record ? { ...record, hasReceipt: Boolean(record.receiptObjectKey) } : null;
   }
 
-  async findExpenseDuplicates(expenseDate, amountMinor, vendor, currency = "THB") {
+  async findExpenseDuplicates(expenseDate, amountMinor, vendor, currency = "THB", businessId = HOUSE_FINANCE_BUSINESS_ID) {
     const date = cleanText(expenseDate, 10);
     const amount = Math.round(Number(amountMinor) || 0);
     const vendorValue = cleanText(vendor, 160).toLowerCase();
     const currencyValue = cleanText(currency, 3) || "THB";
+    const business = cleanText(businessId, 80) || HOUSE_FINANCE_BUSINESS_ID;
     if (!date || !amount) return [];
     return rows(this.ctx.storage.sql.exec(
       `SELECT id, expense_date AS expenseDate, category, description,
               amount_minor AS amountMinor, currency, vendor, created_at AS createdAt
        FROM expense_records
-       WHERE expense_date = ? AND amount_minor = ? AND currency = ?
+       WHERE business_id = ? AND expense_date = ? AND amount_minor = ? AND currency = ?
          AND (? = '' OR lower(vendor) = ?)
        ORDER BY created_at DESC
        LIMIT 5`,
+      business,
       date,
       amount,
       currencyValue,
@@ -1096,14 +1135,15 @@ export class ConciergeStore extends DurableObject {
     ));
   }
 
-  async deleteExpense(id, actorHash, nowValue) {
+  async deleteExpense(id, actorHash, nowValue, businessId = HOUSE_FINANCE_BUSINESS_ID) {
     const expenseId = cleanText(id, 100);
+    const business = cleanText(businessId, 80) || HOUSE_FINANCE_BUSINESS_ID;
     const exists = rows(this.ctx.storage.sql.exec(
-      "SELECT id FROM expense_records WHERE id = ? LIMIT 1",
-      expenseId
+      "SELECT id FROM expense_records WHERE id = ? AND business_id = ? LIMIT 1",
+      expenseId, business
     ))[0];
     if (!exists) return { ok: false, error: "not_found" };
-    this.ctx.storage.sql.exec("DELETE FROM expense_records WHERE id = ?", expenseId);
+    this.ctx.storage.sql.exec("DELETE FROM expense_records WHERE id = ? AND business_id = ?", expenseId, business);
     await this.recordAdminAudit("expense_deleted", `expense:${expenseId}`, nowValue);
     return { ok: true, deleted: true };
   }
@@ -1111,10 +1151,11 @@ export class ConciergeStore extends DurableObject {
   async createIncome(record) {
     this.ctx.storage.sql.exec(
       `INSERT INTO income_records
-       (id, income_date, category, description, gross_minor, fees_minor, net_minor, currency,
-        unit, payment_method, reference, notes, created_by_hash, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       (id, business_id, income_date, category, description, gross_minor, fees_minor, net_minor, currency,
+        unit, payment_method, reference, notes, created_by_hash, created_by_role, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       cleanText(record.id, 100),
+      cleanText(record.businessId, 80) || HOUSE_FINANCE_BUSINESS_ID,
       cleanText(record.incomeDate, 10),
       cleanText(record.category, 40),
       cleanText(record.description, 240),
@@ -1127,64 +1168,71 @@ export class ConciergeStore extends DurableObject {
       cleanText(record.reference, 120),
       cleanText(record.notes, 500),
       cleanText(record.actorHash, 100),
+      cleanText(record.createdByRole, 20) === "staff" ? "staff" : "owner",
       cleanText(record.createdAt, 40) || new Date().toISOString()
     );
     await this.recordAdminAudit("income_created", `income:${cleanText(record.id, 100)}`, record.createdAt);
     return { ok: true };
   }
 
-  async listIncome(month) {
+  async listIncome(month, businessId = HOUSE_FINANCE_BUSINESS_ID) {
     const prefix = cleanText(month, 7);
+    const business = cleanText(businessId, 80) || HOUSE_FINANCE_BUSINESS_ID;
     return rows(this.ctx.storage.sql.exec(
       `SELECT id, income_date AS incomeDate, category, description,
               gross_minor AS grossMinor, fees_minor AS feesMinor, net_minor AS netMinor, currency,
-              unit, payment_method AS paymentMethod, reference, notes, created_at AS createdAt
+              unit, payment_method AS paymentMethod, reference, notes, created_by_role AS createdByRole, created_at AS createdAt
        FROM income_records
-       WHERE substr(income_date, 1, 7) = ?
+       WHERE business_id = ? AND substr(income_date, 1, 7) = ?
        ORDER BY income_date DESC, created_at DESC
        LIMIT 1000`,
+      business,
       prefix
     ));
   }
 
-  async getIncome(id) {
+  async getIncome(id, businessId = HOUSE_FINANCE_BUSINESS_ID) {
+    const business = cleanText(businessId, 80) || HOUSE_FINANCE_BUSINESS_ID;
     return rows(this.ctx.storage.sql.exec(
       `SELECT id, income_date AS incomeDate, category, description,
               gross_minor AS grossMinor, fees_minor AS feesMinor, net_minor AS netMinor, currency,
-              unit, payment_method AS paymentMethod, reference, notes, created_at AS createdAt
-       FROM income_records WHERE id = ? LIMIT 1`,
-      cleanText(id, 100)
+              unit, payment_method AS paymentMethod, reference, notes, created_by_role AS createdByRole, created_at AS createdAt
+       FROM income_records WHERE id = ? AND business_id = ? LIMIT 1`,
+      cleanText(id, 100),
+      business
     ))[0] || null;
   }
 
-  async findIncomeDuplicates(incomeDate, grossMinor, unit, reference, currency = "THB") {
+  async findIncomeDuplicates(incomeDate, grossMinor, unit, reference, currency = "THB", businessId = HOUSE_FINANCE_BUSINESS_ID) {
     const date = cleanText(incomeDate, 10);
     const gross = Math.round(Number(grossMinor) || 0);
     const unitValue = cleanText(unit, 80).toLowerCase();
     const referenceValue = cleanText(reference, 120).toLowerCase();
     const currencyValue = cleanText(currency, 3) || "THB";
+    const business = cleanText(businessId, 80) || HOUSE_FINANCE_BUSINESS_ID;
     if (!date || !gross) return [];
     return rows(this.ctx.storage.sql.exec(
       `SELECT id, income_date AS incomeDate, category, description,
               gross_minor AS grossMinor, fees_minor AS feesMinor, net_minor AS netMinor, currency, unit, reference, created_at AS createdAt
        FROM income_records
-       WHERE income_date = ? AND gross_minor = ? AND currency = ?
+       WHERE business_id = ? AND income_date = ? AND gross_minor = ? AND currency = ?
          AND (? = '' OR lower(unit) = ?)
          AND (? = '' OR lower(reference) = ?)
        ORDER BY created_at DESC
        LIMIT 5`,
-      date, gross, currencyValue, unitValue, unitValue, referenceValue, referenceValue
+      business, date, gross, currencyValue, unitValue, unitValue, referenceValue, referenceValue
     ));
   }
 
-  async deleteIncome(id, actorHash, nowValue) {
+  async deleteIncome(id, actorHash, nowValue, businessId = HOUSE_FINANCE_BUSINESS_ID) {
     const incomeId = cleanText(id, 100);
+    const business = cleanText(businessId, 80) || HOUSE_FINANCE_BUSINESS_ID;
     const exists = rows(this.ctx.storage.sql.exec(
-      "SELECT id FROM income_records WHERE id = ? LIMIT 1",
-      incomeId
+      "SELECT id FROM income_records WHERE id = ? AND business_id = ? LIMIT 1",
+      incomeId, business
     ))[0];
     if (!exists) return { ok: false, error: "not_found" };
-    this.ctx.storage.sql.exec("DELETE FROM income_records WHERE id = ?", incomeId);
+    this.ctx.storage.sql.exec("DELETE FROM income_records WHERE id = ? AND business_id = ?", incomeId, business);
     await this.recordAdminAudit("income_deleted", `income:${incomeId}`, nowValue);
     return { ok: true, deleted: true };
   }

@@ -19,6 +19,7 @@ import {
 import { handleMaintenanceAdminRequest, handleMaintenanceGuestRequest } from "../src/maintenance-api.js";
 import { handleExpenseAdminRequest } from "../src/expense-api.js";
 import { handleFinanceAdminRequest } from "../src/finance-api.js";
+import { BAMBOO_FINANCE_BUSINESS_ID, HOUSE_FINANCE_BUSINESS_ID } from "../src/finance-businesses.js";
 import {
   learningClusterKey,
   matchKnowledge,
@@ -142,54 +143,54 @@ function createStore() {
       };
     },
     async createExpense(record) {
-      this.expenseRecords.push({ ...record, hasReceipt: Boolean(record.receiptObjectKey) });
+      this.expenseRecords.push({ ...record, businessId: record.businessId || HOUSE_FINANCE_BUSINESS_ID, hasReceipt: Boolean(record.receiptObjectKey) });
       this.adminAudit.push({ action: "expense_created", reference: `expense:${record.id}`, createdAt: record.createdAt });
       return { ok: true };
     },
-    async listExpenses(month) {
+    async listExpenses(month, businessId = HOUSE_FINANCE_BUSINESS_ID) {
       return this.expenseRecords
-        .filter((item) => item.expenseDate.startsWith(month))
+        .filter((item) => item.expenseDate.startsWith(month) && (item.businessId || HOUSE_FINANCE_BUSINESS_ID) === businessId)
         .map((item) => ({ ...item, hasReceipt: Boolean(item.receiptObjectKey) }))
         .sort((a, b) => b.expenseDate.localeCompare(a.expenseDate));
     },
-    async getExpense(id) {
-      const item = this.expenseRecords.find((record) => record.id === id);
+    async getExpense(id, businessId = HOUSE_FINANCE_BUSINESS_ID) {
+      const item = this.expenseRecords.find((record) => record.id === id && (record.businessId || HOUSE_FINANCE_BUSINESS_ID) === businessId);
       return item ? { ...item, hasReceipt: Boolean(item.receiptObjectKey) } : null;
     },
-    async findExpenseDuplicates(expenseDate, amountMinor, vendor, currency = "THB") {
+    async findExpenseDuplicates(expenseDate, amountMinor, vendor, currency = "THB", businessId = HOUSE_FINANCE_BUSINESS_ID) {
       const vendorValue = String(vendor || "").toLowerCase();
-      return this.expenseRecords.filter((item) => item.expenseDate === expenseDate && item.amountMinor === amountMinor && item.currency === currency && (!vendorValue || String(item.vendor || "").toLowerCase() === vendorValue));
+      return this.expenseRecords.filter((item) => (item.businessId || HOUSE_FINANCE_BUSINESS_ID) === businessId && item.expenseDate === expenseDate && item.amountMinor === amountMinor && item.currency === currency && (!vendorValue || String(item.vendor || "").toLowerCase() === vendorValue));
     },
-    async deleteExpense(id, actorHash, now) {
-      const index = this.expenseRecords.findIndex((item) => item.id === id);
+    async deleteExpense(id, actorHash, now, businessId = HOUSE_FINANCE_BUSINESS_ID) {
+      const index = this.expenseRecords.findIndex((item) => item.id === id && (item.businessId || HOUSE_FINANCE_BUSINESS_ID) === businessId);
       if (index < 0) return { ok: false, error: "not_found" };
       this.expenseRecords.splice(index, 1);
       this.adminAudit.push({ action: "expense_deleted", reference: `expense:${id}`, actorHash, createdAt: now });
       return { ok: true, deleted: true };
     },
     async createIncome(record) {
-      this.incomeRecords.push({ ...record });
+      this.incomeRecords.push({ ...record, businessId: record.businessId || HOUSE_FINANCE_BUSINESS_ID });
       this.adminAudit.push({ action: "income_created", reference: `income:${record.id}`, createdAt: record.createdAt });
       return { ok: true };
     },
-    async listIncome(month) {
+    async listIncome(month, businessId = HOUSE_FINANCE_BUSINESS_ID) {
       return this.incomeRecords
-        .filter((item) => item.incomeDate.startsWith(month))
+        .filter((item) => item.incomeDate.startsWith(month) && (item.businessId || HOUSE_FINANCE_BUSINESS_ID) === businessId)
         .map((item) => ({ ...item }))
         .sort((a, b) => b.incomeDate.localeCompare(a.incomeDate));
     },
-    async getIncome(id) {
-      return this.incomeRecords.find((item) => item.id === id) || null;
+    async getIncome(id, businessId = HOUSE_FINANCE_BUSINESS_ID) {
+      return this.incomeRecords.find((item) => item.id === id && (item.businessId || HOUSE_FINANCE_BUSINESS_ID) === businessId) || null;
     },
-    async findIncomeDuplicates(incomeDate, grossMinor, unit, reference, currency = "THB") {
+    async findIncomeDuplicates(incomeDate, grossMinor, unit, reference, currency = "THB", businessId = HOUSE_FINANCE_BUSINESS_ID) {
       const unitValue = String(unit || "").toLowerCase();
       const referenceValue = String(reference || "").toLowerCase();
-      return this.incomeRecords.filter((item) => item.incomeDate === incomeDate && item.grossMinor === grossMinor && item.currency === currency
+      return this.incomeRecords.filter((item) => (item.businessId || HOUSE_FINANCE_BUSINESS_ID) === businessId && item.incomeDate === incomeDate && item.grossMinor === grossMinor && item.currency === currency
         && (!unitValue || String(item.unit || "").toLowerCase() === unitValue)
         && (!referenceValue || String(item.reference || "").toLowerCase() === referenceValue));
     },
-    async deleteIncome(id, actorHash, now) {
-      const index = this.incomeRecords.findIndex((item) => item.id === id);
+    async deleteIncome(id, actorHash, now, businessId = HOUSE_FINANCE_BUSINESS_ID) {
+      const index = this.incomeRecords.findIndex((item) => item.id === id && (item.businessId || HOUSE_FINANCE_BUSINESS_ID) === businessId);
       if (index < 0) return { ok: false, error: "not_found" };
       this.incomeRecords.splice(index, 1);
       this.adminAudit.push({ action: "income_deleted", reference: `income:${id}`, actorHash, createdAt: now });
@@ -660,6 +661,8 @@ function createEnvironment(overrides = {}) {
       CONCIERGE_STORE: { getByName: () => store },
       CONCIERGE_RATE_LIMITER: { limit: async () => ({ success: true }) },
       CONCIERGE_ADMIN_TOKEN: "admin_token_test_5500",
+      BAMBOO_FINANCE_OWNER_TOKEN: "bamboo_owner_token_test_5500",
+      BAMBOO_FINANCE_STAFF_TOKEN: "bamboo_staff_token_test_5500",
       PASSPORT_UPLOADS: passportBucket,
       PASSPORT_TOKEN_PEPPER: "passport_test_pepper_5500",
       STAY_TOKEN_PEPPER: "stay_test_pepper_5500",
@@ -3244,7 +3247,7 @@ test("Thai-national exemption is bilingual without duplicating fixed Thai copy i
 test("every guest HTML page loads the shared localization runtime", async () => {
   const publicRoot = new URL("../public/", import.meta.url);
   const guestPages = [];
-  const nonGuestPages = new Set(["concierge-admin.html", "privacy.html", "data-deletion.html", "terms.html"]);
+  const nonGuestPages = new Set(["concierge-admin.html", "bamboo-finance.html", "bamboo-finance-staff.html", "privacy.html", "data-deletion.html", "terms.html"]);
   async function collect(directory) {
     for (const entry of await readdir(directory, { withFileTypes: true })) {
       if (entry.isDirectory()) await collect(new URL(`${entry.name}/`, directory));
@@ -3304,7 +3307,7 @@ test("every guest-facing page exposes a discreet token-free admin footer link", 
   async function collect(directory) {
     for (const entry of await readdir(directory, { withFileTypes: true })) {
       if (entry.isDirectory()) await collect(new URL(`${entry.name}/`, directory));
-      else if (entry.isFile() && entry.name.endsWith(".html") && entry.name !== "concierge-admin.html") pages.push(new URL(entry.name, directory));
+      else if (entry.isFile() && entry.name.endsWith(".html") && !new Set(["concierge-admin.html", "bamboo-finance.html", "bamboo-finance-staff.html"]).has(entry.name)) pages.push(new URL(entry.name, directory));
     }
   }
   await collect(publicRoot);
@@ -8233,6 +8236,8 @@ test("Durable Object SQLite schema initializes every operational table used by a
     "booking_retry_snapshots",
     "booking_retry_group_details",
     "maintenance_reports",
+    "expense_records",
+    "income_records",
     "admin_operation_audit",
     "stay_reservations",
     "stay_checkout_overrides",
@@ -8242,6 +8247,10 @@ test("Durable Object SQLite schema initializes every operational table used by a
     "spare_key_room_state",
     "translation_cache"
   ]) assert.ok(tables.includes(required), `${required} was not initialized`);
+  const expenseColumns = database.prepare("PRAGMA table_info(expense_records)").all().map((row) => row.name);
+  const incomeColumns = database.prepare("PRAGMA table_info(income_records)").all().map((row) => row.name);
+  assert.ok(expenseColumns.includes("business_id"), "expense_records must be business-scoped");
+  assert.ok(incomeColumns.includes("business_id"), "income_records must be business-scoped");
 
   await store.syncStayReservations({
     provider: "airbnb",
@@ -11388,6 +11397,7 @@ test("owner expense save stores private receipt, reports monthly totals, warns d
 
   const csv = await handleExpenseAdminRequest(new Request("https://guide.example/api/concierge/admin/expenses/export.csv?month=2026-08"), env, "/api/concierge/admin/expenses/export.csv", store, "actor_hash_test");
   assert.equal(csv.status, 200);
+  assert.match(csv.headers.get("content-disposition") || "", /expenses-2026-08\.csv/);
   const text = await csv.text();
   assert.match(text, /Date,Category,Description,Amount \(THB\)/);
   assert.match(text, /2026-08-23,Maintenance,Stair construction \/ repair,8190\.00,Island Hardware,Cash,Room 7/);
@@ -11609,6 +11619,7 @@ test("owner income entry calculates net, warns duplicates and combines with expe
     "actor_hash_test"
   );
   assert.equal(csv.status, 200);
+  assert.match(csv.headers.get("content-disposition") || "", /finance-2026-09\.csv/);
   const csvText = await csv.text();
   assert.match(csvText, /Type,Date,Category \/ source,Description,Gross income \(THB\),Fees \(THB\),Net income \(THB\),Expense \(THB\),Operating effect \(THB\)/);
   assert.match(csvText, /Income,2026-09-01,Airbnb,3-night Airbnb stay,3200\.00,480\.00,2720\.00,,2720\.00,TEST-BOOKING-REF,Bank transfer,Room 5/);
@@ -11726,4 +11737,337 @@ test("finance module keeps income sources, property currency and timezone config
   const text = await csv.text();
   assert.match(text, /Gross income \(EUR\),Fees \(EUR\),Net income \(EUR\),Expense \(EUR\)/);
   assert.match(text, /Suite A/);
+});
+
+test("Bamboo finance is isolated from The House across expenses, income, duplicate checks and totals", async () => {
+  const { env, store } = createEnvironment();
+
+  const houseExpense = new FormData();
+  houseExpense.set("date", "2026-09-04");
+  houseExpense.set("amount", "1000");
+  houseExpense.set("category", "Maintenance");
+  houseExpense.set("description", "House maintenance test");
+  houseExpense.set("vendor", "Shared Vendor");
+  const houseSaved = await handleExpenseAdminRequest(new Request("https://guide.example/api/concierge/admin/expenses", { method: "POST", body: houseExpense }), env, "/api/concierge/admin/expenses", store, "actor_house");
+  assert.equal(houseSaved.status, 201);
+
+  const bambooExpense = new FormData();
+  bambooExpense.set("business", BAMBOO_FINANCE_BUSINESS_ID);
+  bambooExpense.set("date", "2026-09-04");
+  bambooExpense.set("amount", "1000");
+  bambooExpense.set("category", "Beverage stock");
+  bambooExpense.set("description", "Beer delivery");
+  bambooExpense.set("vendor", "Shared Vendor");
+  bambooExpense.set("roomArea", "Bar");
+  const bambooSaved = await handleExpenseAdminRequest(new Request("https://guide.example/api/concierge/admin/expenses", { method: "POST", body: bambooExpense }), env, "/api/concierge/admin/expenses", store, "actor_bamboo");
+  assert.equal(bambooSaved.status, 201, "same date/amount/vendor in another business must not be treated as a duplicate");
+
+  const houseIncome = await handleFinanceAdminRequest(new Request("https://guide.example/api/concierge/admin/income", {
+    method: "POST", headers: { "content-type": "application/json" },
+    body: JSON.stringify({ date: "2026-09-04", category: "Direct booking", gross: "3000", fees: "0", unit: "Room 7", description: "House direct stay", paymentMethod: "Cash", reference: "HOUSE-REF" })
+  }), env, "/api/concierge/admin/income", store, "actor_house");
+  assert.equal(houseIncome.status, 201);
+
+  const bambooIncome = await handleFinanceAdminRequest(new Request("https://guide.example/api/concierge/admin/income", {
+    method: "POST", headers: { "content-type": "application/json" },
+    body: JSON.stringify({ business: BAMBOO_FINANCE_BUSINESS_ID, date: "2026-09-04", category: "Bar sales", gross: "5000", fees: "100", unit: "Bar", description: "Daily bar sales", paymentMethod: "Cash", reference: "BAMBOO-REF" })
+  }), env, "/api/concierge/admin/income", store, "actor_bamboo");
+  assert.equal(bambooIncome.status, 201);
+
+  const houseOverview = await handleFinanceAdminRequest(new Request("https://guide.example/api/concierge/admin/finance?month=2026-09"), env, "/api/concierge/admin/finance", store, "actor_house");
+  const houseBody = await houseOverview.json();
+  assert.equal(houseBody.configuration.businessId, HOUSE_FINANCE_BUSINESS_ID);
+  assert.equal(houseBody.totals.netIncome, 3000);
+  assert.equal(houseBody.totals.expenses, 1000);
+  assert.equal(houseBody.income.length, 1);
+  assert.equal(houseBody.income[0].description, "House direct stay");
+
+  const bambooOverview = await handleFinanceAdminRequest(new Request(`https://guide.example/api/concierge/admin/finance?month=2026-09&business=${BAMBOO_FINANCE_BUSINESS_ID}`), env, "/api/concierge/admin/finance", store, "actor_bamboo");
+  const bambooBody = await bambooOverview.json();
+  assert.equal(bambooBody.configuration.businessId, BAMBOO_FINANCE_BUSINESS_ID);
+  assert.equal(bambooBody.configuration.businessName, "Bamboo Beach Bar");
+  assert.deepEqual(bambooBody.configuration.categories, ["Bar sales", "Events", "Food sales", "Other income"]);
+  assert.equal(bambooBody.totals.netIncome, 4900);
+  assert.equal(bambooBody.totals.expenses, 1000);
+  assert.equal(bambooBody.totals.operatingResult, 3900);
+  assert.equal(bambooBody.income.length, 1);
+  assert.equal(bambooBody.income[0].description, "Daily bar sales");
+
+  const bambooExpenses = await handleExpenseAdminRequest(new Request(`https://guide.example/api/concierge/admin/expenses?month=2026-09&business=${BAMBOO_FINANCE_BUSINESS_ID}`), env, "/api/concierge/admin/expenses", store, "actor_bamboo");
+  const bambooExpenseBody = await bambooExpenses.json();
+  assert.deepEqual(bambooExpenseBody.configuration.categories.slice(0, 4), ["Beverage stock", "Food & mixers", "Salary", "Entertainment"]);
+  assert.equal(bambooExpenseBody.records.length, 1);
+  assert.equal(bambooExpenseBody.records[0].description, "Beer delivery");
+});
+
+test("Bamboo receipt storage and combined CSV stay business-scoped", async () => {
+  const { env, store, passportBucket } = createEnvironment();
+  const form = new FormData();
+  form.set("business", BAMBOO_FINANCE_BUSINESS_ID);
+  form.set("date", "2026-09-04");
+  form.set("amount", "2500");
+  form.set("category", "Beverage stock");
+  form.set("description", "Spirits stock");
+  form.set("vendor", "Island Supplier");
+  form.set("paymentMethod", "Bank transfer");
+  form.set("roomArea", "Storage");
+  const png = new Uint8Array(240);
+  png.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  form.set("receipt", new Blob([png], { type: "image/png" }), "bamboo-bill.png");
+  const saved = await handleExpenseAdminRequest(new Request("https://guide.example/api/concierge/admin/expenses", { method: "POST", body: form }), env, "/api/concierge/admin/expenses", store, "actor_bamboo");
+  assert.equal(saved.status, 201);
+  const key = [...passportBucket.objects.keys()].find((value) => value.startsWith("finance/bamboo-beach-bar/expenses/2026-09/"));
+  assert.ok(key, "Bamboo receipt must use its own private object prefix");
+  assert.equal([...passportBucket.objects.keys()].some((value) => value.startsWith("expenses/2026-09/")), false);
+
+  await handleFinanceAdminRequest(new Request("https://guide.example/api/concierge/admin/income", {
+    method: "POST", headers: { "content-type": "application/json" },
+    body: JSON.stringify({ business: BAMBOO_FINANCE_BUSINESS_ID, date: "2026-09-04", category: "Events", gross: "8000", fees: "0", unit: "Events", description: "Live music event", paymentMethod: "Cash", reference: "EVENT-TEST" })
+  }), env, "/api/concierge/admin/income", store, "actor_bamboo");
+
+  const csv = await handleFinanceAdminRequest(new Request(`https://guide.example/api/concierge/admin/finance/export.csv?month=2026-09&business=${BAMBOO_FINANCE_BUSINESS_ID}`), env, "/api/concierge/admin/finance/export.csv", store, "actor_bamboo");
+  assert.equal(csv.status, 200);
+  assert.match(csv.headers.get("content-disposition") || "", /finance-bamboo-beach-bar-2026-09\.csv/);
+  const text = await csv.text();
+  assert.match(text, /Live music event/);
+  assert.match(text, /Spirits stock/);
+  assert.doesNotMatch(text, /Room 7 repair|House direct stay/);
+});
+
+test("Bamboo has a dedicated owner-only finance dashboard using the shared engine", async () => {
+  const [html, script, indexSource, storeSource] = await Promise.all([
+    readFile(new URL("../public/bamboo-finance.html", import.meta.url), "utf8"),
+    readFile(new URL("../public/bamboo-finance.js", import.meta.url), "utf8"),
+    readFile(new URL("../src/index.js", import.meta.url), "utf8"),
+    readFile(new URL("../src/concierge-store.js", import.meta.url), "utf8")
+  ]);
+  assert.match(html, /Bamboo Beach Bar/);
+  assert.match(html, /id="incomeForm"/);
+  assert.match(html, /id="expenseForm"/);
+  assert.match(html, /id="expenseReceipt"[^>]+accept="image\/jpeg,image\/png,image\/webp,image\/heic,application\/pdf"/);
+  assert.match(html, /Financial records here are isolated from The House finance records/);
+  assert.match(html, /href="\/concierge-admin"/);
+  assert.match(script, /const BUSINESS_ID = "bamboo-beach-bar"/);
+  assert.match(script, /\/api\/concierge\/admin\/expenses\/analyze/);
+  assert.match(script, /\/api\/concierge\/admin\/finance\/export\.csv/);
+  assert.doesNotMatch(script, /\/api\/concierge(?:\?|"|')/);
+  assert.match(indexSource, /url\.pathname === "\/bamboo-finance"/);
+  assert.match(storeSource, /business_id TEXT NOT NULL DEFAULT 'the-house-koh-tao'/);
+  assert.match(storeSource, /expense_records_business_date/);
+  assert.match(storeSource, /income_records_business_date/);
+});
+
+test("invalid finance business ids fail closed instead of falling into The House", async () => {
+  const { env, store } = createEnvironment();
+  const expenses = await handleExpenseAdminRequest(new Request("https://guide.example/api/concierge/admin/expenses?month=2026-09&business=unknown-property"), env, "/api/concierge/admin/expenses", store, "actor_hash_test");
+  assert.equal(expenses.status, 400);
+  assert.equal((await expenses.json()).error, "invalid_business");
+  const finance = await handleFinanceAdminRequest(new Request("https://guide.example/api/concierge/admin/finance?month=2026-09&business=unknown-property"), env, "/api/concierge/admin/finance", store, "actor_hash_test");
+  assert.equal(finance.status, 400);
+  assert.equal((await finance.json()).error, "invalid_business");
+});
+
+test("Bamboo owner and staff credentials are separate, business-scoped and enforced server-side", async () => {
+  const { env, store } = createEnvironment();
+
+  const staffConfig = await handleAdminRequest(new Request(`https://guide.example/api/concierge/admin/finance/configuration?business=${BAMBOO_FINANCE_BUSINESS_ID}`, {
+    headers: { authorization: "Bearer bamboo_staff_token_test_5500" }
+  }), env, "/api/concierge/admin/finance/configuration");
+  assert.equal(staffConfig.status, 200);
+  const configBody = await staffConfig.json();
+  assert.equal(configBody.role, "staff");
+  assert.equal(configBody.configuration.businessId, BAMBOO_FINANCE_BUSINESS_ID);
+  assert.ok(configBody.configuration.paymentMethods.includes("Cash"));
+  assert.ok(configBody.configuration.paymentMethods.includes("QR code"));
+  assert.deepEqual(configBody.configuration.incomeCategories, ["Bar sales", "Events", "Food sales", "Other income"]);
+
+  const staffIncomePayload = {
+    business: BAMBOO_FINANCE_BUSINESS_ID,
+    date: "2026-09-04",
+    category: "Bar sales",
+    gross: "12500",
+    fees: "0",
+    unit: "Bar",
+    description: "Daily bar sales",
+    paymentMethod: "QR code",
+    reference: "",
+    notes: "Staff close"
+  };
+  const staffIncome = await handleAdminRequest(new Request("https://guide.example/api/concierge/admin/income", {
+    method: "POST",
+    headers: { authorization: "Bearer bamboo_staff_token_test_5500", "content-type": "application/json" },
+    body: JSON.stringify(staffIncomePayload)
+  }), env, "/api/concierge/admin/income");
+  assert.equal(staffIncome.status, 201);
+  assert.equal(store.incomeRecords.length, 1);
+  assert.equal(store.incomeRecords[0].businessId, BAMBOO_FINANCE_BUSINESS_ID);
+  assert.equal(store.incomeRecords[0].createdByRole, "staff");
+  assert.equal(store.incomeRecords[0].paymentMethod, "QR code");
+
+  const duplicate = await handleAdminRequest(new Request("https://guide.example/api/concierge/admin/income", {
+    method: "POST",
+    headers: { authorization: "Bearer bamboo_staff_token_test_5500", "content-type": "application/json" },
+    body: JSON.stringify(staffIncomePayload)
+  }), env, "/api/concierge/admin/income");
+  assert.equal(duplicate.status, 409);
+  const duplicateBody = await duplicate.json();
+  assert.equal(duplicateBody.error, "possible_duplicate");
+  assert.equal("duplicates" in duplicateBody, false, "staff must not receive existing finance-record details");
+
+  const expenseForm = new FormData();
+  expenseForm.set("business", BAMBOO_FINANCE_BUSINESS_ID);
+  expenseForm.set("date", "2026-09-04");
+  expenseForm.set("amount", "1800");
+  expenseForm.set("category", "Beverage stock");
+  expenseForm.set("description", "Beer stock");
+  expenseForm.set("vendor", "Supplier");
+  expenseForm.set("paymentMethod", "QR code");
+  expenseForm.set("roomArea", "Storage");
+  const staffExpense = await handleAdminRequest(new Request("https://guide.example/api/concierge/admin/expenses", {
+    method: "POST",
+    headers: { authorization: "Bearer bamboo_staff_token_test_5500" },
+    body: expenseForm
+  }), env, "/api/concierge/admin/expenses");
+  assert.equal(staffExpense.status, 201);
+  assert.equal(store.expenseRecords.length, 1);
+  assert.equal(store.expenseRecords[0].createdByRole, "staff");
+  assert.equal(store.expenseRecords[0].paymentMethod, "QR code");
+
+  const staffFinanceRead = await handleAdminRequest(new Request(`https://guide.example/api/concierge/admin/finance?month=2026-09&business=${BAMBOO_FINANCE_BUSINESS_ID}`, {
+    headers: { authorization: "Bearer bamboo_staff_token_test_5500" }
+  }), env, "/api/concierge/admin/finance");
+  assert.equal(staffFinanceRead.status, 403);
+  assert.equal((await staffFinanceRead.json()).error, "owner_access_required");
+
+  const staffExpenseRead = await handleAdminRequest(new Request(`https://guide.example/api/concierge/admin/expenses?month=2026-09&business=${BAMBOO_FINANCE_BUSINESS_ID}`, {
+    headers: { authorization: "Bearer bamboo_staff_token_test_5500" }
+  }), env, "/api/concierge/admin/expenses");
+  assert.equal(staffExpenseRead.status, 403);
+
+  const staffExport = await handleAdminRequest(new Request(`https://guide.example/api/concierge/admin/finance/export.csv?month=2026-09&business=${BAMBOO_FINANCE_BUSINESS_ID}`, {
+    headers: { authorization: "Bearer bamboo_staff_token_test_5500" }
+  }), env, "/api/concierge/admin/finance/export.csv");
+  assert.equal(staffExport.status, 403);
+
+  const staffHouseAdmin = await handleAdminRequest(new Request("https://guide.example/api/concierge/admin/overview", {
+    headers: { authorization: "Bearer bamboo_staff_token_test_5500" }
+  }), env, "/api/concierge/admin/overview");
+  assert.equal(staffHouseAdmin.status, 403);
+
+  const ownerOverview = await handleAdminRequest(new Request(`https://guide.example/api/concierge/admin/finance?month=2026-09&business=${BAMBOO_FINANCE_BUSINESS_ID}`, {
+    headers: { authorization: "Bearer bamboo_owner_token_test_5500" }
+  }), env, "/api/concierge/admin/finance");
+  assert.equal(ownerOverview.status, 200);
+  const ownerBody = await ownerOverview.json();
+  assert.equal(ownerBody.totals.netIncome, 12500);
+  assert.equal(ownerBody.totals.expenses, 1800);
+  assert.equal(ownerBody.totals.incomePaymentMethods["QR code"], 12500);
+  assert.equal(ownerBody.income[0].createdByRole, "staff");
+
+  const ownerExport = await handleAdminRequest(new Request(`https://guide.example/api/concierge/admin/finance/export.csv?month=2026-09&business=${BAMBOO_FINANCE_BUSINESS_ID}`, {
+    headers: { authorization: "Bearer bamboo_owner_token_test_5500" }
+  }), env, "/api/concierge/admin/finance/export.csv");
+  assert.equal(ownerExport.status, 200);
+  const ownerCsv = await ownerExport.text();
+  assert.match(ownerCsv, /Entered by/);
+  assert.match(ownerCsv, /QR code/);
+  assert.match(ownerCsv, /Staff/);
+
+  const houseTokenAgainstBamboo = await handleAdminRequest(new Request(`https://guide.example/api/concierge/admin/finance?month=2026-09&business=${BAMBOO_FINANCE_BUSINESS_ID}`, {
+    headers: { authorization: "Bearer admin_token_test_5500" }
+  }), env, "/api/concierge/admin/finance");
+  assert.equal(houseTokenAgainstBamboo.status, 403);
+
+  const bambooOwnerAgainstHouse = await handleAdminRequest(new Request("https://guide.example/api/concierge/admin/finance?month=2026-09", {
+    headers: { authorization: "Bearer bamboo_owner_token_test_5500" }
+  }), env, "/api/concierge/admin/finance");
+  assert.equal(bambooOwnerAgainstHouse.status, 403);
+
+  const houseFinanceStillWorks = await handleAdminRequest(new Request("https://guide.example/api/concierge/admin/finance?month=2026-09", {
+    headers: { authorization: "Bearer admin_token_test_5500" }
+  }), env, "/api/concierge/admin/finance");
+  assert.equal(houseFinanceStillWorks.status, 200);
+});
+
+test("Bamboo finance secrets fail closed when owner and staff credentials are accidentally duplicated", async () => {
+  const { env } = createEnvironment({
+    BAMBOO_FINANCE_OWNER_TOKEN: "same-bamboo-secret",
+    BAMBOO_FINANCE_STAFF_TOKEN: "same-bamboo-secret"
+  });
+  const response = await handleAdminRequest(new Request(`https://guide.example/api/concierge/admin/finance/configuration?business=${BAMBOO_FINANCE_BUSINESS_ID}`, {
+    headers: { authorization: "Bearer same-bamboo-secret" }
+  }), env, "/api/concierge/admin/finance/configuration");
+  assert.equal(response.status, 401);
+});
+
+test("Bamboo staff page is entry-only while owner page keeps reports, history and print/export controls", async () => {
+  const [staffHtml, staffScript, ownerHtml, ownerScript, indexSource, storeSource] = await Promise.all([
+    readFile(new URL("../public/bamboo-finance-staff.html", import.meta.url), "utf8"),
+    readFile(new URL("../public/bamboo-finance-staff.js", import.meta.url), "utf8"),
+    readFile(new URL("../public/bamboo-finance.html", import.meta.url), "utf8"),
+    readFile(new URL("../public/bamboo-finance.js", import.meta.url), "utf8"),
+    readFile(new URL("../src/index.js", import.meta.url), "utf8"),
+    readFile(new URL("../src/concierge-store.js", import.meta.url), "utf8")
+  ]);
+
+  assert.match(staffHtml, /Staff password/);
+  assert.match(staffHtml, /Enter daily income and bills without access to owner totals, history or reports/);
+  assert.match(staffHtml, /id="incomeForm"/);
+  assert.match(staffHtml, /id="expenseForm"/);
+  assert.match(staffHtml, /<option>QR code<\/option>/);
+  assert.doesNotMatch(staffHtml, /financeSummary|Saved income|Saved expenses|Export finance CSV|Download finance CSV|Print monthly report/);
+  assert.match(staffScript, /bambooFinanceStaffToken/);
+  assert.match(staffScript, /finance\/configuration\?business=/);
+  assert.match(staffScript, /result\.role !== "staff"/);
+  assert.doesNotMatch(staffScript, /finance\/export\.csv|expense-files|income\/delete|expenses\/delete/);
+
+  assert.match(ownerHtml, /Owner password/);
+  assert.match(ownerHtml, /href="\/bamboo-finance\/staff"/);
+  assert.match(ownerHtml, /Print monthly report/);
+  assert.match(ownerHtml, /Download finance CSV/);
+  assert.match(ownerScript, /bambooFinanceOwnerToken/);
+  assert.match(ownerScript, /window\.print\(\)/);
+  assert.match(ownerScript, /Entered by staff/);
+  assert.match(indexSource, /url\.pathname === "\/bamboo-finance\/staff"/);
+  assert.match(storeSource, /created_by_role TEXT NOT NULL DEFAULT 'owner'/);
+});
+
+test("QR code is Bamboo-specific while The House payment-method contract remains unchanged", async () => {
+  const { env, store } = createEnvironment();
+
+  const bamboo = await handleFinanceAdminRequest(new Request("https://guide.example/api/concierge/admin/income", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      business: BAMBOO_FINANCE_BUSINESS_ID,
+      date: "2026-09-04",
+      category: "Bar sales",
+      gross: "1000",
+      fees: "0",
+      unit: "Bar",
+      description: "QR sales",
+      paymentMethod: "QR code",
+      reference: "",
+      notes: ""
+    })
+  }), env, "/api/concierge/admin/income", store, "actor", { role: "owner", businessId: BAMBOO_FINANCE_BUSINESS_ID });
+  assert.equal(bamboo.status, 201);
+
+  const house = await handleFinanceAdminRequest(new Request("https://guide.example/api/concierge/admin/income", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      date: "2026-09-04",
+      category: "Direct booking",
+      gross: "1000",
+      fees: "0",
+      unit: "Room 1",
+      description: "House test",
+      paymentMethod: "QR code",
+      reference: "",
+      notes: ""
+    })
+  }), env, "/api/concierge/admin/income", store, "actor", { role: "owner", businessId: HOUSE_FINANCE_BUSINESS_ID });
+  assert.equal(house.status, 400);
+  assert.equal((await house.json()).error, "invalid_income");
 });

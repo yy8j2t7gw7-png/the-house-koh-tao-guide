@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="robots" content="noindex,nofollow,noarchive">
-  <title>Concierge Learning Review | The House</title>
+  <title>Admin Dashboard | The House & Bamboo</title>
   <link rel="icon" href="/logo.svg">
   <link rel="stylesheet" href="/design-system.css">
   <link rel="stylesheet" href="/concierge-admin.css">
@@ -15,19 +15,38 @@
       <a href="/" class="concierge-admin-brand"><img src="/logo.svg" alt="The House Koh Tao"></a>
       <div>
         <p class="concierge-admin-kicker">Private operations</p>
-        <h1>Concierge Learning Review</h1>
-        <p>Review unanswered questions and corrections before they become approved knowledge.</p>
+        <h1>Admin Dashboard</h1>
+        <p>Choose which business workspace you want to open.</p>
       </div>
     </header>
 
-    <section class="concierge-admin-login" id="adminLogin">
+    <section class="concierge-admin-portal-chooser" id="adminPortalChooser" aria-label="Choose admin dashboard">
+      <article class="concierge-admin-portal-card">
+        <p class="concierge-admin-kicker">Guesthouse operations</p>
+        <h2>The House – Koh Tao</h2>
+        <p>Reservations, guest registration, passports/TM30, Concierge operations and The House finance.</p>
+        <button type="button" id="houseAdminChoice">Open The House Admin</button>
+      </article>
+      <article class="concierge-admin-portal-card bamboo-admin-choice">
+        <p class="concierge-admin-kicker">Finance</p>
+        <h2>Bamboo Beach Bar</h2>
+        <p>Open Bamboo Finance with the separate Owner or Staff credentials.</p>
+        <div class="concierge-admin-portal-actions">
+          <a href="/bamboo-finance">Owner login</a>
+          <a href="/bamboo-finance/staff" class="secondary-link">Staff login</a>
+        </div>
+      </article>
+    </section>
+
+    <section class="concierge-admin-login" id="adminLogin" hidden>
       <form id="adminLoginForm">
-        <label for="adminToken">Admin access token</label>
+        <label for="adminToken">The House admin password</label>
         <div class="concierge-admin-login-row">
           <input id="adminToken" name="token" type="password" autocomplete="current-password" required>
-          <button type="submit">Open review</button>
+          <button type="submit">Open The House Admin</button>
         </div>
-        <p id="loginStatus" role="status">The token is kept only in this browser tab.</p>
+        <p id="loginStatus" role="status">The House password is kept only in this browser tab.</p>
+        <button type="button" class="secondary concierge-admin-login-back" id="backAdminChoice">Back to dashboard choice</button>
       </form>
     </section>
 
@@ -38,7 +57,7 @@
           <span>Approvals take effect immediately. The concierge never approves its own facts.</span>
         </div>
         <div class="concierge-admin-toolbar-actions">
-          <a class="secondary admin-toolbar-link" href="/bamboo-finance">Bamboo Finance</a>
+          <button type="button" class="secondary" id="adminPortalSwitch">Choose dashboard</button>
           <button type="button" class="secondary" id="expandAdminSections">Expand all</button>
           <button type="button" class="secondary" id="collapseAdminSections">Collapse all</button>
           <button type="button" class="secondary" id="exportKnowledge">Export approved answers</button>

@@ -23,6 +23,20 @@ body{margin:0;background:linear-gradient(180deg,#f7f3eb,#f2f6f3);color:var(--adm
 .concierge-admin-header p{max-width:70ch;margin:0;color:var(--admin-muted)}
 .concierge-admin-kicker{margin:0;color:var(--admin-accent)!important;font-size:11px;font-weight:900;letter-spacing:.1em;line-height:1.3;text-transform:uppercase}
 
+
+.concierge-admin-portal-chooser{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;max-width:900px}
+.concierge-admin-portal-chooser[hidden]{display:none}
+.concierge-admin-portal-card{padding:21px;border:1px solid var(--admin-line);border-radius:17px;background:#fff;box-shadow:var(--admin-shadow)}
+.concierge-admin-portal-card h2{margin:4px 0 8px;color:var(--admin-ink);font-size:22px;line-height:1.2}
+.concierge-admin-portal-card>p:not(.concierge-admin-kicker){min-height:48px;margin:0 0 16px;color:var(--admin-muted);font-size:13px;line-height:1.5}
+.concierge-admin-portal-card>button{width:100%}
+.concierge-admin-portal-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.concierge-admin-portal-actions a{display:inline-flex;align-items:center;justify-content:center;min-height:44px;box-sizing:border-box;padding:9px 14px;border:1px solid var(--admin-accent);border-radius:10px;background:var(--admin-accent);color:#fff;font-weight:850;line-height:1.25;text-decoration:none}
+.concierge-admin-portal-actions a:hover{background:var(--admin-accent-dark)}
+.concierge-admin-portal-actions a.secondary-link{border-color:var(--admin-line-strong);background:#fff;color:var(--admin-accent-dark)}
+.concierge-admin-portal-actions a.secondary-link:hover{border-color:var(--admin-accent);background:var(--admin-soft)}
+.concierge-admin-login-back{margin-top:12px}
+
 .concierge-admin-login,.concierge-admin-section,.concierge-admin-toolbar{border:1px solid var(--admin-line);border-radius:17px;background:#fff;box-shadow:var(--admin-shadow)}
 .concierge-admin-login{max-width:640px;padding:21px}
 .concierge-admin-login label{display:block;margin-bottom:8px;color:var(--admin-ink);font-weight:850}
@@ -224,3 +238,9 @@ tr:last-child td{border-bottom:0}
 .concierge-admin-expense-category-summary{display:flex;flex-wrap:wrap;gap:6px;margin:2px 0 12px}
 .concierge-admin-expense-category-summary span{padding:6px 8px;border-radius:999px;background:var(--admin-soft);color:var(--admin-muted);font-size:10px;font-weight:800}
 @media(max-width:760px){.concierge-admin-expense-summary{grid-template-columns:1fr}.concierge-admin-expense-fields{grid-template-columns:1fr}.concierge-admin-expense-item-head{flex-direction:column}.concierge-admin-expense-amount{white-space:normal}}
+
+@media (max-width:720px){
+  .concierge-admin-portal-chooser{grid-template-columns:1fr}
+  .concierge-admin-portal-card>p:not(.concierge-admin-kicker){min-height:0}
+  .concierge-admin-portal-actions{grid-template-columns:1fr}
+}

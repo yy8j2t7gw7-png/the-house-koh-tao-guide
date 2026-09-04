@@ -11857,6 +11857,24 @@ test("Bamboo has a dedicated owner-only finance dashboard using the shared engin
   assert.match(storeSource, /income_records_business_date/);
 });
 
+test("Admin dashboard landing page lets owner choose The House or Bamboo before authentication", async () => {
+  const [html, script] = await Promise.all([
+    readFile(new URL("../public/concierge-admin.html", import.meta.url), "utf8"),
+    readFile(new URL("../public/concierge-admin.js", import.meta.url), "utf8")
+  ]);
+  assert.match(html, /id="adminPortalChooser"/);
+  assert.match(html, /Open The House Admin/);
+  assert.match(html, /href="\/bamboo-finance"/);
+  assert.match(html, /href="\/bamboo-finance\/staff"/);
+  assert.match(html, /id="adminLogin" hidden/);
+  assert.match(html, /Back to dashboard choice/);
+  assert.match(html, /id="adminPortalSwitch">Choose dashboard/);
+  assert.match(script, /showPortalChooser\(\)/);
+  assert.match(script, /houseAdminChoice\.addEventListener\("click"/);
+  assert.match(script, /window\.sessionStorage\.getItem\(tokenKey\)/);
+  assert.match(script, /showPortalChooser\(\);\s*\}\)\(\);\s*$/);
+});
+
 test("invalid finance business ids fail closed instead of falling into The House", async () => {
   const { env, store } = createEnvironment();
   const expenses = await handleExpenseAdminRequest(new Request("https://guide.example/api/concierge/admin/expenses?month=2026-09&business=unknown-property"), env, "/api/concierge/admin/expenses", store, "actor_hash_test");

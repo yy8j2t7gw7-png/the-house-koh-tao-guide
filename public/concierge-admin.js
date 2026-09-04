@@ -1,5 +1,9 @@
 (function () {
   const tokenKey = "houseConciergeAdminToken";
+  const portalChooser = document.getElementById("adminPortalChooser");
+  const houseAdminChoice = document.getElementById("houseAdminChoice");
+  const backAdminChoice = document.getElementById("backAdminChoice");
+  const adminPortalSwitch = document.getElementById("adminPortalSwitch");
   const login = document.getElementById("adminLogin");
   const loginForm = document.getElementById("adminLoginForm");
   const tokenInput = document.getElementById("adminToken");
@@ -1046,6 +1050,19 @@
     return form;
   }
 
+  function showPortalChooser() {
+    workspace.hidden = true;
+    login.hidden = true;
+    portalChooser.hidden = false;
+  }
+
+  function showHouseLogin() {
+    portalChooser.hidden = true;
+    workspace.hidden = true;
+    login.hidden = false;
+    tokenInput.focus();
+  }
+
   async function loadOverview() {
     const data = await api("/api/concierge/admin/overview");
     renderStats(data.totals || {});
@@ -1060,6 +1077,7 @@
     renderRecent(data.recent || []);
     updateAdminSectionSummaries(data);
     await loadFinance();
+    portalChooser.hidden = true;
     login.hidden = true;
     workspace.hidden = false;
   }
@@ -1076,6 +1094,7 @@
     } catch (error) {
       token = "";
       window.sessionStorage.removeItem(tokenKey);
+      showHouseLogin();
       loginStatus.textContent = error.status === 401 ? "That access token is not valid." : "The review service is not available yet.";
     }
   }
@@ -1084,6 +1103,15 @@
     event.preventDefault();
     loginWith(tokenInput.value);
   });
+
+  houseAdminChoice.addEventListener("click", () => {
+    showHouseLogin();
+    const storedToken = window.sessionStorage.getItem(tokenKey);
+    if (storedToken) loginWith(storedToken);
+  });
+
+  backAdminChoice.addEventListener("click", showPortalChooser);
+  adminPortalSwitch?.addEventListener("click", showPortalChooser);
 
   expandAdminSections?.addEventListener("click", () => {
     adminSections.forEach((section) => setAdminSectionOpen(section, true, false));
@@ -1725,9 +1753,7 @@
   document.getElementById("adminLogout").addEventListener("click", () => {
     token = "";
     window.sessionStorage.removeItem(tokenKey);
-    workspace.hidden = true;
-    login.hidden = false;
-    tokenInput.focus();
+    showPortalChooser();
   });
 
   queue.addEventListener("click", async (event) => {
@@ -1782,6 +1808,5 @@
   resetExpenseForm();
   resetIncomeForm();
 
-  const storedToken = window.sessionStorage.getItem(tokenKey);
-  if (storedToken) loginWith(storedToken);
+  showPortalChooser();
 })();

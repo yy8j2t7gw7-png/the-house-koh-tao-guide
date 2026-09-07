@@ -832,6 +832,13 @@ export async function handleStayAdminRequest(request, env, path, store) {
       return json({ error: "invalid_request" }, 400);
     }
     const confirmationCodeHash = await hmac(`reservation:${confirmationCode}`, env.STAY_TOKEN_PEPPER);
+    const existingReservation = typeof store.getStayReservationByCodeHash === "function"
+      ? await store.getStayReservationByCodeHash(confirmationCodeHash, room)
+      : null;
+    const overlap = typeof store.findStayOverlap === "function"
+      ? await store.findStayOverlap(room, checkInDate, checkOutDate, existingReservation?.id || "")
+      : null;
+    if (overlap) return json({ error: "room_date_conflict", conflict: overlap }, 409);
     const result = await store.syncStayReservations({
       provider: "manual",
       listingId,
@@ -854,6 +861,8 @@ export async function handleStayAdminRequest(request, env, path, store) {
     if (!PROPERTY_ROOMS.has(room) || !checkInDate || !checkOutDate || checkOutDate <= checkInDate) {
       return json({ error: "invalid_request" }, 400);
     }
+    const overlap = typeof store.findStayOverlap === "function" ? await store.findStayOverlap(room, checkInDate, checkOutDate) : null;
+    if (overlap) return json({ error: "room_date_conflict", conflict: overlap }, 409);
     const confirmationCode = randomDirectStayCode();
     const confirmationCodeHash = await hmac(`reservation:${confirmationCode}`, env.STAY_TOKEN_PEPPER);
     const result = await store.syncStayReservations({
@@ -874,6 +883,19 @@ export async function handleStayAdminRequest(request, env, path, store) {
       confirmationCode,
       welcomeUrl: `${new URL(request.url).origin}/room/${encodeURIComponent(room)}`
     });
+  }
+
+  if (path === "/api/concierge/admin/manual-stay-delete") {
+    if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405, { allow: "POST" });
+    const body = await readJson(request, 2_000);
+    const reservationId = String(body?.reservationId || "");
+    if (!/^stay_[A-Za-z0-9-]{20,}$/.test(reservationId) || body?.confirmed !== true) {
+      return json({ error: "invalid_request" }, 400);
+    }
+    if (typeof store.cancelOwnerManagedStay !== "function") return json({ error: "stay_delete_unavailable" }, 503);
+    const result = await store.cancelOwnerManagedStay(reservationId, new Date().toISOString());
+    const status = result.ok ? 200 : result.error === "reservation_not_found" ? 404 : 409;
+    return json(result, status);
   }
 
   if (path === "/api/concierge/admin/direct-stay-code") {
@@ -917,7 +939,8 @@ export async function handleStayAdminRequest(request, env, path, store) {
       return json({ error: "invalid_request" }, 400);
     }
     const result = await store.extendStayReservation(reservationId, checkOutDate, new Date().toISOString());
-    return json(result, result.ok ? 200 : 400);
+    const status = result.ok ? 200 : result.error === "room_date_conflict" ? 409 : 400;
+    return json(result, status);
   }
 
   if (path === "/api/concierge/admin/registration-reset") {

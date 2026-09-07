@@ -43,7 +43,7 @@ import {
   specialtyChoiceLabels
 } from "./diving-catalog.js";
 
-const RELEASE = "5.11.45";
+const RELEASE = "5.11.46";
 const ROOM_OPTIONS = new Set(["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11"]);
 const MAX_HISTORY_ITEMS = 10;
 const MAX_QUESTION_LENGTH = 800;
@@ -342,6 +342,30 @@ function cleanWorkflowState(value) {
         preferredTime: cleanWorkflowValue(request.preferredTime, 60),
         requestedDate: /^\d{4}-\d{2}-\d{2}$/.test(String(request.requestedDate || "")) ? String(request.requestedDate) : "",
         notes: cleanWorkflowNotes(request.notes)
+      }
+    };
+  }
+  if (value.type === "late_checkout") {
+    const request = value.lateCheckoutRequest || {};
+    return {
+      type: "late_checkout",
+      status: "collecting",
+      retainPrivateContact: false,
+      missing: ["requestedTime"],
+      lateCheckoutRequest: {
+        scheduledCheckoutDate: /^\d{4}-\d{2}-\d{2}$/.test(String(request.scheduledCheckoutDate || "")) ? String(request.scheduledCheckoutDate) : ""
+      }
+    };
+  }
+  if (value.type === "early_checkin") {
+    const request = value.earlyCheckinRequest || {};
+    return {
+      type: "early_checkin",
+      status: "collecting",
+      retainPrivateContact: false,
+      missing: ["requestedTime"],
+      earlyCheckinRequest: {
+        scheduledCheckInDate: /^\d{4}-\d{2}-\d{2}$/.test(String(request.scheduledCheckInDate || "")) ? String(request.scheduledCheckInDate) : ""
       }
     };
   }
@@ -653,7 +677,7 @@ function verifiedAccessAcknowledgementResult(question, access, room) {
 function genericExistingRequestSubmissionResult(question, workflowState = null) {
   if (!GENERIC_EXISTING_REQUEST_SUBMISSION.test(String(question || ""))) return null;
   const structuredCollectorActive = workflowState?.status === "collecting"
-    && ["booking", "luggage", "cleaning"].includes(workflowState?.type);
+    && ["booking", "luggage", "cleaning", "late_checkout", "early_checkin"].includes(workflowState?.type);
   // A real structured collector remains authoritative and will ask for or use
   // its own missing fields below. Any other stale/monitoring workflow must not
   // let a context-free "send the request" sentence fall through to the model
@@ -980,6 +1004,106 @@ function applyCleaningRequestPolicy(question, workflowState = null, now = new Da
       cleaningRequest: { preferredTime, requestedDate: requestedDay.dateKey, notes }
     }
   };
+}
+
+
+const LATE_CHECKOUT_REQUEST = /\b(?:can|could|may)\s+(?:i|we)\s+(?:check\s*out|leave)\s+(?:later|late)|\blate\s*check\s*out\b|\bcheck\s*out\s+(?:later|late)\b|\bkeep\s+(?:the|my|our)\s+room\s+(?:later|longer)\b|\bleave\s+after\s+11\b/i;
+const EARLY_CHECKIN_REQUEST = /\b(?:can|could|may)\s+(?:i|we)\s+check\s*in\s+(?:early|earlier)|\bearly\s*check\s*in\b|\bcheck\s*in\s+(?:early|earlier|before\s+2)\b|\barrive\s+(?:before\s+2|early|earlier)\b/i;
+
+function formatStayDate(dateKey) {
+  const match = String(dateKey || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return String(dateKey || "");
+  const date = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]), 12));
+  return new Intl.DateTimeFormat("en-GB", { timeZone: "UTC", weekday: "long", day: "numeric", month: "long", year: "numeric" }).format(date);
+}
+
+function requestedStayClock(question, allowBareHour = false) {
+  return displayPreferredTime(question, allowBareHour);
+}
+
+async function roomTurnoverContext(store, access) {
+  const reservationId = String(access?.session?.reservationId || "").trim().slice(0, 100);
+  if (!store?.getStayTurnoverContext || !/^stay_[A-Za-z0-9-]{20,}$/.test(reservationId)) {
+    return { previousSameDayCheckout: false, nextSameDayCheckIn: false };
+  }
+  return store.getStayTurnoverContext(reservationId).catch(() => ({ previousSameDayCheckout: false, nextSameDayCheckIn: false }));
+}
+
+async function applyLateCheckoutPolicy(question, workflowState, access, store) {
+  const pending = workflowState?.type === "late_checkout" && workflowState.status === "collecting" ? workflowState : null;
+  if (!pending && !LATE_CHECKOUT_REQUEST.test(String(question || ""))) return { handled: false, result: null, alertQuestion: question, workflow: null };
+  const checkoutDate = access?.session?.checkOutDate || pending?.lateCheckoutRequest?.scheduledCheckoutDate || "";
+  if (!access?.verified || !checkoutDate) return { handled: false, result: null, alertQuestion: question, workflow: null };
+  if (/^\s*(?:cancel|never\s*mind|nevermind|forget\s+it)\s*[.!]?\s*$/i.test(question)) {
+    return { handled: true, result: {
+      answer: "No problem. I have cancelled the late-checkout request.", intentId: "late_checkout_cancelled", category: "departure", confidence: 1,
+      needsHuman: false, handoff: "none", learningGap: false, learningReason: "none", actions: [], suppressDefaultActions: true, source: "reservation-policy"
+    }, alertQuestion: question, workflow: { type: "late_checkout", status: "cancelled", missing: [] } };
+  }
+  const requestedTime = requestedStayClock(question, Boolean(pending));
+  const dateLabel = formatStayDate(checkoutDate);
+  const turnover = await roomTurnoverContext(store, access);
+  if (!requestedTime) {
+    return { handled: true, result: {
+      answer: `Your scheduled checkout is ${dateLabel} at 11:00 AM. What time would you like to check out?`,
+      intentId: "late_checkout", category: "departure", confidence: 1, needsHuman: false, handoff: "stay_support",
+      learningGap: false, learningReason: "none", actions: [], suppressDefaultActions: true, source: "reservation-policy"
+    }, alertQuestion: question, workflow: {
+      type: "late_checkout", status: "collecting", retainPrivateContact: false, missing: ["requestedTime"],
+      lateCheckoutRequest: { scheduledCheckoutDate: checkoutDate }
+    } };
+  }
+  const turnoverText = turnover.nextSameDayCheckIn
+    ? "A new guest is currently scheduled to arrive in this room on the same day, so approval may be difficult."
+    : "No same-day arrival is currently recorded for this room, but the request still requires approval.";
+  const alertQuestion = `Late checkout request. Scheduled checkout: ${dateLabel} at 11:00 AM. Requested checkout: ${requestedTime}. ${turnover.nextSameDayCheckIn ? "Same-day arrival is recorded." : "No same-day arrival is currently recorded."}`;
+  return { handled: true, result: {
+    answer: `I’ll send your request for ${requestedTime} on ${dateLabel} to The House team now. ${turnoverText} It is not confirmed until the team approves it.`,
+    intentId: "late_checkout_request", category: "departure", confidence: 1, needsHuman: true, handoff: "stay_support",
+    learningGap: false, learningReason: "none", actions: [], suppressDefaultActions: true,
+    staySupportRequest: { type: "late_checkout", scheduledDate: checkoutDate, requestedTime, sameDayArrival: Boolean(turnover.nextSameDayCheckIn) },
+    source: "reservation-policy"
+  }, alertQuestion, workflow: { type: "late_checkout", status: "ready", missing: [], lateCheckoutRequest: { scheduledCheckoutDate: checkoutDate, requestedTime } } };
+}
+
+async function applyEarlyCheckinPolicy(question, workflowState, access, store) {
+  const pending = workflowState?.type === "early_checkin" && workflowState.status === "collecting" ? workflowState : null;
+  if (!pending && !EARLY_CHECKIN_REQUEST.test(String(question || ""))) return { handled: false, result: null, alertQuestion: question, workflow: null };
+  const checkInDate = access?.session?.checkInDate || pending?.earlyCheckinRequest?.scheduledCheckInDate || "";
+  if (!access?.verified || !checkInDate) return { handled: false, result: null, alertQuestion: question, workflow: null };
+  if (/^\s*(?:cancel|never\s*mind|nevermind|forget\s+it)\s*[.!]?\s*$/i.test(question)) {
+    return { handled: true, result: {
+      answer: "No problem. I have cancelled the early-check-in request.", intentId: "early_checkin_cancelled", category: "arrival", confidence: 1,
+      needsHuman: false, handoff: "none", learningGap: false, learningReason: "none", actions: [], suppressDefaultActions: true, source: "reservation-policy"
+    }, alertQuestion: question, workflow: { type: "early_checkin", status: "cancelled", missing: [] } };
+  }
+  const requestedTime = requestedStayClock(question, Boolean(pending));
+  const dateLabel = formatStayDate(checkInDate);
+  const turnover = await roomTurnoverContext(store, access);
+  if (!requestedTime) {
+    const context = turnover.previousSameDayCheckout
+      ? "Another guest is scheduled to check out of your room that morning, so housekeeping must clean it before you can enter."
+      : "There is no same-day checkout currently recorded for your room, but the room still needs to be confirmed clean and ready.";
+    return { handled: true, result: {
+      answer: `Your scheduled check-in is ${dateLabel} from 2:00 PM. ${context} What time are you hoping to arrive?`,
+      intentId: "early_check_in", category: "arrival", confidence: 1, needsHuman: false, handoff: "stay_support",
+      learningGap: false, learningReason: "none", actions: [], suppressDefaultActions: true, source: "reservation-policy"
+    }, alertQuestion: question, workflow: {
+      type: "early_checkin", status: "collecting", retainPrivateContact: false, missing: ["requestedTime"],
+      earlyCheckinRequest: { scheduledCheckInDate: checkInDate }
+    } };
+  }
+  const context = turnover.previousSameDayCheckout
+    ? "Another guest is scheduled to check out that morning, so housekeeping will need to prepare the room first."
+    : "There is no same-day checkout currently recorded, but the team still needs to confirm that the room is clean and ready.";
+  const alertQuestion = `Early check-in request. Scheduled check-in: ${dateLabel} from 2:00 PM. Requested arrival: ${requestedTime}. ${turnover.previousSameDayCheckout ? "Same-day departure is recorded." : "No same-day departure is currently recorded."}`;
+  return { handled: true, result: {
+    answer: `I’ll send your early check-in request for ${requestedTime} on ${dateLabel} to The House team now. ${context} Early check-in is not confirmed until the team approves it.`,
+    intentId: "early_checkin_request", category: "arrival", confidence: 1, needsHuman: true, handoff: "stay_support",
+    learningGap: false, learningReason: "none", actions: [], suppressDefaultActions: true,
+    staySupportRequest: { type: "early_checkin", scheduledDate: checkInDate, requestedTime, sameDayDeparture: Boolean(turnover.previousSameDayCheckout) },
+    source: "reservation-policy"
+  }, alertQuestion, workflow: { type: "early_checkin", status: "ready", missing: [], earlyCheckinRequest: { scheduledCheckInDate: checkInDate, requestedTime } } };
 }
 
 export function housekeepingServiceResult(question, now = new Date()) {
@@ -3497,7 +3621,8 @@ export async function handleConciergeRequest(request, env, ctx, now = new Date()
   const validShortWorkflowReply = /^\d$/.test(question)
     && ((workflowState?.type === "booking" && ["guests", "groupCount", "nights"].includes(workflowState.missing?.[0]))
       || (workflowState?.type === "luggage" && workflowState.missing?.[0] === "bags")
-      || (workflowState?.type === "cleaning" && workflowState.missing?.[0] === "preferredTime"));
+      || (workflowState?.type === "cleaning" && workflowState.missing?.[0] === "preferredTime")
+      || (["late_checkout", "early_checkin"].includes(workflowState?.type) && workflowState.missing?.[0] === "requestedTime"));
   if (!sessionId || (question.length < 2 && !validShortWorkflowReply) || question.length > MAX_QUESTION_LENGTH) {
     return json({ error: "invalid_request" }, 400);
   }
@@ -3664,10 +3789,16 @@ export async function handleConciergeRequest(request, env, ctx, now = new Date()
   const wifiPasswordResult = wifiPasswordKnowledgeResult(question, effectiveKnowledge);
   const independentInformationRequest = isIndependentCurrentTurnInformation(question);
   const informationDetour = Boolean(independentInformationRequest && workflowState);
-  const cleaningPolicy = safetyResult || lostKeyResult || independentInformationRequest
+  const lateCheckoutPolicy = safetyResult || lostKeyResult || independentInformationRequest
+    ? { handled: false, result: null, alertQuestion: question, workflow: null }
+    : await applyLateCheckoutPolicy(question, workflowState, access, store);
+  const earlyCheckinPolicy = safetyResult || lostKeyResult || independentInformationRequest || lateCheckoutPolicy.handled
+    ? { handled: false, result: null, alertQuestion: question, workflow: null }
+    : await applyEarlyCheckinPolicy(question, workflowState, access, store);
+  const cleaningPolicy = safetyResult || lostKeyResult || independentInformationRequest || lateCheckoutPolicy.handled || earlyCheckinPolicy.handled
     ? { handled: false, result: null, alertQuestion: question, workflow: null }
     : applyCleaningRequestPolicy(question, workflowState, now);
-  const servicePolicyResult = safetyResult || lostKeyResult || cleaningPolicy.handled ? null : housekeepingServiceResult(question, now);
+  const servicePolicyResult = safetyResult || lostKeyResult || lateCheckoutPolicy.handled || earlyCheckinPolicy.handled || cleaningPolicy.handled ? null : housekeepingServiceResult(question, now);
   const propertyPolicy = safetyResult || lostKeyResult || independentInformationRequest || cleaningPolicy.handled || servicePolicyResult
     ? { handled: false, result: null, alertQuestion: question, workflow: null }
     : propertyIssuePolicy(question, workflowState);
@@ -3679,7 +3810,7 @@ export async function handleConciergeRequest(request, env, ctx, now = new Date()
   const genericSubmissionResult = safetyResult || lostKeyResult || cleaningPolicy.handled || servicePolicyResult || propertyPolicy.handled || bookingInformationResult
     ? null
     : genericExistingRequestSubmissionResult(question, workflowState);
-  const directPolicyResult = safetyResult || lostKeyResult || wifiPasswordResult || cleaningPolicy.result || servicePolicyResult || propertyPolicy.result || roomPolicyResult || bookingInformationResult || genericSubmissionResult;
+  const directPolicyResult = safetyResult || lostKeyResult || wifiPasswordResult || lateCheckoutPolicy.result || earlyCheckinPolicy.result || cleaningPolicy.result || servicePolicyResult || propertyPolicy.result || roomPolicyResult || bookingInformationResult || genericSubmissionResult;
   const criticalPropertyMatch = safetyResult?.intentId === "property_emergency"
     ? matchKnowledge("major water leak", effectiveKnowledge, 0.44)
     : null;
@@ -3734,6 +3865,10 @@ export async function handleConciergeRequest(request, env, ctx, now = new Date()
 
   const directWorkflow = result.intentId === "urgent_clarification"
     ? { type: "urgent_clarification", status: "collecting" }
+    : lateCheckoutPolicy.handled
+      ? lateCheckoutPolicy.workflow
+      : earlyCheckinPolicy.handled
+        ? earlyCheckinPolicy.workflow
     : cleaningPolicy.handled
       ? cleaningPolicy.workflow
       : propertyPolicy.handled
@@ -3759,6 +3894,8 @@ export async function handleConciergeRequest(request, env, ctx, now = new Date()
     && Boolean(divingYesNo(question));
   const bypassOrdinaryWorkflows = Boolean(lostKeyResult
     || directWorkflow
+    || lateCheckoutPolicy.handled
+    || earlyCheckinPolicy.handled
     || servicePolicyResult
     || bookingInformationResult
     || safetyResult
@@ -3789,6 +3926,10 @@ export async function handleConciergeRequest(request, env, ctx, now = new Date()
     : applyLuggageRequestPolicy(result, question, history, replyContactForTurn, workflowState, now);
   let workflowPolicy = lostKeyResult
     ? { result, alertQuestion: question, workflow: lostKeyResult.workflow || null }
+    : lateCheckoutPolicy.handled
+      ? { result, alertQuestion: lateCheckoutPolicy.alertQuestion, workflow: directWorkflow }
+      : earlyCheckinPolicy.handled
+        ? { result, alertQuestion: earlyCheckinPolicy.alertQuestion, workflow: directWorkflow }
     : cleaningPolicy.handled
     ? { result, alertQuestion: cleaningPolicy.alertQuestion, workflow: directWorkflow }
     : propertyPolicy.handled
@@ -3840,6 +3981,18 @@ export async function handleConciergeRequest(request, env, ctx, now = new Date()
         answer: "Thank you. I’ve notified The House team about your lost key. Someone from the team will assist you as soon as possible.",
         actions: []
       };
+    } else if (result.staySupportRequest?.type === "late_checkout") {
+      result = {
+        ...result,
+        answer: `Your late-checkout request for ${result.staySupportRequest.requestedTime} on ${formatStayDate(result.staySupportRequest.scheduledDate)} has been sent to The House team. It is subject to availability and is not confirmed until the team approves it.`,
+        actions: []
+      };
+    } else if (result.staySupportRequest?.type === "early_checkin") {
+      result = {
+        ...result,
+        answer: `Your early check-in request for ${result.staySupportRequest.requestedTime} on ${formatStayDate(result.staySupportRequest.scheduledDate)} has been sent to The House team. It is not confirmed until the team approves it.`,
+        actions: []
+      };
     } else if (result.propertyIssueRequest) {
       result = {
         ...result,
@@ -3861,6 +4014,8 @@ export async function handleConciergeRequest(request, env, ctx, now = new Date()
     }
     if (luggagePolicy.handled) luggagePolicy.workflow.status = "submitted";
     if (bookingPolicy.handled) bookingPolicy.workflow.status = "submitted";
+    if (lateCheckoutPolicy.handled && lateCheckoutPolicy.workflow) lateCheckoutPolicy.workflow.status = "submitted";
+    if (earlyCheckinPolicy.handled && earlyCheckinPolicy.workflow) earlyCheckinPolicy.workflow.status = "submitted";
     if (cleaningPolicy.handled) cleaningPolicy.workflow.status = "submitted";
     if (propertyPolicy.handled && propertyPolicy.workflow) {
       propertyPolicy.workflow.status = "monitoring";
@@ -3876,6 +4031,14 @@ export async function handleConciergeRequest(request, env, ctx, now = new Date()
       propertyPolicy.workflow.status = "monitoring";
       propertyPolicy.workflow.notified = false;
     }
+  } else if (result.staySupportRequest && result.needsHuman) {
+    result = {
+      ...result,
+      answer: "I couldn’t send that request automatically, so please don’t rely on it as received. Please try again or call The House for help.",
+      actions: [{ label: "Call Us", type: "route", route: "houseCall" }]
+    };
+    if (lateCheckoutPolicy.handled && lateCheckoutPolicy.workflow) lateCheckoutPolicy.workflow.status = "collecting";
+    if (earlyCheckinPolicy.handled && earlyCheckinPolicy.workflow) earlyCheckinPolicy.workflow.status = "collecting";
   } else if (result.propertyIssueRequest && result.needsHuman) {
     result = {
       ...result,
@@ -4055,7 +4218,7 @@ export async function handleAdminRequest(request, env, path) {
     if (financeResponse) return financeResponse;
   }
 
-  if (path.includes("/stays") || path.includes("/direct-stays") || path.includes("/direct-stay-code") || path.includes("/stay-extension") || path.includes("/in-person-registration") || path.includes("/registration-reset") || path.includes("/spare-key-rotation")) {
+  if (path.includes("/stays") || path.includes("/direct-stays") || path.includes("/manual-stay-delete") || path.includes("/direct-stay-code") || path.includes("/stay-extension") || path.includes("/in-person-registration") || path.includes("/registration-reset") || path.includes("/spare-key-rotation")) {
     const stayResponse = await handleStayAdminRequest(request, env, path, store);
     if (stayResponse) return stayResponse;
   }

@@ -583,12 +583,18 @@
         element("span", "", registrationDetail),
         element("span", "", `Status: ${item.status} · updated ${bangkokDate(item.updatedAt)}`)
       );
-      if (item.provider === "direct" && item.id) {
+      if (["direct", "manual"].includes(item.provider) && item.id) {
         const actions = element("div", "concierge-admin-card-actions");
-        const newCode = element("button", "secondary", "Generate new stay code");
-        newCode.type = "button";
-        newCode.dataset.directCodeAction = "generate";
-        actions.appendChild(newCode);
+        if (item.provider === "direct") {
+          const newCode = element("button", "secondary", "Generate new stay code");
+          newCode.type = "button";
+          newCode.dataset.directCodeAction = "generate";
+          actions.appendChild(newCode);
+        }
+        const removeStay = element("button", "danger", "Delete manually added stay");
+        removeStay.type = "button";
+        removeStay.dataset.stayDeleteAction = "delete";
+        actions.appendChild(removeStay);
         card.appendChild(actions);
       }
       if (isActive && item.id) {
@@ -1197,8 +1203,10 @@
       directStayResult.hidden = false;
       directStayForm.reset();
       await loadOverview();
-    } catch (_error) {
-      window.alert("The direct stay could not be created. Check the room and dates.");
+    } catch (error) {
+      window.alert(error.message === "room_date_conflict"
+        ? "This room already has a confirmed stay that overlaps those dates. Delete or correct the existing manually added stay first."
+        : "The direct stay could not be created. Check the room and dates.");
     } finally {
       submit.disabled = false;
     }
@@ -1215,9 +1223,25 @@
   });
 
   async function stayOperationAction(event) {
-    const button = event.target.closest("[data-extension-action],[data-in-person-action],[data-direct-code-action]");
+    const button = event.target.closest("[data-extension-action],[data-in-person-action],[data-direct-code-action],[data-stay-delete-action]");
     if (!button) return;
     const card = button.closest("[data-reservation-id]");
+    if (button.dataset.stayDeleteAction) {
+      if (!card?.dataset.reservationId) return;
+      if (!window.confirm("Delete this manually added stay? Guest access for this stay will stop immediately. Synchronized Airbnb stays cannot be deleted here.")) return;
+      button.disabled = true;
+      try {
+        await api("/api/concierge/admin/manual-stay-delete", {
+          method: "POST",
+          body: JSON.stringify({ reservationId: card.dataset.reservationId, confirmed: true })
+        });
+        await loadOverview();
+      } catch (_error) {
+        button.disabled = false;
+        window.alert("This manually added stay could not be deleted.");
+      }
+      return;
+    }
     if (button.dataset.directCodeAction) {
       if (!card?.dataset.reservationId) return;
       if (!window.confirm("Generate a new private stay code for this direct stay? The previous code will stop working. Existing verified guest access will remain active.")) return;
@@ -1302,9 +1326,11 @@
         body: JSON.stringify({ reservationId: card.dataset.reservationId, checkOutDate })
       });
       await loadOverview();
-    } catch (_error) {
+    } catch (error) {
       button.disabled = false;
-      window.alert("The stay could not be extended. Choose a date after the current checkout date.");
+      window.alert(error.message === "room_date_conflict"
+        ? "This stay cannot be extended because another confirmed stay already uses this room during those dates."
+        : "The stay could not be extended. Choose a date after the current checkout date.");
     }
   }
 

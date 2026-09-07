@@ -1,3 +1,12 @@
+# v5.11.46 — Reservation-Aware Stay Operations
+
+- Late checkout now uses the verified reservation checkout date, asks only for requested time, and creates a protected operational alert before claiming the request was sent.
+- Early check-in now uses the verified check-in date and same-room turnover context.
+- Direct/manual stay creation rejects true room/date overlaps while allowing same-day turnover.
+- Stay extensions cannot cross into a later confirmed arrival for the same room.
+- Owner Admin can delete direct/manual stays; synchronized Airbnb stays remain protected.
+- Deleting an owner-managed stay revokes guest access, closes unused passport links and records an audit event.
+
 # Changelog
 
 All notable changes to The House – Koh Tao guest guide are recorded here.

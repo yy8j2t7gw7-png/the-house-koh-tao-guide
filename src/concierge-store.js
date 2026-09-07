@@ -2186,6 +2186,85 @@ export class ConciergeStore extends DurableObject {
     return { ok: true, room, resetMode: mode, rotationConfirmedAt: now };
   }
 
+
+  async findStayOverlap(room, checkInDate, checkOutDate, excludeReservationId = "") {
+    const cleanRoom = cleanText(room, 4);
+    const start = cleanText(checkInDate, 10);
+    const end = cleanText(checkOutDate, 10);
+    const exclude = cleanText(excludeReservationId, 100);
+    if (!cleanRoom || !/^\d{4}-\d{2}-\d{2}$/.test(start) || !/^\d{4}-\d{2}-\d{2}$/.test(end) || end <= start) return null;
+    return rows(this.ctx.storage.sql.exec(
+      `SELECT r.id, r.provider, r.room, r.check_in_date AS checkInDate,
+              CASE WHEN o.check_out_date > r.check_out_date THEN o.check_out_date ELSE r.check_out_date END AS checkOutDate
+       FROM stay_reservations r
+       LEFT JOIN stay_checkout_overrides o ON o.reservation_id = r.id
+       WHERE r.room = ? AND r.status = 'confirmed' AND r.id != ?
+         AND r.check_in_date < ?
+         AND (CASE WHEN o.check_out_date > r.check_out_date THEN o.check_out_date ELSE r.check_out_date END) > ?
+       ORDER BY r.check_in_date ASC LIMIT 1`,
+      cleanRoom,
+      exclude,
+      end,
+      start
+    ))[0] || null;
+  }
+
+  async getStayTurnoverContext(reservationId) {
+    const id = cleanText(reservationId, 100);
+    const current = rows(this.ctx.storage.sql.exec(
+      `SELECT r.id, r.room, r.check_in_date AS checkInDate,
+              CASE WHEN o.check_out_date > r.check_out_date THEN o.check_out_date ELSE r.check_out_date END AS checkOutDate
+       FROM stay_reservations r
+       LEFT JOIN stay_checkout_overrides o ON o.reservation_id = r.id
+       WHERE r.id = ? AND r.status = 'confirmed' LIMIT 1`,
+      id
+    ))[0] || null;
+    if (!current) return { previousSameDayCheckout: false, nextSameDayCheckIn: false };
+    const previous = rows(this.ctx.storage.sql.exec(
+      `SELECT r.id FROM stay_reservations r
+       LEFT JOIN stay_checkout_overrides o ON o.reservation_id = r.id
+       WHERE r.room = ? AND r.status = 'confirmed' AND r.id != ?
+         AND (CASE WHEN o.check_out_date > r.check_out_date THEN o.check_out_date ELSE r.check_out_date END) = ?
+       LIMIT 1`,
+      current.room,
+      id,
+      current.checkInDate
+    ))[0] || null;
+    const next = rows(this.ctx.storage.sql.exec(
+      `SELECT r.id FROM stay_reservations r
+       WHERE r.room = ? AND r.status = 'confirmed' AND r.id != ? AND r.check_in_date = ?
+       LIMIT 1`,
+      current.room,
+      id,
+      current.checkOutDate
+    ))[0] || null;
+    return {
+      room: current.room,
+      checkInDate: current.checkInDate,
+      checkOutDate: current.checkOutDate,
+      previousSameDayCheckout: Boolean(previous),
+      nextSameDayCheckIn: Boolean(next)
+    };
+  }
+
+  async cancelOwnerManagedStay(reservationId, nowValue) {
+    const id = cleanText(reservationId, 100);
+    const now = cleanText(nowValue, 40) || new Date().toISOString();
+    const reservation = rows(this.ctx.storage.sql.exec(
+      "SELECT id, provider, room, status FROM stay_reservations WHERE id = ? LIMIT 1",
+      id
+    ))[0] || null;
+    if (!reservation) return { ok: false, error: "reservation_not_found" };
+    if (!["direct", "manual"].includes(reservation.provider)) return { ok: false, error: "owner_managed_stay_required" };
+    if (reservation.status !== "confirmed") return { ok: false, error: "reservation_not_active" };
+    this.ctx.storage.sql.exec("UPDATE stay_reservations SET status = 'cancelled', updated_at = ? WHERE id = ?", now, id);
+    this.ctx.storage.sql.exec("UPDATE verified_stay_sessions SET revoked_at = ? WHERE reservation_id = ? AND revoked_at = ''", now, id);
+    this.ctx.storage.sql.exec("DELETE FROM stay_checkout_overrides WHERE reservation_id = ?", id);
+    await this.closePendingPassportLinksForReservation(id, now);
+    await this.recordAdminAudit("owner_managed_stay_deleted", `reservation:${id}`, now);
+    return { ok: true, reservationId: id, room: cleanText(reservation.room, 4), deleted: true };
+  }
+
   async replaceDirectStayConfirmationCode(reservationId, confirmationCodeHash, updatedAt) {
     const id = cleanText(reservationId, 100);
     const codeHash = cleanText(confirmationCodeHash, 100);
@@ -2226,6 +2305,9 @@ export class ConciergeStore extends DurableObject {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(nextCheckout) || nextCheckout <= current.effectiveCheckout) {
       return { ok: false, error: "checkout_must_be_later" };
     }
+    const reservationRoom = rows(this.ctx.storage.sql.exec("SELECT room, check_in_date AS checkInDate FROM stay_reservations WHERE id = ? LIMIT 1", id))[0];
+    const overlap = reservationRoom ? await this.findStayOverlap(reservationRoom.room, reservationRoom.checkInDate, nextCheckout, id) : null;
+    if (overlap) return { ok: false, error: "room_date_conflict", conflict: overlap };
     const now = cleanText(nowValue, 40) || new Date().toISOString();
     this.ctx.storage.sql.exec(
       `INSERT INTO stay_checkout_overrides (reservation_id, check_out_date, updated_at)

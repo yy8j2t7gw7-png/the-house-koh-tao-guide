@@ -241,7 +241,7 @@ function createStore() {
     async getVerifiedStaySession(tokenHash, now) {
       const session = this.staySessions.find((item) => item.tokenHash === tokenHash && item.expiresAt > now && !item.revokedAt);
       if (!session) return null;
-      const reservation = this.stayReservations.find((item) => item.id === session.reservationId);
+      const reservation = this.stayReservations.find((item) => item.id === session.reservationId && item.status === "confirmed");
       return reservation ? { ...reservation, ...session, reservationId: reservation.id, reservationStatus: reservation.status } : null;
     },
     async revokeVerifiedStaySession(tokenHash, now) {
@@ -261,10 +261,43 @@ function createStore() {
       reservation.updatedAt = updatedAt;
       return { ok: true, reservationId, room: reservation.room, updatedAt };
     },
+    async findStayOverlap(room, checkInDate, checkOutDate, excludeReservationId = "") {
+      if (!room || !checkInDate || !checkOutDate || checkOutDate <= checkInDate) return null;
+      return this.stayReservations.find((item) => item.room === room
+        && item.status === "confirmed"
+        && item.id !== excludeReservationId
+        && item.checkInDate < checkOutDate
+        && item.checkOutDate > checkInDate) || null;
+    },
+    async getStayTurnoverContext(reservationId) {
+      const reservation = this.stayReservations.find((item) => item.id === reservationId && item.status === "confirmed");
+      if (!reservation) return { previousSameDayCheckout: false, nextSameDayCheckIn: false };
+      return {
+        room: reservation.room,
+        checkInDate: reservation.checkInDate,
+        checkOutDate: reservation.checkOutDate,
+        previousSameDayCheckout: this.stayReservations.some((item) => item.id !== reservationId && item.room === reservation.room && item.status === "confirmed" && item.checkOutDate === reservation.checkInDate),
+        nextSameDayCheckIn: this.stayReservations.some((item) => item.id !== reservationId && item.room === reservation.room && item.status === "confirmed" && item.checkInDate === reservation.checkOutDate)
+      };
+    },
+    async cancelOwnerManagedStay(reservationId, updatedAt) {
+      const reservation = this.stayReservations.find((item) => item.id === reservationId);
+      if (!reservation) return { ok: false, error: "reservation_not_found" };
+      if (!["direct", "manual"].includes(reservation.provider)) return { ok: false, error: "owner_managed_stay_required" };
+      if (reservation.status !== "confirmed") return { ok: false, error: "reservation_not_active" };
+      reservation.status = "cancelled";
+      reservation.updatedAt = updatedAt;
+      this.staySessions.filter((item) => item.reservationId === reservationId && !item.revokedAt).forEach((item) => { item.revokedAt = updatedAt; });
+      await this.closePendingPassportLinksForReservation(reservationId, updatedAt);
+      this.adminAudit.push({ action: "owner_managed_stay_deleted", reference: `reservation:${reservationId}`, createdAt: updatedAt });
+      return { ok: true, reservationId, room: reservation.room, deleted: true };
+    },
     async extendStayReservation(reservationId, checkOutDate, updatedAt) {
       const reservation = this.stayReservations.find((item) => item.id === reservationId && item.status === "confirmed");
       if (!reservation) return { ok: false, error: "reservation_not_found" };
       if (checkOutDate <= reservation.checkOutDate) return { ok: false, error: "checkout_must_be_later" };
+      const overlap = await this.findStayOverlap(reservation.room, reservation.checkInDate, checkOutDate, reservationId);
+      if (overlap) return { ok: false, error: "room_date_conflict", conflict: overlap };
       reservation.checkOutDate = checkOutDate;
       reservation.updatedAt = updatedAt;
       this.staySessions.filter((item) => item.reservationId === reservationId).forEach((item) => {
@@ -3188,7 +3221,7 @@ test("guest localization supports seven languages and keeps the owner dashboard 
   assert.doesNotMatch(admin, /src="\/i18n\.js"/);
   assert.match(runtime, /exploreContentDeferred/);
   assert.match(runtime, /element\.closest\("\.section,\.footer"\)/);
-  assert.match(runtime, /houseGuideTranslations:v5\.11\.45:/);
+  assert.match(runtime, /houseGuideTranslations:v5\.11\.46:/);
   assert.match(runtime, /MAX_REQUEST_RETRIES = 2/);
   assert.match(runtime, /let flushRunning = false/);
 });
@@ -12384,4 +12417,335 @@ test("hourly registration reminder cron is present while existing escalation and
   ]);
   assert.match(indexSource, /controller\.cron === "0 \* \* \* \*"[\s\S]*processRegistrationReminderAlerts/);
   assert.match(config, /"crons": \["\*\/1 \* \* \* \*", "0 \* \* \* \*", "17 19 \* \* \*"\]/);
+});
+
+test("reservation-aware late checkout knows the verified checkout date and sends one operational alert after the requested time", async () => {
+  const now = new Date("2026-09-07T09:00:00.000Z");
+  const { env, store } = createEnvironment({
+    GUEST_ACCESS_ENFORCEMENT: "true",
+    WHATSAPP_ACCESS_TOKEN: "meta-test-token",
+    WHATSAPP_PHONE_NUMBER_ID: "1234567890",
+    WHATSAPP_ALERT_RECIPIENTS: JSON.stringify({
+      support: [{ label: "Su", phone: "+66 64 000 0001" }],
+      emergency: [
+        { label: "Owner 1", phone: "+66 81 000 0002" },
+        { label: "Owner 2", phone: "+66 82 000 0003" }
+      ]
+    })
+  });
+  const cookie = await syncAndVerifyStay(env, {
+    room: "11",
+    confirmationCode: "HMLATEOUT11",
+    checkInDate: "2026-09-05",
+    checkOutDate: "2026-09-08",
+    now
+  });
+  await completeThaiRegistration(env, cookie, new Date(now.getTime() + 10));
+  store.stayReservations.push({
+    id: `stay_${crypto.randomUUID()}`,
+    provider: "airbnb",
+    listingId: "next-room-11",
+    room: "11",
+    confirmationCodeHash: `hash_${crypto.randomUUID()}`,
+    checkInDate: "2026-09-08",
+    checkOutDate: "2026-09-10",
+    status: "confirmed",
+    updatedAt: now.toISOString()
+  });
+
+  const first = await handleConciergeRequest(
+    verifiedConciergeRequest("can I check out later", cookie),
+    env,
+    undefined,
+    now
+  );
+  const firstBody = await first.json();
+  assert.equal(firstBody.workflow.type, "late_checkout");
+  assert.equal(firstBody.workflow.status, "collecting");
+  assert.equal(firstBody.workflow.lateCheckoutRequest.scheduledCheckoutDate, "2026-09-08");
+  assert.match(firstBody.answer, /scheduled checkout is Tuesday, 8 September 2026 at 11:00 AM/i);
+  assert.match(firstBody.answer, /what time would you like to check out/i);
+  assert.doesNotMatch(firstBody.answer, /what is your scheduled checkout date/i);
+  assert.equal(store.alerts.length, 0);
+
+  const outbound = [];
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (_url, options) => {
+    outbound.push(JSON.parse(options.body));
+    return new Response(JSON.stringify({ messages: [{ id: `wamid.late-checkout-${outbound.length}` }] }), {
+      status: 200,
+      headers: { "content-type": "application/json" }
+    });
+  };
+  try {
+    const completed = await handleConciergeRequest(
+      verifiedConciergeRequest("5pm", cookie, {
+        workflowState: firstBody.workflow,
+        history: [
+          { role: "user", content: "can I check out later" },
+          { role: "assistant", content: firstBody.answer }
+        ]
+      }),
+      env,
+      undefined,
+      new Date(now.getTime() + 1000)
+    );
+    const body = await completed.json();
+    assert.equal(body.workflow.type, "late_checkout");
+    assert.equal(body.workflow.status, "submitted");
+    assert.match(body.answer, /late-checkout request for 5:00 PM on Tuesday, 8 September 2026 has been sent/i);
+    assert.match(body.answer, /not confirmed/i);
+    assert.equal(store.alerts.length, 1);
+    assert.equal(store.alerts[0].alertType, "stay_support");
+    assert.equal(store.alerts[0].recipientGroup, "support_with_owners");
+    assert.match(store.alerts[0].summary, /Late checkout request/i);
+    assert.match(store.alerts[0].summary, /Same-day arrival is recorded/i);
+    assert.equal(outbound.length, 3);
+    assert.deepEqual(outbound.map((item) => item.to).sort(), ["66640000001", "66810000002", "66820000003"]);
+    for (const payload of outbound) {
+      assert.equal(payload.template.name, "house_service_alert_v3");
+      assert.equal(payload.template.components[0].parameters[2].text, "Late checkout");
+    }
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("late checkout never claims the request was sent when WhatsApp delivery is not accepted", async () => {
+  const now = new Date("2026-09-07T09:00:00.000Z");
+  const { env } = createEnvironment({ GUEST_ACCESS_ENFORCEMENT: "true" });
+  const cookie = await syncAndVerifyStay(env, {
+    room: "11",
+    confirmationCode: "HMLATEFAIL11",
+    checkInDate: "2026-09-05",
+    checkOutDate: "2026-09-08",
+    now
+  });
+  await completeThaiRegistration(env, cookie, new Date(now.getTime() + 10));
+  const pending = await handleConciergeRequest(verifiedConciergeRequest("Can I check out later?", cookie), env, undefined, now);
+  const pendingBody = await pending.json();
+  const failed = await handleConciergeRequest(
+    verifiedConciergeRequest("5pm", cookie, { workflowState: pendingBody.workflow }),
+    env,
+    undefined,
+    new Date(now.getTime() + 1000)
+  );
+  const failedBody = await failed.json();
+  assert.match(failedBody.answer, /couldn.?t send that request automatically/i);
+  assert.doesNotMatch(failedBody.answer, /has been sent/i);
+  assert.equal(failedBody.workflow.type, "late_checkout");
+  assert.equal(failedBody.workflow.status, "collecting");
+});
+
+test("reservation-aware early check-in detects a same-day departure and sends the requested arrival time", async () => {
+  const now = new Date("2026-09-09T08:00:00.000Z");
+  const { env, store } = createEnvironment({
+    GUEST_ACCESS_ENFORCEMENT: "true",
+    WHATSAPP_ACCESS_TOKEN: "meta-test-token",
+    WHATSAPP_PHONE_NUMBER_ID: "1234567890",
+    WHATSAPP_ALERT_RECIPIENTS: JSON.stringify({
+      support: [{ label: "Su", phone: "+66 64 000 0001" }],
+      emergency: [
+        { label: "Owner 1", phone: "+66 81 000 0002" },
+        { label: "Owner 2", phone: "+66 82 000 0003" }
+      ]
+    })
+  });
+  const cookie = await syncAndVerifyStay(env, {
+    room: "11",
+    confirmationCode: "HMEARLYIN11",
+    checkInDate: "2026-09-10",
+    checkOutDate: "2026-09-12",
+    now
+  });
+  await completeThaiRegistration(env, cookie, new Date(now.getTime() + 10));
+  store.stayReservations.push({
+    id: `stay_${crypto.randomUUID()}`,
+    provider: "airbnb",
+    listingId: "previous-room-11",
+    room: "11",
+    confirmationCodeHash: `hash_${crypto.randomUUID()}`,
+    checkInDate: "2026-09-07",
+    checkOutDate: "2026-09-10",
+    status: "confirmed",
+    updatedAt: now.toISOString()
+  });
+
+  const first = await handleConciergeRequest(
+    verifiedConciergeRequest("Can I check in earlier?", cookie),
+    env,
+    undefined,
+    now
+  );
+  const firstBody = await first.json();
+  assert.equal(firstBody.workflow.type, "early_checkin");
+  assert.equal(firstBody.workflow.earlyCheckinRequest.scheduledCheckInDate, "2026-09-10");
+  assert.match(firstBody.answer, /scheduled check-in is Thursday, 10 September 2026 from 2:00 PM/i);
+  assert.match(firstBody.answer, /another guest is scheduled to check out of your room that morning/i);
+  assert.match(firstBody.answer, /what time are you hoping to arrive/i);
+  assert.equal(store.alerts.length, 0);
+
+  const outbound = [];
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (_url, options) => {
+    outbound.push(JSON.parse(options.body));
+    return new Response(JSON.stringify({ messages: [{ id: `wamid.early-checkin-${outbound.length}` }] }), {
+      status: 200,
+      headers: { "content-type": "application/json" }
+    });
+  };
+  try {
+    const completed = await handleConciergeRequest(
+      verifiedConciergeRequest("11am", cookie, { workflowState: firstBody.workflow }),
+      env,
+      undefined,
+      new Date(now.getTime() + 1000)
+    );
+    const body = await completed.json();
+    assert.match(body.answer, /early check-in request for 11:00 AM on Thursday, 10 September 2026 has been sent/i);
+    assert.equal(store.alerts.length, 1);
+    assert.match(store.alerts[0].summary, /Early check-in request/i);
+    assert.match(store.alerts[0].summary, /Same-day departure is recorded/i);
+    assert.equal(outbound.length, 3);
+    for (const payload of outbound) {
+      assert.equal(payload.template.components[0].parameters[2].text, "Early check-in");
+    }
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("direct stay creation blocks true room overlaps but allows same-day checkout-to-check-in turnover", async () => {
+  const { env, store } = createEnvironment();
+  const makeDirect = (checkInDate, checkOutDate) => handleStayAdminRequest(new Request("https://guide.example/api/concierge/admin/direct-stays", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ room: "7", checkInDate, checkOutDate })
+  }), env, "/api/concierge/admin/direct-stays", store);
+
+  const first = await makeDirect("2026-09-01", "2026-09-03");
+  assert.equal(first.status, 200);
+  const firstBody = await first.json();
+  assert.match(firstBody.confirmationCode, /^HS[A-Z0-9]{10}$/);
+
+  const overlap = await makeDirect("2026-09-02", "2026-09-04");
+  assert.equal(overlap.status, 409);
+  const overlapBody = await overlap.json();
+  assert.equal(overlapBody.error, "room_date_conflict");
+  assert.equal(store.stayReservations.filter((item) => item.room === "7" && item.status === "confirmed").length, 1);
+
+  const turnover = await makeDirect("2026-09-03", "2026-09-05");
+  assert.equal(turnover.status, 200);
+  assert.equal(store.stayReservations.filter((item) => item.room === "7" && item.status === "confirmed").length, 2);
+});
+
+test("owner can delete a direct stay and revoke its guest access while Airbnb stays remain protected", async () => {
+  const now = new Date("2026-09-02T08:00:00.000Z");
+  const { env, store } = createEnvironment();
+  const created = await handleStayAdminRequest(new Request("https://guide.example/api/concierge/admin/direct-stays", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ room: "7", checkInDate: "2026-09-01", checkOutDate: "2026-09-03" })
+  }), env, "/api/concierge/admin/direct-stays", store);
+  const createdBody = await created.json();
+  const directReservation = store.stayReservations.find((item) => item.provider === "direct" && item.room === "7");
+  assert.ok(directReservation);
+
+  const verified = await handleStayGuestRequest(new Request("https://guide.example/api/stay/verify", {
+    method: "POST",
+    headers: { origin: "https://guide.example", "content-type": "application/json" },
+    body: JSON.stringify({ room: "7", confirmationCode: createdBody.confirmationCode })
+  }), env, "/api/stay/verify", null, now);
+  assert.equal(verified.status, 200);
+  const cookie = verified.headers.get("set-cookie").split(";")[0];
+
+  const unauthorizedDelete = await handleAdminRequest(new Request("https://guide.example/api/concierge/admin/manual-stay-delete", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ reservationId: directReservation.id, confirmed: true })
+  }), env, "/api/concierge/admin/manual-stay-delete");
+  assert.equal(unauthorizedDelete.status, 401);
+
+  const deleted = await handleAdminRequest(new Request("https://guide.example/api/concierge/admin/manual-stay-delete", {
+    method: "POST",
+    headers: { authorization: "Bearer admin_token_test_5500", "content-type": "application/json" },
+    body: JSON.stringify({ reservationId: directReservation.id, confirmed: true })
+  }), env, "/api/concierge/admin/manual-stay-delete");
+  assert.equal(deleted.status, 200);
+  assert.equal(store.stayReservations.find((item) => item.id === directReservation.id)?.status, "cancelled");
+  assert.ok(store.adminAudit.some((item) => item.action === "owner_managed_stay_deleted" && item.reference === `reservation:${directReservation.id}`));
+
+  const statusAfterDelete = await handleStayGuestRequest(new Request("https://guide.example/api/stay/status?room=7", {
+    headers: { origin: "https://guide.example", cookie }
+  }), env, "/api/stay/status", null, new Date(now.getTime() + 1000));
+  const statusBody = await statusAfterDelete.json();
+  assert.equal(statusBody.verified, false);
+
+  const airbnbId = `stay_${crypto.randomUUID()}`;
+  store.stayReservations.push({ id: airbnbId, provider: "airbnb", room: "6", checkInDate: "2026-09-01", checkOutDate: "2026-09-03", status: "confirmed" });
+  const protectedDelete = await handleAdminRequest(new Request("https://guide.example/api/concierge/admin/manual-stay-delete", {
+    method: "POST",
+    headers: { authorization: "Bearer admin_token_test_5500", "content-type": "application/json" },
+    body: JSON.stringify({ reservationId: airbnbId, confirmed: true })
+  }), env, "/api/concierge/admin/manual-stay-delete");
+  assert.equal(protectedDelete.status, 409);
+  assert.equal((await protectedDelete.json()).error, "owner_managed_stay_required");
+  assert.equal(store.stayReservations.find((item) => item.id === airbnbId)?.status, "confirmed");
+});
+
+test("Owner Admin exposes delete only for owner-managed stays and keeps the Room 7 overlap warning", async () => {
+  const source = await readFile(new URL("../public/concierge-admin.js", import.meta.url), "utf8");
+  assert.match(source, /\["direct", "manual"\]\.includes\(item\.provider\)/);
+  assert.match(source, /Delete manually added stay/);
+  assert.match(source, /room_date_conflict/);
+  assert.match(source, /already has a confirmed stay that overlaps those dates/i);
+});
+
+test("manual stay correction with the same confirmation code does not conflict with itself", async () => {
+  const { env, store } = createEnvironment();
+  const listingId = Object.entries(listingRoomMap).find(([, room]) => room === "6")[0];
+  const requestManual = (checkInDate, checkOutDate) => handleStayAdminRequest(new Request("https://guide.example/api/concierge/admin/stays", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ room: "6", listingId, confirmationCode: "HMMANUALFIX6", checkInDate, checkOutDate })
+  }), env, "/api/concierge/admin/stays", store);
+
+  const first = await requestManual("2026-09-01", "2026-09-03");
+  assert.equal(first.status, 200);
+  const second = await requestManual("2026-09-01", "2026-09-04");
+  assert.equal(second.status, 200);
+  const records = store.stayReservations.filter((item) => item.room === "6" && item.provider === "manual" && item.status === "confirmed");
+  assert.equal(records.length, 1);
+  assert.equal(records[0].checkOutDate, "2026-09-04");
+});
+
+test("owner stay extension refuses to extend through a later confirmed arrival", async () => {
+  const { env, store } = createEnvironment();
+  const current = {
+    id: `stay_${crypto.randomUUID()}`,
+    provider: "direct",
+    room: "7",
+    checkInDate: "2026-09-01",
+    checkOutDate: "2026-09-03",
+    status: "confirmed",
+    confirmationCodeHash: `hash_${crypto.randomUUID()}`
+  };
+  const next = {
+    id: `stay_${crypto.randomUUID()}`,
+    provider: "direct",
+    room: "7",
+    checkInDate: "2026-09-04",
+    checkOutDate: "2026-09-06",
+    status: "confirmed",
+    confirmationCodeHash: `hash_${crypto.randomUUID()}`
+  };
+  store.stayReservations.push(current, next);
+  const response = await handleStayAdminRequest(new Request("https://guide.example/api/concierge/admin/stay-extension", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ reservationId: current.id, checkOutDate: "2026-09-05" })
+  }), env, "/api/concierge/admin/stay-extension", store);
+  assert.equal(response.status, 409);
+  assert.equal((await response.json()).error, "room_date_conflict");
+  assert.equal(current.checkOutDate, "2026-09-03");
 });

@@ -365,6 +365,8 @@ function requestLabel(alert) {
     passport_tm30_overdue: "TM30 reminder"
   };
   if (alert.alertType === "stay_support") {
+    if (/\blate\s+checkout\b/i.test(summary)) return "Late checkout";
+    if (/\bearly\s+check[- ]?in\b/i.test(summary)) return "Early check-in";
     if (/\b(?:fresh\s+|clean\s+|new\s+)?towels?\b/i.test(summary)) return "Fresh towels";
     if (/\btoilet\s+paper\b/i.test(summary)) return "Toilet paper";
     if (/\bsoap\b/i.test(summary)) return "Soap";

@@ -6,6 +6,7 @@ import {
   handleFeedbackRequest
 } from "./concierge-api.js";
 import { cleanupPassportUploads, handlePassportGuestRequest } from "./passport-api.js";
+import { processRegistrationReminderAlerts } from "./registration-alerts.js";
 import { cleanupMaintenanceReports, handleMaintenanceGuestRequest } from "./maintenance-api.js";
 import { handleTranslationRequest } from "./i18n-api.js";
 import { handleWhatsAppWebhook, processDueAlertEscalations } from "./whatsapp-alerts.js";
@@ -131,7 +132,7 @@ export default {
     }
 
     if (url.pathname === "/api/passport-upload" || url.pathname === "/api/passport-upload/session") {
-      return handlePassportGuestRequest(request, env, url.pathname);
+      return handlePassportGuestRequest(request, env, url.pathname, ctx);
     }
 
     if (url.pathname === "/api/maintenance/report") {
@@ -220,6 +221,10 @@ export default {
   async scheduled(controller, env, ctx) {
     if (controller.cron === "*/1 * * * *") {
       ctx.waitUntil(processDueAlertEscalations(env));
+      return;
+    }
+    if (controller.cron === "0 * * * *") {
+      ctx.waitUntil(processRegistrationReminderAlerts(env));
       return;
     }
     ctx.waitUntil(Promise.all([

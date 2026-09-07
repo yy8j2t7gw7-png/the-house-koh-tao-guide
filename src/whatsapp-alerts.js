@@ -16,7 +16,8 @@ const TEMPLATE_DEFAULTS = Object.freeze({
   luggage: "house_luggage_alert_v2",
   urgent: "house_urgent_alert_v2",
   lostKey: "house_lost_key_alert_v3",
-  status: "house_alert_status_v1"
+  status: "house_alert_status_v1",
+  registration: "house_registration_admin_alert_v1"
 });
 
 const APPROVED_ACTION_TEMPLATE_NAMES = Object.freeze({
@@ -26,6 +27,8 @@ const APPROVED_ACTION_TEMPLATE_NAMES = Object.freeze({
   urgent: "house_urgent_alert_actions_v2",
   lostKey: "house_lost_key_alert_actions_v2"
 });
+
+const APPROVED_REGISTRATION_ACTION_TEMPLATE_NAME = "house_registration_admin_alert_actions_v1";
 
 const TEMPLATE_SCHEMAS = Object.freeze({
   // These current templates are approved in Meta as generic English. Meta
@@ -37,6 +40,8 @@ const TEMPLATE_SCHEMAS = Object.freeze({
   house_urgent_alert_v2: Object.freeze({ kind: "urgent", languageCode: "en", bodyParameterCount: 5 }),
   house_lost_key_alert_v3: Object.freeze({ kind: "lostKey", languageCode: "en", bodyParameterCount: 3 }),
   house_alert_status_v1: Object.freeze({ kind: "status", languageCode: "en", bodyParameterCount: 5 }),
+  house_registration_admin_alert_v1: Object.freeze({ kind: "registration", languageCode: "en", bodyParameterCount: 1, quickActions: true, quickActionCount: 1, layout: "registration_reminder_v2" }),
+  house_registration_admin_alert_actions_v1: Object.freeze({ kind: "registration", languageCode: "en", bodyParameterCount: 2, quickActions: true, quickActionCount: 2, layout: "registration_passport_received_v2" }),
   // Optional interactive successors. They are selected only after the
   // explicit feature flag and exact per-kind template mapping are enabled.
   // Until Meta approves them, every existing production mapping remains live.
@@ -218,6 +223,7 @@ function parseRecipients(env) {
   result.booking_with_owners = union("booking", "emergency");
   result.lost_key_team = union("urgent", "support", "emergency");
   result.urgent_response = union("emergency", "booking");
+  result.owners = union("emergency");
   if (!result.escalation.length) result.escalation = union("emergency");
   return result;
 }
@@ -271,6 +277,22 @@ function actionTemplateNames(env) {
   };
 }
 
+function registrationActionTemplateName(env) {
+  return String(env.WHATSAPP_REGISTRATION_ACTION_TEMPLATE_NAME || "").trim();
+}
+
+function registrationPassportActionsEnabled(alert, env) {
+  if (String(env.WHATSAPP_STAFF_ACTIONS_ENABLED || "false").toLowerCase() !== "true") return false;
+  if (alert?.alertType !== "passport_received") return false;
+  const name = registrationActionTemplateName(env);
+  const schema = TEMPLATE_SCHEMAS[name];
+  return Boolean(
+    name === APPROVED_REGISTRATION_ACTION_TEMPLATE_NAME
+    && schema?.kind === "registration"
+    && schema.quickActions
+  );
+}
+
 function templateNames(env) {
   return {
     service: String(env.WHATSAPP_SERVICE_TEMPLATE_NAME || TEMPLATE_DEFAULTS.service).trim(),
@@ -278,7 +300,8 @@ function templateNames(env) {
     luggage: String(env.WHATSAPP_LUGGAGE_TEMPLATE_NAME || TEMPLATE_DEFAULTS.luggage).trim(),
     urgent: String(env.WHATSAPP_URGENT_TEMPLATE_NAME || TEMPLATE_DEFAULTS.urgent).trim(),
     lostKey: String(env.WHATSAPP_LOST_KEY_TEMPLATE_NAME || TEMPLATE_DEFAULTS.lostKey).trim(),
-    status: String(env.WHATSAPP_STATUS_TEMPLATE_NAME || TEMPLATE_DEFAULTS.status).trim()
+    status: String(env.WHATSAPP_STATUS_TEMPLATE_NAME || TEMPLATE_DEFAULTS.status).trim(),
+    registration: String(env.WHATSAPP_REGISTRATION_TEMPLATE_NAME || TEMPLATE_DEFAULTS.registration).trim()
   };
 }
 
@@ -335,7 +358,11 @@ function requestLabel(alert) {
     property_emergency: "Serious property incident",
     medical_emergency: "Medical or personal-safety concern",
     verified_spare_key_release: "Verified spare-key request",
-    lost_key: "Lost key"
+    lost_key: "Lost key",
+    passport_received: "Passport received",
+    passport_checkin_missing: "Passport check-in reminder",
+    passport_checkin_partial: "Passport registration incomplete",
+    passport_tm30_overdue: "TM30 reminder"
   };
   if (alert.alertType === "stay_support") {
     if (/\b(?:fresh\s+|clean\s+|new\s+)?towels?\b/i.test(summary)) return "Fresh towels";
@@ -363,6 +390,7 @@ function requestLabel(alert) {
 }
 
 function alertTemplateKind(alert) {
+  if (["passport_received", "passport_checkin_missing", "passport_checkin_partial", "passport_tm30_overdue"].includes(alert.alertType)) return "registration";
   if (alert.alertType === "verified_spare_key_release" || alert.alertType === "lost_key") return "lostKey";
   if (alert.alertType === "luggage_storage") return "luggage";
   if (alert.alertType === "booking_request") return "booking";
@@ -375,6 +403,7 @@ function legacyTemplateValues(alert, kind) {
   const room = roomLabel(alert);
   const time = alert.bangkokTime || formatBangkokAlertTime(new Date(alert.createdAt));
   const reference = alert.id;
+  if (kind === "registration") return [requestLabel(alert), room, reference, summary, time];
   if (kind === "lostKey") return [reference, room, time];
   if (kind === "luggage") {
     const luggage = alert.luggageRequest || {};
@@ -473,8 +502,28 @@ function approvedActionTemplateValues(alert, kind) {
   return [requestLabel(alert), room, time, appendProtectedContact(summary, alert.privateReplyContact), reference];
 }
 
+
+function roomNumberValue(alert) {
+  const room = String(alert?.room || "").trim();
+  return room || "Not selected";
+}
+
+function registrationReminderTemplateValues(alert) {
+  const room = roomNumberValue(alert);
+  const summary = safeAlertSummary(alert.summary || "Guest registration requires attention.").slice(0, 780);
+  return [`Room ${room}: ${summary}`];
+}
+
+function registrationPassportReceivedTemplateValues(alert) {
+  const room = roomNumberValue(alert);
+  const summary = safeAlertSummary(alert.summary || "A passport has been uploaded.").slice(0, 780);
+  return [room, summary];
+}
+
 function templateValues(alert, kind, templateName = "") {
   const schema = TEMPLATE_SCHEMAS[String(templateName || "").trim()];
+  if (schema?.layout === "registration_reminder_v2") return registrationReminderTemplateValues(alert);
+  if (schema?.layout === "registration_passport_received_v2") return registrationPassportReceivedTemplateValues(alert);
   return schema?.layout === "approved_v2"
     ? approvedActionTemplateValues(alert, kind)
     : legacyTemplateValues(alert, kind);
@@ -486,27 +535,39 @@ export function validateWhatsAppTemplateParameters(name, kind, parameters) {
   if (!Array.isArray(parameters) || parameters.length !== schema.bodyParameterCount) {
     return { ok: false, name, errorCode: "parameter_count_mismatch" };
   }
-  return { ok: true, name: String(name).trim(), kind, languageCode: schema.languageCode, parameters, quickActions: Boolean(schema.quickActions) };
+  return {
+    ok: true,
+    name: String(name).trim(),
+    kind,
+    languageCode: schema.languageCode,
+    parameters,
+    quickActions: Boolean(schema.quickActions),
+    quickActionCount: schema.quickActions ? Math.max(1, Number(schema.quickActionCount) || 2) : 0
+  };
 }
 
 function selectedTemplateForAlert(alert, env) {
   const names = templateNames(env);
   const kind = alertTemplateKind(alert);
-  const mappedActionName = actionTemplateNames(env)[kind];
+  const mappedActionName = kind === "registration"
+    ? registrationActionTemplateName(env)
+    : actionTemplateNames(env)[kind];
   const actionSchema = TEMPLATE_SCHEMAS[mappedActionName];
-  const name = staffQuickActionsEnabled(env)
-    && mappedActionName
-    && actionSchema?.kind === kind
-    && actionSchema.quickActions
+  const name = kind === "registration" && registrationPassportActionsEnabled(alert, env)
     ? mappedActionName
-    : names[kind];
+    : staffQuickActionsEnabled(env)
+      && mappedActionName
+      && actionSchema?.kind === kind
+      && actionSchema.quickActions
+      ? mappedActionName
+      : names[kind];
   const parameters = templateValues(alert, kind, name);
   return validateWhatsAppTemplateParameters(name, kind, parameters);
 }
 
 function staffActionPayload(command, alertId) {
   const id = String(alertId || "");
-  if (!/^alert_[A-Za-z0-9-]{20,}$/.test(id) || !["RECEIVED", "RESOLVE"].includes(command)) return "";
+  if (!/^alert_[A-Za-z0-9-]{20,}$/.test(id) || !["RECEIVED", "RESOLVE", "TM30"].includes(command)) return "";
   return `HOUSE_ALERT|${command}|${id}`;
 }
 
@@ -519,9 +580,16 @@ export function buildWhatsAppTemplatePayload(alert, recipient, env) {
   }];
   if (selected.quickActions) {
     components.push(
-      { type: "button", sub_type: "quick_reply", index: "0", parameters: [{ type: "payload", payload: staffActionPayload("RECEIVED", alert.id) }] },
-      { type: "button", sub_type: "quick_reply", index: "1", parameters: [{ type: "payload", payload: staffActionPayload("RESOLVE", alert.id) }] }
+      { type: "button", sub_type: "quick_reply", index: "0", parameters: [{ type: "payload", payload: staffActionPayload("RECEIVED", alert.id) }] }
     );
+    if (selected.quickActionCount >= 2) {
+      const secondCommand = alert.alertType === "passport_received" && selected.name === APPROVED_REGISTRATION_ACTION_TEMPLATE_NAME
+        ? "TM30"
+        : "RESOLVE";
+      components.push(
+        { type: "button", sub_type: "quick_reply", index: "1", parameters: [{ type: "payload", payload: staffActionPayload(secondCommand, alert.id) }] }
+      );
+    }
   }
   return { ok: true, name: selected.name, bodyParameterCount: selected.parameters.length, payload: {
     messaging_product: "whatsapp",
@@ -941,10 +1009,10 @@ function recipientIsAuthorized(phone, env) {
 
 function statusCommandFromMessage(message) {
   const buttonPayload = String(message?.button?.payload || message?.interactive?.button_reply?.id || "").trim();
-  const quickAction = buttonPayload.match(/^HOUSE_ALERT\|(RECEIVED|RESOLVE)\|(alert_[A-Za-z0-9-]{20,})$/i);
+  const quickAction = buttonPayload.match(/^HOUSE_ALERT\|(RECEIVED|RESOLVE|TM30)\|(alert_[A-Za-z0-9-]{20,})$/i);
   if (quickAction) return { command: quickAction[1].toUpperCase(), alertId: quickAction[2] };
   const text = String(message?.text?.body || message?.button?.text || "").trim();
-  const typed = text.match(/^(RECEIVED|ACK|RESOLVE)\s+(alert_[A-Za-z0-9-]{20,})$/i);
+  const typed = text.match(/^(RECEIVED|ACK|RESOLVE|TM30)\s+(alert_[A-Za-z0-9-]{20,})$/i);
   return typed ? { command: typed[1].toUpperCase(), alertId: typed[2] } : null;
 }
 
@@ -1059,9 +1127,24 @@ export async function handleWhatsAppWebhook(request, env) {
     const eligible = ["RECEIVED", "ACK"].includes(command) ? before.status === "open" : ["open", "acknowledged"].includes(before.status);
     if (!eligible) continue;
     const actor = await recipientHash(from, env);
-    if (["RECEIVED", "ACK"].includes(command)) await store.acknowledgeAlert(parsed.alertId, actor, new Date().toISOString());
-    else await store.resolveAlert(parsed.alertId, actor, new Date().toISOString());
-    await notifyStatusChange(before, from, ["RECEIVED", "ACK"].includes(command) ? "ACKNOWLEDGED" : "RESOLVED", env, store);
+    const now = new Date().toISOString();
+    if (["RECEIVED", "ACK"].includes(command)) {
+      await store.acknowledgeAlert(parsed.alertId, actor, now);
+      await notifyStatusChange(before, from, "ACKNOWLEDGED", env, store);
+      continue;
+    }
+    if (command === "TM30") {
+      if (before.alertType !== "passport_received" || typeof store.getPassportIdForAlert !== "function" || typeof store.setPassportTm30Registered !== "function") continue;
+      const linked = await store.getPassportIdForAlert(parsed.alertId);
+      if (!linked?.passportId) continue;
+      const marked = await store.setPassportTm30Registered(linked.passportId, true, now);
+      if (!marked?.ok) continue;
+      await store.resolveAlert(parsed.alertId, actor, now);
+      await notifyStatusChange(before, from, "RESOLVED", env, store);
+      continue;
+    }
+    await store.resolveAlert(parsed.alertId, actor, now);
+    await notifyStatusChange(before, from, "RESOLVED", env, store);
   }
   return new Response("OK", { status: 200 });
 }

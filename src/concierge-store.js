@@ -106,6 +106,8 @@ export class ConciergeStore extends DurableObject {
           uploaded_at TEXT NOT NULL DEFAULT '',
           delete_after TEXT NOT NULL DEFAULT '',
           tm30_registered_at TEXT NOT NULL DEFAULT '',
+          tm30_reminder_claimed_at TEXT NOT NULL DEFAULT '',
+          tm30_reminder_sent_at TEXT NOT NULL DEFAULT '',
           deleted_at TEXT NOT NULL DEFAULT ''
         );
         CREATE INDEX IF NOT EXISTS passport_uploads_status ON passport_uploads(status, arrival_at, expires_at);
@@ -374,6 +376,20 @@ export class ConciergeStore extends DurableObject {
           updated_at TEXT NOT NULL
         );
 
+        CREATE TABLE IF NOT EXISTS stay_registration_reminders (
+          reservation_id TEXT PRIMARY KEY,
+          checkin_missing_claimed_at TEXT NOT NULL DEFAULT '',
+          checkin_missing_sent_at TEXT NOT NULL DEFAULT ''
+        );
+
+        CREATE TABLE IF NOT EXISTS passport_alert_links (
+          alert_id TEXT PRIMARY KEY,
+          passport_id TEXT NOT NULL,
+          created_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS passport_alert_links_passport
+          ON passport_alert_links(passport_id, created_at);
+
         CREATE TABLE IF NOT EXISTS spare_key_events (
           id TEXT PRIMARY KEY,
           reservation_id TEXT NOT NULL,
@@ -417,6 +433,16 @@ export class ConciergeStore extends DurableObject {
         this.ctx.storage.sql.exec("ALTER TABLE passport_uploads ADD COLUMN tm30_registered_at TEXT NOT NULL DEFAULT ''");
       } catch (_error) {
         // Fresh databases and upgraded deployments already have the TM30 processing marker.
+      }
+      try {
+        this.ctx.storage.sql.exec("ALTER TABLE passport_uploads ADD COLUMN tm30_reminder_claimed_at TEXT NOT NULL DEFAULT ''");
+      } catch (_error) {
+        // Fresh databases and upgraded deployments already have the TM30 reminder claim marker.
+      }
+      try {
+        this.ctx.storage.sql.exec("ALTER TABLE passport_uploads ADD COLUMN tm30_reminder_sent_at TEXT NOT NULL DEFAULT ''");
+      } catch (_error) {
+        // Fresh databases and upgraded deployments already have the TM30 reminder delivery marker.
       }
       try {
         this.ctx.storage.sql.exec("ALTER TABLE expense_records ADD COLUMN business_id TEXT NOT NULL DEFAULT 'the-house-koh-tao'");
@@ -800,6 +826,9 @@ export class ConciergeStore extends DurableObject {
     );
     this.ctx.storage.sql.exec(
       "DELETE FROM concierge_alert_details WHERE alert_id NOT IN (SELECT id FROM concierge_alerts)"
+    );
+    this.ctx.storage.sql.exec(
+      "DELETE FROM passport_alert_links WHERE alert_id NOT IN (SELECT id FROM concierge_alerts) OR passport_id NOT IN (SELECT id FROM passport_uploads)"
     );
     this.ctx.storage.sql.exec(
       "DELETE FROM whatsapp_diagnostic_dismissals WHERE alert_id NOT IN (SELECT id FROM concierge_alerts)"
@@ -2428,12 +2457,190 @@ export class ConciergeStore extends DurableObject {
     if ((record.documentType || "passport") !== "passport") return { ok: false, error: "tm30_not_applicable" };
     const tm30RegisteredAt = registered ? (cleanText(nowValue, 40) || new Date().toISOString()) : "";
     this.ctx.storage.sql.exec(
-      "UPDATE passport_uploads SET tm30_registered_at = ? WHERE id = ? AND status = 'uploaded'",
+      "UPDATE passport_uploads SET tm30_registered_at = ?, tm30_reminder_claimed_at = '' WHERE id = ? AND status = 'uploaded'",
       tm30RegisteredAt,
       cleanId
     );
     await this.recordAdminAudit(registered ? "passport_tm30_registered" : "passport_tm30_unregistered", `passport:${cleanId}`, tm30RegisteredAt || nowValue);
     return { ok: true, tm30RegisteredAt };
+  }
+
+  async linkPassportAlert(alertId, passportId, nowValue) {
+    const cleanAlertId = cleanText(alertId, 100);
+    const cleanPassportId = cleanText(passportId, 100);
+    const now = cleanText(nowValue, 40) || new Date().toISOString();
+    if (!cleanAlertId || !cleanPassportId) return { ok: false, error: "invalid_request" };
+    const passport = rows(this.ctx.storage.sql.exec(
+      `SELECT id, document_type AS documentType, status FROM passport_uploads WHERE id = ? LIMIT 1`,
+      cleanPassportId
+    ))[0];
+    if (!passport || passport.status !== "uploaded" || (passport.documentType || "passport") !== "passport") {
+      return { ok: false, error: "passport_not_found" };
+    }
+    const alert = rows(this.ctx.storage.sql.exec(
+      `SELECT id, alert_type AS alertType FROM concierge_alerts WHERE id = ? LIMIT 1`,
+      cleanAlertId
+    ))[0];
+    if (!alert || alert.alertType !== "passport_received") return { ok: false, error: "alert_not_found" };
+    const existing = rows(this.ctx.storage.sql.exec(
+      `SELECT passport_id AS passportId FROM passport_alert_links WHERE alert_id = ? LIMIT 1`,
+      cleanAlertId
+    ))[0];
+    if (existing?.passportId && existing.passportId !== cleanPassportId) return { ok: false, error: "alert_link_conflict" };
+    this.ctx.storage.sql.exec(
+      `INSERT OR IGNORE INTO passport_alert_links (alert_id, passport_id, created_at) VALUES (?, ?, ?)`,
+      cleanAlertId,
+      cleanPassportId,
+      now
+    );
+    return { ok: true, passportId: cleanPassportId };
+  }
+
+  async getPassportIdForAlert(alertId) {
+    return rows(this.ctx.storage.sql.exec(
+      `SELECT passport_id AS passportId FROM passport_alert_links WHERE alert_id = ? LIMIT 1`,
+      cleanText(alertId, 100)
+    ))[0] || null;
+  }
+
+  async claimCheckinPassportReminders(checkInDate, nowValue, limitValue = 25) {
+    const date = cleanText(checkInDate, 10);
+    const now = cleanText(nowValue, 40) || new Date().toISOString();
+    const limit = Math.max(1, Math.min(50, Number(limitValue) || 25));
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return [];
+    const candidates = rows(this.ctx.storage.sql.exec(
+      `SELECT r.id AS reservationId, r.room,
+              COALESCE(q.status, g.status, 'not_started') AS registrationStatus,
+              COALESCE(q.required_passports, 0) AS requiredPassports,
+              (
+                SELECT COUNT(*)
+                FROM passport_reservation_links l
+                JOIN passport_uploads p ON p.id = l.passport_id
+                WHERE l.reservation_id = r.id
+                  AND p.document_type = 'passport'
+                  AND p.status = 'uploaded'
+              ) AS receivedPassports
+       FROM stay_reservations r
+       LEFT JOIN stay_registration_status g ON g.reservation_id = r.id
+       LEFT JOIN stay_registration_requirements q ON q.reservation_id = r.id
+       LEFT JOIN stay_registration_reminders m ON m.reservation_id = r.id
+       WHERE r.status = 'confirmed'
+         AND r.check_in_date = ?
+         AND COALESCE(q.status, g.status, 'not_started') NOT IN ('passport_complete', 'thai_id_pending', 'thai_id_complete', 'thai_exempt', 'in_person_pending', 'in_person_complete')
+         AND COALESCE(m.checkin_missing_sent_at, '') = ''
+         AND (COALESCE(m.checkin_missing_claimed_at, '') = '' OR julianday(m.checkin_missing_claimed_at) <= julianday(?, '-15 minutes'))
+         AND (
+           COALESCE(q.required_passports, 0) <= 0
+           OR (
+             SELECT COUNT(*)
+             FROM passport_reservation_links l
+             JOIN passport_uploads p ON p.id = l.passport_id
+             WHERE l.reservation_id = r.id
+               AND p.document_type = 'passport'
+               AND p.status = 'uploaded'
+           ) < COALESCE(q.required_passports, 0)
+         )
+       ORDER BY r.room ASC
+       LIMIT ?`,
+      date, now, limit
+    ));
+    const claimed = [];
+    for (const item of candidates) {
+      this.ctx.storage.sql.exec(
+        `INSERT INTO stay_registration_reminders
+         (reservation_id, checkin_missing_claimed_at, checkin_missing_sent_at)
+         VALUES (?, ?, '')
+         ON CONFLICT(reservation_id) DO UPDATE SET
+           checkin_missing_claimed_at = excluded.checkin_missing_claimed_at
+         WHERE stay_registration_reminders.checkin_missing_sent_at = ''
+           AND (stay_registration_reminders.checkin_missing_claimed_at = ''
+             OR julianday(stay_registration_reminders.checkin_missing_claimed_at) <= julianday(?, '-15 minutes'))`,
+        cleanText(item.reservationId, 100), now, now
+      );
+      const state = rows(this.ctx.storage.sql.exec(
+        `SELECT checkin_missing_claimed_at AS claimedAt, checkin_missing_sent_at AS sentAt
+         FROM stay_registration_reminders WHERE reservation_id = ? LIMIT 1`,
+        cleanText(item.reservationId, 100)
+      ))[0];
+      if (state?.claimedAt === now && !state?.sentAt) claimed.push(item);
+    }
+    return claimed;
+  }
+
+  async completeCheckinPassportReminder(reservationId, delivered, nowValue) {
+    const id = cleanText(reservationId, 100);
+    const now = cleanText(nowValue, 40) || new Date().toISOString();
+    if (delivered) {
+      this.ctx.storage.sql.exec(
+        `UPDATE stay_registration_reminders
+         SET checkin_missing_sent_at = ?, checkin_missing_claimed_at = ''
+         WHERE reservation_id = ?`,
+        now, id
+      );
+    } else {
+      this.ctx.storage.sql.exec(
+        `UPDATE stay_registration_reminders SET checkin_missing_claimed_at = ''
+         WHERE reservation_id = ? AND checkin_missing_sent_at = ''`,
+        id
+      );
+    }
+    return { ok: true };
+  }
+
+  async claimTm30PassportReminders(nowValue, limitValue = 25) {
+    const now = cleanText(nowValue, 40) || new Date().toISOString();
+    const limit = Math.max(1, Math.min(50, Number(limitValue) || 25));
+    const candidates = rows(this.ctx.storage.sql.exec(
+      `SELECT p.id, p.room, p.uploaded_at AS uploadedAt
+       FROM passport_uploads p
+       WHERE p.status = 'uploaded'
+         AND p.document_type = 'passport'
+         AND p.uploaded_at != ''
+         AND julianday(p.uploaded_at) <= julianday(?, '-24 hours')
+         AND p.tm30_registered_at = ''
+         AND p.tm30_reminder_sent_at = ''
+         AND (p.tm30_reminder_claimed_at = '' OR julianday(p.tm30_reminder_claimed_at) <= julianday(?, '-15 minutes'))
+       ORDER BY p.uploaded_at ASC
+       LIMIT ?`,
+      now, now, limit
+    ));
+    const claimed = [];
+    for (const item of candidates) {
+      this.ctx.storage.sql.exec(
+        `UPDATE passport_uploads SET tm30_reminder_claimed_at = ?
+         WHERE id = ? AND status = 'uploaded' AND document_type = 'passport'
+           AND tm30_registered_at = '' AND tm30_reminder_sent_at = ''
+           AND (tm30_reminder_claimed_at = '' OR julianday(tm30_reminder_claimed_at) <= julianday(?, '-15 minutes'))`,
+        now, cleanText(item.id, 100), now
+      );
+      const state = rows(this.ctx.storage.sql.exec(
+        `SELECT tm30_reminder_claimed_at AS claimedAt, tm30_reminder_sent_at AS sentAt, tm30_registered_at AS tm30RegisteredAt
+         FROM passport_uploads WHERE id = ? LIMIT 1`,
+        cleanText(item.id, 100)
+      ))[0];
+      if (state?.claimedAt === now && !state?.sentAt && !state?.tm30RegisteredAt) claimed.push(item);
+    }
+    return claimed;
+  }
+
+  async completeTm30PassportReminder(id, delivered, nowValue) {
+    const cleanId = cleanText(id, 100);
+    const now = cleanText(nowValue, 40) || new Date().toISOString();
+    if (delivered) {
+      this.ctx.storage.sql.exec(
+        `UPDATE passport_uploads
+         SET tm30_reminder_sent_at = ?, tm30_reminder_claimed_at = ''
+         WHERE id = ? AND tm30_registered_at = ''`,
+        now, cleanId
+      );
+    } else {
+      this.ctx.storage.sql.exec(
+        `UPDATE passport_uploads SET tm30_reminder_claimed_at = ''
+         WHERE id = ? AND tm30_reminder_sent_at = ''`,
+        cleanId
+      );
+    }
+    return { ok: true };
   }
 
   async markPassportReminderSent(id) {

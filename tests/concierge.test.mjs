@@ -10,6 +10,7 @@ import {
   housekeepingServiceResult
 } from "../src/concierge-api.js";
 import { handlePassportGuestRequest } from "../src/passport-api.js";
+import { notifyPassportUploadedOwners, processRegistrationReminderAlerts } from "../src/registration-alerts.js";
 import {
   handleStayAdminRequest,
   handleReservationSyncRequest,
@@ -88,9 +89,11 @@ function createStore() {
     interactions: [],
     feedback: [],
     passportRecords: [],
+    passportAlertLinks: new Map(),
     stayReservations: [],
     staySessions: [],
     registrationStatuses: new Map(),
+    checkinReminderState: new Map(),
     spareKeyEvents: [],
     spareKeyRotations: new Map(),
     maintenanceReports: [],
@@ -465,6 +468,59 @@ function createStore() {
       target.tm30RegisteredAt = registered ? now : "";
       this.adminAudit.push({ action: registered ? "passport_tm30_registered" : "passport_tm30_unregistered", reference: `passport:${id}`, createdAt: now });
       return { ok: true, tm30RegisteredAt: target.tm30RegisteredAt };
+    },
+    async linkPassportAlert(alertId, passportId) {
+      const alert = this.alerts.find((item) => item.id === alertId && item.alertType === "passport_received");
+      const passport = this.passportRecords.find((item) => item.id === passportId && item.status === "uploaded" && (item.documentType || "passport") === "passport");
+      if (!alert) return { ok: false, error: "alert_not_found" };
+      if (!passport) return { ok: false, error: "passport_not_found" };
+      const existing = this.passportAlertLinks.get(alertId);
+      if (existing && existing !== passportId) return { ok: false, error: "alert_link_conflict" };
+      this.passportAlertLinks.set(alertId, passportId);
+      return { ok: true, passportId };
+    },
+    async getPassportIdForAlert(alertId) {
+      const passportId = this.passportAlertLinks.get(alertId);
+      return passportId ? { passportId } : null;
+    },
+    async claimCheckinPassportReminders(checkInDate, now) {
+      const due = [];
+      for (const reservation of this.stayReservations) {
+        if (reservation.status !== "confirmed" || reservation.checkInDate !== checkInDate) continue;
+        const registration = this.registrationStatuses.get(reservation.id) || { status: "not_started", requiredPassports: 0, receivedPassports: 0 };
+        if (["passport_complete", "thai_id_pending", "thai_id_complete", "thai_exempt", "in_person_pending", "in_person_complete"].includes(registration.status)) continue;
+        const receivedPassports = this.passportRecords.filter((item) => item.reservationId === reservation.id && item.status === "uploaded" && (item.documentType || "passport") === "passport").length;
+        const requiredPassports = Number(registration.requiredPassports) || 0;
+        if (requiredPassports > 0 && receivedPassports >= requiredPassports) continue;
+        const state = this.checkinReminderState.get(reservation.id) || {};
+        if (state.sentAt) continue;
+        state.claimedAt = now;
+        this.checkinReminderState.set(reservation.id, state);
+        due.push({ reservationId: reservation.id, room: reservation.room, registrationStatus: registration.status, requiredPassports, receivedPassports });
+      }
+      return due;
+    },
+    async completeCheckinPassportReminder(reservationId, delivered, now) {
+      const state = this.checkinReminderState.get(reservationId) || {};
+      if (delivered) state.sentAt = now;
+      state.claimedAt = "";
+      this.checkinReminderState.set(reservationId, state);
+      return { ok: true };
+    },
+    async claimTm30PassportReminders(now) {
+      const cutoff = new Date(new Date(now).getTime() - 24 * 60 * 60 * 1000);
+      return this.passportRecords.filter((item) => item.status === "uploaded"
+        && (item.documentType || "passport") === "passport"
+        && item.uploadedAt && new Date(item.uploadedAt) <= cutoff
+        && !item.tm30RegisteredAt && !item.tm30ReminderSentAt && !item.tm30ReminderClaimedAt)
+        .map((item) => { item.tm30ReminderClaimedAt = now; return { id: item.id, room: item.room, uploadedAt: item.uploadedAt }; });
+    },
+    async completeTm30PassportReminder(id, delivered, now) {
+      const target = this.passportRecords.find((item) => item.id === id);
+      if (!target) return { ok: false };
+      if (delivered && !target.tm30RegisteredAt) target.tm30ReminderSentAt = now;
+      target.tm30ReminderClaimedAt = "";
+      return { ok: true };
     },
     async deletePassportUpload(id) {
       const target = this.passportRecords.find((record) => record.id === id);
@@ -9334,6 +9390,7 @@ test("release configuration activates the five exact reviewed staff quick-action
   assert.equal(vars.WHATSAPP_BOOKING_ACTION_TEMPLATE_NAME, "house_booking_alert_actions_v2");
   assert.equal(vars.WHATSAPP_URGENT_ACTION_TEMPLATE_NAME, "house_urgent_alert_actions_v2");
   assert.equal(vars.WHATSAPP_LOST_KEY_ACTION_TEMPLATE_NAME, "house_lost_key_alert_actions_v2");
+  assert.equal(vars.WHATSAPP_REGISTRATION_ACTION_TEMPLATE_NAME, "house_registration_admin_alert_actions_v1");
   assert.equal(whatsappAlertConfiguration(vars).staffQuickActionsEnabled, true);
   assert.equal(Object.values(whatsappAlertConfiguration(vars).staffQuickActionTemplates).length, 5);
   const built = buildWhatsAppTemplatePayload({
@@ -11226,7 +11283,7 @@ test("Room 7 is guide-enabled for direct testing while remaining excluded from A
 test("verified registration-pending guests receive arrival directions but not the full room guide", async () => {
   const now = new Date("2026-08-31T07:30:00.000Z");
   const { env } = createEnvironment({ GUEST_ACCESS_ENFORCEMENT: "true" });
-  const cookie = await syncAndVerifyStay(env, { room: "11", confirmationCode: "HMARRIVAL11", checkInDate: "2026-08-31", checkOutDate: "2026-09-05", now });
+  const cookie = await syncAndVerifyStay(env, { room: "11", confirmationCode: "HMARRIVAL11", checkInDate: "2026-08-31", checkOutDate: "2026-09-30", now });
 
   const arrival = await handleStayGuestRequest(new Request("https://guide.example/api/stay/arrival-content?room=11", {
     headers: { origin: "https://guide.example", cookie }
@@ -11248,7 +11305,7 @@ test("verified registration-pending guests receive arrival directions but not th
 test("registration-pending concierge allows find-my-room and reminds about passport registration", async () => {
   const now = new Date("2026-08-31T07:31:00.000Z");
   const { env } = createEnvironment({ GUEST_ACCESS_ENFORCEMENT: "true", OPENAI_API_KEY: "not-used" });
-  const cookie = await syncAndVerifyStay(env, { room: "11", confirmationCode: "HMARRIVAL12", checkInDate: "2026-08-31", checkOutDate: "2026-09-05", now });
+  const cookie = await syncAndVerifyStay(env, { room: "11", confirmationCode: "HMARRIVAL12", checkInDate: "2026-08-31", checkOutDate: "2026-09-30", now });
   await markForeignRegistrationPending(env, cookie, 2, now);
 
   const response = await handleConciergeRequest(verifiedConciergeRequest("find my room", cookie), env, undefined, now);
@@ -11265,7 +11322,7 @@ test("registration-pending concierge allows find-my-room and reminds about passp
 test("registration-pending guests cannot create service, cleaning, luggage or booking alerts", async () => {
   const now = new Date("2026-08-31T07:32:00.000Z");
   const { env, store } = createEnvironment({ GUEST_ACCESS_ENFORCEMENT: "true", OPENAI_API_KEY: "not-used" });
-  const cookie = await syncAndVerifyStay(env, { room: "11", confirmationCode: "HMARRIVAL13", checkInDate: "2026-08-31", checkOutDate: "2026-09-05", now });
+  const cookie = await syncAndVerifyStay(env, { room: "11", confirmationCode: "HMARRIVAL13", checkInDate: "2026-08-31", checkOutDate: "2026-09-30", now });
   await markForeignRegistrationPending(env, cookie, 1, now);
 
   for (const question of [
@@ -12088,4 +12145,243 @@ test("QR code is Bamboo-specific while The House payment-method contract remains
   }), env, "/api/concierge/admin/income", store, "actor", { role: "owner", businessId: HOUSE_FINANCE_BUSINESS_ID });
   assert.equal(house.status, 400);
   assert.equal((await house.json()).error, "invalid_income");
+});
+
+test("registration reminder template matches the approved one-variable body and Received button", () => {
+  const id = "alert_12345678-1234-1234-1234-123456789087";
+  const built = buildWhatsAppTemplatePayload({
+    id,
+    room: "5",
+    alertType: "passport_checkin_partial",
+    severity: "attention",
+    summary: "1 of 2 passports has been uploaded. 1 passport is still missing. Please check with the guest.",
+    bangkokTime: "05 Sep 2026, 20:00",
+    createdAt: "2026-09-05T13:00:00.000Z"
+  }, { label: "Owner 1", phone: "66810000002" }, {
+    WHATSAPP_REGISTRATION_TEMPLATE_NAME: "house_registration_admin_alert_v1"
+  });
+  assert.equal(built.ok, true);
+  assert.equal(built.payload.template.name, "house_registration_admin_alert_v1");
+  assert.equal(built.payload.template.language.code, "en");
+  assert.equal(built.bodyParameterCount, 1);
+  assert.equal(built.payload.template.components.length, 2);
+  const values = built.payload.template.components[0].parameters.map((item) => item.text);
+  assert.deepEqual(values, ["Room 5: 1 of 2 passports has been uploaded. 1 passport is still missing. Please check with the guest."]);
+  assert.equal(built.payload.template.components[1].parameters[0].payload, `HOUSE_ALERT|RECEIVED|${id}`);
+  assert.doesNotMatch(JSON.stringify(built.payload), /passport number|nationality|date of birth|guest name|alert_registration_reference/i);
+});
+
+test("passport received action template uses two approved variables while reminders use one variable plus Received", () => {
+  const id = "alert_12345678-1234-1234-1234-123456789088";
+  const env = {
+    WHATSAPP_STAFF_ACTIONS_ENABLED: "true",
+    WHATSAPP_REGISTRATION_TEMPLATE_NAME: "house_registration_admin_alert_v1",
+    WHATSAPP_REGISTRATION_ACTION_TEMPLATE_NAME: "house_registration_admin_alert_actions_v1"
+  };
+  const recipient = { label: "Owner 1", phone: "66810000002" };
+  const received = buildWhatsAppTemplatePayload({
+    id,
+    room: "5",
+    alertType: "passport_received",
+    severity: "attention",
+    summary: "Passport image received successfully. Upload reference 12345678. Registration progress: 1 of 2 required passports received.",
+    bangkokTime: "05 Sep 2026, 17:45",
+    createdAt: "2026-09-05T10:45:00.000Z"
+  }, recipient, env);
+  assert.equal(received.ok, true);
+  assert.equal(received.payload.template.name, "house_registration_admin_alert_actions_v1");
+  assert.equal(received.bodyParameterCount, 2);
+  assert.deepEqual(received.payload.template.components[0].parameters.map((item) => item.text), [
+    "5",
+    "Passport image received successfully. Upload reference 12345678. Registration progress: 1 of 2 required passports received."
+  ]);
+  assert.equal(received.payload.template.components.length, 3);
+  assert.equal(received.payload.template.components[1].parameters[0].payload, `HOUSE_ALERT|RECEIVED|${id}`);
+  assert.equal(received.payload.template.components[2].parameters[0].payload, `HOUSE_ALERT|TM30|${id}`);
+
+  const reminder = buildWhatsAppTemplatePayload({
+    id,
+    room: "5",
+    alertType: "passport_tm30_overdue",
+    severity: "attention",
+    summary: "TM30 reminder for a stored passport.",
+    bangkokTime: "06 Sep 2026, 18:00",
+    createdAt: "2026-09-06T11:00:00.000Z"
+  }, recipient, env);
+  assert.equal(reminder.payload.template.name, "house_registration_admin_alert_v1");
+  assert.equal(reminder.bodyParameterCount, 1);
+  assert.deepEqual(reminder.payload.template.components[0].parameters.map((item) => item.text), ["Room 5: TM30 reminder for a stored passport."]);
+  assert.equal(reminder.payload.template.components.length, 2);
+  assert.equal(reminder.payload.template.components[1].parameters[0].payload, `HOUSE_ALERT|RECEIVED|${id}`);
+});
+
+test("successful linked passport upload queues one privacy-safe owner alert only after registration progress is saved", async () => {
+  const { env, store } = createEnvironment({
+    GUEST_ACCESS_ENFORCEMENT: "true",
+    WHATSAPP_ACCESS_TOKEN: "token",
+    WHATSAPP_PHONE_NUMBER_ID: "123",
+    WHATSAPP_WEBHOOK_VERIFY_TOKEN: "verify",
+    META_APP_SECRET: "passport-alert-secret",
+    WHATSAPP_REGISTRATION_TEMPLATE_NAME: "house_registration_admin_alert_v1",
+    WHATSAPP_REGISTRATION_ACTION_TEMPLATE_NAME: "house_registration_admin_alert_actions_v1",
+    WHATSAPP_STAFF_ACTIONS_ENABLED: "true",
+    WHATSAPP_ALERT_RECIPIENTS: JSON.stringify({
+      booking: [{ label: "Fah", phone: "+66 63 000 0004" }],
+      emergency: [{ label: "Owner 1", phone: "+66 81 000 0002" }, { label: "Owner 2", phone: "+66 82 000 0003" }]
+    })
+  });
+  const now = new Date("2026-09-05T10:45:00.000Z");
+  const cookie = await syncAndVerifyStay(env, {
+    room: "5",
+    confirmationCode: "HMPASSALERT5",
+    checkInDate: "2026-09-05",
+    checkOutDate: "2026-09-30",
+    now
+  });
+  await markForeignRegistrationPending(env, cookie, 2, now);
+  const linkResponse = await handleStayGuestRequest(new Request("https://guide.example/api/stay/passport-link", {
+    method: "POST",
+    headers: { origin: "https://guide.example", cookie, "content-type": "application/json" },
+    body: "{}"
+  }), env, "/api/stay/passport-link", null, now);
+  const token = new URL((await linkResponse.json()).uploadUrl).hash.replace("#token=", "");
+  const jpeg = new Uint8Array(1024);
+  jpeg.set([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46]);
+  const outbound = [];
+  const pending = [];
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (_url, options) => {
+    outbound.push(JSON.parse(options.body));
+    return new Response(JSON.stringify({ messages: [{ id: `wamid.registration.${outbound.length}` }] }), { status: 200, headers: { "content-type": "application/json" } });
+  };
+  try {
+    const upload = await handlePassportGuestRequest(new Request("https://guide.example/api/passport-upload", {
+      method: "POST",
+      headers: { authorization: `Bearer ${token}`, "content-type": "image/jpeg" },
+      body: jpeg
+    }), env, "/api/passport-upload", { waitUntil: (promise) => pending.push(promise) });
+    const body = await upload.json();
+    assert.equal(upload.status, 200);
+    assert.equal(body.receivedPassports, 1);
+    assert.equal(body.requiredPassports, 2);
+    await Promise.all(pending);
+    assert.equal(outbound.length, 2);
+    assert.deepEqual(outbound.map((item) => item.to).sort(), ["66810000002", "66820000003"]);
+    assert.equal(outbound.some((item) => item.to === "66630000004"), false, "Fah must not receive passport alerts");
+    for (const payload of outbound) {
+      assert.equal(payload.template.name, "house_registration_admin_alert_actions_v1");
+      assert.deepEqual(payload.template.components[0].parameters.map((item) => item.text), [
+        "5",
+        "1 of 2 required passports has been uploaded."
+      ]);
+      assert.equal(payload.template.components[1].parameters[0].payload, `HOUSE_ALERT|RECEIVED|${store.alerts.at(-1).id}`);
+      assert.equal(payload.template.components[2].parameters[0].payload, `HOUSE_ALERT|TM30|${store.alerts.at(-1).id}`);
+    }
+    assert.equal(store.alerts.at(-1).recipientGroup, "owners");
+    assert.equal(store.alerts.at(-1).alertType, "passport_received");
+    const passportId = store.passportRecords.find((item) => item.status === "uploaded" && item.documentType === "passport")?.id;
+    const alertId = store.alerts.at(-1).id;
+    assert.equal(store.passportAlertLinks.get(alertId), passportId);
+    assert.equal(store.alerts.at(-1).summary, "1 of 2 required passports has been uploaded.");
+    assert.doesNotMatch(JSON.stringify(store.alerts.at(-1)), /HMPASSALERT5|Fah|66630000004/);
+
+    await handleWhatsAppWebhook(await signedWhatsAppButton(env, "66630000004", `HOUSE_ALERT|TM30|${alertId}`, "TM30 uploaded"), env);
+    assert.equal(store.alerts.at(-1).status, "open", "Fah is not an owner and cannot mark TM30");
+    assert.equal(store.passportRecords.find((item) => item.id === passportId)?.tm30RegisteredAt || "", "");
+
+    await handleWhatsAppWebhook(await signedWhatsAppButton(env, "66810000002", `HOUSE_ALERT|RECEIVED|${alertId}`, "Received"), env);
+    assert.equal(store.alerts.at(-1).status, "acknowledged");
+    assert.equal(store.passportRecords.find((item) => item.id === passportId)?.tm30RegisteredAt || "", "");
+
+    await handleWhatsAppWebhook(await signedWhatsAppButton(env, "66820000003", `HOUSE_ALERT|TM30|${alertId}`, "TM30 uploaded"), env);
+    assert.equal(store.alerts.at(-1).status, "resolved");
+    assert.ok(store.passportRecords.find((item) => item.id === passportId)?.tm30RegisteredAt);
+    assert.ok(store.adminAudit.some((item) => item.action === "passport_tm30_registered" && item.reference === `passport:${passportId}`));
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("20:00 check-in reminder distinguishes zero and partial passport progress while TM30 reminder sends once", async () => {
+  const { env, store } = createEnvironment({
+    WHATSAPP_ACCESS_TOKEN: "token",
+    WHATSAPP_PHONE_NUMBER_ID: "123",
+    WHATSAPP_WEBHOOK_VERIFY_TOKEN: "verify",
+    META_APP_SECRET: "registration-reminder-secret",
+    WHATSAPP_REGISTRATION_TEMPLATE_NAME: "house_registration_admin_alert_v1",
+    WHATSAPP_ALERT_RECIPIENTS: JSON.stringify({
+      emergency: [{ label: "Owner 1", phone: "+66 81 000 0002" }, { label: "Owner 2", phone: "+66 82 000 0003" }]
+    })
+  });
+  const checkInReservation = { id: `stay_${crypto.randomUUID()}`, provider: "airbnb", room: "3", checkInDate: "2026-09-05", checkOutDate: "2026-09-08", status: "confirmed" };
+  const partialReservation = { id: `stay_${crypto.randomUUID()}`, provider: "airbnb", room: "4", checkInDate: "2026-09-05", checkOutDate: "2026-09-08", status: "confirmed" };
+  store.stayReservations.push(checkInReservation, partialReservation);
+  store.registrationStatuses.set(checkInReservation.id, { guestType: "foreign", requiredPassports: 1, receivedPassports: 0, status: "passport_pending" });
+  store.registrationStatuses.set(partialReservation.id, { guestType: "foreign", requiredPassports: 2, receivedPassports: 1, status: "passport_pending" });
+  store.passportRecords.push({
+    id: `pass_${crypto.randomUUID()}`,
+    reservationId: partialReservation.id,
+    room: "4",
+    documentType: "passport",
+    status: "uploaded",
+    uploadedAt: "2026-09-05T08:00:00.000Z",
+    tm30RegisteredAt: ""
+  });
+  const overduePassport = {
+    id: `pass_${crypto.randomUUID()}`,
+    reservationId: `stay_${crypto.randomUUID()}`,
+    room: "8",
+    documentType: "passport",
+    status: "uploaded",
+    uploadedAt: "2026-09-04T11:30:00.000Z",
+    tm30RegisteredAt: ""
+  };
+  store.passportRecords.push(overduePassport);
+
+  const outbound = [];
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (_url, options) => {
+    outbound.push(JSON.parse(options.body));
+    return new Response(JSON.stringify({ messages: [{ id: `wamid.reminder.${outbound.length}` }] }), { status: 200, headers: { "content-type": "application/json" } });
+  };
+  try {
+    const first = await processRegistrationReminderAlerts(env, new Date("2026-09-05T13:00:00.000Z"));
+    assert.deepEqual(first, { checkInDue: 2, checkInSent: 2, tm30Due: 1, tm30Sent: 1 });
+    assert.equal(outbound.length, 6);
+    const recentAlerts = store.alerts.slice(-3);
+    const types = recentAlerts.map((item) => item.alertType).sort();
+    assert.deepEqual(types, ["passport_checkin_missing", "passport_checkin_partial", "passport_tm30_overdue"]);
+    const zeroReminder = recentAlerts.find((item) => item.room === "3" && item.alertType === "passport_checkin_missing");
+    const partialReminder = recentAlerts.find((item) => item.room === "4" && item.alertType === "passport_checkin_partial");
+    assert.equal(zeroReminder?.summary, "No passports have been uploaded yet. 1 passport is still missing. Please check with the guest.");
+    assert.equal(partialReminder?.summary, "1 of 2 passports has been uploaded. 1 passport is still missing. Please check with the guest.");
+    assert.doesNotMatch(partialReminder?.summary || "", /No passports have been uploaded/i);
+
+    const reminderPayloads = outbound.filter((item) => item.template.name === "house_registration_admin_alert_v1");
+    assert.equal(reminderPayloads.length, 6);
+    for (const payload of reminderPayloads) {
+      assert.equal(payload.template.components[0].parameters.length, 1);
+      assert.match(payload.template.components[0].parameters[0].text, /^Room /);
+      assert.equal(payload.template.components.length, 2);
+      assert.match(payload.template.components[1].parameters[0].payload, /^HOUSE_ALERT\|RECEIVED\|alert_/);
+    }
+
+    const second = await processRegistrationReminderAlerts(env, new Date("2026-09-05T14:00:00.000Z"));
+    assert.deepEqual(second, { checkInDue: 0, checkInSent: 0, tm30Due: 0, tm30Sent: 0 });
+    assert.equal(outbound.length, 6, "delivered reminders must not repeat");
+    assert.ok(store.checkinReminderState.get(checkInReservation.id).sentAt);
+    assert.ok(store.checkinReminderState.get(partialReservation.id).sentAt);
+    assert.ok(overduePassport.tm30ReminderSentAt);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("hourly registration reminder cron is present while existing escalation and cleanup crons remain", async () => {
+  const [indexSource, config] = await Promise.all([
+    readFile(new URL("../src/index.js", import.meta.url), "utf8"),
+    readFile(new URL("../wrangler.jsonc", import.meta.url), "utf8")
+  ]);
+  assert.match(indexSource, /controller\.cron === "0 \* \* \* \*"[\s\S]*processRegistrationReminderAlerts/);
+  assert.match(config, /"crons": \["\*\/1 \* \* \* \*", "0 \* \* \* \*", "17 19 \* \* \*"\]/);
 });

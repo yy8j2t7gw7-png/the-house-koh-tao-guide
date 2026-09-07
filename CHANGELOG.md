@@ -4,6 +4,7 @@ All notable changes to The House – Koh Tao guest guide are recorded here.
 
 ## v5.11.45 — Fix Unstable Version
 
+- Aligns the final registration Meta templates to the owner-created production contract: reminder template uses one BODY variable plus `Received`; immediate passport-received template uses two BODY variables plus `Received` / `TM30 uploaded`. Reminder wording is human-readable and privacy-safe, and the exact-passport TM30 action remains server-side linked and owner-authorized.
 - Rebuilt directly from stable v5.11.42; later unstable passport/registration branches are excluded.
 - Airbnb host mail is checked every 5 minutes; trustworthy active-listing + HM-code + stay-date records can immediately create/update the protected stay with `complete:false` without waiting for iCal.
 - All ten active Airbnb calendars (Rooms 1–6 and 8–11) reconcile at least hourly; Room 7 remains excluded from Airbnb synchronization; the 24-hour full audit remains the only cancellation-capable complete-feed path.

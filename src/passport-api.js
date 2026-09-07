@@ -1,3 +1,5 @@
+import { notifyPassportUploadedOwners } from "./registration-alerts.js";
+
 const ROOM_OPTIONS = new Set(["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11"]);
 const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 const MIN_UPLOAD_BYTES = 512;
@@ -164,7 +166,7 @@ function privateDownload(object, record) {
   return new Response(object.body, { status: 200, headers });
 }
 
-export async function handlePassportGuestRequest(request, env, path) {
+export async function handlePassportGuestRequest(request, env, path, ctx) {
   if (!configured(env)) return json({ error: "passport_upload_unavailable" }, 503);
   const store = getStore(env);
   if (!store) return json({ error: "passport_upload_unavailable" }, 503);
@@ -239,6 +241,17 @@ export async function handlePassportGuestRequest(request, env, path) {
       registration = await store.markRegistrationFromDocument(completed.id, uploadedAt).catch(() => null);
     } else if (typeof store.markRegistrationFromPassport === "function") {
       registration = await store.markRegistrationFromPassport(completed.id, uploadedAt).catch(() => null);
+    }
+    if (documentType === "passport" && registration?.ok) {
+      const notification = notifyPassportUploadedOwners({
+        env,
+        room: completed.room,
+        passportId: completed.id,
+        requiredPassports: registration.requiredPassports,
+        receivedPassports: registration.receivedPassports,
+        now: new Date(uploadedAt)
+      }).catch(() => null);
+      if (ctx?.waitUntil) ctx.waitUntil(notification);
     }
     return json({
       ok: true,

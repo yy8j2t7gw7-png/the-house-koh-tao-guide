@@ -1,3 +1,9 @@
+# v5.11.52 — Canonical Reservation Model
+
+- Added a provider-neutral internal reservation model for existing Airbnb, direct and manual/walk-in stays.
+- Centralized reservation source capabilities and sync normalization.
+- Preserved all current The House production behavior; no new booking platform is enabled.
+
 # v5.11.51 — Editable Saved Expenses
 
 - Adds owner-only **Edit expense** to The House and Bamboo saved-expense history, including bills originally entered by staff.

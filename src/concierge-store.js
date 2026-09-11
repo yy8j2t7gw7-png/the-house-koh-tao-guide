@@ -1,4 +1,10 @@
 import { DurableObject } from "cloudflare:workers";
+import {
+  canonicalReservationFromStorage,
+  legacyStayReservationView,
+  normalizeReservationSyncPayload,
+  reservationSourceCapabilities
+} from "./reservation-model.js";
 const HOUSE_FINANCE_BUSINESS_ID = "the-house-koh-tao";
 
 function rows(cursor) {
@@ -1664,18 +1670,15 @@ export class ConciergeStore extends DurableObject {
   }
 
   async syncStayReservations(payload) {
-    const now = cleanText(payload.syncedAt, 40) || new Date().toISOString();
-    const room = cleanText(payload.room, 4);
-    const listingId = cleanText(payload.listingId, 32);
-    const provider = cleanText(payload.provider || "airbnb", 24);
-    const syncId = cleanText(payload.syncId, 100);
-    const records = Array.isArray(payload.records) ? payload.records.slice(0, 250) : [];
+    const normalized = normalizeReservationSyncPayload(payload);
+    const now = normalized.syncedAt || new Date().toISOString();
+    const { room, listingId, provider, syncId, records } = normalized;
     let upserted = 0;
 
     for (const record of records) {
-      const codeHash = cleanText(record.confirmationCodeHash, 100);
-      const checkInDate = cleanText(record.checkInDate, 10);
-      const checkOutDate = cleanText(record.checkOutDate, 10);
+      const codeHash = record.confirmationCodeHash;
+      const checkInDate = record.checkInDate;
+      const checkOutDate = record.checkOutDate;
       if (!codeHash || !/^\d{4}-\d{2}-\d{2}$/.test(checkInDate) || !/^\d{4}-\d{2}-\d{2}$/.test(checkOutDate)) continue;
       const existing = rows(this.ctx.storage.sql.exec(
         "SELECT id, created_at AS createdAt FROM stay_reservations WHERE confirmation_code_hash = ? LIMIT 1",
@@ -1683,7 +1686,7 @@ export class ConciergeStore extends DurableObject {
       ))[0];
       const id = existing?.id || `stay_${crypto.randomUUID()}`;
       const createdAt = existing?.createdAt || now;
-      const status = record.status === "cancelled" ? "cancelled" : "confirmed";
+      const status = record.status;
       this.ctx.storage.sql.exec(
         `INSERT INTO stay_reservations
          (id, provider, listing_id, room, confirmation_code_hash, guest_first_name, check_in_date,
@@ -1705,11 +1708,11 @@ export class ConciergeStore extends DurableObject {
         listingId,
         room,
         codeHash,
-        cleanText(record.guestFirstName, 40),
+        record.guestFirstName,
         checkInDate,
         checkOutDate,
         status,
-        cleanText(record.sourceRefHash, 100),
+        record.sourceRefHash,
         syncId,
         createdAt,
         now
@@ -1717,7 +1720,7 @@ export class ConciergeStore extends DurableObject {
       upserted += 1;
     }
 
-    if (payload.complete === true) {
+    if (normalized.complete === true) {
       this.ctx.storage.sql.exec(
         `UPDATE stay_reservations
          SET status = 'cancelled', updated_at = ?
@@ -1740,8 +1743,8 @@ export class ConciergeStore extends DurableObject {
     return { ok: true, upserted };
   }
 
-  async getStayReservationByCodeHash(codeHash, room) {
-    return rows(this.ctx.storage.sql.exec(
+  async getCanonicalStayReservationByCodeHash(codeHash, room) {
+    const row = rows(this.ctx.storage.sql.exec(
       `SELECT id, provider, listing_id AS listingId, room, guest_first_name AS guestFirstName,
               check_in_date AS checkInDate,
               CASE WHEN o.check_out_date > r.check_out_date THEN o.check_out_date ELSE r.check_out_date END AS checkOutDate,
@@ -1753,6 +1756,12 @@ export class ConciergeStore extends DurableObject {
       cleanText(codeHash, 100),
       cleanText(room, 4)
     ))[0] || null;
+    return row ? canonicalReservationFromStorage(row) : null;
+  }
+
+  async getStayReservationByCodeHash(codeHash, room) {
+    const canonical = await this.getCanonicalStayReservationByCodeHash(codeHash, room);
+    return canonical ? legacyStayReservationView(canonical) : null;
   }
 
   async createVerifiedStaySession(record) {
@@ -2737,7 +2746,7 @@ export class ConciergeStore extends DurableObject {
       id
     ))[0] || null;
     if (!reservation) return { ok: false, error: "reservation_not_found" };
-    if (!["direct", "manual"].includes(reservation.provider)) return { ok: false, error: "owner_managed_stay_required" };
+    if (!reservationSourceCapabilities(reservation.provider).ownerManaged) return { ok: false, error: "owner_managed_stay_required" };
     if (reservation.status !== "confirmed") return { ok: false, error: "reservation_not_active" };
     this.ctx.storage.sql.exec("UPDATE stay_reservations SET status = 'cancelled', updated_at = ? WHERE id = ?", now, id);
     this.ctx.storage.sql.exec("UPDATE verified_stay_sessions SET revoked_at = ? WHERE reservation_id = ? AND revoked_at = ''", now, id);

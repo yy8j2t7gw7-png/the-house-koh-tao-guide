@@ -43,6 +43,12 @@ import {
 } from "../src/whatsapp-alerts.js";
 import { servePublicLegalPage } from "../src/public-legal.js";
 import { processHousekeepingTurnovers } from "../src/housekeeping-operations.js";
+import {
+  canonicalReservationFromStorage,
+  legacyStayReservationView,
+  normalizeReservationSyncPayload,
+  reservationSourceCapabilities
+} from "../src/reservation-model.js";
 import knowledge from "../public/data/concierge-knowledge.json" with { type: "json" };
 import activities from "../public/data/activities.json" with { type: "json" };
 import bars from "../public/data/bars.json" with { type: "json" };
@@ -3386,7 +3392,7 @@ test("guest localization supports seven languages and keeps the owner dashboard 
   assert.doesNotMatch(admin, /src="\/i18n\.js"/);
   assert.match(runtime, /exploreContentDeferred/);
   assert.match(runtime, /element\.closest\("\.section,\.footer"\)/);
-  assert.match(runtime, /houseGuideTranslations:v5\.11\.51:/);
+  assert.match(runtime, /houseGuideTranslations:v5\.11\.52:/);
   assert.match(runtime, /MAX_REQUEST_RETRIES = 2/);
   assert.match(runtime, /let flushRunning = false/);
 });
@@ -8593,9 +8599,14 @@ test("public legal documents expose no operational credentials or protected secr
 
 test("Durable Object SQLite schema initializes every operational table used by admin and scheduled jobs", async () => {
   const { DatabaseSync } = await import("node:sqlite");
-  const source = await readFile(new URL("../src/concierge-store.js", import.meta.url), "utf8");
+  const [source, reservationModelSource] = await Promise.all([
+    readFile(new URL("../src/concierge-store.js", import.meta.url), "utf8"),
+    readFile(new URL("../src/reservation-model.js", import.meta.url), "utf8")
+  ]);
+  const inlineReservationModel = reservationModelSource.replace(/^export /gm, "");
   const executable = source
     .replace('import { DurableObject } from "cloudflare:workers";', "class DurableObject { constructor(ctx, env) { this.ctx = ctx; this.env = env; } }")
+    .replace(/import \{[\s\S]*?\} from "\.\/reservation-model\.js";/, inlineReservationModel)
     .replace("export class ConciergeStore", "class ConciergeStore")
     .concat("\nexport { ConciergeStore };\n");
   const moduleUrl = `data:text/javascript;base64,${Buffer.from(executable).toString("base64")}`;
@@ -13439,3 +13450,84 @@ test("v5.11.50 housekeeping Received stays with Su while Room ready notifies own
     globalThis.fetch = originalFetch;
   }
 });
+
+test("v5.11.52 canonical reservation model preserves current House behavior while normalizing source shape", () => {
+  const currentSources = [
+    { provider: "airbnb", listingId: "1376393324098439141", ownerManaged: false, synchronized: true },
+    { provider: "direct", listingId: "house-direct-7", ownerManaged: true, synchronized: false },
+    { provider: "manual", listingId: "1376393324098439141", ownerManaged: true, synchronized: false }
+  ];
+
+  for (const source of currentSources) {
+    const canonical = canonicalReservationFromStorage({
+      id: "stay_model-test-12345678901234567890",
+      provider: source.provider,
+      listingId: source.listingId,
+      room: "7",
+      guestFirstName: "Alex",
+      checkInDate: "2027-10-01",
+      checkOutDate: "2027-10-04",
+      status: "confirmed",
+      updatedAt: "2027-09-30T12:00:00.000Z"
+    });
+    assert.equal(canonical.source.provider, source.provider);
+    assert.equal(canonical.source.listingId, source.listingId);
+    assert.equal(canonical.room, "7");
+    assert.deepEqual(canonical.guest, { firstName: "Alex" });
+    assert.deepEqual(canonical.stay, {
+      checkInDate: "2027-10-01",
+      checkOutDate: "2027-10-04",
+      status: "confirmed"
+    });
+    assert.equal(canonical.capabilities.ownerManaged, source.ownerManaged);
+    assert.equal(canonical.capabilities.synchronized, source.synchronized);
+
+    assert.deepEqual(legacyStayReservationView(canonical), {
+      id: "stay_model-test-12345678901234567890",
+      provider: source.provider,
+      listingId: source.listingId,
+      room: "7",
+      guestFirstName: "Alex",
+      checkInDate: "2027-10-01",
+      checkOutDate: "2027-10-04",
+      status: "confirmed",
+      updatedAt: "2027-09-30T12:00:00.000Z"
+    });
+  }
+});
+
+test("v5.11.52 reservation sync normalization is provider-agnostic without enabling any new live booking channel", () => {
+  const normalized = normalizeReservationSyncPayload({
+    provider: "future-pms",
+    listingId: "future-property-room-2",
+    room: "2",
+    syncId: "sync-future-demo",
+    complete: true,
+    syncedAt: "2027-10-01T00:00:00.000Z",
+    records: [{
+      confirmationCodeHash: "hash_demo",
+      guestFirstName: "Morgan",
+      checkInDate: "2027-10-02",
+      checkOutDate: "2027-10-05",
+      status: "confirmed",
+      sourceRefHash: "source_demo"
+    }]
+  });
+  assert.equal(normalized.provider, "future-pms");
+  assert.equal(normalized.complete, true);
+  assert.deepEqual(normalized.records[0], {
+    confirmationCodeHash: "hash_demo",
+    guestFirstName: "Morgan",
+    checkInDate: "2027-10-02",
+    checkOutDate: "2027-10-05",
+    status: "confirmed",
+    sourceRefHash: "source_demo"
+  });
+  assert.deepEqual(reservationSourceCapabilities("future-pms"), {
+    provider: "future-pms",
+    ownerManaged: false,
+    synchronized: false,
+    directConfirmationCode: false
+  });
+});
+

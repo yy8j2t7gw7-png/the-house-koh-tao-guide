@@ -1,3 +1,12 @@
+# v5.11.49 — Calendar & Operations Dashboard
+
+- Added a protected Owner Admin operations overview for today's arrivals, departures, housekeeping and room readiness.
+- Added room-by-room status cards for Rooms 1–11 using the existing reservation/provider model.
+- Added a 14-day room calendar covering Airbnb, direct/walk-in, manual reservations and effective extensions.
+- Added existing approved late-checkout timing to the admin operations data so departures display the correct time.
+- Kept all existing guest, registration, WhatsApp, reservation-write, Finance, lost-key and sync behavior unchanged.
+- Full automated suite: 271 passed / 0 failed before final package validation.
+
 # v5.11.48 — Reversible Guest-Type Selection
 
 - Adds **Selected the wrong guest type? Change selection** for verified guests who accidentally choose Thai-only vs foreign/mixed registration.

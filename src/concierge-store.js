@@ -2770,11 +2770,16 @@ export class ConciergeStore extends DurableObject {
               COALESCE(q.status, g.status, 'not_started') AS registrationStatus,
               COALESCE(q.guest_type, '') AS guestType,
               COALESCE(q.required_passports, 0) AS requiredPassports,
-              COALESCE(q.received_passports, 0) AS receivedPassports
+              COALESCE(q.received_passports, 0) AS receivedPassports,
+              COALESCE(l.checkout_minutes, 0) AS lateCheckoutMinutes,
+              COALESCE(l.checkout_time, '') AS lateCheckoutTime,
+              COALESCE(l.fee_thb, 0) AS lateCheckoutFeeThb,
+              COALESCE(l.approved_at, '') AS lateCheckoutApprovedAt
        FROM stay_reservations r
        LEFT JOIN stay_checkout_overrides o ON o.reservation_id = r.id
        LEFT JOIN stay_registration_status g ON g.reservation_id = r.id
        LEFT JOIN stay_registration_requirements q ON q.reservation_id = r.id
+       LEFT JOIN stay_late_checkout_approvals l ON l.reservation_id = r.id
        WHERE r.status = 'confirmed'
          AND (CASE WHEN o.check_out_date > r.check_out_date THEN o.check_out_date ELSE r.check_out_date END) >= date('now', '-1 day')
        ORDER BY r.check_in_date ASC, r.room ASC LIMIT 250`

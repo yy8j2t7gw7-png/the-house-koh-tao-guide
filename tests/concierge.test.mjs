@@ -3306,8 +3306,8 @@ test("owner dashboard major sections are independently collapsible, persistent a
     readFile(new URL("../public/concierge-admin.css", import.meta.url), "utf8")
   ]);
   const sections = [...html.matchAll(/<details class="concierge-admin-section" data-admin-section="([^"]+)"( open)?>/g)];
-  assert.deepEqual(sections.map((match) => match[1]), ["stays", "finance", "alerts", "maintenance", "passports", "learning", "approved", "recent"]);
-  assert.deepEqual(sections.filter((match) => match[2]).map((match) => match[1]), ["stays", "alerts"]);
+  assert.deepEqual(sections.map((match) => match[1]), ["operations", "stays", "finance", "alerts", "maintenance", "passports", "learning", "approved", "recent"]);
+  assert.deepEqual(sections.filter((match) => match[2]).map((match) => match[1]), ["operations", "stays", "alerts"]);
   assert.equal((html.match(/<summary class="concierge-admin-section-head">/g) || []).length, sections.length);
   assert.equal((html.match(/data-section-count/g) || []).length, sections.length);
   assert.equal((html.match(/data-section-state/g) || []).length, sections.length);
@@ -3376,7 +3376,7 @@ test("guest localization supports seven languages and keeps the owner dashboard 
   assert.doesNotMatch(admin, /src="\/i18n\.js"/);
   assert.match(runtime, /exploreContentDeferred/);
   assert.match(runtime, /element\.closest\("\.section,\.footer"\)/);
-  assert.match(runtime, /houseGuideTranslations:v5\.11\.48:/);
+  assert.match(runtime, /houseGuideTranslations:v5\.11\.49:/);
   assert.match(runtime, /MAX_REQUEST_RETRIES = 2/);
   assert.match(runtime, /let flushRunning = false/);
 });
@@ -8941,6 +8941,46 @@ test("owner operations separates active and upcoming stays and labels manual rec
   assert.match(script, /function maintenanceReference\(room, createdAt\)/);
   assert.match(script, /item\.checkOutDate === today && nowMinutes < 660/);
   assert.doesNotMatch(script, /Reference \$\{item\.id\}/);
+});
+
+test("Calendar & Operations dashboard combines room, reservation, housekeeping and stay-timing context without adding a new write workflow", async () => {
+  const [html, script, styles, storeSource] = await Promise.all([
+    readFile(new URL("../public/concierge-admin.html", import.meta.url), "utf8"),
+    readFile(new URL("../public/concierge-admin.js", import.meta.url), "utf8"),
+    readFile(new URL("../public/concierge-admin.css", import.meta.url), "utf8"),
+    readFile(new URL("../src/concierge-store.js", import.meta.url), "utf8")
+  ]);
+  assert.match(html, /data-admin-section="operations" open/);
+  assert.match(html, /<h2>Calendar &amp; Operations<\/h2>/);
+  assert.match(html, /id="todayOperationsSummary"/);
+  assert.match(html, /id="todayOperationsRooms"/);
+  assert.match(html, /id="todayHousekeepingTasks"/);
+  assert.match(html, /id="operationsCalendar"/);
+  assert.match(html, /14-day room calendar/);
+
+  assert.match(script, /function renderOperationsDashboard\(data = \{\}\)/);
+  assert.match(script, /Arrivals today/);
+  assert.match(script, /Departures today/);
+  assert.match(script, /Housekeeping open/);
+  assert.match(script, /Rooms marked ready/);
+  assert.match(script, /for \(let roomNumber = 1; roomNumber <= 11; roomNumber \+= 1\)/);
+  assert.match(script, /provider === "direct"/);
+  assert.match(script, /provider === "manual"/);
+  assert.match(script, /lateCheckoutMinutes/);
+  assert.match(script, /lateCheckoutTime/);
+  assert.match(script, /Array\.from\(\{ length: 14 \}/);
+  assert.match(script, /renderOperationsDashboard\(data\.stayOperations \|\| \{\}\)/);
+
+  assert.match(storeSource, /LEFT JOIN stay_late_checkout_approvals l ON l\.reservation_id = r\.id/);
+  assert.match(storeSource, /AS lateCheckoutMinutes/);
+  assert.match(storeSource, /AS lateCheckoutTime/);
+  assert.match(styles, /\.concierge-admin-room-board/);
+  assert.match(styles, /\.concierge-admin-operations-calendar/);
+
+  // Existing operational write controls stay in the established Guest stays section.
+  assert.match(html, /id="manualStayForm"/);
+  assert.match(html, /id="directStayForm"/);
+  assert.match(html, /id="roomHousekeepingStatuses"/);
 });
 
 test("verified guests can report routine and critical room problems with protected routing", async () => {

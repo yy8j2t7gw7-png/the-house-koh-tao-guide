@@ -75,14 +75,6 @@ No intentional change is made to:
 - The House Finance or Bamboo Finance;
 - maintenance, luggage, booking, towel, cleaning-request or emergency workflows.
 
-### Validation completed in the hosted environment
-
-- Full automated regression suite: **270 passed / 0 failed**.
-- JavaScript/MJS syntax validation: **43 files passed**.
-- `airbnb-sync/Code.gs` passed JavaScript syntax validation through an unchanged temporary `.js` copy.
-- JSON/JSONC parsing: **13 files passed**.
-- No Wrangler dry-run is claimed in the hosted environment.
-
 ### Required production checks after deployment
 
 1. Verified guest selects Thai-only, then clicks **Selected the wrong guest type? Change selection** before uploading Thai ID — original unused Thai-ID link is no longer usable and the guest can choose foreign/mixed.

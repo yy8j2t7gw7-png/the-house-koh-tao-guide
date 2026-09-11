@@ -140,6 +140,40 @@ tr:last-child td{border-bottom:0}
 .concierge-admin-config-status.is-ready{background:#e3f4eb;color:#1e654c}
 .concierge-admin-config-status.is-missing{background:var(--admin-attention-soft);color:#8b4d15}
 
+.concierge-admin-section[data-admin-section="operations"]>p{margin-bottom:12px}
+.concierge-admin-operations-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;margin-bottom:14px}
+.concierge-admin-operations-summary .concierge-admin-stat{box-shadow:none}
+.concierge-admin-room-board{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}
+.concierge-admin-room-card{min-width:0;padding:13px;border:1px solid var(--admin-line);border-radius:13px;background:var(--admin-soft)}
+.concierge-admin-room-card-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.concierge-admin-room-card-head strong{color:var(--admin-ink);font-size:15px}
+.concierge-admin-room-state{display:inline-flex;align-items:center;min-height:24px;padding:2px 7px;border:1px solid var(--admin-line);border-radius:999px;background:#fff;color:var(--admin-muted);font-size:9px;font-weight:900;letter-spacing:.035em;text-transform:uppercase;white-space:nowrap}
+.concierge-admin-room-state.is-arrival,.concierge-admin-room-state.is-turnover{border-color:#d6c49c;background:var(--admin-attention-soft);color:#7a4d12}
+.concierge-admin-room-state.is-departure{border-color:#d8c1b5;background:#fff7f2;color:#80543e}
+.concierge-admin-room-state.is-occupied{border-color:#bfd1c9;background:#edf8f2;color:#2d6650}
+.concierge-admin-room-card-details{display:grid;gap:3px;margin-top:9px}
+.concierge-admin-room-card-details span{color:var(--admin-muted);font-size:11px;line-height:1.4;overflow-wrap:anywhere}
+.concierge-admin-room-housekeeping{display:flex;flex-wrap:wrap;align-items:center;gap:5px;margin-top:10px;padding-top:9px;border-top:1px solid var(--admin-line)}
+.concierge-admin-housekeeping-state,.concierge-admin-room-task{display:inline-flex;align-items:center;min-height:23px;padding:2px 7px;border-radius:999px;font-size:9px;font-weight:850;line-height:1.25}
+.concierge-admin-housekeeping-state{border:1px solid var(--admin-line);background:#fff;color:var(--admin-muted)}
+.concierge-admin-housekeeping-state.is-ready{border-color:#b7d5c8;background:#edf8f2;color:#2d6650}
+.concierge-admin-housekeeping-state.is-dirty{border-color:#d8aaa6;background:var(--admin-danger-soft);color:var(--admin-danger)}
+.concierge-admin-housekeeping-state.is-clean{border-color:#c8d9e0;background:#f1f7f9;color:#3e6170}
+.concierge-admin-room-task{background:#fff;color:var(--admin-attention)}
+.concierge-admin-operations-note{margin:0 0 9px;color:var(--admin-muted);font-size:11px;line-height:1.45}
+.concierge-admin-calendar-wrap{overflow:auto;border:1px solid var(--admin-line);border-radius:12px;background:#fff}
+.concierge-admin-operations-calendar{min-width:1180px;table-layout:fixed}
+.concierge-admin-operations-calendar th,.concierge-admin-operations-calendar td{width:72px;min-width:72px;padding:7px 5px;text-align:center}
+.concierge-admin-operations-calendar thead th{white-space:nowrap}
+.concierge-admin-operations-calendar .concierge-admin-calendar-room{position:sticky;left:0;z-index:2;width:76px;min-width:76px;background:var(--admin-soft);color:var(--admin-ink);text-align:left}
+.concierge-admin-operations-calendar thead .concierge-admin-calendar-room{z-index:3}
+.concierge-admin-operations-calendar th.is-today,.concierge-admin-operations-calendar td.is-today{box-shadow:inset 0 0 0 2px rgba(47,111,95,.2)}
+.concierge-admin-operations-calendar td.is-stay{background:#f4f8f6}
+.concierge-admin-operations-calendar td.is-arrival{background:#fffaf0}
+.concierge-admin-operations-calendar td.is-departure{background:#fff8f4}
+.concierge-admin-operations-calendar td.is-turnover{background:#fff3dc}
+.concierge-admin-calendar-tag{display:block;margin:1px auto;padding:2px 3px;border-radius:5px;color:var(--admin-ink);font-size:8px;font-weight:900;line-height:1.25;white-space:normal;overflow-wrap:anywhere}
+
 .concierge-admin-alert{padding:15px;border:1px solid var(--admin-line);border-left:4px solid var(--admin-attention);border-radius:13px;background:#fff}
 .concierge-admin-alert.is-critical,.concierge-admin-alert.is-urgent{border-color:#ddb0ac;border-left-color:var(--admin-danger);background:#fffafa}
 .concierge-admin-alert.is-attention{border-left-color:var(--admin-attention)}
@@ -166,6 +200,7 @@ tr:last-child td{border-bottom:0}
 
 @media(max-width:980px){
   .concierge-admin-stats{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .concierge-admin-room-board{grid-template-columns:repeat(2,minmax(0,1fr))}
   .concierge-admin-registration-form{grid-template-columns:repeat(2,minmax(0,1fr))}
   .concierge-admin-registration-form>button{align-self:end}
   .concierge-admin-diagnostic-grid,.concierge-admin-diagnostic-card .concierge-admin-diagnostic-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
@@ -179,6 +214,8 @@ tr:last-child td{border-bottom:0}
   .concierge-admin-login-row,.concierge-admin-toolbar,.concierge-admin-approved-item{align-items:stretch;flex-direction:column}
   .concierge-admin-toolbar-actions{justify-content:flex-start}
   .concierge-admin-stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .concierge-admin-operations-summary{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .concierge-admin-room-board{grid-template-columns:1fr}
   .concierge-admin-registration-form,.concierge-admin-direct-form,.concierge-admin-registration-columns{grid-template-columns:1fr}
   .concierge-admin-extension{align-items:stretch;flex-direction:column}
   .concierge-admin-fields{grid-template-columns:1fr}

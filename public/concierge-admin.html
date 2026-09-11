@@ -67,6 +67,31 @@
 
       <section class="concierge-admin-stats" id="adminStats" aria-label="Concierge statistics"></section>
 
+      <details class="concierge-admin-section" data-admin-section="operations" open>
+        <summary class="concierge-admin-section-head">
+          <div>
+            <p class="concierge-admin-kicker">Today at The House</p>
+            <h2>Calendar &amp; Operations</h2>
+          </div>
+          <span class="concierge-admin-section-summary"><span class="concierge-admin-section-count" data-section-count>0</span><span data-section-state>Expanded</span><span class="concierge-admin-section-chevron" aria-hidden="true"></span></span>
+        </summary>
+        <p>A live owner view of today’s rooms, arrivals, departures and housekeeping, using the same Airbnb, direct/walk-in, manual and extension records that control guest access.</p>
+        <div id="todayOperationsSummary" class="concierge-admin-operations-summary" aria-label="Today's operations summary"></div>
+        <div class="concierge-admin-operations-block">
+          <h3>Rooms today</h3>
+          <div id="todayOperationsRooms" class="concierge-admin-room-board"></div>
+        </div>
+        <div class="concierge-admin-operations-block">
+          <h3>Housekeeping today</h3>
+          <div id="todayHousekeepingTasks" class="concierge-admin-queue"></div>
+        </div>
+        <div class="concierge-admin-operations-block">
+          <h3>14-day room calendar</h3>
+          <p class="concierge-admin-operations-note">Shows confirmed stays from every provider. Same-day checkout and check-in can appear together in one room.</p>
+          <div id="operationsCalendar" class="concierge-admin-calendar-wrap" aria-label="14-day room calendar"></div>
+        </div>
+      </details>
+
       <details class="concierge-admin-section" data-admin-section="stays" open>
         <summary class="concierge-admin-section-head">
           <div>

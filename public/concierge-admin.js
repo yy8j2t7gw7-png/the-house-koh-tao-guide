@@ -40,6 +40,10 @@
   const activeStayReservations = document.getElementById("activeStayReservations");
   const upcomingStayReservations = document.getElementById("upcomingStayReservations");
   const roomHousekeepingStatuses = document.getElementById("roomHousekeepingStatuses");
+  const todayOperationsSummary = document.getElementById("todayOperationsSummary");
+  const todayOperationsRooms = document.getElementById("todayOperationsRooms");
+  const todayHousekeepingTasks = document.getElementById("todayHousekeepingTasks");
+  const operationsCalendar = document.getElementById("operationsCalendar");
   const keyRotations = document.getElementById("keyRotations");
   const keyRotationActivity = document.getElementById("keyRotationActivity");
   const manualStayForm = document.getElementById("manualStayForm");
@@ -146,6 +150,8 @@
 
   function updateAdminSectionSummaries(data) {
     const stayOperations = data.stayOperations || {};
+    const operationsCount = Number(todayOperationsSummary?.dataset.count || 0);
+    setAdminSectionCount("operations", operationsCount);
     setAdminSectionCount("stays", (stayOperations.reservations || []).length + (stayOperations.rotations || []).length);
     setAdminSectionCount("alerts", (data.alerts || []).length);
     setAdminSectionCount("maintenance", (data.maintenanceReports || []).length);
@@ -542,6 +548,225 @@
       hourCycle: "h23"
     }).formatToParts(date).reduce((result, item) => ({ ...result, [item.type]: item.value }), {});
     return `R${room}-D${parts.year}${parts.month}${parts.day}-T${parts.hour}${parts.minute}${parts.second}`;
+  }
+
+  function bangkokOperationsClock() {
+    const parts = Object.fromEntries(new Intl.DateTimeFormat("en-GB", {
+      timeZone: "Asia/Bangkok",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23"
+    }).formatToParts(new Date()).filter((part) => part.type !== "literal").map((part) => [part.type, part.value]));
+    return {
+      date: `${parts.year}-${parts.month}-${parts.day}`,
+      minutes: (Number(parts.hour) * 60) + Number(parts.minute)
+    };
+  }
+
+  function addOperationsDays(dateKey, days) {
+    const date = new Date(`${dateKey}T12:00:00Z`);
+    date.setUTCDate(date.getUTCDate() + days);
+    return date.toISOString().slice(0, 10);
+  }
+
+  function operationsDateLabel(dateKey) {
+    return new Date(`${dateKey}T12:00:00Z`).toLocaleDateString("en-GB", {
+      timeZone: "UTC", weekday: "short", day: "numeric", month: "short"
+    });
+  }
+
+  function operationsProviderLabel(provider) {
+    if (provider === "direct") return "Direct / walk-in";
+    if (provider === "manual") return "Manual Airbnb";
+    return "Airbnb";
+  }
+
+  function operationsGuestLabel(reservation) {
+    const firstName = String(reservation?.guestFirstName || "").trim();
+    return firstName ? ` · ${firstName}` : "";
+  }
+
+  function checkoutMinutesForOperations(reservation) {
+    const late = Number(reservation?.lateCheckoutMinutes || 0);
+    return Number.isFinite(late) && late > 660 ? late : 660;
+  }
+
+  function renderOperationsDashboard(data = {}) {
+    if (!todayOperationsSummary || !todayOperationsRooms || !todayHousekeepingTasks || !operationsCalendar) return;
+    const reservations = Array.isArray(data.reservations) ? data.reservations : [];
+    const statuses = Array.isArray(data.housekeepingStatuses) ? data.housekeepingStatuses : [];
+    const tasks = Array.isArray(data.housekeepingTasks) ? data.housekeepingTasks : [];
+    const clock = bangkokOperationsClock();
+    const today = clock.date;
+    const todayArrivals = reservations.filter((item) => item.checkInDate === today);
+    const todayDepartures = reservations.filter((item) => item.checkOutDate === today);
+    const todayTasks = tasks.filter((item) => item.serviceDate === today);
+    const openTodayTasks = todayTasks.filter((item) => !["ready", "resolved"].includes(String(item.status || "").toLowerCase()));
+    const readyRooms = statuses.filter((item) => item.status === "ready").length;
+    const priorityTasks = openTodayTasks.filter((item) => item.priority).length;
+    const operationsCount = todayArrivals.length + todayDepartures.length + openTodayTasks.length;
+    todayOperationsSummary.dataset.count = String(operationsCount);
+    todayOperationsSummary.replaceChildren(
+      stat(todayArrivals.length, "Arrivals today"),
+      stat(todayDepartures.length, "Departures today"),
+      stat(openTodayTasks.length, priorityTasks ? `Housekeeping open · ${priorityTasks} priority` : "Housekeeping open"),
+      stat(readyRooms, "Rooms marked ready")
+    );
+
+    const statusByRoom = new Map(statuses.map((item) => [String(item.room), item]));
+    const tasksByRoom = new Map();
+    todayTasks.forEach((item) => {
+      const room = String(item.room || "");
+      const current = tasksByRoom.get(room);
+      if (!current || Number(Boolean(item.priority)) > Number(Boolean(current.priority)) || String(item.updatedAt || "") > String(current.updatedAt || "")) {
+        tasksByRoom.set(room, item);
+      }
+    });
+
+    todayOperationsRooms.replaceChildren();
+    for (let roomNumber = 1; roomNumber <= 11; roomNumber += 1) {
+      const room = String(roomNumber);
+      const roomReservations = reservations.filter((item) => String(item.room) === room);
+      const departures = roomReservations.filter((item) => item.checkOutDate === today);
+      const arrivals = roomReservations.filter((item) => item.checkInDate === today);
+      const continuing = roomReservations.filter((item) => item.checkInDate < today && item.checkOutDate > today);
+      const stillInsideDeparture = departures.find((item) => clock.minutes < checkoutMinutesForOperations(item));
+      const nextReservation = roomReservations
+        .filter((item) => item.checkInDate > today)
+        .sort((a, b) => a.checkInDate.localeCompare(b.checkInDate))[0] || null;
+      const housekeeping = statusByRoom.get(room) || { status: "unknown" };
+      const task = tasksByRoom.get(room) || null;
+      const card = element("article", "concierge-admin-room-card");
+      card.dataset.operationRoom = room;
+      const head = element("div", "concierge-admin-room-card-head");
+      head.appendChild(element("strong", "", `Room ${room}`));
+      let state = "Vacant";
+      let stateClass = "is-vacant";
+      if (departures.length && arrivals.length) {
+        state = "Turnover today";
+        stateClass = "is-turnover";
+      } else if (stillInsideDeparture) {
+        state = "Checkout today";
+        stateClass = "is-departure";
+      } else if (arrivals.length) {
+        state = "Arrival today";
+        stateClass = "is-arrival";
+      } else if (continuing.length) {
+        state = "In-house";
+        stateClass = "is-occupied";
+      }
+      head.appendChild(element("span", `concierge-admin-room-state ${stateClass}`, state));
+      card.appendChild(head);
+
+      const details = element("div", "concierge-admin-room-card-details");
+      departures.forEach((item) => {
+        const checkout = item.lateCheckoutTime || "11:00 AM";
+        const late = Number(item.lateCheckoutMinutes || 0) > 660 ? ` · late checkout ${checkout}` : ` · checkout ${checkout}`;
+        details.appendChild(element("span", "", `Departure: ${operationsProviderLabel(item.provider)}${operationsGuestLabel(item)}${late}`));
+      });
+      arrivals.forEach((item) => {
+        details.appendChild(element("span", "", `Arrival: ${operationsProviderLabel(item.provider)}${operationsGuestLabel(item)}`));
+      });
+      if (!departures.length && !arrivals.length && continuing[0]) {
+        const item = continuing[0];
+        details.appendChild(element("span", "", `Current stay: ${operationsProviderLabel(item.provider)}${operationsGuestLabel(item)} · until ${item.checkOutDate}`));
+      }
+      if (!departures.length && !arrivals.length && !continuing.length && nextReservation) {
+        details.appendChild(element("span", "", `Next arrival: ${nextReservation.checkInDate} · ${operationsProviderLabel(nextReservation.provider)}${operationsGuestLabel(nextReservation)}`));
+      }
+      if (!details.children.length) details.appendChild(element("span", "", "No confirmed stay today."));
+      card.appendChild(details);
+
+      const housekeepingRow = element("div", "concierge-admin-room-housekeeping");
+      housekeepingRow.appendChild(element("span", `concierge-admin-housekeeping-state is-${String(housekeeping.status || "unknown")}`, `Housekeeping: ${String(housekeeping.status || "unknown").toUpperCase()}`));
+      if (task) {
+        const taskText = task.priority
+          ? `Priority cleaning${task.requestedArrival ? ` · early arrival ${task.requestedArrival}` : ""}`
+          : `Task: ${String(task.status || "pending").replaceAll("_", " ")}`;
+        housekeepingRow.appendChild(element("span", "concierge-admin-room-task", taskText));
+      }
+      card.appendChild(housekeepingRow);
+      todayOperationsRooms.appendChild(card);
+    }
+
+    todayHousekeepingTasks.replaceChildren();
+    if (!todayTasks.length) {
+      todayHousekeepingTasks.appendChild(element("div", "concierge-admin-empty", "No housekeeping turnover tasks recorded for today."));
+    } else {
+      [...todayTasks].sort((a, b) => Number(Boolean(b.priority)) - Number(Boolean(a.priority)) || Number(a.room) - Number(b.room)).forEach((item) => {
+        const card = element("article", "concierge-admin-registration-item");
+        card.append(
+          element("strong", "", `Room ${item.room}${item.priority ? " · PRIORITY" : ""}`),
+          element("span", "", `Checkout: ${item.checkoutTime || "11:00 AM"}`),
+          element("span", "", item.requestedArrival ? `Requested early arrival: ${item.requestedArrival}` : "No early-arrival request recorded."),
+          element("span", "", `Task status: ${String(item.status || "pending").replaceAll("_", " ")}`)
+        );
+        todayHousekeepingTasks.appendChild(card);
+      });
+    }
+
+    const dateKeys = Array.from({ length: 14 }, (_, index) => addOperationsDays(today, index));
+    const table = document.createElement("table");
+    table.className = "concierge-admin-operations-calendar";
+    const thead = document.createElement("thead");
+    const headerRow = document.createElement("tr");
+    const roomHeader = element("th", "concierge-admin-calendar-room", "Room");
+    roomHeader.scope = "col";
+    headerRow.appendChild(roomHeader);
+    dateKeys.forEach((dateKey) => {
+      const th = element("th", dateKey === today ? "is-today" : "", operationsDateLabel(dateKey));
+      th.scope = "col";
+      headerRow.appendChild(th);
+    });
+    thead.appendChild(headerRow);
+    table.appendChild(thead);
+    const tbody = document.createElement("tbody");
+    for (let roomNumber = 1; roomNumber <= 11; roomNumber += 1) {
+      const room = String(roomNumber);
+      const roomReservations = reservations.filter((item) => String(item.room) === room);
+      const tr = document.createElement("tr");
+      const roomCell = element("th", "concierge-admin-calendar-room", `Room ${room}`);
+      roomCell.scope = "row";
+      tr.appendChild(roomCell);
+      dateKeys.forEach((dateKey) => {
+        const arrivals = roomReservations.filter((item) => item.checkInDate === dateKey);
+        const departures = roomReservations.filter((item) => item.checkOutDate === dateKey);
+        const occupying = roomReservations.filter((item) => item.checkInDate < dateKey && item.checkOutDate > dateKey);
+        const cell = document.createElement("td");
+        if (dateKey === today) cell.classList.add("is-today");
+        if (departures.length && arrivals.length) cell.classList.add("is-turnover");
+        else if (arrivals.length) cell.classList.add("is-arrival");
+        else if (departures.length) cell.classList.add("is-departure");
+        else if (occupying.length) cell.classList.add("is-stay");
+        if (departures.length) {
+          departures.forEach((item) => {
+            const text = item.lateCheckoutTime ? `OUT ${item.lateCheckoutTime}` : "OUT";
+            const tag = element("span", "concierge-admin-calendar-tag", text);
+            tag.title = `${operationsProviderLabel(item.provider)}${operationsGuestLabel(item)} · checkout`;
+            cell.appendChild(tag);
+          });
+        }
+        if (arrivals.length) {
+          arrivals.forEach((item) => {
+            const tag = element("span", "concierge-admin-calendar-tag", "IN");
+            tag.title = `${operationsProviderLabel(item.provider)}${operationsGuestLabel(item)} · arrival`;
+            cell.appendChild(tag);
+          });
+        }
+        if (!departures.length && !arrivals.length && occupying.length) {
+          const tag = element("span", "concierge-admin-calendar-tag", "STAY");
+          tag.title = occupying.map((item) => `${operationsProviderLabel(item.provider)}${operationsGuestLabel(item)}`).join(" / ");
+          cell.appendChild(tag);
+        }
+        tr.appendChild(cell);
+      });
+      tbody.appendChild(tr);
+    }
+    table.appendChild(tbody);
+    operationsCalendar.replaceChildren(table);
   }
 
   function renderStayOperations(data = {}) {
@@ -1101,6 +1326,7 @@
     renderMaintenanceReports(data.maintenanceReports || []);
     renderAlerts(data.alerts || [], data.alertConfiguration || {}, data.deliveryDiagnostics || []);
     renderWhatsAppDeliveryDiagnostics(data.deliveryDiagnostics || [], data.alerts || []);
+    renderOperationsDashboard(data.stayOperations || {});
     renderStayOperations(data.stayOperations || {});
     renderRecent(data.recent || []);
     updateAdminSectionSummaries(data);

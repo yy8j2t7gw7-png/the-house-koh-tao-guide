@@ -1,3 +1,12 @@
+# v5.11.50 — Housekeeping Timing & Ready Owner Notification
+
+- Keeps guest-requested cleaning times attached to their housekeeping request even when a later maintenance issue is reported in the same conversation.
+- Separates maintenance and cleaning labels/alerts so a maintenance message cannot make housekeeping arrive early.
+- Keeps normal turnover messages to Su; `Received` remains staff-only.
+- Notifies configured owners when Su taps **Room ready**, reusing the approved `house_alert_status_v1` template.
+- No new Meta template required; unrelated production behavior is unchanged.
+- Full automated suite: **273 passed / 0 failed** before final package validation.
+
 # v5.11.49 — Calendar & Operations Dashboard
 
 - Added a protected Owner Admin operations overview for today's arrivals, departures, housekeeping and room readiness.

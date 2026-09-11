@@ -355,6 +355,8 @@ function appendProtectedContact(value, contact) {
 }
 
 function requestLabel(alert) {
+  const explicitValue = String(alert?.requestLabelOverride || alert?.alertRequestLabel || "").trim();
+  if (explicitValue) return cleanLabel(explicitValue);
   const summary = String(alert.summary || "");
   const labels = {
     maintenance_broken_light: "Broken light",
@@ -864,6 +866,7 @@ export async function createConciergeAlert({ env, interactionId, sessionId, room
     roomVerified: Boolean(roomVerified),
     summary: safeAlertSummary(policy.summary),
     detailSummary: bookingSubmission?.request?.structuredSummary || "",
+    requestLabelOverride: String(result.alertRequestLabel || "").trim().slice(0, 80),
     bangkokTime: policy.bangkokTime,
     createdAt: policy.createdAt,
     escalationDueAt
@@ -1052,12 +1055,18 @@ function statusCommandFromMessage(message) {
   return typed ? { command: typed[1].toUpperCase(), alertId: typed[2] } : null;
 }
 
-export function buildWhatsAppStatusPayload(alert, recipient, status, actorLabel, env) {
+export function buildWhatsAppStatusPayload(alert, recipient, status, actorLabel, env, { requestLabelOverride = "" } = {}) {
   const name = String(env.WHATSAPP_STATUS_TEMPLATE_NAME || "").trim();
   if (!name) return { ok: false, name: "", errorCode: "status_template_not_configured" };
   const normalizedStatus = status === "ACKNOWLEDGED" ? status : status === "RESOLVED" ? status : "";
   if (!normalizedStatus) return { ok: false, name, errorCode: "invalid_status" };
-  const parameters = [alert.id, roomLabel(alert), requestLabel(alert), cleanLabel(actorLabel), normalizedStatus];
+  const parameters = [
+    alert.id,
+    roomLabel(alert),
+    String(requestLabelOverride || "").trim() ? cleanLabel(requestLabelOverride) : requestLabel(alert),
+    cleanLabel(actorLabel),
+    normalizedStatus
+  ];
   const validated = validateWhatsAppTemplateParameters(name, "status", parameters);
   if (!validated.ok) return validated;
   return { ok: true, name, bodyParameterCount: parameters.length, payload: {
@@ -1066,21 +1075,21 @@ export function buildWhatsAppStatusPayload(alert, recipient, status, actorLabel,
   } };
 }
 
-async function notifyStatusChange(alert, actorPhone, status, env, store) {
-  if (!env.WHATSAPP_STATUS_TEMPLATE_NAME) return { attempted: 0, accepted: 0 };
-  const assigned = parseRecipients(env)[alert.recipientGroup] || [];
-  const actor = assigned.find((item) => item.phone === digits(actorPhone));
-  if (!actor) return { attempted: 0, accepted: 0 };
-  const others = assigned.filter((item) => item.phone !== digits(actorPhone));
+async function notifyStatusChangeToRecipients(alert, actor, recipients, status, env, store, {
+  stageSuffix = "",
+  requestLabelOverride = ""
+} = {}) {
+  const others = (Array.isArray(recipients) ? recipients : []).filter((item) => item.phone !== digits(actor?.phone));
+  const stage = `status_${status.toLowerCase()}${stageSuffix ? `_${stageSuffix}` : ""}`;
   let accepted = 0;
   for (const recipient of others) {
-    const built = buildWhatsAppStatusPayload(alert, recipient, status, actor.label, env);
+    const built = buildWhatsAppStatusPayload(alert, recipient, status, actor?.label || "The House team", env, { requestLabelOverride });
     const deliveryId = `delivery_${crypto.randomUUID()}`;
     const hashedRecipient = await recipientHash(recipient.phone, env);
     if (!built.ok) {
       const createdAt = new Date().toISOString();
       await store.recordAlertDelivery({
-        id: deliveryId, alertId: alert.id, stage: `status_${status.toLowerCase()}`,
+        id: deliveryId, alertId: alert.id, stage,
         recipientHash: hashedRecipient, recipientLabel: recipient.label,
         providerMessageId: "", status: "failed", errorCode: built.errorCode,
         createdAt
@@ -1089,7 +1098,7 @@ async function notifyStatusChange(alert, actorPhone, status, env, store) {
         store,
         deliveryId,
         alert,
-        `status_${status.toLowerCase()}`,
+        stage,
         buildWhatsAppFailureDiagnostic({ built, localCode: built.errorCode }),
         createdAt
       );
@@ -1098,7 +1107,7 @@ async function notifyStatusChange(alert, actorPhone, status, env, store) {
     const outcome = await submitBuiltTemplate(built, env);
     const createdAt = new Date().toISOString();
     await store.recordAlertDelivery({
-      id: deliveryId, alertId: alert.id, stage: `status_${status.toLowerCase()}`,
+      id: deliveryId, alertId: alert.id, stage,
       recipientHash: hashedRecipient, recipientLabel: recipient.label,
       providerMessageId: outcome.providerMessageId,
       status: outcome.submitted ? "accepted" : "failed",
@@ -1106,16 +1115,28 @@ async function notifyStatusChange(alert, actorPhone, status, env, store) {
       createdAt
     });
     if (outcome.submitted) accepted += 1;
-    else await recordWhatsAppFailure(
-      store,
-      deliveryId,
-      alert,
-      `status_${status.toLowerCase()}`,
-      outcome.diagnostic,
-      createdAt
-    );
+    else await recordWhatsAppFailure(store, deliveryId, alert, stage, outcome.diagnostic, createdAt);
   }
   return { attempted: others.length, accepted };
+}
+
+async function notifyStatusChange(alert, actorPhone, status, env, store) {
+  if (!env.WHATSAPP_STATUS_TEMPLATE_NAME) return { attempted: 0, accepted: 0 };
+  const assigned = parseRecipients(env)[alert.recipientGroup] || [];
+  const actor = assigned.find((item) => item.phone === digits(actorPhone));
+  if (!actor) return { attempted: 0, accepted: 0 };
+  return notifyStatusChangeToRecipients(alert, actor, assigned, status, env, store);
+}
+
+async function notifyHousekeepingReadyOwners(alert, actorPhone, env, store) {
+  if (!env.WHATSAPP_STATUS_TEMPLATE_NAME) return { attempted: 0, accepted: 0 };
+  const recipients = parseRecipients(env);
+  const actor = (recipients.support || []).find((item) => item.phone === digits(actorPhone));
+  if (!actor) return { attempted: 0, accepted: 0 };
+  return notifyStatusChangeToRecipients(alert, actor, recipients.owners || [], "RESOLVED", env, store, {
+    stageSuffix: "owners_ready",
+    requestLabelOverride: "Room ready"
+  });
 }
 
 export async function handleWhatsAppWebhook(request, env) {
@@ -1178,6 +1199,7 @@ export async function handleWhatsAppWebhook(request, env) {
       if (!marked?.ok) continue;
       await store.resolveAlert(parsed.alertId, actor, now);
       await notifyStatusChange(before, from, "RESOLVED", env, store);
+      await notifyHousekeepingReadyOwners(before, from, env, store);
       continue;
     }
     if (command === "TM30") {

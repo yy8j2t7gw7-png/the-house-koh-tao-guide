@@ -3376,7 +3376,7 @@ test("guest localization supports seven languages and keeps the owner dashboard 
   assert.doesNotMatch(admin, /src="\/i18n\.js"/);
   assert.match(runtime, /exploreContentDeferred/);
   assert.match(runtime, /element\.closest\("\.section,\.footer"\)/);
-  assert.match(runtime, /houseGuideTranslations:v5\.11\.49:/);
+  assert.match(runtime, /houseGuideTranslations:v5\.11\.50:/);
   assert.match(runtime, /MAX_REQUEST_RETRIES = 2/);
   assert.match(runtime, /let flushRunning = false/);
 });
@@ -13187,4 +13187,162 @@ test("owner stay extension refuses to extend through a later confirmed arrival",
   assert.equal(response.status, 409);
   assert.equal((await response.json()).error, "room_date_conflict");
   assert.equal(current.checkOutDate, "2026-09-03");
+});
+
+test("v5.11.50 keeps a requested cleaning time separate when the guest later reports maintenance", async () => {
+  const now = new Date("2026-09-11T05:00:00.000Z"); // Friday 12:00 Bangkok.
+  const { env, store } = createEnvironment({
+    OPENAI_API_KEY: "",
+    WHATSAPP_ACCESS_TOKEN: "meta-test-token",
+    WHATSAPP_PHONE_NUMBER_ID: "1234567890",
+    WHATSAPP_ALERT_RECIPIENTS: JSON.stringify({
+      support: [{ label: "Su", phone: "+66 64 000 0001" }],
+      emergency: [
+        { label: "Owner 1", phone: "+66 81 000 0002" },
+        { label: "Owner 2", phone: "+66 82 000 0003" }
+      ]
+    })
+  });
+  const outbound = [];
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (_url, options) => {
+    outbound.push(JSON.parse(options.body));
+    return new Response(JSON.stringify({ messages: [{ id: `wamid.mixed-service-${outbound.length}` }] }), {
+      status: 200,
+      headers: { "content-type": "application/json" }
+    });
+  };
+  try {
+    const pending = await handleConciergeRequest(guestRequest("I would like to request cleaning"), env, undefined, now);
+    const pendingBody = await pending.json();
+    assert.equal(pendingBody.workflow.type, "cleaning");
+    assert.equal(pendingBody.workflow.status, "collecting");
+
+    const cleaning = await handleConciergeRequest(guestRequest("4pm would be great", {
+      workflowState: pendingBody.workflow,
+      history: [
+        { role: "user", content: "I would like to request cleaning" },
+        { role: "assistant", content: pendingBody.answer }
+      ]
+    }), env, undefined, new Date(now.getTime() + 1000));
+    const cleaningBody = await cleaning.json();
+    assert.equal(cleaningBody.workflow.status, "submitted");
+    assert.equal(cleaningBody.workflow.cleaningRequest.preferredTime, "4:00 PM");
+    assert.match(store.alerts[0].summary, /Requested cleaning time: 4:00 PM/i);
+    assert.match(store.alerts[0].summary, /do not attend earlier unless the guest agrees/i);
+    assert.equal(outbound.length, 3);
+    outbound.slice(0, 3).forEach((payload) => {
+      const parameters = payload.template.components[0].parameters;
+      assert.equal(parameters[2].text, "Room cleaning");
+      assert.match(parameters[4].text, /Requested cleaning time: 4:00 PM/i);
+    });
+
+    const maintenance = await handleConciergeRequest(guestRequest(
+      "Also there's a really small leak on the bathroom faucet, nothing major. I'd like it fixed when there's time. Either this afternoon with the cleaning or Monday afternoon",
+      {
+        workflowState: cleaningBody.workflow,
+        history: [
+          { role: "user", content: "I would like to request cleaning" },
+          { role: "assistant", content: pendingBody.answer },
+          { role: "user", content: "4pm would be great" },
+          { role: "assistant", content: cleaningBody.answer }
+        ]
+      }
+    ), env, undefined, new Date(now.getTime() + 2000));
+    const maintenanceBody = await maintenance.json();
+    assert.equal(maintenanceBody.intentId, "property_issue_plumbing");
+    assert.equal(store.alerts.length, 2);
+    assert.match(store.alerts[1].summary, /Property issue — plumbing or water issue/i);
+    assert.match(store.alerts[1].summary, /Linked housekeeping: cleaning requested for 4:00 PM/i);
+    assert.match(store.alerts[1].summary, /Do not attend the cleaning earlier unless the guest agrees/i);
+    assert.equal(outbound.length, 6);
+    outbound.slice(3).forEach((payload) => {
+      const parameters = payload.template.components[0].parameters;
+      assert.equal(parameters[2].text, "Maintenance / room issue");
+      assert.match(parameters[4].text, /cleaning requested for 4:00 PM/i);
+      assert.doesNotMatch(parameters[2].text, /Room cleaning/i);
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("v5.11.50 housekeeping Received stays with Su while Room ready notifies owners through the existing status template", async () => {
+  const now = new Date("2027-09-09T08:00:00.000Z");
+  const { env, store } = createEnvironment({
+    GUEST_ACCESS_ENFORCEMENT: "true",
+    WHATSAPP_ACCESS_TOKEN: "meta-test-token",
+    WHATSAPP_PHONE_NUMBER_ID: "1234567890",
+    WHATSAPP_WEBHOOK_VERIFY_TOKEN: "verify",
+    META_APP_SECRET: "housekeeping-ready-secret",
+    WHATSAPP_HOUSEKEEPING_ACTION_TEMPLATE_NAME: "house_housekeeping_task_actions_v1",
+    WHATSAPP_STATUS_TEMPLATE_NAME: "house_alert_status_v1",
+    WHATSAPP_STAFF_ACTIONS_ENABLED: "true",
+    WHATSAPP_ALERT_RECIPIENTS: JSON.stringify({
+      support: [{ label: "Su", phone: "+66 64 000 0001" }],
+      emergency: [
+        { label: "Owner 1", phone: "+66 81 000 0002" },
+        { label: "Owner 2", phone: "+66 82 000 0003" }
+      ]
+    })
+  });
+  const cookie = await syncAndVerifyStay(env, {
+    room: "11", confirmationCode: "HMEARLYREADY11", checkInDate: "2027-09-10", checkOutDate: "2027-09-12", now
+  });
+  await completeThaiRegistration(env, cookie, new Date(now.getTime() + 10));
+  store.stayReservations.push({
+    id: `stay_${crypto.randomUUID()}`,
+    provider: "direct", listingId: "turnover-before-room-11", room: "11",
+    confirmationCodeHash: `hash_${crypto.randomUUID()}`,
+    checkInDate: "2027-09-07", checkOutDate: "2027-09-10", status: "confirmed", updatedAt: now.toISOString()
+  });
+
+  const first = await handleConciergeRequest(verifiedConciergeRequest("Can I check in earlier?", cookie), env, undefined, now);
+  const firstBody = await first.json();
+  const outbound = [];
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (_url, options) => {
+    outbound.push(JSON.parse(options.body));
+    return new Response(JSON.stringify({ messages: [{ id: `wamid.ready-owner-${outbound.length}` }] }), {
+      status: 200,
+      headers: { "content-type": "application/json" }
+    });
+  };
+  try {
+    await handleConciergeRequest(
+      verifiedConciergeRequest("11am", cookie, { workflowState: firstBody.workflow }),
+      env,
+      undefined,
+      new Date(now.getTime() + 1000)
+    );
+    assert.equal(outbound.length, 1);
+    const alert = store.alerts[0];
+    assert.equal(alert.alertType, "housekeeping_turnover");
+    assert.equal(alert.recipientGroup, "support");
+
+    await handleWhatsAppWebhook(
+      await signedWhatsAppButton(env, "66640000001", `HOUSE_ALERT|RECEIVED|${alert.id}`, "Received"),
+      env
+    );
+    assert.equal(outbound.length, 1, "Received does not notify owners");
+    assert.equal(store.housekeepingTasks[0].status, "received");
+
+    await handleWhatsAppWebhook(
+      await signedWhatsAppButton(env, "66640000001", `HOUSE_ALERT|READY|${alert.id}`, "Room ready"),
+      env
+    );
+    assert.equal(store.housekeepingTasks[0].status, "ready");
+    assert.equal(outbound.length, 3, "Room ready sends one status message to each owner");
+    assert.deepEqual(outbound.slice(1).map((payload) => payload.to).sort(), ["66810000002", "66820000003"]);
+    outbound.slice(1).forEach((payload) => {
+      assert.equal(payload.template.name, "house_alert_status_v1");
+      const parameters = payload.template.components[0].parameters.map((entry) => entry.text);
+      assert.equal(parameters[1], "Room 11");
+      assert.equal(parameters[2], "Room ready");
+      assert.equal(parameters[3], "Su");
+      assert.equal(parameters[4], "RESOLVED");
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });

@@ -208,8 +208,8 @@ const DIRECT_ACTIVITY_BOOKING = /(?:\b(?:i|we)\s+(?:(?:want|need|plan)\s+to|woul
 const DIVING_LEARNING_REQUEST = /\b(?:i|we)\s+(?:(?:want|need|plan)\s+to|would\s+like\s+to|wanna)\s+learn(?:\s+how)?\s+(?:to\s+)?div(?:e|ing)\b/i;
 const SUPPORTED_BOOKING_KINDS = new Set(["diving", "fishing", "snorkeling", "taxi", "taxi_boat", "ferry", "motorbike_taxi", "stay_extension"]);
 const PROPERTY_ISSUE_CATEGORIES = new Set(["pest", "odor", "plumbing", "equipment", "fixture", "condition", "odor_clarification"]);
-const HOUSEKEEPING_ITEM_REQUEST = /\b(?:toilet\s+paper|soap|(?:(?:new|fresh|clean)\s+)?towels?|room\s+cleaning|clean\s+(?:my|our|the)\s+room|housekeeping)\b/i;
-const HOUSEKEEPING_REQUEST_ACTION = /\b(?:can\s+(?:i|we)\s+(?:have|get)|please\s+(?:bring|send|provide|clean)|can\s+you\s+(?:bring|send|provide|clean)|could\s+you\s+(?:bring|send|provide|clean)|i\s+(?:need|want|would\s+like)|(?:bring|send|provide)\s+(?:me\s+)?|clean\s+(?:my|our|the)\s+room)\b|\b(?:toilet\s+paper|soap|towels?)\s+please\b/i;
+const HOUSEKEEPING_ITEM_REQUEST = /\b(?:toilet\s+paper|soap|(?:(?:new|fresh|clean)\s+)?towels?|(?:room\s+)?cleaning|clean\s+(?:my|our|the)\s+room|housekeeping)\b/i;
+const HOUSEKEEPING_REQUEST_ACTION = /\b(?:can\s+(?:i|we)\s+(?:have|get)|please\s+(?:bring|send|provide|clean)|can\s+you\s+(?:bring|send|provide|clean)|could\s+you\s+(?:bring|send|provide|clean)|i\s+(?:need|want|would\s+like)(?:\s+to\s+request)?|(?:bring|send|provide)\s+(?:me\s+)?|clean\s+(?:my|our|the)\s+room)\b|\b(?:toilet\s+paper|soap|towels?)\s+please\b/i;
 const CLEANUP_REQUEST = /\b(?:(?:i|we)\s+(?:need|want|would\s+like)\s+(?:a\s+)?(?:clean\s*up|cleanup)|(?:can|could)\s+(?:i|we)\s+(?:get|have)\s+(?:a\s+)?(?:clean\s*up|cleanup)|(?:please\s+)?clean\s*up\s+(?:(?:my|our|the)\s+)?room|(?:room\s+)?(?:clean\s*up|cleanup)\s+please)\b/i;
 const GENERIC_EXISTING_REQUEST_SUBMISSION = /^\s*(?:please\s+)?(?:send|submit|forward)(?:\s+(?:the|my|this))?\s+request(?:\s+(?:now|please))?\s*[.!]?\s*$/i;
 const VERIFIED_ACCESS_ACKNOWLEDGEMENT = /^\s*(?:(?:i\s+am|i[’\']m|im)\s+already(?:\s+(?:verified|registered|done))?|i\s+already\s+(?:verified|registered|did\s+that|did\s+it))\s*[.!]?\s*$/i;
@@ -325,6 +325,22 @@ function cleanWorkflowState(value) {
       issueCategory: value.issueCategory,
       notified: Boolean(value.notified),
       notes: cleanWorkflowNotes(value.notes)
+    };
+  }
+  if (value.type === "cleaning" && value.status === "submitted") {
+    const request = value.cleaningRequest || {};
+    const preferredTime = cleanWorkflowValue(request.preferredTime, 60);
+    if (!preferredTime) return null;
+    return {
+      type: "cleaning",
+      status: "submitted",
+      retainPrivateContact: false,
+      missing: [],
+      cleaningRequest: {
+        preferredTime,
+        requestedDate: /^\d{4}-\d{2}-\d{2}$/.test(String(request.requestedDate || "")) ? String(request.requestedDate) : "",
+        notes: cleanWorkflowNotes(request.notes)
+      }
     };
   }
   const retryableBooking = value.type === "booking" && value.status === "delivery_failed";
@@ -610,7 +626,7 @@ function housekeepingItem(question) {
   if (/\btoilet\s+paper\b/i.test(source)) return { id: "toilet_paper", label: "toilet paper", delivery: "bring toilet paper to your room" };
   if (/\bsoap\b/i.test(source)) return { id: "soap", label: "soap", delivery: "bring soap to your room" };
   if (/\b(?:(?:new|fresh|clean)\s+)?towels?\b|\btowel\s+(?:change|replacement)\b/i.test(source)) return { id: "fresh_towels", label: "fresh towels", delivery: "bring fresh towels to your room" };
-  if (/\b(?:room\s+cleaning|clean\s+(?:my|our|the)\s+room|housekeeping)\b/i.test(source) || CLEANUP_REQUEST.test(source) || DIRTY_ROOM_CLEANING_REQUEST.test(source) || STAINED_LINEN_REQUEST.test(source)) {
+  if (/\b(?:(?:room\s+)?cleaning|clean\s+(?:my|our|the)\s+room|housekeeping)\b/i.test(source) || CLEANUP_REQUEST.test(source) || DIRTY_ROOM_CLEANING_REQUEST.test(source) || STAINED_LINEN_REQUEST.test(source)) {
     return { id: "room_cleaning", label: "room cleaning", delivery: "arrange room cleaning" };
   }
   return null;
@@ -986,7 +1002,7 @@ function applyCleaningRequestPolicy(question, workflowState = null, now = new Da
     };
   }
   const preferredTime = cleaningPreferenceLabel(preference, requestedDay, today);
-  const alertQuestion = `Room cleaning request. Preferred time: ${preferredTime}. Earliest normal housekeeping: ${availability.open ? "currently available" : availability.nextOpening}. Guest notes: ${notes}`;
+  const alertQuestion = `Room cleaning request. Preferred time: ${preferredTime}. Requested cleaning time: ${preferredTime}. Please do not attend earlier unless the guest agrees. Earliest normal housekeeping: ${availability.open ? "currently available" : availability.nextOpening}. Guest notes: ${notes}`;
   return {
     handled: true,
     result: {
@@ -1002,6 +1018,8 @@ function applyCleaningRequestPolicy(question, workflowState = null, now = new Da
         item: "room cleaning", afterHours: availability.afterHours, preferredTime,
         earliestService: availability.open ? "Current housekeeping hours" : availability.nextOpening
       },
+      requestedDateTime: preferredTime,
+      alertRequestLabel: "Room cleaning",
       source: "service-policy"
     },
     alertQuestion,
@@ -1428,8 +1446,21 @@ function propertyIssueClassification(question, workflowState = null) {
   return null;
 }
 
+function linkedCleaningContext(question, workflowState = null) {
+  if (workflowState?.type !== "cleaning") return null;
+  const preferredTime = cleanWorkflowValue(workflowState?.cleaningRequest?.preferredTime, 80);
+  if (!preferredTime || !["ready", "submitted"].includes(workflowState?.status)) return null;
+  const source = normalizeText(question);
+  if (!/\b(?:cleaning|housekeeping|clean(?:ed|ing)?\s+(?:my|our|the)?\s*room)\b/.test(source)) return null;
+  return {
+    preferredTime,
+    requestedDate: cleanWorkflowValue(workflowState?.cleaningRequest?.requestedDate, 20)
+  };
+}
+
 function propertyIssuePolicy(question, workflowState = null) {
   const pending = workflowState?.type === "property_issue" ? workflowState : null;
+  const linkedCleaning = linkedCleaningContext(question, workflowState);
   const issue = propertyIssueClassification(question, pending);
   if (issue?.cancelled) {
     return {
@@ -1485,10 +1516,21 @@ function propertyIssuePolicy(question, workflowState = null) {
       intentId: `property_issue_${issue.category}`, category: "stay-support", confidence: 1,
       needsHuman: true, handoff: "stay_support", learningGap: false, learningReason: "none",
       actions: [], suppressDefaultActions: true,
-      propertyIssueRequest: { category: issue.category, label: issue.label, instanceKey: notes },
+      propertyIssueRequest: {
+        category: issue.category,
+        label: issue.label,
+        instanceKey: notes,
+        linkedCleaningTime: linkedCleaning?.preferredTime || ""
+      },
+      alertRequestLabel: "Maintenance / room issue",
       source: "service-policy"
     },
-    alertQuestion: `Property issue — ${issue.label}. Guest report: ${notes || cleanWorkflowNotes(question)}`,
+    alertQuestion: [
+      linkedCleaning?.preferredTime
+        ? `Linked housekeeping: cleaning requested for ${linkedCleaning.preferredTime}. Do not attend the cleaning earlier unless the guest agrees.`
+        : "",
+      `Property issue — ${issue.label}. Guest report: ${notes || cleanWorkflowNotes(question)}`
+    ].filter(Boolean).join(" "),
     workflow: { type: "property_issue", status: "ready", issueCategory: issue.category, notified: false, notes }
   };
 }

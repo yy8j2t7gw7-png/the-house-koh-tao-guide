@@ -30,6 +30,7 @@
     "WHATSAPP_LUGGAGE_ACTION_TEMPLATE_NAME": "house_luggage_alert_actions_v2",
     "WHATSAPP_URGENT_ACTION_TEMPLATE_NAME": "house_urgent_alert_actions_v2",
     "WHATSAPP_LOST_KEY_ACTION_TEMPLATE_NAME": "house_lost_key_alert_actions_v2",
+    "WHATSAPP_HOUSEKEEPING_ACTION_TEMPLATE_NAME": "house_housekeeping_task_actions_v1",
     "WHATSAPP_STAFF_ACTIONS_ENABLED": "true",
     "WHATSAPP_ALERT_TEMPLATE_LANGUAGE": "en_US",
     "WHATSAPP_ALERT_ESCALATION_MINUTES": "10"

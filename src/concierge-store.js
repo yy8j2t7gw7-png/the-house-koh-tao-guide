@@ -340,6 +340,48 @@ export class ConciergeStore extends DurableObject {
           updated_at TEXT NOT NULL
         );
 
+        CREATE TABLE IF NOT EXISTS stay_late_checkout_approvals (
+          reservation_id TEXT PRIMARY KEY,
+          room TEXT NOT NULL,
+          checkout_date TEXT NOT NULL,
+          checkout_minutes INTEGER NOT NULL,
+          checkout_time TEXT NOT NULL,
+          fee_thb INTEGER NOT NULL DEFAULT 200,
+          approved_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS stay_late_checkout_room_date
+          ON stay_late_checkout_approvals(room, checkout_date);
+
+        CREATE TABLE IF NOT EXISTS room_housekeeping_status (
+          room TEXT PRIMARY KEY,
+          status TEXT NOT NULL DEFAULT 'dirty',
+          current_task_id TEXT NOT NULL DEFAULT '',
+          service_date TEXT NOT NULL DEFAULT '',
+          arriving_reservation_id TEXT NOT NULL DEFAULT '',
+          updated_at TEXT NOT NULL,
+          updated_by_hash TEXT NOT NULL DEFAULT ''
+        );
+
+        CREATE TABLE IF NOT EXISTS housekeeping_tasks (
+          id TEXT PRIMARY KEY,
+          source_key TEXT NOT NULL UNIQUE,
+          room TEXT NOT NULL,
+          service_date TEXT NOT NULL,
+          departing_reservation_id TEXT NOT NULL DEFAULT '',
+          arriving_reservation_id TEXT NOT NULL DEFAULT '',
+          requested_arrival TEXT NOT NULL DEFAULT '',
+          checkout_time TEXT NOT NULL DEFAULT '11:00 AM',
+          priority INTEGER NOT NULL DEFAULT 0,
+          alert_id TEXT NOT NULL DEFAULT '',
+          status TEXT NOT NULL DEFAULT 'pending',
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS housekeeping_tasks_room_date
+          ON housekeeping_tasks(room, service_date, status);
+        CREATE INDEX IF NOT EXISTS housekeeping_tasks_alert
+          ON housekeeping_tasks(alert_id);
+
         CREATE TABLE IF NOT EXISTS verified_stay_sessions (
           id TEXT PRIMARY KEY,
           token_hash TEXT NOT NULL UNIQUE,
@@ -2247,6 +2289,355 @@ export class ConciergeStore extends DurableObject {
     };
   }
 
+  async recordLateCheckoutApproval(record = {}) {
+    const reservationId = cleanText(record.reservationId, 100);
+    const room = cleanText(record.room, 4);
+    const checkoutDate = cleanText(record.checkoutDate, 10);
+    const checkoutTime = cleanText(record.checkoutTime, 40);
+    const checkoutMinutes = Number(record.checkoutMinutes);
+    const feeThb = Number(record.feeThb) || 200;
+    const approvedAt = cleanText(record.approvedAt, 40) || new Date().toISOString();
+    if (!reservationId || !/^([1-9]|1[01])$/.test(room) || !/^\d{4}-\d{2}-\d{2}$/.test(checkoutDate)
+      || !checkoutTime || !Number.isInteger(checkoutMinutes) || checkoutMinutes <= 660 || checkoutMinutes > 840 || feeThb !== 200) {
+      return { ok: false, error: "invalid_late_checkout_approval" };
+    }
+    const reservation = rows(this.ctx.storage.sql.exec(
+      `SELECT id, room, status,
+              CASE WHEN o.check_out_date > r.check_out_date THEN o.check_out_date ELSE r.check_out_date END AS checkOutDate
+       FROM stay_reservations r
+       LEFT JOIN stay_checkout_overrides o ON o.reservation_id = r.id
+       WHERE r.id = ? LIMIT 1`,
+      reservationId
+    ))[0] || null;
+    if (!reservation || reservation.status !== "confirmed" || String(reservation.room) !== room || reservation.checkOutDate !== checkoutDate) {
+      return { ok: false, error: "reservation_mismatch" };
+    }
+    this.ctx.storage.sql.exec(
+      `INSERT INTO stay_late_checkout_approvals
+       (reservation_id, room, checkout_date, checkout_minutes, checkout_time, fee_thb, approved_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(reservation_id) DO UPDATE SET
+         room = excluded.room,
+         checkout_date = excluded.checkout_date,
+         checkout_minutes = excluded.checkout_minutes,
+         checkout_time = excluded.checkout_time,
+         fee_thb = excluded.fee_thb,
+         approved_at = excluded.approved_at`,
+      reservationId, room, checkoutDate, checkoutMinutes, checkoutTime, feeThb, approvedAt
+    );
+    this.ctx.storage.sql.exec(
+      `UPDATE housekeeping_tasks
+       SET checkout_time = ?, updated_at = ?
+       WHERE departing_reservation_id = ? AND service_date = ? AND status IN ('pending', 'received')`,
+      checkoutTime, approvedAt, reservationId, checkoutDate
+    );
+    await this.recordAdminAudit("late_checkout_approved", `reservation:${reservationId}`, approvedAt);
+    return { ok: true, reservationId, room, checkoutDate, checkoutMinutes, checkoutTime, feeThb, approvedAt };
+  }
+
+  async getLateCheckoutApproval(reservationId) {
+    const id = cleanText(reservationId, 100);
+    if (!id) return null;
+    return rows(this.ctx.storage.sql.exec(
+      `SELECT reservation_id AS reservationId, room, checkout_date AS checkoutDate,
+              checkout_minutes AS checkoutMinutes, checkout_time AS checkoutTime,
+              fee_thb AS feeThb, approved_at AS approvedAt
+       FROM stay_late_checkout_approvals WHERE reservation_id = ? LIMIT 1`,
+      id
+    ))[0] || null;
+  }
+
+  async getRoomHousekeepingStatus(room) {
+    const cleanRoom = cleanText(room, 4);
+    if (!cleanRoom) return null;
+    const record = rows(this.ctx.storage.sql.exec(
+      `SELECT room, status, current_task_id AS currentTaskId, service_date AS serviceDate,
+              arriving_reservation_id AS arrivingReservationId, updated_at AS updatedAt
+       FROM room_housekeeping_status WHERE room = ? LIMIT 1`,
+      cleanRoom
+    ))[0] || null;
+    return record || { room: cleanRoom, status: "unknown", currentTaskId: "", serviceDate: "", arrivingReservationId: "", updatedAt: "" };
+  }
+
+  async listRoomHousekeepingStatuses() {
+    const existing = new Map(rows(this.ctx.storage.sql.exec(
+      `SELECT room, status, current_task_id AS currentTaskId, service_date AS serviceDate,
+              arriving_reservation_id AS arrivingReservationId, updated_at AS updatedAt
+       FROM room_housekeeping_status ORDER BY CAST(room AS INTEGER) ASC`
+    )).map((item) => [String(item.room), item]));
+    return Array.from({ length: 11 }, (_, index) => {
+      const room = String(index + 1);
+      return existing.get(room) || { room, status: "unknown", currentTaskId: "", serviceDate: "", arrivingReservationId: "", updatedAt: "" };
+    });
+  }
+
+  async setRoomHousekeepingStatus(room, status, nowValue, actorHash = "", context = {}) {
+    const cleanRoom = cleanText(room, 4);
+    const cleanStatus = cleanText(status, 12).toLowerCase();
+    if (!/^([1-9]|1[01])$/.test(cleanRoom) || !["dirty", "clean", "ready"].includes(cleanStatus)) {
+      return { ok: false, error: "invalid_housekeeping_status" };
+    }
+    const now = cleanText(nowValue, 40) || new Date().toISOString();
+    const existing = await this.getRoomHousekeepingStatus(cleanRoom);
+    const hasTaskId = Object.prototype.hasOwnProperty.call(context, "currentTaskId");
+    const hasServiceDate = Object.prototype.hasOwnProperty.call(context, "serviceDate");
+    const hasArrival = Object.prototype.hasOwnProperty.call(context, "arrivingReservationId");
+    const taskId = cleanText(hasTaskId ? context.currentTaskId : existing?.currentTaskId || "", 100);
+    const rawServiceDate = hasServiceDate ? context.serviceDate : existing?.serviceDate || "";
+    const serviceDate = /^\d{4}-\d{2}-\d{2}$/.test(String(rawServiceDate || "")) ? String(rawServiceDate) : "";
+    const arrivingReservationId = cleanText(hasArrival ? context.arrivingReservationId : existing?.arrivingReservationId || "", 100);
+    this.ctx.storage.sql.exec(
+      `INSERT INTO room_housekeeping_status
+       (room, status, current_task_id, service_date, arriving_reservation_id, updated_at, updated_by_hash)
+       VALUES (?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(room) DO UPDATE SET status = excluded.status,
+         current_task_id = excluded.current_task_id,
+         service_date = excluded.service_date,
+         arriving_reservation_id = excluded.arriving_reservation_id,
+         updated_at = excluded.updated_at,
+         updated_by_hash = excluded.updated_by_hash`,
+      cleanRoom, cleanStatus, taskId, serviceDate, arrivingReservationId, now, cleanText(actorHash, 100)
+    );
+    await this.recordAdminAudit(`housekeeping_room_${cleanStatus}`, `room:${cleanRoom}`, now);
+    return { ok: true, room: cleanRoom, status: cleanStatus, currentTaskId: taskId, serviceDate, arrivingReservationId, updatedAt: now };
+  }
+
+  async claimHousekeepingTask(payload = {}) {
+    const sourceKey = cleanText(payload.sourceKey, 180);
+    const room = cleanText(payload.room, 4);
+    const serviceDate = cleanText(payload.serviceDate, 10);
+    const departingReservationId = cleanText(payload.departingReservationId, 100);
+    const arrivingReservationId = cleanText(payload.arrivingReservationId, 100);
+    const requestedArrival = cleanText(payload.requestedArrival, 60);
+    const checkoutTime = cleanText(payload.checkoutTime || "11:00 AM", 40) || "11:00 AM";
+    const priority = payload.priority ? 1 : 0;
+    const now = cleanText(payload.createdAt, 40) || new Date().toISOString();
+    if (!sourceKey || !/^([1-9]|1[01])$/.test(room) || !/^\d{4}-\d{2}-\d{2}$/.test(serviceDate)) {
+      return { created: false, error: "invalid_housekeeping_task" };
+    }
+    let existing = rows(this.ctx.storage.sql.exec(
+      `SELECT id, source_key AS sourceKey, room, service_date AS serviceDate,
+              departing_reservation_id AS departingReservationId, arriving_reservation_id AS arrivingReservationId,
+              requested_arrival AS requestedArrival, checkout_time AS checkoutTime, priority,
+              alert_id AS alertId, status, created_at AS createdAt, updated_at AS updatedAt
+       FROM housekeeping_tasks WHERE source_key = ? LIMIT 1`,
+      sourceKey
+    ))[0] || null;
+    if (!existing && departingReservationId) {
+      existing = rows(this.ctx.storage.sql.exec(
+        `SELECT id, source_key AS sourceKey, room, service_date AS serviceDate,
+                departing_reservation_id AS departingReservationId, arriving_reservation_id AS arrivingReservationId,
+                requested_arrival AS requestedArrival, checkout_time AS checkoutTime, priority,
+                alert_id AS alertId, status, created_at AS createdAt, updated_at AS updatedAt
+         FROM housekeeping_tasks
+         WHERE departing_reservation_id = ? AND service_date = ? AND status IN ('pending', 'received')
+         ORDER BY updated_at DESC LIMIT 1`,
+        departingReservationId, serviceDate
+      ))[0] || null;
+    }
+    if (existing) {
+      const nextPriority = priority || Number(existing.priority) ? 1 : 0;
+      const nextArrival = requestedArrival || existing.requestedArrival || "";
+      const nextCheckoutTime = checkoutTime || existing.checkoutTime || "11:00 AM";
+      const nextArrivingReservationId = arrivingReservationId || existing.arrivingReservationId || "";
+      const priorityUpdated = Boolean((nextPriority && !Number(existing.priority))
+        || (requestedArrival && requestedArrival !== existing.requestedArrival)
+        || (nextCheckoutTime && nextCheckoutTime !== existing.checkoutTime)
+        || (nextArrivingReservationId && nextArrivingReservationId !== existing.arrivingReservationId));
+      if (priorityUpdated) {
+        this.ctx.storage.sql.exec(
+          `UPDATE housekeeping_tasks
+           SET priority = ?, requested_arrival = ?, checkout_time = ?, arriving_reservation_id = ?, updated_at = ?
+           WHERE id = ?`,
+          nextPriority, nextArrival, nextCheckoutTime, nextArrivingReservationId, now, existing.id
+        );
+        Object.assign(existing, { priority: nextPriority, requestedArrival: nextArrival, checkoutTime: nextCheckoutTime, arrivingReservationId: nextArrivingReservationId, updatedAt: now });
+      }
+      return { created: false, priorityUpdated, task: existing };
+    }
+    const id = `housekeeping_${crypto.randomUUID()}`;
+    this.ctx.storage.sql.exec(
+      `INSERT INTO housekeeping_tasks
+       (id, source_key, room, service_date, departing_reservation_id, arriving_reservation_id,
+        requested_arrival, checkout_time, priority, alert_id, status, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, '', 'pending', ?, ?)`,
+      id, sourceKey, room, serviceDate, departingReservationId, arrivingReservationId,
+      requestedArrival, checkoutTime, priority, now, now
+    );
+    await this.setRoomHousekeepingStatus(room, "dirty", now, "", {
+      currentTaskId: id,
+      serviceDate,
+      arrivingReservationId
+    });
+    return { created: true, task: { id, sourceKey, room, serviceDate, departingReservationId, arrivingReservationId, requestedArrival, checkoutTime, priority, alertId: "", status: "pending", createdAt: now, updatedAt: now } };
+  }
+
+  async linkHousekeepingTaskAlert(taskId, alertId, nowValue) {
+    const id = cleanText(taskId, 100);
+    const alert = cleanText(alertId, 100);
+    const now = cleanText(nowValue, 40) || new Date().toISOString();
+    if (!id || !alert) return { ok: false, error: "invalid_request" };
+    this.ctx.storage.sql.exec("UPDATE housekeeping_tasks SET alert_id = ?, updated_at = ? WHERE id = ?", alert, now, id);
+    return { ok: true };
+  }
+
+  async getHousekeepingTaskForAlert(alertId) {
+    const id = cleanText(alertId, 100);
+    return rows(this.ctx.storage.sql.exec(
+      `SELECT id, source_key AS sourceKey, room, service_date AS serviceDate,
+              departing_reservation_id AS departingReservationId, arriving_reservation_id AS arrivingReservationId,
+              requested_arrival AS requestedArrival, checkout_time AS checkoutTime, priority, alert_id AS alertId, status,
+              created_at AS createdAt, updated_at AS updatedAt
+       FROM housekeeping_tasks WHERE alert_id = ? LIMIT 1`,
+      id
+    ))[0] || null;
+  }
+
+  async acknowledgeHousekeepingTask(alertId, nowValue) {
+    const task = await this.getHousekeepingTaskForAlert(alertId);
+    if (!task) return { ok: false, error: "housekeeping_task_not_found" };
+    const now = cleanText(nowValue, 40) || new Date().toISOString();
+    this.ctx.storage.sql.exec(
+      "UPDATE housekeeping_tasks SET status = CASE WHEN status = 'ready' THEN status ELSE 'received' END, updated_at = ? WHERE id = ?",
+      now, task.id
+    );
+    return { ok: true, taskId: task.id, room: task.room };
+  }
+
+  async markHousekeepingReadyFromAlert(alertId, actorHash, nowValue) {
+    const task = await this.getHousekeepingTaskForAlert(alertId);
+    if (!task) return { ok: false, error: "housekeeping_task_not_found" };
+    const current = await this.getRoomHousekeepingStatus(task.room);
+    if (current?.currentTaskId && current.currentTaskId !== task.id) return { ok: false, error: "stale_housekeeping_task" };
+    if (task.departingReservationId) {
+      const departure = rows(this.ctx.storage.sql.exec(
+        `SELECT CASE WHEN o.check_out_date > r.check_out_date THEN o.check_out_date ELSE r.check_out_date END AS checkOutDate
+         FROM stay_reservations r
+         LEFT JOIN stay_checkout_overrides o ON o.reservation_id = r.id
+         WHERE r.id = ? AND r.status = 'confirmed' LIMIT 1`,
+        task.departingReservationId
+      ))[0] || null;
+      if (!departure || departure.checkOutDate !== task.serviceDate) return { ok: false, error: "stale_housekeeping_task" };
+      const approval = await this.getLateCheckoutApproval(task.departingReservationId);
+      const checkoutMinutes = Number(approval?.checkoutMinutes) || 660;
+      const nowDate = new Date(nowValue || Date.now());
+      const parts = Object.fromEntries(new Intl.DateTimeFormat("en-GB", {
+        timeZone: "Asia/Bangkok", year: "numeric", month: "2-digit", day: "2-digit",
+        hour: "2-digit", minute: "2-digit", hourCycle: "h23"
+      }).formatToParts(nowDate).filter((item) => item.type !== "literal").map((item) => [item.type, item.value]));
+      const bangkokDate = `${parts.year}-${parts.month}-${parts.day}`;
+      const bangkokMinutes = (Number(parts.hour) * 60) + Number(parts.minute);
+      if (bangkokDate < task.serviceDate || (bangkokDate === task.serviceDate && bangkokMinutes < checkoutMinutes)) {
+        return { ok: false, error: "checkout_not_reached" };
+      }
+    }
+    const now = cleanText(nowValue, 40) || new Date().toISOString();
+    this.ctx.storage.sql.exec("UPDATE housekeeping_tasks SET status = 'ready', updated_at = ? WHERE id = ?", now, task.id);
+    const result = await this.setRoomHousekeepingStatus(task.room, "ready", now, actorHash, {
+      currentTaskId: task.id,
+      serviceDate: task.serviceDate,
+      arrivingReservationId: task.arrivingReservationId
+    });
+    return { ...result, taskId: task.id };
+  }
+
+  async getDueHousekeepingTurnovers(serviceDate, currentMinutes = 660) {
+    const date = cleanText(serviceDate, 10);
+    const minutes = Number(currentMinutes);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !Number.isFinite(minutes)) return [];
+    const departures = rows(this.ctx.storage.sql.exec(
+      `SELECT r.id AS departingReservationId, r.room,
+              CASE WHEN o.check_out_date > r.check_out_date THEN o.check_out_date ELSE r.check_out_date END AS serviceDate,
+              COALESCE(l.checkout_minutes, 660) AS checkoutMinutes,
+              COALESCE(l.checkout_time, '11:00 AM') AS checkoutTime
+       FROM stay_reservations r
+       LEFT JOIN stay_checkout_overrides o ON o.reservation_id = r.id
+       LEFT JOIN stay_late_checkout_approvals l ON l.reservation_id = r.id
+       WHERE r.status = 'confirmed'
+         AND (CASE WHEN o.check_out_date > r.check_out_date THEN o.check_out_date ELSE r.check_out_date END) = ?
+         AND COALESCE(l.checkout_minutes, 660) <= ?
+       ORDER BY CAST(r.room AS INTEGER) ASC`,
+      date, Math.floor(minutes)
+    ));
+    const result = [];
+    for (const departure of departures) {
+      const sourceKey = `checkout:${departure.departingReservationId}:${date}`;
+      const existing = rows(this.ctx.storage.sql.exec(
+        `SELECT id FROM housekeeping_tasks
+         WHERE departing_reservation_id = ? AND service_date = ? AND status IN ('pending', 'received', 'ready')
+         ORDER BY updated_at DESC LIMIT 1`,
+        departure.departingReservationId, date
+      ))[0];
+      if (existing) continue;
+      const arrival = rows(this.ctx.storage.sql.exec(
+        `SELECT id, guest_first_name AS guestFirstName, provider
+         FROM stay_reservations
+         WHERE room = ? AND status = 'confirmed' AND check_in_date = ? AND id != ?
+         ORDER BY updated_at DESC LIMIT 1`,
+        departure.room, date, departure.departingReservationId
+      ))[0] || null;
+      result.push({ ...departure, sourceKey, arrivingReservationId: arrival?.id || "", arrivingProvider: arrival?.provider || "" });
+    }
+    return result;
+  }
+
+  async getEarlyCheckinHousekeepingContext(reservationId) {
+    const id = cleanText(reservationId, 100);
+    const reservation = rows(this.ctx.storage.sql.exec(
+      `SELECT r.id, r.room, r.check_in_date AS checkInDate,
+              CASE WHEN o.check_out_date > r.check_out_date THEN o.check_out_date ELSE r.check_out_date END AS checkOutDate,
+              r.provider
+       FROM stay_reservations r
+       LEFT JOIN stay_checkout_overrides o ON o.reservation_id = r.id
+       WHERE r.id = ? AND r.status = 'confirmed' LIMIT 1`, id
+    ))[0] || null;
+    if (!reservation) return null;
+    const previous = rows(this.ctx.storage.sql.exec(
+      `SELECT r.id, r.provider, r.check_in_date AS checkInDate,
+              CASE WHEN o.check_out_date > r.check_out_date THEN o.check_out_date ELSE r.check_out_date END AS checkOutDate
+       FROM stay_reservations r
+       LEFT JOIN stay_checkout_overrides o ON o.reservation_id = r.id
+       WHERE r.room = ? AND r.status = 'confirmed' AND r.id != ?
+         AND (CASE WHEN o.check_out_date > r.check_out_date THEN o.check_out_date ELSE r.check_out_date END) <= ?
+       ORDER BY (CASE WHEN o.check_out_date > r.check_out_date THEN o.check_out_date ELSE r.check_out_date END) DESC,
+                r.updated_at DESC LIMIT 1`,
+      reservation.room, id, reservation.checkInDate
+    ))[0] || null;
+    const previousSameDay = previous?.checkOutDate === reservation.checkInDate ? previous : null;
+    const blockingStay = rows(this.ctx.storage.sql.exec(
+      `SELECT r.id, r.provider, r.check_in_date AS checkInDate,
+              CASE WHEN o.check_out_date > r.check_out_date THEN o.check_out_date ELSE r.check_out_date END AS checkOutDate
+       FROM stay_reservations r
+       LEFT JOIN stay_checkout_overrides o ON o.reservation_id = r.id
+       WHERE r.room = ? AND r.status = 'confirmed' AND r.id != ?
+         AND r.check_in_date < ?
+         AND (CASE WHEN o.check_out_date > r.check_out_date THEN o.check_out_date ELSE r.check_out_date END) > ?
+       ORDER BY r.updated_at DESC LIMIT 1`,
+      reservation.room, id, reservation.checkInDate, reservation.checkInDate
+    ))[0] || null;
+    const previousLateCheckout = previousSameDay ? await this.getLateCheckoutApproval(previousSameDay.id) : null;
+    const roomStatus = await this.getRoomHousekeepingStatus(reservation.room);
+    let readyForReservation = false;
+    if (!blockingStay && roomStatus?.status === "ready") {
+      if (roomStatus.arrivingReservationId === reservation.id && roomStatus.serviceDate === reservation.checkInDate) {
+        readyForReservation = true;
+      } else if (!previous) {
+        readyForReservation = true;
+      } else if (roomStatus.serviceDate === previous.checkOutDate) {
+        readyForReservation = true;
+      }
+    }
+    return {
+      ...reservation,
+      previousSameDayStay: previousSameDay,
+      previousStay: previous,
+      blockingStay,
+      previousLateCheckout,
+      roomStatus,
+      readyForReservation
+    };
+  }
+
   async cancelOwnerManagedStay(reservationId, nowValue) {
     const id = cleanText(reservationId, 100);
     const now = cleanText(nowValue, 40) || new Date().toISOString();
@@ -2260,6 +2651,7 @@ export class ConciergeStore extends DurableObject {
     this.ctx.storage.sql.exec("UPDATE stay_reservations SET status = 'cancelled', updated_at = ? WHERE id = ?", now, id);
     this.ctx.storage.sql.exec("UPDATE verified_stay_sessions SET revoked_at = ? WHERE reservation_id = ? AND revoked_at = ''", now, id);
     this.ctx.storage.sql.exec("DELETE FROM stay_checkout_overrides WHERE reservation_id = ?", id);
+    this.ctx.storage.sql.exec("DELETE FROM stay_late_checkout_approvals WHERE reservation_id = ?", id);
     await this.closePendingPassportLinksForReservation(id, now);
     await this.recordAdminAudit("owner_managed_stay_deleted", `reservation:${id}`, now);
     return { ok: true, reservationId: id, room: cleanText(reservation.room, 4), deleted: true };
@@ -2367,7 +2759,15 @@ export class ConciergeStore extends DurableObject {
        WHERE event_type IN ('rotation_cleared_controlled_test', 'rotation_cleared_physical')
        ORDER BY created_at DESC LIMIT 20`
     ));
-    return { reservations, rotations, rotationActivity };
+    const housekeepingStatuses = await this.listRoomHousekeepingStatuses();
+    const housekeepingTasks = rows(this.ctx.storage.sql.exec(
+      `SELECT id, room, service_date AS serviceDate, requested_arrival AS requestedArrival, checkout_time AS checkoutTime,
+              priority, alert_id AS alertId, status, created_at AS createdAt, updated_at AS updatedAt
+       FROM housekeeping_tasks
+       WHERE service_date >= date('now', '-1 day')
+       ORDER BY service_date DESC, priority DESC, CAST(room AS INTEGER) ASC LIMIT 100`
+    )).map((item) => ({ ...item, priority: Boolean(item.priority) }));
+    return { reservations, rotations, rotationActivity, housekeepingStatuses, housekeepingTasks };
   }
 
   async getTranslations(cacheKeys) {

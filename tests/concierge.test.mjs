@@ -42,6 +42,7 @@ import {
   whatsappAlertConfiguration
 } from "../src/whatsapp-alerts.js";
 import { servePublicLegalPage } from "../src/public-legal.js";
+import { processHousekeepingTurnovers } from "../src/housekeeping-operations.js";
 import knowledge from "../public/data/concierge-knowledge.json" with { type: "json" };
 import activities from "../public/data/activities.json" with { type: "json" };
 import bars from "../public/data/bars.json" with { type: "json" };
@@ -92,6 +93,9 @@ function createStore() {
     passportAlertLinks: new Map(),
     stayReservations: [],
     staySessions: [],
+    lateCheckoutApprovals: new Map(),
+    housekeepingStatuses: new Map(),
+    housekeepingTasks: [],
     registrationStatuses: new Map(),
     checkinReminderState: new Map(),
     spareKeyEvents: [],
@@ -214,7 +218,12 @@ function createStore() {
         rotationActivity: this.spareKeyEvents
           .filter((item) => ["rotation_cleared_controlled_test", "rotation_cleared_physical"].includes(item.eventType))
           .map(({ id, room, eventType, createdAt }) => ({ id, room, eventType, createdAt }))
-          .reverse()
+          .reverse(),
+        housekeepingStatuses: Array.from({ length: 11 }, (_, index) => {
+          const room = String(index + 1);
+          return this.housekeepingStatuses.get(room) || { room, status: "unknown", currentTaskId: "", serviceDate: "", arrivingReservationId: "", updatedAt: "" };
+        }),
+        housekeepingTasks: this.housekeepingTasks.map((item) => ({ ...item }))
       };
     },
     async syncStayReservations(payload) {
@@ -280,6 +289,136 @@ function createStore() {
         nextSameDayCheckIn: this.stayReservations.some((item) => item.id !== reservationId && item.room === reservation.room && item.status === "confirmed" && item.checkInDate === reservation.checkOutDate)
       };
     },
+    async recordLateCheckoutApproval(record) {
+      const reservation = this.stayReservations.find((item) => item.id === record.reservationId && item.status === "confirmed");
+      if (!reservation || reservation.room !== record.room || reservation.checkOutDate !== record.checkoutDate
+        || !Number.isInteger(record.checkoutMinutes) || record.checkoutMinutes <= 660 || record.checkoutMinutes > 840 || record.feeThb !== 200) {
+        return { ok: false, error: "reservation_mismatch" };
+      }
+      const value = { ...record };
+      this.lateCheckoutApprovals.set(record.reservationId, value);
+      this.housekeepingTasks.filter((item) => item.departingReservationId === record.reservationId && item.serviceDate === record.checkoutDate && ["pending", "received"].includes(item.status))
+        .forEach((item) => { item.checkoutTime = record.checkoutTime; item.updatedAt = record.approvedAt; });
+      this.adminAudit.push({ action: "late_checkout_approved", reference: `reservation:${record.reservationId}`, createdAt: record.approvedAt });
+      return { ok: true, ...value };
+    },
+    async getLateCheckoutApproval(reservationId) {
+      return this.lateCheckoutApprovals.get(reservationId) || null;
+    },
+    async getRoomHousekeepingStatus(room) {
+      return this.housekeepingStatuses.get(room) || { room, status: "unknown", currentTaskId: "", serviceDate: "", arrivingReservationId: "", updatedAt: "" };
+    },
+    async listRoomHousekeepingStatuses() {
+      return Array.from({ length: 11 }, (_, index) => this.getRoomHousekeepingStatus(String(index + 1)));
+    },
+    async setRoomHousekeepingStatus(room, status, updatedAt, _actorHash = "", context = {}) {
+      const current = await this.getRoomHousekeepingStatus(room);
+      const value = {
+        room, status,
+        currentTaskId: Object.prototype.hasOwnProperty.call(context, "currentTaskId") ? context.currentTaskId : current.currentTaskId,
+        serviceDate: Object.prototype.hasOwnProperty.call(context, "serviceDate") ? context.serviceDate : current.serviceDate,
+        arrivingReservationId: Object.prototype.hasOwnProperty.call(context, "arrivingReservationId") ? context.arrivingReservationId : current.arrivingReservationId,
+        updatedAt
+      };
+      this.housekeepingStatuses.set(room, value);
+      this.adminAudit.push({ action: `housekeeping_room_${status}`, reference: `room:${room}`, createdAt: updatedAt });
+      return { ok: true, ...value };
+    },
+    async getEarlyCheckinHousekeepingContext(reservationId) {
+      const reservation = this.stayReservations.find((item) => item.id === reservationId && item.status === "confirmed");
+      if (!reservation) return null;
+      const others = this.stayReservations.filter((item) => item.id !== reservationId && item.room === reservation.room && item.status === "confirmed");
+      const prior = others.filter((item) => item.checkOutDate <= reservation.checkInDate).sort((a,b) => b.checkOutDate.localeCompare(a.checkOutDate))[0] || null;
+      const previousSameDayStay = prior?.checkOutDate === reservation.checkInDate ? prior : null;
+      const blockingStay = others.find((item) => item.checkInDate < reservation.checkInDate && item.checkOutDate > reservation.checkInDate) || null;
+      const previousLateCheckout = previousSameDayStay ? this.lateCheckoutApprovals.get(previousSameDayStay.id) || null : null;
+      const roomStatus = await this.getRoomHousekeepingStatus(reservation.room);
+      let readyForReservation = false;
+      if (!blockingStay && roomStatus.status === "ready") {
+        if (roomStatus.arrivingReservationId === reservation.id && roomStatus.serviceDate === reservation.checkInDate) readyForReservation = true;
+        else if (!prior) readyForReservation = true;
+        else if (roomStatus.serviceDate === prior.checkOutDate) readyForReservation = true;
+      }
+      return { ...reservation, previousStay: prior, previousSameDayStay, blockingStay, previousLateCheckout, roomStatus, readyForReservation };
+    },
+    async claimHousekeepingTask(payload) {
+      let existing = this.housekeepingTasks.find((item) => item.sourceKey === payload.sourceKey);
+      if (!existing && payload.departingReservationId) {
+        existing = this.housekeepingTasks.find((item) => item.departingReservationId === payload.departingReservationId && item.serviceDate === payload.serviceDate && ["pending", "received"].includes(item.status));
+      }
+      if (existing) {
+        const priorityUpdated = Boolean((payload.priority && !existing.priority)
+          || (payload.requestedArrival && payload.requestedArrival !== existing.requestedArrival)
+          || (payload.checkoutTime && payload.checkoutTime !== existing.checkoutTime)
+          || (payload.arrivingReservationId && payload.arrivingReservationId !== existing.arrivingReservationId));
+        if (priorityUpdated) Object.assign(existing, {
+          priority: Boolean(payload.priority || existing.priority),
+          requestedArrival: payload.requestedArrival || existing.requestedArrival || "",
+          checkoutTime: payload.checkoutTime || existing.checkoutTime || "11:00 AM",
+          arrivingReservationId: payload.arrivingReservationId || existing.arrivingReservationId || "",
+          updatedAt: payload.createdAt
+        });
+        return { created: false, priorityUpdated, task: existing };
+      }
+      const task = {
+        id: `housekeeping_${crypto.randomUUID()}`,
+        sourceKey: payload.sourceKey, room: payload.room, serviceDate: payload.serviceDate,
+        departingReservationId: payload.departingReservationId || "", arrivingReservationId: payload.arrivingReservationId || "",
+        requestedArrival: payload.requestedArrival || "", checkoutTime: payload.checkoutTime || "11:00 AM",
+        priority: Boolean(payload.priority), alertId: "", status: "pending", createdAt: payload.createdAt, updatedAt: payload.createdAt
+      };
+      this.housekeepingTasks.push(task);
+      await this.setRoomHousekeepingStatus(task.room, "dirty", payload.createdAt, "", {
+        currentTaskId: task.id, serviceDate: task.serviceDate, arrivingReservationId: task.arrivingReservationId
+      });
+      return { created: true, task };
+    },
+    async linkHousekeepingTaskAlert(taskId, alertId, updatedAt) {
+      const task = this.housekeepingTasks.find((item) => item.id === taskId);
+      if (!task) return { ok: false };
+      Object.assign(task, { alertId, updatedAt });
+      return { ok: true };
+    },
+    async getHousekeepingTaskForAlert(alertId) {
+      return this.housekeepingTasks.find((item) => item.alertId === alertId) || null;
+    },
+    async acknowledgeHousekeepingTask(alertId, updatedAt) {
+      const task = await this.getHousekeepingTaskForAlert(alertId);
+      if (!task) return { ok: false };
+      if (task.status !== "ready") task.status = "received";
+      task.updatedAt = updatedAt;
+      return { ok: true, taskId: task.id, room: task.room };
+    },
+    async markHousekeepingReadyFromAlert(alertId, actorHash, updatedAt) {
+      const task = await this.getHousekeepingTaskForAlert(alertId);
+      if (!task) return { ok: false, error: "housekeeping_task_not_found" };
+      const current = await this.getRoomHousekeepingStatus(task.room);
+      if (current.currentTaskId && current.currentTaskId !== task.id) return { ok: false, error: "stale_housekeeping_task" };
+      if (task.departingReservationId) {
+        const departure = this.stayReservations.find((item) => item.id === task.departingReservationId && item.status === "confirmed");
+        if (!departure || departure.checkOutDate !== task.serviceDate) return { ok: false, error: "stale_housekeeping_task" };
+      }
+      task.status = "ready";
+      task.updatedAt = updatedAt;
+      return this.setRoomHousekeepingStatus(task.room, "ready", updatedAt, actorHash, {
+        currentTaskId: task.id, serviceDate: task.serviceDate, arrivingReservationId: task.arrivingReservationId
+      });
+    },
+    async getDueHousekeepingTurnovers(serviceDate, currentMinutes = 660) {
+      return this.stayReservations.filter((item) => item.status === "confirmed" && item.checkOutDate === serviceDate).flatMap((departure) => {
+        const approval = this.lateCheckoutApprovals.get(departure.id);
+        const checkoutMinutes = approval?.checkoutMinutes || 660;
+        if (checkoutMinutes > currentMinutes) return [];
+        if (this.housekeepingTasks.some((task) => task.departingReservationId === departure.id && task.serviceDate === serviceDate && ["pending", "received", "ready"].includes(task.status))) return [];
+        const arrival = this.stayReservations.find((item) => item.id !== departure.id && item.room === departure.room && item.status === "confirmed" && item.checkInDate === serviceDate);
+        return [{
+          sourceKey: `checkout:${departure.id}:${serviceDate}`,
+          departingReservationId: departure.id, room: departure.room, serviceDate,
+          checkoutMinutes, checkoutTime: approval?.checkoutTime || "11:00 AM",
+          arrivingReservationId: arrival?.id || "", arrivingProvider: arrival?.provider || ""
+        }];
+      });
+    },
     async cancelOwnerManagedStay(reservationId, updatedAt) {
       const reservation = this.stayReservations.find((item) => item.id === reservationId);
       if (!reservation) return { ok: false, error: "reservation_not_found" };
@@ -287,6 +426,7 @@ function createStore() {
       if (reservation.status !== "confirmed") return { ok: false, error: "reservation_not_active" };
       reservation.status = "cancelled";
       reservation.updatedAt = updatedAt;
+      this.lateCheckoutApprovals.delete(reservationId);
       this.staySessions.filter((item) => item.reservationId === reservationId && !item.revokedAt).forEach((item) => { item.revokedAt = updatedAt; });
       await this.closePendingPassportLinksForReservation(reservationId, updatedAt);
       this.adminAudit.push({ action: "owner_managed_stay_deleted", reference: `reservation:${reservationId}`, createdAt: updatedAt });
@@ -3221,7 +3361,7 @@ test("guest localization supports seven languages and keeps the owner dashboard 
   assert.doesNotMatch(admin, /src="\/i18n\.js"/);
   assert.match(runtime, /exploreContentDeferred/);
   assert.match(runtime, /element\.closest\("\.section,\.footer"\)/);
-  assert.match(runtime, /houseGuideTranslations:v5\.11\.46:/);
+  assert.match(runtime, /houseGuideTranslations:v5\.11\.47:/);
   assert.match(runtime, /MAX_REQUEST_RETRIES = 2/);
   assert.match(runtime, /let flushRunning = false/);
 });
@@ -8330,6 +8470,9 @@ test("Durable Object SQLite schema initializes every operational table used by a
     "admin_operation_audit",
     "stay_reservations",
     "stay_checkout_overrides",
+    "stay_late_checkout_approvals",
+    "room_housekeeping_status",
+    "housekeeping_tasks",
     "verified_stay_sessions",
     "stay_registration_requirements",
     "spare_key_events",
@@ -9413,7 +9556,7 @@ test("the centralized Meta text sanitizer protects service, status and future ac
   assert.doesNotMatch(JSON.stringify(diagnostic), /66812345678|81 234 5678|Please bring new towels/);
 });
 
-test("release configuration activates the five exact reviewed staff quick-action templates", async () => {
+test("release configuration keeps the five reviewed staff templates and adds the housekeeping quick-action template", async () => {
   const wrangler = JSON.parse(await readFile(new URL("../wrangler.jsonc", import.meta.url), "utf8"));
   const vars = wrangler.vars;
   assert.equal(vars.EXPLORE_ENABLED, "false");
@@ -9424,8 +9567,9 @@ test("release configuration activates the five exact reviewed staff quick-action
   assert.equal(vars.WHATSAPP_URGENT_ACTION_TEMPLATE_NAME, "house_urgent_alert_actions_v2");
   assert.equal(vars.WHATSAPP_LOST_KEY_ACTION_TEMPLATE_NAME, "house_lost_key_alert_actions_v2");
   assert.equal(vars.WHATSAPP_REGISTRATION_ACTION_TEMPLATE_NAME, "house_registration_admin_alert_actions_v1");
+  assert.equal(vars.WHATSAPP_HOUSEKEEPING_ACTION_TEMPLATE_NAME, "house_housekeeping_task_actions_v1");
   assert.equal(whatsappAlertConfiguration(vars).staffQuickActionsEnabled, true);
-  assert.equal(Object.values(whatsappAlertConfiguration(vars).staffQuickActionTemplates).length, 5);
+  assert.equal(Object.values(whatsappAlertConfiguration(vars).staffQuickActionTemplates).length, 6);
   const built = buildWhatsAppTemplatePayload({
     id: "alert_release_config_1234567890",
     room: "6",
@@ -12419,8 +12563,8 @@ test("hourly registration reminder cron is present while existing escalation and
   assert.match(config, /"crons": \["\*\/1 \* \* \* \*", "0 \* \* \* \*", "17 19 \* \* \*"\]/);
 });
 
-test("reservation-aware late checkout knows the verified checkout date and sends one operational alert after the requested time", async () => {
-  const now = new Date("2026-09-07T09:00:00.000Z");
+test("late checkout up to 2 PM requires the 200 THB fee acceptance, then auto-confirms and notifies the team even with a same-day arrival", async () => {
+  const now = new Date("2027-09-07T09:00:00.000Z");
   const { env, store } = createEnvironment({
     GUEST_ACCESS_ENFORCEMENT: "true",
     WHATSAPP_ACCESS_TOKEN: "meta-test-token",
@@ -12436,8 +12580,8 @@ test("reservation-aware late checkout knows the verified checkout date and sends
   const cookie = await syncAndVerifyStay(env, {
     room: "11",
     confirmationCode: "HMLATEOUT11",
-    checkInDate: "2026-09-05",
-    checkOutDate: "2026-09-08",
+    checkInDate: "2027-09-05",
+    checkOutDate: "2027-09-08",
     now
   });
   await completeThaiRegistration(env, cookie, new Date(now.getTime() + 10));
@@ -12447,25 +12591,33 @@ test("reservation-aware late checkout knows the verified checkout date and sends
     listingId: "next-room-11",
     room: "11",
     confirmationCodeHash: `hash_${crypto.randomUUID()}`,
-    checkInDate: "2026-09-08",
-    checkOutDate: "2026-09-10",
+    checkInDate: "2027-09-08",
+    checkOutDate: "2027-09-10",
     status: "confirmed",
     updatedAt: now.toISOString()
   });
 
-  const first = await handleConciergeRequest(
-    verifiedConciergeRequest("can I check out later", cookie),
-    env,
-    undefined,
-    now
-  );
+  const first = await handleConciergeRequest(verifiedConciergeRequest("can I check out later", cookie), env, undefined, now);
   const firstBody = await first.json();
   assert.equal(firstBody.workflow.type, "late_checkout");
   assert.equal(firstBody.workflow.status, "collecting");
-  assert.equal(firstBody.workflow.lateCheckoutRequest.scheduledCheckoutDate, "2026-09-08");
-  assert.match(firstBody.answer, /scheduled checkout is Tuesday, 8 September 2026 at 11:00 AM/i);
-  assert.match(firstBody.answer, /what time would you like to check out/i);
-  assert.doesNotMatch(firstBody.answer, /what is your scheduled checkout date/i);
+  assert.equal(firstBody.workflow.lateCheckoutRequest.scheduledCheckoutDate, "2027-09-08");
+  assert.match(firstBody.answer, /checkout is Wednesday, 8 September 2027 at 11:00 AM/i);
+  assert.match(firstBody.answer, /until 2:00 PM at the latest/i);
+  assert.match(firstBody.answer, /200 THB/i);
+  assert.equal(store.alerts.length, 0);
+
+  const timeReply = await handleConciergeRequest(
+    verifiedConciergeRequest("2pm", cookie, { workflowState: firstBody.workflow }),
+    env,
+    undefined,
+    new Date(now.getTime() + 1000)
+  );
+  const timeBody = await timeReply.json();
+  assert.equal(timeBody.workflow.status, "collecting");
+  assert.equal(timeBody.workflow.missing[0], "feeAcceptance");
+  assert.match(timeBody.answer, /200 THB service fee/i);
+  assert.match(timeBody.answer, /reply “Yes”/i);
   assert.equal(store.alerts.length, 0);
 
   const outbound = [];
@@ -12479,29 +12631,27 @@ test("reservation-aware late checkout knows the verified checkout date and sends
   };
   try {
     const completed = await handleConciergeRequest(
-      verifiedConciergeRequest("5pm", cookie, {
-        workflowState: firstBody.workflow,
-        history: [
-          { role: "user", content: "can I check out later" },
-          { role: "assistant", content: firstBody.answer }
-        ]
-      }),
+      verifiedConciergeRequest("yes", cookie, { workflowState: timeBody.workflow }),
       env,
       undefined,
-      new Date(now.getTime() + 1000)
+      new Date(now.getTime() + 2000)
     );
     const body = await completed.json();
     assert.equal(body.workflow.type, "late_checkout");
     assert.equal(body.workflow.status, "submitted");
-    assert.match(body.answer, /late-checkout request for 5:00 PM on Tuesday, 8 September 2026 has been sent/i);
-    assert.match(body.answer, /not confirmed/i);
+    assert.match(body.answer, /late checkout until 2:00 PM.*is confirmed/i);
+    assert.match(body.answer, /200 THB service fee applies/i);
     assert.equal(store.alerts.length, 1);
     assert.equal(store.alerts[0].alertType, "stay_support");
     assert.equal(store.alerts[0].recipientGroup, "support_with_owners");
-    assert.match(store.alerts[0].summary, /Late checkout request/i);
+    assert.match(store.alerts[0].summary, /Late checkout approved/i);
     assert.match(store.alerts[0].summary, /Same-day arrival is recorded/i);
+    assert.match(store.alerts[0].summary, /after 3:00 PM/i);
+    assert.equal(store.lateCheckoutApprovals.size, 1);
+    const approval = [...store.lateCheckoutApprovals.values()][0];
+    assert.equal(approval.checkoutMinutes, 840);
+    assert.equal(approval.feeThb, 200);
     assert.equal(outbound.length, 3);
-    assert.deepEqual(outbound.map((item) => item.to).sort(), ["66640000001", "66810000002", "66820000003"]);
     for (const payload of outbound) {
       assert.equal(payload.template.name, "house_service_alert_v3");
       assert.equal(payload.template.components[0].parameters[2].text, "Late checkout");
@@ -12511,38 +12661,60 @@ test("reservation-aware late checkout knows the verified checkout date and sends
   }
 });
 
-test("late checkout never claims the request was sent when WhatsApp delivery is not accepted", async () => {
-  const now = new Date("2026-09-07T09:00:00.000Z");
-  const { env } = createEnvironment({ GUEST_ACCESS_ENFORCEMENT: "true" });
+test("late checkout over 2 PM is refused and failed delivery never records an approval", async () => {
+  const now = new Date("2027-09-07T09:00:00.000Z");
+  const { env, store } = createEnvironment({ GUEST_ACCESS_ENFORCEMENT: "true" });
   const cookie = await syncAndVerifyStay(env, {
     room: "11",
     confirmationCode: "HMLATEFAIL11",
-    checkInDate: "2026-09-05",
-    checkOutDate: "2026-09-08",
+    checkInDate: "2027-09-05",
+    checkOutDate: "2027-09-08",
     now
   });
   await completeThaiRegistration(env, cookie, new Date(now.getTime() + 10));
   const pending = await handleConciergeRequest(verifiedConciergeRequest("Can I check out later?", cookie), env, undefined, now);
   const pendingBody = await pending.json();
-  const failed = await handleConciergeRequest(
+
+  const tooLate = await handleConciergeRequest(
     verifiedConciergeRequest("5pm", cookie, { workflowState: pendingBody.workflow }),
     env,
     undefined,
     new Date(now.getTime() + 1000)
   );
+  const tooLateBody = await tooLate.json();
+  assert.match(tooLateBody.answer, /latest possible checkout is 2:00 PM/i);
+  assert.equal(store.alerts.length, 0);
+
+  const twoPm = await handleConciergeRequest(
+    verifiedConciergeRequest("2pm", cookie, { workflowState: tooLateBody.workflow }),
+    env,
+    undefined,
+    new Date(now.getTime() + 2000)
+  );
+  const twoPmBody = await twoPm.json();
+  assert.match(twoPmBody.answer, /200 THB service fee/i);
+  const failed = await handleConciergeRequest(
+    verifiedConciergeRequest("yes", cookie, { workflowState: twoPmBody.workflow }),
+    env,
+    undefined,
+    new Date(now.getTime() + 3000)
+  );
   const failedBody = await failed.json();
   assert.match(failedBody.answer, /couldn.?t send that request automatically/i);
-  assert.doesNotMatch(failedBody.answer, /has been sent/i);
+  assert.doesNotMatch(failedBody.answer, /is confirmed/i);
   assert.equal(failedBody.workflow.type, "late_checkout");
   assert.equal(failedBody.workflow.status, "collecting");
+  assert.equal(store.lateCheckoutApprovals.size, 0);
 });
 
-test("reservation-aware early check-in detects a same-day departure and sends the requested arrival time", async () => {
-  const now = new Date("2026-09-09T08:00:00.000Z");
+test("early check-in with a same-day departure prioritizes housekeeping and uses the new Received / Room ready template", async () => {
+  const now = new Date("2027-09-09T08:00:00.000Z");
   const { env, store } = createEnvironment({
     GUEST_ACCESS_ENFORCEMENT: "true",
     WHATSAPP_ACCESS_TOKEN: "meta-test-token",
     WHATSAPP_PHONE_NUMBER_ID: "1234567890",
+    WHATSAPP_HOUSEKEEPING_ACTION_TEMPLATE_NAME: "house_housekeeping_task_actions_v1",
+    WHATSAPP_STAFF_ACTIONS_ENABLED: "true",
     WHATSAPP_ALERT_RECIPIENTS: JSON.stringify({
       support: [{ label: "Su", phone: "+66 64 000 0001" }],
       emergency: [
@@ -12554,42 +12726,38 @@ test("reservation-aware early check-in detects a same-day departure and sends th
   const cookie = await syncAndVerifyStay(env, {
     room: "11",
     confirmationCode: "HMEARLYIN11",
-    checkInDate: "2026-09-10",
-    checkOutDate: "2026-09-12",
+    checkInDate: "2027-09-10",
+    checkOutDate: "2027-09-12",
     now
   });
   await completeThaiRegistration(env, cookie, new Date(now.getTime() + 10));
   store.stayReservations.push({
     id: `stay_${crypto.randomUUID()}`,
-    provider: "airbnb",
-    listingId: "previous-room-11",
+    provider: "direct",
+    listingId: "walk-in-before-room-11",
     room: "11",
     confirmationCodeHash: `hash_${crypto.randomUUID()}`,
-    checkInDate: "2026-09-07",
-    checkOutDate: "2026-09-10",
+    checkInDate: "2027-09-07",
+    checkOutDate: "2027-09-10",
     status: "confirmed",
     updatedAt: now.toISOString()
   });
 
-  const first = await handleConciergeRequest(
-    verifiedConciergeRequest("Can I check in earlier?", cookie),
-    env,
-    undefined,
-    now
-  );
+  const first = await handleConciergeRequest(verifiedConciergeRequest("Can I check in earlier?", cookie), env, undefined, now);
   const firstBody = await first.json();
   assert.equal(firstBody.workflow.type, "early_checkin");
-  assert.equal(firstBody.workflow.earlyCheckinRequest.scheduledCheckInDate, "2026-09-10");
-  assert.match(firstBody.answer, /scheduled check-in is Thursday, 10 September 2026 from 2:00 PM/i);
-  assert.match(firstBody.answer, /another guest is scheduled to check out of your room that morning/i);
-  assert.match(firstBody.answer, /what time are you hoping to arrive/i);
+  assert.equal(firstBody.workflow.earlyCheckinRequest.scheduledCheckInDate, "2027-09-10");
+  assert.match(firstBody.answer, /scheduled check-in is Friday, 10 September 2027 from 2:00 PM/i);
+  assert.match(firstBody.answer, /still a guest in your room/i);
+  assert.match(firstBody.answer, /do not expect the room to be ready before 12:00 PM/i);
+  assert.match(firstBody.answer, /not guaranteed/i);
   assert.equal(store.alerts.length, 0);
 
   const outbound = [];
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async (_url, options) => {
     outbound.push(JSON.parse(options.body));
-    return new Response(JSON.stringify({ messages: [{ id: `wamid.early-checkin-${outbound.length}` }] }), {
+    return new Response(JSON.stringify({ messages: [{ id: `wamid.housekeeping-${outbound.length}` }] }), {
       status: 200,
       headers: { "content-type": "application/json" }
     });
@@ -12602,17 +12770,94 @@ test("reservation-aware early check-in detects a same-day departure and sends th
       new Date(now.getTime() + 1000)
     );
     const body = await completed.json();
-    assert.match(body.answer, /early check-in request for 11:00 AM on Thursday, 10 September 2026 has been sent/i);
+    assert.match(body.answer, /ask(?:ed)? housekeeping to prioritize the room if possible/i);
+    assert.match(body.answer, /before 12:00 PM/i);
+    assert.match(body.answer, /not guaranteed/i);
     assert.equal(store.alerts.length, 1);
-    assert.match(store.alerts[0].summary, /Early check-in request/i);
-    assert.match(store.alerts[0].summary, /Same-day departure is recorded/i);
-    assert.equal(outbound.length, 3);
-    for (const payload of outbound) {
-      assert.equal(payload.template.components[0].parameters[2].text, "Early check-in");
-    }
+    assert.equal(store.alerts[0].alertType, "housekeeping_turnover");
+    assert.equal(store.alerts[0].recipientGroup, "support");
+    assert.equal(store.housekeepingTasks.length, 1);
+    assert.equal(store.housekeepingTasks[0].priority, true);
+    assert.equal(store.housekeepingTasks[0].requestedArrival, "11:00 AM");
+    assert.equal(outbound.length, 1, "housekeeping task goes to Su only");
+    const payload = outbound[0];
+    assert.equal(payload.template.name, "house_housekeeping_task_actions_v1");
+    assert.equal(payload.template.language.code, "en");
+    assert.deepEqual(payload.template.components.slice(1).map((component) => component.index), ["0", "1"]);
+    assert.match(payload.template.components[1].parameters[0].payload, /^HOUSE_ALERT\|RECEIVED\|alert_/);
+    assert.match(payload.template.components[2].parameters[0].payload, /^HOUSE_ALERT\|READY\|alert_/);
   } finally {
     globalThis.fetch = originalFetch;
   }
+});
+
+test("an incoming guest is politely asked to check in after 3 PM when the previous stay has an approved late checkout", async () => {
+  const now = new Date("2027-09-08T03:00:00.000Z");
+  const { env, store } = createEnvironment({ GUEST_ACCESS_ENFORCEMENT: "true" });
+  const previousCookie = await syncAndVerifyStay(env, {
+    room: "6", confirmationCode: "HMPREVIOUS06", checkInDate: "2027-09-05", checkOutDate: "2027-09-08", now
+  });
+  const previousSession = store.staySessions.find((item) => item.tokenHash && item.room === "6");
+  const previousReservation = store.stayReservations.find((item) => item.id === previousSession.reservationId);
+  await store.recordLateCheckoutApproval({
+    reservationId: previousReservation.id, room: "6", checkoutDate: "2027-09-08",
+    checkoutMinutes: 840, checkoutTime: "2:00 PM", feeThb: 200, approvedAt: now.toISOString()
+  });
+  const incomingCookie = await syncAndVerifyStay(env, {
+    room: "6", confirmationCode: "HMLASTMIN06", checkInDate: "2027-09-08", checkOutDate: "2027-09-10", now
+  });
+  const response = await handleConciergeRequest(
+    verifiedConciergeRequest("What time can I check in?", incomingCookie), env, undefined, now
+  );
+  const body = await response.json();
+  assert.equal(body.intentId, "check_in_after_late_checkout");
+  assert.match(body.answer, /previous guest has a late checkout/i);
+  assert.match(body.answer, /check in after 3:00 PM/i);
+  assert.doesNotMatch(body.answer, /guarantee|approval|200 THB/i);
+  assert.ok(previousCookie);
+});
+
+test("ready vacant rooms allow early check-in at any time while walk-ins and extensions still block stale ready status", async () => {
+  const now = new Date("2027-09-09T06:00:00.000Z");
+  const { env, store } = createEnvironment({ GUEST_ACCESS_ENFORCEMENT: "true" });
+  const cookie = await syncAndVerifyStay(env, {
+    room: "5", confirmationCode: "HMREADYROOM5", checkInDate: "2027-09-10", checkOutDate: "2027-09-12", now
+  });
+  await completeThaiRegistration(env, cookie, new Date(now.getTime() + 10));
+  await store.setRoomHousekeepingStatus("5", "ready", now.toISOString(), "owner-admin", {});
+  const ready = await handleConciergeRequest(verifiedConciergeRequest("Can I check in at 9am?", cookie), env, undefined, now);
+  const readyBody = await ready.json();
+  assert.equal(readyBody.intentId, "early_checkin_ready");
+  assert.match(readyBody.answer, /room is ready/i);
+  assert.match(readyBody.answer, /9:00 AM/i);
+
+  const reservation = store.stayReservations.find((item) => item.room === "5" && item.checkInDate === "2027-09-10");
+  store.stayReservations.push({
+    id: `stay_${crypto.randomUUID()}`, provider: "manual", listingId: "walk-in-extension",
+    room: "5", confirmationCodeHash: `hash_${crypto.randomUUID()}`,
+    checkInDate: "2027-09-09", checkOutDate: "2027-09-11", status: "confirmed", updatedAt: now.toISOString()
+  });
+  const blocked = await handleConciergeRequest(verifiedConciergeRequest("Can I check in early?", cookie), env, undefined, new Date(now.getTime() + 1000));
+  const blockedBody = await blocked.json();
+  assert.equal(blockedBody.intentId, "early_checkin_occupancy_conflict");
+  assert.match(blockedBody.answer, /active stay.*overlaps your arrival/i);
+  assert.ok(reservation);
+});
+
+test("door locking and office location use short deterministic hotel-concierge answers", async () => {
+  const { env } = createEnvironment();
+  const lock = await handleConciergeRequest(guestRequest("How do I lock my door from outside?"), env);
+  const lockBody = await lock.json();
+  assert.equal(lockBody.intentId, "door_locking");
+  assert.match(lockBody.answer, /press the button on the inside/i);
+  assert.match(lockBody.answer, /make sure you have your key/i);
+  assert.match(lockBody.answer, /turn the handle/i);
+  assert.doesNotMatch(lockBody.answer, /cylind|latch|mechanism|privacy knob/i);
+
+  const office = await handleConciergeRequest(guestRequest("Where is the office?"), env);
+  const officeBody = await office.json();
+  assert.equal(officeBody.intentId, "office_location");
+  assert.equal(officeBody.answer, "Our office is downstairs at The House, next to Bar Thai Food. Look for the Taoedge Business Solutions office.");
 });
 
 test("direct stay creation blocks true room overlaps but allows same-day checkout-to-check-in turnover", async () => {

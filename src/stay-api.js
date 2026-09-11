@@ -819,6 +819,25 @@ export async function handleStayGuestRequest(request, env, path, ctx, now = new 
 }
 
 export async function handleStayAdminRequest(request, env, path, store) {
+  if (path === "/api/concierge/admin/housekeeping-status") {
+    if (request.method === "GET") {
+      const statuses = typeof store.listRoomHousekeepingStatuses === "function"
+        ? await store.listRoomHousekeepingStatuses()
+        : [];
+      return json({ statuses });
+    }
+    if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405, { allow: "GET, POST" });
+    const body = await readJson(request, 2_000);
+    const room = String(body?.room || "");
+    const status = String(body?.status || "").toLowerCase();
+    if (!PROPERTY_ROOMS.has(room) || !["dirty", "clean", "ready"].includes(status)) {
+      return json({ error: "invalid_housekeeping_status" }, 400);
+    }
+    if (typeof store.setRoomHousekeepingStatus !== "function") return json({ error: "housekeeping_status_unavailable" }, 503);
+    const result = await store.setRoomHousekeepingStatus(room, status, new Date().toISOString(), "owner-admin", {});
+    return json(result, result?.ok ? 200 : 400);
+  }
+
   if (path === "/api/concierge/admin/stays") {
     if (request.method === "GET") return json(await store.getStayOperationsOverview());
     if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405, { allow: "GET, POST" });

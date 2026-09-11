@@ -10,6 +10,7 @@ import { processRegistrationReminderAlerts } from "./registration-alerts.js";
 import { cleanupMaintenanceReports, handleMaintenanceGuestRequest } from "./maintenance-api.js";
 import { handleTranslationRequest } from "./i18n-api.js";
 import { handleWhatsAppWebhook, processDueAlertEscalations } from "./whatsapp-alerts.js";
+import { processHousekeepingTurnovers } from "./housekeeping-operations.js";
 import { servePublicLegalPage } from "./public-legal.js";
 import {
   getGuestAccess,
@@ -220,7 +221,10 @@ export default {
   },
   async scheduled(controller, env, ctx) {
     if (controller.cron === "*/1 * * * *") {
-      ctx.waitUntil(processDueAlertEscalations(env));
+      ctx.waitUntil(Promise.all([
+        processDueAlertEscalations(env),
+        processHousekeepingTurnovers(env)
+      ]));
       return;
     }
     if (controller.cron === "0 * * * *") {

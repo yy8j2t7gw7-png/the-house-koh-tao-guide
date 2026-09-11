@@ -39,6 +39,7 @@
   const alertStatus = document.getElementById("whatsappAlertStatus");
   const activeStayReservations = document.getElementById("activeStayReservations");
   const upcomingStayReservations = document.getElementById("upcomingStayReservations");
+  const roomHousekeepingStatuses = document.getElementById("roomHousekeepingStatuses");
   const keyRotations = document.getElementById("keyRotations");
   const keyRotationActivity = document.getElementById("keyRotationActivity");
   const manualStayForm = document.getElementById("manualStayForm");
@@ -647,6 +648,27 @@
     upcomingStayReservations.replaceChildren();
     if (!upcoming.length) upcomingStayReservations.appendChild(element("div", "concierge-admin-empty", "No upcoming synchronized stays."));
     upcoming.forEach((item) => appendReservation(upcomingStayReservations, item));
+
+    roomHousekeepingStatuses.replaceChildren();
+    (data.housekeepingStatuses || []).forEach((item) => {
+      const card = element("article", "concierge-admin-registration-item");
+      card.dataset.housekeepingRoom = item.room;
+      card.append(
+        element("strong", "", `Room ${item.room}`),
+        element("span", "", `Housekeeping: ${String(item.status || "unknown").toUpperCase()}`),
+        element("span", "", item.updatedAt ? `Updated ${bangkokDate(item.updatedAt)}` : "No housekeeping status recorded yet")
+      );
+      const actions = element("div", "concierge-admin-card-actions");
+      ["dirty", "clean", "ready"].forEach((status) => {
+        const button = element("button", status === item.status ? "" : "secondary", status[0].toUpperCase() + status.slice(1));
+        button.type = "button";
+        button.dataset.housekeepingStatus = status;
+        if (status === item.status) button.disabled = true;
+        actions.appendChild(button);
+      });
+      card.appendChild(actions);
+      roomHousekeepingStatuses.appendChild(card);
+    });
 
     keyRotations.replaceChildren();
     const rotations = data.rotations || [];
@@ -1336,6 +1358,24 @@
 
   activeStayReservations.addEventListener("click", stayOperationAction);
   upcomingStayReservations.addEventListener("click", stayOperationAction);
+
+  roomHousekeepingStatuses.addEventListener("click", async (event) => {
+    const button = event.target.closest("[data-housekeeping-status]");
+    if (!button) return;
+    const card = button.closest("[data-housekeeping-room]");
+    if (!card?.dataset.housekeepingRoom) return;
+    button.disabled = true;
+    try {
+      await api("/api/concierge/admin/housekeeping-status", {
+        method: "POST",
+        body: JSON.stringify({ room: card.dataset.housekeepingRoom, status: button.dataset.housekeepingStatus })
+      });
+      await loadOverview();
+    } catch (_error) {
+      button.disabled = false;
+      window.alert("The room housekeeping status could not be updated.");
+    }
+  });
 
   keyRotations.addEventListener("click", async (event) => {
     const button = event.target.closest("[data-rotation-action]");

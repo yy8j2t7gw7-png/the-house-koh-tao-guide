@@ -27,6 +27,7 @@ import {
   whatsappAlertConfiguration
 } from "./whatsapp-alerts.js";
 import { getGuestAccess, handleStayAdminRequest, stayConfiguration } from "./stay-api.js";
+import { submitEarlyCheckinHousekeepingTask } from "./housekeeping-operations.js";
 import {
   DIVING_ACTIVITY_CHOICES,
   DIVING_AGENCY_CHOICES,
@@ -43,7 +44,7 @@ import {
   specialtyChoiceLabels
 } from "./diving-catalog.js";
 
-const RELEASE = "5.11.46";
+const RELEASE = "5.11.47";
 const ROOM_OPTIONS = new Set(["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11"]);
 const MAX_HISTORY_ITEMS = 10;
 const MAX_QUESTION_LENGTH = 800;
@@ -347,13 +348,17 @@ function cleanWorkflowState(value) {
   }
   if (value.type === "late_checkout") {
     const request = value.lateCheckoutRequest || {};
+    const requestedTime = cleanWorkflowValue(request.requestedTime, 40);
+    const feeAccepted = request.feeAccepted === true;
     return {
       type: "late_checkout",
       status: "collecting",
       retainPrivateContact: false,
-      missing: ["requestedTime"],
+      missing: requestedTime ? (feeAccepted ? [] : ["feeAcceptance"]) : ["requestedTime"],
       lateCheckoutRequest: {
-        scheduledCheckoutDate: /^\d{4}-\d{2}-\d{2}$/.test(String(request.scheduledCheckoutDate || "")) ? String(request.scheduledCheckoutDate) : ""
+        scheduledCheckoutDate: /^\d{4}-\d{2}-\d{2}$/.test(String(request.scheduledCheckoutDate || "")) ? String(request.scheduledCheckoutDate) : "",
+        requestedTime,
+        feeAccepted
       }
     };
   }
@@ -645,6 +650,7 @@ function isIndependentCurrentTurnInformation(question) {
     || STAINED_LINEN_REQUEST.test(source)
     || HOUSEKEEPING_SUPPLY_MISSING.test(source)
     || (HOUSEKEEPING_ITEM_REQUEST.test(source) && HOUSEKEEPING_REQUEST_ACTION.test(source))) return false;
+  if (isEarlyCheckinRequest(source)) return false;
   if (SUPPLY_INFORMATION_REQUEST.test(source) || isWifiPasswordInformationRequest(source)) return true;
   return LOCAL_INFORMATION_TOPIC.test(source) && INFORMATION_REQUEST_FORM.test(source);
 }
@@ -1009,6 +1015,10 @@ function applyCleaningRequestPolicy(question, workflowState = null, now = new Da
 
 const LATE_CHECKOUT_REQUEST = /\b(?:can|could|may)\s+(?:i|we)\s+(?:check\s*out|leave)\s+(?:later|late)|\blate\s*check\s*out\b|\bcheck\s*out\s+(?:later|late)\b|\bkeep\s+(?:the|my|our)\s+room\s+(?:later|longer)\b|\bleave\s+after\s+11\b/i;
 const EARLY_CHECKIN_REQUEST = /\b(?:can|could|may)\s+(?:i|we)\s+check\s*in\s+(?:early|earlier)|\bearly\s*check\s*in\b|\bcheck\s*in\s+(?:early|earlier|before\s+2)\b|\barrive\s+(?:before\s+2|early|earlier)\b/i;
+const CHECKIN_AT_TIME_REQUEST = /\b(?:can|could|may)\s+(?:i|we)\s+check\s*in\s+(?:at|around|by)\s+(?:(?:[01]?\d|2[0-3])(?::[0-5]\d)?\s*(?:am|pm)|(?:[01]?\d|2[0-3]):[0-5]\d)\b/i;
+const CHECKIN_TIME_REQUEST = /\b(?:what\s+time\s+(?:is|does)\s+check\s*in|what\s+time\s+can\s+(?:i|we)\s+(?:check\s*in|arrive)|when\s+can\s+(?:i|we)\s+check\s*in|when\s+is\s+check\s*in|check\s*in\s+time|arrival\s+time)\b/i;
+const DOOR_LOCK_REQUEST = /\b(?:how\s+(?:do|can)\s+(?:i|we)\s+lock\s+(?:my|our|the)?\s*(?:room\s+)?door|how\s+to\s+lock\s+(?:(?:my|our|the)\s+)?(?:room\s+)?door|how\s+(?:do|can)\s+(?:i|we)\s+lock\s+(?:it|the\s+door)\s+from\s+outside|how\s+to\s+lock\s+(?:it|the\s+door)\s+from\s+outside|how\s+does\s+(?:the|my|our)\s+(?:room\s+)?door\s+lock\s+work|how\s+does\s+(?:the|my|our)\s+room\s+lock\s+work|lock\s+(?:my|our|the)\s+room\s+when\s+(?:i|we)\s+leave|(?:can|should)\s+(?:i|we)\s+lock\s+(?:the|my|our)\s+door\s+when\s+(?:i|we)\s+leave|door\s+lock\s+from\s+outside|does\s+(?:the|my|our)\s+door\s+lock\s+automatically|push\s+button\s+door\s+lock|which\s+button\s+(?:do|should)\s+(?:i|we)\s+press\s+to\s+lock\s+(?:the|my|our)\s+door)\b/i;
+const OFFICE_LOCATION_REQUEST = /\b(?:where\s+is\s+(?:the|your|our)\s+office|where\s+is\s+(?:the\s+)?taoedge\s+office|where\s+can\s+(?:i|we)\s+find\s+(?:the|your|our)\s+office|how\s+(?:do|can)\s+(?:i|we)\s+(?:find|get\s+to)\s+(?:the|your|our)\s+office|office\s+location|where\s+is\s+(?:the\s+)?(?:reception|front\s+desk)|where\s+can\s+(?:i|we)\s+find\s+(?:reception|the\s+front\s+desk)|where\s+is\s+taoedge(?:\s+business\s+solutions)?)\b/i;
 
 function formatStayDate(dateKey) {
   const match = String(dateKey || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
@@ -1019,6 +1029,65 @@ function formatStayDate(dateKey) {
 
 function requestedStayClock(question, allowBareHour = false) {
   return displayPreferredTime(question, allowBareHour);
+}
+
+function isEarlyCheckinRequest(question) {
+  const source = String(question || "");
+  if (EARLY_CHECKIN_REQUEST.test(source)) return true;
+  if (!CHECKIN_AT_TIME_REQUEST.test(source)) return false;
+  const requested = requestedStayClock(source, false);
+  const minutes = displayedClockMinutes(requested);
+  return Number.isInteger(minutes) && minutes < (14 * 60);
+}
+
+function displayedClockMinutes(value) {
+  const match = String(value || "").match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+  if (!match) return null;
+  let hour = Number(match[1]);
+  const minute = Number(match[2]);
+  const suffix = match[3].toUpperCase();
+  if (suffix === "AM" && hour === 12) hour = 0;
+  if (suffix === "PM" && hour !== 12) hour += 12;
+  return (hour * 60) + minute;
+}
+
+function acceptsLateCheckoutFee(question) {
+  return /^\s*(?:yes|yes please|accept|i accept|i agree|agree|ok|okay|sure|that(?:'s| is) fine|fine)\s*[.!]?\s*$/i.test(String(question || ""));
+}
+
+function declinesLateCheckoutFee(question) {
+  return /^\s*(?:no|no thanks|no thank you|decline|i decline|cancel|never\s*mind|nevermind|forget\s+it)\s*[.!]?\s*$/i.test(String(question || ""));
+}
+
+function doorLockInformationResult(question) {
+  if (!DOOR_LOCK_REQUEST.test(String(question || ""))) return null;
+  return {
+    answer: "If your room has the round door handle, press the button on the inside handle, then close the door behind you. Please make sure you have your key with you first. To unlock it from inside, simply turn the handle.",
+    intentId: "door_locking", category: "room", confidence: 1, needsHuman: false, handoff: "none",
+    learningGap: false, learningReason: "none", actions: [], suppressDefaultActions: true, source: "room-policy"
+  };
+}
+
+function officeLocationInformationResult(question) {
+  if (!OFFICE_LOCATION_REQUEST.test(String(question || ""))) return null;
+  return {
+    answer: "Our office is downstairs at The House, next to Bar Thai Food. Look for the Taoedge Business Solutions office.",
+    intentId: "office_location", category: "practical", confidence: 1, needsHuman: false, handoff: "none",
+    learningGap: false, learningReason: "none", actions: [], suppressDefaultActions: true, source: "house-policy"
+  };
+}
+
+async function checkinTimingInformationResult(question, access, store) {
+  if (!CHECKIN_TIME_REQUEST.test(String(question || "")) || !access?.verified) return null;
+  const reservationId = String(access?.session?.reservationId || "").trim();
+  if (!reservationId || typeof store?.getEarlyCheckinHousekeepingContext !== "function") return null;
+  const context = await store.getEarlyCheckinHousekeepingContext(reservationId).catch(() => null);
+  if (!context?.previousLateCheckout || Number(context.previousLateCheckout.checkoutMinutes) <= 660) return null;
+  return {
+    answer: "Because the previous guest has a late checkout today, please plan to check in after 3:00 PM. Thank you for your understanding.",
+    intentId: "check_in_after_late_checkout", category: "arrival", confidence: 1, needsHuman: false, handoff: "none",
+    learningGap: false, learningReason: "none", actions: [], suppressDefaultActions: true, source: "reservation-policy"
+  };
 }
 
 async function roomTurnoverContext(store, access) {
@@ -1033,44 +1102,94 @@ async function applyLateCheckoutPolicy(question, workflowState, access, store) {
   const pending = workflowState?.type === "late_checkout" && workflowState.status === "collecting" ? workflowState : null;
   if (!pending && !LATE_CHECKOUT_REQUEST.test(String(question || ""))) return { handled: false, result: null, alertQuestion: question, workflow: null };
   const checkoutDate = access?.session?.checkOutDate || pending?.lateCheckoutRequest?.scheduledCheckoutDate || "";
-  if (!access?.verified || !checkoutDate) return { handled: false, result: null, alertQuestion: question, workflow: null };
+  const reservationId = String(access?.session?.reservationId || "").trim();
+  if (!access?.verified || !checkoutDate || !reservationId) return { handled: false, result: null, alertQuestion: question, workflow: null };
+  const dateLabel = formatStayDate(checkoutDate);
+
+  if (declinesLateCheckoutFee(question) && pending?.lateCheckoutRequest?.requestedTime) {
+    return { handled: true, result: {
+      answer: "No problem. I have cancelled the late-checkout request.", intentId: "late_checkout_cancelled", category: "departure", confidence: 1,
+      needsHuman: false, handoff: "none", learningGap: false, learningReason: "none", actions: [], suppressDefaultActions: true, source: "reservation-policy"
+    }, alertQuestion: question, workflow: { type: "late_checkout", status: "cancelled", missing: [] } };
+  }
   if (/^\s*(?:cancel|never\s*mind|nevermind|forget\s+it)\s*[.!]?\s*$/i.test(question)) {
     return { handled: true, result: {
       answer: "No problem. I have cancelled the late-checkout request.", intentId: "late_checkout_cancelled", category: "departure", confidence: 1,
       needsHuman: false, handoff: "none", learningGap: false, learningReason: "none", actions: [], suppressDefaultActions: true, source: "reservation-policy"
     }, alertQuestion: question, workflow: { type: "late_checkout", status: "cancelled", missing: [] } };
   }
-  const requestedTime = requestedStayClock(question, Boolean(pending));
-  const dateLabel = formatStayDate(checkoutDate);
-  const turnover = await roomTurnoverContext(store, access);
+
+  const pendingTime = pending?.lateCheckoutRequest?.requestedTime || "";
+  const feeAccepted = Boolean(pending?.lateCheckoutRequest?.feeAccepted);
+  let requestedTime = pendingTime;
+  if (!(pendingTime && acceptsLateCheckoutFee(question))) {
+    const parsed = requestedStayClock(question, Boolean(pending));
+    if (parsed) requestedTime = parsed;
+  }
+
   if (!requestedTime) {
     return { handled: true, result: {
-      answer: `Your scheduled checkout is ${dateLabel} at 11:00 AM. What time would you like to check out?`,
+      answer: `Your checkout is ${dateLabel} at 11:00 AM. Late checkout is available until 2:00 PM at the latest for a 200 THB service fee. What time would you like to check out?`,
       intentId: "late_checkout", category: "departure", confidence: 1, needsHuman: false, handoff: "stay_support",
       learningGap: false, learningReason: "none", actions: [], suppressDefaultActions: true, source: "reservation-policy"
     }, alertQuestion: question, workflow: {
       type: "late_checkout", status: "collecting", retainPrivateContact: false, missing: ["requestedTime"],
-      lateCheckoutRequest: { scheduledCheckoutDate: checkoutDate }
+      lateCheckoutRequest: { scheduledCheckoutDate: checkoutDate, requestedTime: "", feeAccepted: false }
     } };
   }
-  const turnoverText = turnover.nextSameDayCheckIn
-    ? "A new guest is currently scheduled to arrive in this room on the same day, so approval may be difficult."
-    : "No same-day arrival is currently recorded for this room, but the request still requires approval.";
-  const alertQuestion = `Late checkout request. Scheduled checkout: ${dateLabel} at 11:00 AM. Requested checkout: ${requestedTime}. ${turnover.nextSameDayCheckIn ? "Same-day arrival is recorded." : "No same-day arrival is currently recorded."}`;
+
+  const requestedMinutes = displayedClockMinutes(requestedTime);
+  if (requestedMinutes !== null && requestedMinutes <= (11 * 60)) {
+    return { handled: true, result: {
+      answer: "Standard checkout is until 11:00 AM, so you do not need a late-checkout request for that time.",
+      intentId: "late_checkout_not_needed", category: "departure", confidence: 1, needsHuman: false, handoff: "none",
+      learningGap: false, learningReason: "none", actions: [], suppressDefaultActions: true, source: "reservation-policy"
+    }, alertQuestion: question, workflow: { type: "late_checkout", status: "cancelled", missing: [] } };
+  }
+  if (requestedMinutes !== null && requestedMinutes > (14 * 60)) {
+    return { handled: true, result: {
+      answer: "The latest possible checkout is 2:00 PM. If 2:00 PM works for you, please reply “2 PM” and I’ll continue.",
+      intentId: "late_checkout_latest_time", category: "departure", confidence: 1, needsHuman: false, handoff: "stay_support",
+      learningGap: false, learningReason: "none", actions: [], suppressDefaultActions: true, source: "reservation-policy"
+    }, alertQuestion: question, workflow: {
+      type: "late_checkout", status: "collecting", retainPrivateContact: false, missing: ["requestedTime"],
+      lateCheckoutRequest: { scheduledCheckoutDate: checkoutDate, requestedTime: "", feeAccepted: false }
+    } };
+  }
+
+  const acceptedNow = feeAccepted || (pendingTime && acceptsLateCheckoutFee(question));
+  if (!acceptedNow) {
+    return { handled: true, result: {
+      answer: `Late checkout until ${requestedTime} has a 200 THB service fee. Reply “Yes” if you accept the fee.`,
+      intentId: "late_checkout_fee_acceptance", category: "departure", confidence: 1, needsHuman: false, handoff: "stay_support",
+      learningGap: false, learningReason: "none", actions: [], suppressDefaultActions: true, source: "reservation-policy"
+    }, alertQuestion: question, workflow: {
+      type: "late_checkout", status: "collecting", retainPrivateContact: false, missing: ["feeAcceptance"],
+      lateCheckoutRequest: { scheduledCheckoutDate: checkoutDate, requestedTime, feeAccepted: false }
+    } };
+  }
+
+  const turnover = await roomTurnoverContext(store, access);
+  const sameDayArrival = Boolean(turnover?.nextSameDayCheckIn);
+  const alertQuestion = `Late checkout approved. Scheduled checkout: ${dateLabel} at 11:00 AM. Approved checkout: ${requestedTime}. 200 THB service fee accepted. ${sameDayArrival ? "Same-day arrival is recorded; incoming guest should be advised to check in after 3:00 PM." : "No same-day arrival is currently recorded."}`;
   return { handled: true, result: {
-    answer: `I’ll send your request for ${requestedTime} on ${dateLabel} to The House team now. ${turnoverText} It is not confirmed until the team approves it.`,
-    intentId: "late_checkout_request", category: "departure", confidence: 1, needsHuman: true, handoff: "stay_support",
+    answer: `Thank you. You accepted the 200 THB service fee. I’m notifying The House team about your late checkout until ${requestedTime}.`,
+    intentId: "late_checkout_approved", category: "departure", confidence: 1, needsHuman: true, handoff: "stay_support",
     learningGap: false, learningReason: "none", actions: [], suppressDefaultActions: true,
-    staySupportRequest: { type: "late_checkout", scheduledDate: checkoutDate, requestedTime, sameDayArrival: Boolean(turnover.nextSameDayCheckIn) },
+    staySupportRequest: {
+      type: "late_checkout", reservationId, scheduledDate: checkoutDate, requestedTime,
+      requestedMinutes, feeThb: 200, feeAccepted: true, sameDayArrival
+    },
     source: "reservation-policy"
-  }, alertQuestion, workflow: { type: "late_checkout", status: "ready", missing: [], lateCheckoutRequest: { scheduledCheckoutDate: checkoutDate, requestedTime } } };
+  }, alertQuestion, workflow: { type: "late_checkout", status: "ready", missing: [], lateCheckoutRequest: { scheduledCheckoutDate: checkoutDate, requestedTime, feeAccepted: true } } };
 }
 
 async function applyEarlyCheckinPolicy(question, workflowState, access, store) {
   const pending = workflowState?.type === "early_checkin" && workflowState.status === "collecting" ? workflowState : null;
-  if (!pending && !EARLY_CHECKIN_REQUEST.test(String(question || ""))) return { handled: false, result: null, alertQuestion: question, workflow: null };
+  if (!pending && !isEarlyCheckinRequest(question)) return { handled: false, result: null, alertQuestion: question, workflow: null };
   const checkInDate = access?.session?.checkInDate || pending?.earlyCheckinRequest?.scheduledCheckInDate || "";
-  if (!access?.verified || !checkInDate) return { handled: false, result: null, alertQuestion: question, workflow: null };
+  const reservationId = String(access?.session?.reservationId || "");
+  if (!access?.verified || !checkInDate || !reservationId) return { handled: false, result: null, alertQuestion: question, workflow: null };
   if (/^\s*(?:cancel|never\s*mind|nevermind|forget\s+it)\s*[.!]?\s*$/i.test(question)) {
     return { handled: true, result: {
       answer: "No problem. I have cancelled the early-check-in request.", intentId: "early_checkin_cancelled", category: "arrival", confidence: 1,
@@ -1079,11 +1198,39 @@ async function applyEarlyCheckinPolicy(question, workflowState, access, store) {
   }
   const requestedTime = requestedStayClock(question, Boolean(pending));
   const dateLabel = formatStayDate(checkInDate);
-  const turnover = await roomTurnoverContext(store, access);
+  const housekeeping = store?.getEarlyCheckinHousekeepingContext
+    ? await store.getEarlyCheckinHousekeepingContext(reservationId).catch(() => null)
+    : null;
+  const turnover = housekeeping || await roomTurnoverContext(store, access);
+  const previousSameDay = Boolean(housekeeping?.previousSameDayStay || turnover?.previousSameDayCheckout);
+  const blockingStay = Boolean(housekeeping?.blockingStay);
+  const previousLateCheckout = housekeeping?.previousLateCheckout && Number(housekeeping.previousLateCheckout.checkoutMinutes) > 660
+    ? housekeeping.previousLateCheckout
+    : null;
+  const roomReady = Boolean(housekeeping?.readyForReservation) && !blockingStay && !previousLateCheckout;
+
+  if (blockingStay) {
+    return { handled: true, result: {
+      answer: "There is still an active stay in this room that overlaps your arrival. Early check-in cannot be confirmed. Please contact The House team for assistance.",
+      intentId: "early_checkin_occupancy_conflict", category: "arrival", confidence: 1, needsHuman: false, handoff: "stay_support",
+      learningGap: false, learningReason: "none", actions: [{ label: "Call Us", type: "route", route: "houseCall" }], suppressDefaultActions: true, source: "reservation-policy"
+    }, alertQuestion: question, workflow: { type: "early_checkin", status: "cancelled", missing: [] } };
+  }
+
+  if (previousLateCheckout) {
+    return { handled: true, result: {
+      answer: "The previous guest has a late checkout today, so please plan to check in after 3:00 PM. We’ll prepare the room as quickly as possible after they leave. Thank you for your understanding.",
+      intentId: "early_checkin_unavailable_late_checkout", category: "arrival", confidence: 1, needsHuman: false, handoff: "none",
+      learningGap: false, learningReason: "none", actions: [], suppressDefaultActions: true, source: "reservation-policy"
+    }, alertQuestion: question, workflow: { type: "early_checkin", status: "cancelled", missing: [] } };
+  }
+
   if (!requestedTime) {
-    const context = turnover.previousSameDayCheckout
-      ? "Another guest is scheduled to check out of your room that morning, so housekeeping must clean it before you can enter."
-      : "There is no same-day checkout currently recorded for your room, but the room still needs to be confirmed clean and ready.";
+    const context = roomReady
+      ? "Your room is already marked ready, so you can arrive earlier."
+      : previousSameDay
+        ? "There is still a guest in your room. As soon as they check out, housekeeping will prepare it as quickly as possible. We’ll let you know if early check-in becomes possible. Please do not expect the room to be ready before 12:00 PM, and early check-in is not guaranteed."
+        : "The room is not marked ready yet, so housekeeping must prepare it first. We’ll let you know if early check-in becomes possible. Please do not expect the room to be ready before 12:00 PM, and early check-in is not guaranteed.";
     return { handled: true, result: {
       answer: `Your scheduled check-in is ${dateLabel} from 2:00 PM. ${context} What time are you hoping to arrive?`,
       intentId: "early_check_in", category: "arrival", confidence: 1, needsHuman: false, handoff: "stay_support",
@@ -1093,16 +1240,28 @@ async function applyEarlyCheckinPolicy(question, workflowState, access, store) {
       earlyCheckinRequest: { scheduledCheckInDate: checkInDate }
     } };
   }
-  const context = turnover.previousSameDayCheckout
-    ? "Another guest is scheduled to check out that morning, so housekeeping will need to prepare the room first."
-    : "There is no same-day checkout currently recorded, but the team still needs to confirm that the room is clean and ready.";
-  const alertQuestion = `Early check-in request. Scheduled check-in: ${dateLabel} from 2:00 PM. Requested arrival: ${requestedTime}. ${turnover.previousSameDayCheckout ? "Same-day departure is recorded." : "No same-day departure is currently recorded."}`;
+
+  if (roomReady) {
+    return { handled: true, result: {
+      answer: `Good news — your room is ready, so you can check in at ${requestedTime} on ${dateLabel}. You can use your private room page for the self check-in instructions.`,
+      intentId: "early_checkin_ready", category: "arrival", confidence: 1, needsHuman: false, handoff: "none",
+      learningGap: false, learningReason: "none", actions: [], suppressDefaultActions: true,
+      staySupportRequest: { type: "early_checkin", scheduledDate: checkInDate, requestedTime, roomReady: true },
+      source: "housekeeping-status"
+    }, alertQuestion: question, workflow: { type: "early_checkin", status: "submitted", missing: [], earlyCheckinRequest: { scheduledCheckInDate: checkInDate, requestedTime } } };
+  }
+
+  const context = previousSameDay
+    ? "There is still a guest in your room. As soon as they check out, housekeeping will prepare it as quickly as possible."
+    : "The room is not marked ready yet, so housekeeping still needs to prepare it.";
+  const alertQuestion = `Early check-in request. Scheduled check-in: ${dateLabel} from 2:00 PM. Requested arrival: ${requestedTime}. ${previousSameDay ? "Previous same-day stay is recorded." : "No previous same-day stay is recorded."}`;
   return { handled: true, result: {
-    answer: `I’ll send your early check-in request for ${requestedTime} on ${dateLabel} to The House team now. ${context} Early check-in is not confirmed until the team approves it.`,
+    answer: `${context} I’ll ask housekeeping to prioritize the room if possible. We’ll let you know if early check-in becomes available. Please do not expect the room to be ready before 12:00 PM, and early check-in is not guaranteed.`,
     intentId: "early_checkin_request", category: "arrival", confidence: 1, needsHuman: true, handoff: "stay_support",
     learningGap: false, learningReason: "none", actions: [], suppressDefaultActions: true,
-    staySupportRequest: { type: "early_checkin", scheduledDate: checkInDate, requestedTime, sameDayDeparture: Boolean(turnover.previousSameDayCheckout) },
-    source: "reservation-policy"
+    staySupportRequest: { type: "early_checkin", scheduledDate: checkInDate, requestedTime, sameDayDeparture: previousSameDay, roomReady: false },
+    housekeepingPriorityRequest: { reservationId, requestedArrival: requestedTime },
+    source: "housekeeping-status"
   }, alertQuestion, workflow: { type: "early_checkin", status: "ready", missing: [], earlyCheckinRequest: { scheduledCheckInDate: checkInDate, requestedTime } } };
 }
 
@@ -3308,20 +3467,32 @@ async function recordInteractionAndAlert({ env, store, ctx, sessionId, room, roo
   const recordedId = await interactionRecord({ env, store, interactionId, sessionId, room, question, result })
     .catch(() => null);
   if (!recordedId) return { interactionId: null, alert: null, delivery: { attempted: 0, accepted: 0 } };
-  const alert = await createConciergeAlert({
-    env,
-    interactionId,
-    sessionId,
-    room,
-    roomVerified,
-    question: alertQuestion,
-    result,
-    now
-  }).catch(() => null);
+  let alert = null;
   let delivery = { attempted: 0, accepted: 0 };
+  if (result.housekeepingPriorityRequest?.reservationId) {
+    const housekeeping = await submitEarlyCheckinHousekeepingTask({
+      env,
+      reservationId: result.housekeepingPriorityRequest.reservationId,
+      requestedArrival: result.housekeepingPriorityRequest.requestedArrival,
+      now
+    }).catch(() => null);
+    alert = housekeeping?.alert || null;
+    delivery = housekeeping?.delivery || delivery;
+  } else {
+    alert = await createConciergeAlert({
+      env,
+      interactionId,
+      sessionId,
+      room,
+      roomVerified,
+      question: alertQuestion,
+      result,
+      now
+    }).catch(() => null);
+  }
   if (alert?.previouslyAccepted) {
     delivery = { attempted: 0, accepted: 1 };
-  } else if (alert && (!alert.duplicate || alert.retryableDelivery)) {
+  } else if (!result.housekeepingPriorityRequest && alert && (!alert.duplicate || alert.retryableDelivery)) {
     delivery = await dispatchConciergeAlert(alert, env).catch(() => delivery);
   }
   return { interactionId, alert, delivery };
@@ -3694,16 +3865,19 @@ export async function handleConciergeRequest(request, env, ctx, now = new Date()
   const accessAcknowledgementResult = classifiedSafetyResult || lostKeyResult || humanContactResult
     ? null
     : verifiedAccessAcknowledgementResult(question, access, room);
-  const pendingArrivalResult = classifiedSafetyResult || lostKeyResult || humanContactResult || accessAcknowledgementResult
+  const arrivalTimingResult = classifiedSafetyResult || lostKeyResult || humanContactResult || accessAcknowledgementResult
+    ? null
+    : await checkinTimingInformationResult(question, access, store);
+  const pendingArrivalResult = classifiedSafetyResult || lostKeyResult || humanContactResult || accessAcknowledgementResult || arrivalTimingResult
     ? null
     : pendingArrivalRoomLocationResult(question, access, room);
-  const urgentClarificationActive = humanContactResult || accessAcknowledgementResult || pendingArrivalResult ? false : activeUrgentClarification(history, workflowState);
+  const urgentClarificationActive = humanContactResult || accessAcknowledgementResult || arrivalTimingResult || pendingArrivalResult ? false : activeUrgentClarification(history, workflowState);
   const needsUrgentClarification = !classifiedSafetyResult
     && !humanContactResult
     && (isVagueUrgentMessage(question)
       || (urgentClarificationActive && !hasMeaningfulIncidentDescription(question)));
   const safetyResult = classifiedSafetyResult || (needsUrgentClarification ? urgentClarificationResult(room) : null);
-  let earlyPolicyResult = humanContactResult || accessAcknowledgementResult || pendingArrivalResult || (access.accessGranted || (lostKeyResult && access.verified)
+  let earlyPolicyResult = humanContactResult || accessAcknowledgementResult || arrivalTimingResult || pendingArrivalResult || (access.accessGranted || (lostKeyResult && access.verified)
     ? null
     : (lostKeyResult || publicAccessResult(question, access, room, safetyResult)));
   if (earlyPolicyResult) {
@@ -3810,7 +3984,9 @@ export async function handleConciergeRequest(request, env, ctx, now = new Date()
   const genericSubmissionResult = safetyResult || lostKeyResult || cleaningPolicy.handled || servicePolicyResult || propertyPolicy.handled || bookingInformationResult
     ? null
     : genericExistingRequestSubmissionResult(question, workflowState);
-  const directPolicyResult = safetyResult || lostKeyResult || wifiPasswordResult || lateCheckoutPolicy.result || earlyCheckinPolicy.result || cleaningPolicy.result || servicePolicyResult || propertyPolicy.result || roomPolicyResult || bookingInformationResult || genericSubmissionResult;
+  const doorLockResult = safetyResult || lostKeyResult ? null : doorLockInformationResult(question);
+  const officeLocationResult = safetyResult || lostKeyResult || doorLockResult ? null : officeLocationInformationResult(question);
+  const directPolicyResult = safetyResult || lostKeyResult || doorLockResult || officeLocationResult || wifiPasswordResult || lateCheckoutPolicy.result || earlyCheckinPolicy.result || cleaningPolicy.result || servicePolicyResult || propertyPolicy.result || roomPolicyResult || bookingInformationResult || genericSubmissionResult;
   const criticalPropertyMatch = safetyResult?.intentId === "property_emergency"
     ? matchKnowledge("major water leak", effectiveKnowledge, 0.44)
     : null;
@@ -3982,15 +4158,34 @@ export async function handleConciergeRequest(request, env, ctx, now = new Date()
         actions: []
       };
     } else if (result.staySupportRequest?.type === "late_checkout") {
-      result = {
-        ...result,
-        answer: `Your late-checkout request for ${result.staySupportRequest.requestedTime} on ${formatStayDate(result.staySupportRequest.scheduledDate)} has been sent to The House team. It is subject to availability and is not confirmed until the team approves it.`,
-        actions: []
-      };
+      const approval = typeof store?.recordLateCheckoutApproval === "function"
+        ? await store.recordLateCheckoutApproval({
+            reservationId: result.staySupportRequest.reservationId,
+            room,
+            checkoutDate: result.staySupportRequest.scheduledDate,
+            checkoutMinutes: result.staySupportRequest.requestedMinutes,
+            checkoutTime: result.staySupportRequest.requestedTime,
+            feeThb: 200,
+            approvedAt: now.toISOString()
+          }).catch(() => null)
+        : null;
+      result = approval?.ok
+        ? {
+            ...result,
+            answer: `Your late checkout until ${result.staySupportRequest.requestedTime} on ${formatStayDate(result.staySupportRequest.scheduledDate)} is confirmed. The 200 THB service fee applies, and The House team has been notified.`,
+            actions: []
+          }
+        : {
+            ...result,
+            answer: "The team was notified, but I could not update the late-checkout status automatically. Please contact The House before relying on the late checkout.",
+            actions: [{ label: "Call Us", type: "route", route: "houseCall" }]
+          };
     } else if (result.staySupportRequest?.type === "early_checkin") {
       result = {
         ...result,
-        answer: `Your early check-in request for ${result.staySupportRequest.requestedTime} on ${formatStayDate(result.staySupportRequest.scheduledDate)} has been sent to The House team. It is not confirmed until the team approves it.`,
+        answer: result.staySupportRequest.sameDayDeparture
+          ? `There is another guest in the room before your stay. As soon as they check out, housekeeping will prepare it as quickly as possible. We’ve asked housekeeping to prioritize the room if possible. We’ll let you know if early check-in becomes available. Please do not expect the room to be ready before 12:00 PM, and early check-in is not guaranteed.`
+          : `The room is not marked ready yet. We’ve asked housekeeping to prepare it as soon as possible and prioritize it if possible. We’ll let you know if early check-in becomes available. Please do not expect the room to be ready before 12:00 PM, and early check-in is not guaranteed.`,
         actions: []
       };
     } else if (result.propertyIssueRequest) {
@@ -4218,7 +4413,7 @@ export async function handleAdminRequest(request, env, path) {
     if (financeResponse) return financeResponse;
   }
 
-  if (path.includes("/stays") || path.includes("/direct-stays") || path.includes("/manual-stay-delete") || path.includes("/direct-stay-code") || path.includes("/stay-extension") || path.includes("/in-person-registration") || path.includes("/registration-reset") || path.includes("/spare-key-rotation")) {
+  if (path.includes("/stays") || path.includes("/direct-stays") || path.includes("/manual-stay-delete") || path.includes("/direct-stay-code") || path.includes("/stay-extension") || path.includes("/in-person-registration") || path.includes("/registration-reset") || path.includes("/spare-key-rotation") || path.includes("/housekeeping-status")) {
     const stayResponse = await handleStayAdminRequest(request, env, path, store);
     if (stayResponse) return stayResponse;
   }

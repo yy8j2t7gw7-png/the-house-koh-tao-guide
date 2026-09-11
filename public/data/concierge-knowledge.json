@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0.0",
-  "release": "5.11.46",
+  "release": "5.11.47",
   "language": "en",
   "updated": "2026-08-14",
   "scope": "Verified accommodation, room, house-rule, support, booking and emergency answers for guests of The House – Koh Tao.",
@@ -216,6 +216,54 @@
       ]
     },
     {
+      "id": "door_locking",
+      "category": "room",
+      "priority": 45,
+      "triggers": [
+        "how do i lock my door",
+        "how can i lock my door",
+        "how do i lock the door from outside",
+        "how can i lock the door from outside",
+        "lock my room door",
+        "lock the room when i leave",
+        "how does the door lock work",
+        "how does my room lock work",
+        "how do i lock it when i leave",
+        "door lock from outside",
+        "round door handle lock",
+        "push button door lock",
+        "how to lock the door",
+        "how to lock my room door",
+        "how to lock the door from outside",
+        "can i lock the door when i leave",
+        "which button do i press to lock the door"
+      ],
+      "answer": "To lock your door when you leave, press the button on the inside of the round door handle, then close the door. Please make sure you have your key with you before closing it. To unlock the door from inside, simply turn the handle.",
+      "actions": []
+    },
+    {
+      "id": "office_location",
+      "category": "practical",
+      "priority": 40,
+      "triggers": [
+        "where is the office",
+        "where is your office",
+        "office location",
+        "how do i find the office",
+        "where is reception",
+        "where can i find reception",
+        "taoedge office",
+        "taoedge business solutions",
+        "where is taoedge business solutions",
+        "where is the taoedge office",
+        "how do i get to the office",
+        "how can i find the office",
+        "where is the front desk"
+      ],
+      "answer": "Our office is downstairs at The House, next to Bar Thai Food. Look for the Taoedge Business Solutions office.",
+      "actions": []
+    },
+    {
       "id": "checkout_time",
       "category": "departure",
       "priority": 20,
@@ -247,7 +295,7 @@
         "leave after 11",
         "extend check out"
       ],
-      "answer": "Please ask in advance. We will help when possible if the room is not needed immediately.",
+      "answer": "Late checkout is available up to 2:00 PM at the latest for a 200 THB service fee. The guest must accept the fee before the Concierge confirms the late checkout and notifies The House team.",
       "actions": [
         {
           "label": "Ask About Late Checkout",

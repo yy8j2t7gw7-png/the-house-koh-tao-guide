@@ -29,6 +29,7 @@ const APPROVED_ACTION_TEMPLATE_NAMES = Object.freeze({
 });
 
 const APPROVED_REGISTRATION_ACTION_TEMPLATE_NAME = "house_registration_admin_alert_actions_v1";
+const APPROVED_HOUSEKEEPING_ACTION_TEMPLATE_NAME = "house_housekeeping_task_actions_v1";
 
 const TEMPLATE_SCHEMAS = Object.freeze({
   // These current templates are approved in Meta as generic English. Meta
@@ -42,6 +43,7 @@ const TEMPLATE_SCHEMAS = Object.freeze({
   house_alert_status_v1: Object.freeze({ kind: "status", languageCode: "en", bodyParameterCount: 5 }),
   house_registration_admin_alert_v1: Object.freeze({ kind: "registration", languageCode: "en", bodyParameterCount: 1, quickActions: true, quickActionCount: 1, layout: "registration_reminder_v2" }),
   house_registration_admin_alert_actions_v1: Object.freeze({ kind: "registration", languageCode: "en", bodyParameterCount: 2, quickActions: true, quickActionCount: 2, layout: "registration_passport_received_v2" }),
+  house_housekeeping_task_actions_v1: Object.freeze({ kind: "housekeeping", languageCode: "en", bodyParameterCount: 4, quickActions: true, quickActionCount: 2, layout: "housekeeping_v1" }),
   // Optional interactive successors. They are selected only after the
   // explicit feature flag and exact per-kind template mapping are enabled.
   // Until Meta approves them, every existing production mapping remains live.
@@ -273,7 +275,8 @@ function actionTemplateNames(env) {
     booking: String(env.WHATSAPP_BOOKING_ACTION_TEMPLATE_NAME || "").trim(),
     luggage: String(env.WHATSAPP_LUGGAGE_ACTION_TEMPLATE_NAME || "").trim(),
     urgent: String(env.WHATSAPP_URGENT_ACTION_TEMPLATE_NAME || "").trim(),
-    lostKey: String(env.WHATSAPP_LOST_KEY_ACTION_TEMPLATE_NAME || "").trim()
+    lostKey: String(env.WHATSAPP_LOST_KEY_ACTION_TEMPLATE_NAME || "").trim(),
+    housekeeping: String(env.WHATSAPP_HOUSEKEEPING_ACTION_TEMPLATE_NAME || "").trim()
   };
 }
 
@@ -301,7 +304,8 @@ function templateNames(env) {
     urgent: String(env.WHATSAPP_URGENT_TEMPLATE_NAME || TEMPLATE_DEFAULTS.urgent).trim(),
     lostKey: String(env.WHATSAPP_LOST_KEY_TEMPLATE_NAME || TEMPLATE_DEFAULTS.lostKey).trim(),
     status: String(env.WHATSAPP_STATUS_TEMPLATE_NAME || TEMPLATE_DEFAULTS.status).trim(),
-    registration: String(env.WHATSAPP_REGISTRATION_TEMPLATE_NAME || TEMPLATE_DEFAULTS.registration).trim()
+    registration: String(env.WHATSAPP_REGISTRATION_TEMPLATE_NAME || TEMPLATE_DEFAULTS.registration).trim(),
+    housekeeping: ""
   };
 }
 
@@ -393,6 +397,7 @@ function requestLabel(alert) {
 
 function alertTemplateKind(alert) {
   if (["passport_received", "passport_checkin_missing", "passport_checkin_partial", "passport_tm30_overdue"].includes(alert.alertType)) return "registration";
+  if (alert.alertType === "housekeeping_turnover") return "housekeeping";
   if (alert.alertType === "verified_spare_key_release" || alert.alertType === "lost_key") return "lostKey";
   if (alert.alertType === "luggage_storage") return "luggage";
   if (alert.alertType === "booking_request") return "booking";
@@ -522,10 +527,24 @@ function registrationPassportReceivedTemplateValues(alert) {
   return [room, summary];
 }
 
+function housekeepingTemplateValues(alert) {
+  const task = alert.housekeepingTask || {};
+  const room = roomNumberValue(alert);
+  const checkout = task.departingReservationId ? `Checkout ${task.serviceDate || "today"} at ${task.checkoutTime || "11:00 AM"}` : "Room is currently vacant";
+  const arrival = task.requestedArrival
+    ? `Early arrival requested: ${task.requestedArrival}`
+    : task.arrivingReservationId ? `Next check-in: ${task.serviceDate || "today"} from 2:00 PM` : "No next arrival currently recorded";
+  const instruction = task.priority
+    ? "Early check-in requested. Please clean this room first if possible."
+    : "Please prepare this room for the next guest.";
+  return [room, checkout, arrival, instruction];
+}
+
 function templateValues(alert, kind, templateName = "") {
   const schema = TEMPLATE_SCHEMAS[String(templateName || "").trim()];
   if (schema?.layout === "registration_reminder_v2") return registrationReminderTemplateValues(alert);
   if (schema?.layout === "registration_passport_received_v2") return registrationPassportReceivedTemplateValues(alert);
+  if (schema?.layout === "housekeeping_v1") return housekeepingTemplateValues(alert);
   return schema?.layout === "approved_v2"
     ? approvedActionTemplateValues(alert, kind)
     : legacyTemplateValues(alert, kind);
@@ -555,21 +574,30 @@ function selectedTemplateForAlert(alert, env) {
     ? registrationActionTemplateName(env)
     : actionTemplateNames(env)[kind];
   const actionSchema = TEMPLATE_SCHEMAS[mappedActionName];
+  const housekeepingEnabled = kind === "housekeeping"
+    && String(env.WHATSAPP_STAFF_ACTIONS_ENABLED || "false").toLowerCase() === "true"
+    && mappedActionName === APPROVED_HOUSEKEEPING_ACTION_TEMPLATE_NAME
+    && actionSchema?.kind === "housekeeping"
+    && actionSchema.quickActions;
   const name = kind === "registration" && registrationPassportActionsEnabled(alert, env)
     ? mappedActionName
-    : staffQuickActionsEnabled(env)
-      && mappedActionName
-      && actionSchema?.kind === kind
-      && actionSchema.quickActions
+    : housekeepingEnabled
       ? mappedActionName
-      : names[kind];
+      : kind === "housekeeping"
+        ? ""
+        : staffQuickActionsEnabled(env)
+          && mappedActionName
+          && actionSchema?.kind === kind
+          && actionSchema.quickActions
+          ? mappedActionName
+          : names[kind];
   const parameters = templateValues(alert, kind, name);
   return validateWhatsAppTemplateParameters(name, kind, parameters);
 }
 
 function staffActionPayload(command, alertId) {
   const id = String(alertId || "");
-  if (!/^alert_[A-Za-z0-9-]{20,}$/.test(id) || !["RECEIVED", "RESOLVE", "TM30"].includes(command)) return "";
+  if (!/^alert_[A-Za-z0-9-]{20,}$/.test(id) || !["RECEIVED", "RESOLVE", "TM30", "READY"].includes(command)) return "";
   return `HOUSE_ALERT|${command}|${id}`;
 }
 
@@ -587,7 +615,9 @@ export function buildWhatsAppTemplatePayload(alert, recipient, env) {
     if (selected.quickActionCount >= 2) {
       const secondCommand = alert.alertType === "passport_received" && selected.name === APPROVED_REGISTRATION_ACTION_TEMPLATE_NAME
         ? "TM30"
-        : "RESOLVE";
+        : alert.alertType === "housekeeping_turnover" && selected.name === APPROVED_HOUSEKEEPING_ACTION_TEMPLATE_NAME
+          ? "READY"
+          : "RESOLVE";
       components.push(
         { type: "button", sub_type: "quick_reply", index: "1", parameters: [{ type: "payload", payload: staffActionPayload(secondCommand, alert.id) }] }
       );
@@ -878,6 +908,7 @@ export async function createProtectedOperationsAlert({
   summary,
   replyContact = "",
   escalationRequired = false,
+  housekeepingTask = null,
   now = new Date()
 }) {
   const store = getStore(env);
@@ -906,8 +937,11 @@ export async function createProtectedOperationsAlert({
   };
   const created = await store.createAlert(alert);
   const ephemeralContact = privateReplyContact(replyContact);
-  if (!created?.created) return { ...created?.alert, duplicate: true, privateReplyContact: ephemeralContact };
-  return { ...alert, duplicate: false, configured: config.configured, privateReplyContact: ephemeralContact };
+  if (!created?.created) return { ...created?.alert, duplicate: true, privateReplyContact: ephemeralContact, housekeepingTask };
+  if (housekeepingTask?.id && typeof store.linkHousekeepingTaskAlert === "function") {
+    await store.linkHousekeepingTaskAlert(housekeepingTask.id, alert.id, now.toISOString());
+  }
+  return { ...alert, duplicate: false, configured: config.configured, privateReplyContact: ephemeralContact, housekeepingTask };
 }
 
 function normalizeDedupeSummary(value) {
@@ -1011,10 +1045,10 @@ function recipientIsAuthorized(phone, env) {
 
 function statusCommandFromMessage(message) {
   const buttonPayload = String(message?.button?.payload || message?.interactive?.button_reply?.id || "").trim();
-  const quickAction = buttonPayload.match(/^HOUSE_ALERT\|(RECEIVED|RESOLVE|TM30)\|(alert_[A-Za-z0-9-]{20,})$/i);
+  const quickAction = buttonPayload.match(/^HOUSE_ALERT\|(RECEIVED|RESOLVE|TM30|READY)\|(alert_[A-Za-z0-9-]{20,})$/i);
   if (quickAction) return { command: quickAction[1].toUpperCase(), alertId: quickAction[2] };
   const text = String(message?.text?.body || message?.button?.text || "").trim();
-  const typed = text.match(/^(RECEIVED|ACK|RESOLVE|TM30)\s+(alert_[A-Za-z0-9-]{20,})$/i);
+  const typed = text.match(/^(RECEIVED|ACK|RESOLVE|TM30|READY)\s+(alert_[A-Za-z0-9-]{20,})$/i);
   return typed ? { command: typed[1].toUpperCase(), alertId: typed[2] } : null;
 }
 
@@ -1132,7 +1166,18 @@ export async function handleWhatsAppWebhook(request, env) {
     const now = new Date().toISOString();
     if (["RECEIVED", "ACK"].includes(command)) {
       await store.acknowledgeAlert(parsed.alertId, actor, now);
+      if (before.alertType === "housekeeping_turnover" && typeof store.acknowledgeHousekeepingTask === "function") {
+        await store.acknowledgeHousekeepingTask(parsed.alertId, now);
+      }
       await notifyStatusChange(before, from, "ACKNOWLEDGED", env, store);
+      continue;
+    }
+    if (command === "READY") {
+      if (before.alertType !== "housekeeping_turnover" || typeof store.markHousekeepingReadyFromAlert !== "function") continue;
+      const marked = await store.markHousekeepingReadyFromAlert(parsed.alertId, actor, now);
+      if (!marked?.ok) continue;
+      await store.resolveAlert(parsed.alertId, actor, now);
+      await notifyStatusChange(before, from, "RESOLVED", env, store);
       continue;
     }
     if (command === "TM30") {

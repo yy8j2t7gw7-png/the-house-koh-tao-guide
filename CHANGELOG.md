@@ -1,3 +1,14 @@
+# v5.11.47 — Housekeeping Room Status & Stay Timing
+
+- Adds server-side `dirty` / `clean` / `ready` housekeeping state for Rooms 1–11 with Owner Admin fallback controls.
+- Adds Su housekeeping WhatsApp tasks using the new `house_housekeeping_task_actions_v1` Utility template with **Received / Room ready** quick replies.
+- Makes early check-in reservation- and housekeeping-aware across Airbnb, direct/walk-in/manual stays and owner extensions; only a genuinely vacant applicable `ready` room may be confirmed early.
+- Prioritizes a not-ready room for housekeeping when an incoming guest requests early arrival, while clearly stating that early check-in is not guaranteed and should not be expected before 12:00 PM.
+- Sets late checkout to a 2:00 PM hard maximum with a 200 THB fee and explicit fee acceptance before the operational alert; same-day/last-minute arrivals do not block it.
+- Incoming guests are asked to plan to check in after 3:00 PM when the previous same-room stay has an approved same-day late checkout.
+- Adds short deterministic Concierge answers for keyed round-handle door locking and the Taoedge Business Solutions office location.
+- Preserves unrelated v5.11.46 behavior. Complete suite: **268 passed, 0 failed**.
+
 # v5.11.46 — Reservation-Aware Stay Operations
 
 - Late checkout now uses the verified reservation checkout date, asks only for requested time, and creates a protected operational alert before claiming the request was sent.

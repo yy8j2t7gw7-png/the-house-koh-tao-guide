@@ -1,3 +1,12 @@
+# v5.11.48 — Reversible Guest-Type Selection
+
+- Adds **Selected the wrong guest type? Change selection** for verified guests who accidentally choose Thai-only vs foreign/mixed registration.
+- Allows evidence-free pending registration to return to the existing guest-type choice without repeating stay verification.
+- Works in both directions and invalidates unused passport/Thai-ID upload links from the abandoned branch.
+- Blocks guest self-service switching after document evidence exists or when registration is complete/staff-authorized.
+- Preserves all v5.11.47 housekeeping, stay-timing, WhatsApp, reservation, security and finance behavior.
+- Complete suite: **270 passed, 0 failed** before final packaging.
+
 # v5.11.47 — Housekeeping Room Status & Stay Timing
 
 - Adds server-side `dirty` / `clean` / `ready` housekeeping state for Rooms 1–11 with Owner Admin fallback controls.

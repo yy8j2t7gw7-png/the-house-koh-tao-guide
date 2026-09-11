@@ -22,6 +22,7 @@
   const foreignButton = document.getElementById("startForeignRegistration");
   const foreignCount = document.getElementById("nonThaiGuestCount");
   const allForeignGuestsConfirmed = document.getElementById("confirmAllNonThaiGuests");
+  const changeGuestTypeButton = document.getElementById("changeGuestTypeSelection");
   const arrivalAccess = document.getElementById("arrivalAccess");
   const arrivalAccessEntrancePhoto = document.getElementById("arrivalAccessEntrancePhoto");
   const arrivalAccessRoomPhoto = document.getElementById("arrivalAccessRoomPhoto");
@@ -61,6 +62,9 @@
     nationalityError: "The guest type could not be saved. Please check the information and try again.",
     countError: "Enter the number of non-Thai people who will stay overnight in this room.",
     allGuestsError: "Confirm that the number includes every non-Thai adult and child staying overnight, not only the Airbnb booking guest.",
+    guestTypeResetting: "Returning to guest type selection…",
+    guestTypeReset: "Choose the correct guest type below.",
+    guestTypeResetError: "This guest type can no longer be changed here. Please contact the concierge for help.",
     keyNotActive: "Spare-key access starts at check-in and ends at 11:00 AM on checkout day.",
     keyAlreadyReleased: "A spare key has already been provided for this stay. For security, another code cannot be released automatically. Please contact The House Concierge and we will help you.",
     keyRotation: "Another spare-key code cannot be released until the key box has been reset. Please contact The House Concierge and we will help you.",
@@ -125,6 +129,11 @@
     }
   }
 
+  function canChangeGuestType(data) {
+    if (data.registrationStatus === "thai_id_pending") return true;
+    return data.registrationStatus === "passport_pending" && Number(data.receivedPassports || 0) === 0;
+  }
+
   function showRegistration(data) {
     window.dispatchEvent(new CustomEvent("house:stay-access-updated", {
       detail: {
@@ -138,6 +147,7 @@
     if (verificationFields) verificationFields.hidden = true;
     setStatus(verificationStatus, messages.verified, "success");
     void loadVerifiedArrivalAccess();
+    if (changeGuestTypeButton) changeGuestTypeButton.hidden = !canChangeGuestType(data);
     if (data.guestType === "thai" || ["thai_id_pending", "thai_id_complete"].includes(data.registrationStatus)) {
       registrationDocumentType = "thai_id";
       if (nationalityPanel) nationalityPanel.hidden = true;
@@ -181,6 +191,7 @@
     }
     if (nationalityPanel) nationalityPanel.hidden = false;
     if (progressPanel) progressPanel.hidden = true;
+    if (changeGuestTypeButton) changeGuestTypeButton.hidden = true;
   }
 
   function renderSpareKey(data) {
@@ -297,6 +308,23 @@
     } catch (_error) {
       setStatus(registrationStatus, messages.nationalityError, "error");
       setBusy(foreignButton, false);
+    }
+  });
+
+  changeGuestTypeButton?.addEventListener("click", async () => {
+    setBusy(changeGuestTypeButton, true);
+    setStatus(registrationStatus, messages.guestTypeResetting, "working");
+    try {
+      const data = await api("/api/stay/registration-selection-reset", { method: "POST", body: "{}" });
+      if (foreignCount) foreignCount.value = "1";
+      if (allForeignGuestsConfirmed) allForeignGuestsConfirmed.checked = false;
+      showRegistration(data);
+      setStatus(registrationStatus, messages.guestTypeReset, "attention");
+      nationalityPanel?.scrollIntoView({ behavior: "smooth", block: "start" });
+    } catch (_error) {
+      setStatus(registrationStatus, messages.guestTypeResetError, "error");
+    } finally {
+      setBusy(changeGuestTypeButton, false);
     }
   });
 

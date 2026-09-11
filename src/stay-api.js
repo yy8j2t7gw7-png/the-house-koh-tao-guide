@@ -300,6 +300,13 @@ function registrationComplete(status) {
   return REGISTRATION_COMPLETE_STATUSES.has(String(status || ""));
 }
 
+function guestTypeSelectionChangeAllowed(registration) {
+  const status = String(registration?.status || "not_started");
+  if (status === "thai_id_pending") return true;
+  if (status === "passport_pending" && Number(registration?.receivedPassports || 0) === 0) return true;
+  return false;
+}
+
 export async function getGuestAccess(request, env, requestedRoom = "") {
   const store = getStore(env);
   if (!store || !env.STAY_TOKEN_PEPPER) {
@@ -517,6 +524,26 @@ export async function handleStayGuestRequest(request, env, path, ctx, now = new 
   const registration = await store.getStayRegistrationStatus(session.reservationId);
   const registrationStatus = registration?.status || "not_started";
 
+  if (path === "/api/stay/registration-selection-reset") {
+    if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405, { allow: "POST" });
+    if (!guestTypeSelectionChangeAllowed(registration)) {
+      return json({ error: "guest_type_change_requires_staff" }, 409);
+    }
+    if (typeof store.resetPendingGuestTypeSelection !== "function") {
+      return json({ error: "registration_selection_reset_unavailable" }, 503);
+    }
+    const result = await store.resetPendingGuestTypeSelection(session.reservationId, now.toISOString());
+    if (!result?.ok) return json({ error: result?.error || "guest_type_change_requires_staff" }, 409);
+    return json({
+      ok: true,
+      accessGranted: false,
+      registrationStatus: "not_started",
+      guestType: "",
+      requiredPassports: 0,
+      receivedPassports: 0
+    });
+  }
+
   if (path === "/api/stay/nationality") {
     if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405, { allow: "POST" });
     const body = await readJson(request, 2_000);
@@ -525,8 +552,11 @@ export async function handleStayGuestRequest(request, env, path, ctx, now = new 
       if (registrationStatus === "thai_id_complete" && registration?.guestType === "thai") {
         return json({ ok: true, accessGranted: true, registrationStatus, guestType: "thai" });
       }
-      if (registration?.guestType === "foreign" || Number(registration?.receivedPassports) > 0) {
+      if (["passport_complete", "in_person_pending", "in_person_complete"].includes(registrationStatus) || Number(registration?.receivedPassports) > 0) {
         return json({ error: "guest_type_change_requires_staff" }, 409);
+      }
+      if (registration?.guestType === "foreign" || registrationStatus === "passport_pending") {
+        return json({ error: "guest_type_selection_reset_required" }, 409);
       }
       const updatedAt = new Date().toISOString();
       await store.closePendingPassportLinksForReservation(session.reservationId, updatedAt);
@@ -539,6 +569,9 @@ export async function handleStayGuestRequest(request, env, path, ctx, now = new 
       const requiredPassports = Number(body?.nonThaiGuestCount);
       if (registrationStatus === "thai_id_complete") {
         return json({ error: "guest_type_change_requires_staff" }, 409);
+      }
+      if (registration?.guestType === "thai" || registrationStatus === "thai_id_pending") {
+        return json({ error: "guest_type_selection_reset_required" }, 409);
       }
       if (body?.allNonThaiGuestsIncluded !== true) {
         return json({ error: "all_non_thai_guests_confirmation_required" }, 400);
@@ -645,8 +678,11 @@ export async function handleStayGuestRequest(request, env, path, ctx, now = new 
     if (registrationStatus === "thai_id_complete" && registration?.guestType === "thai") {
       return json({ ok: true, accessGranted: true, registrationStatus, guestType: "thai" });
     }
-    if (registration?.guestType === "foreign" || Number(registration?.receivedPassports) > 0 || registrationStatus === "passport_complete") {
+    if (["passport_complete", "in_person_pending", "in_person_complete"].includes(registrationStatus) || Number(registration?.receivedPassports) > 0) {
       return json({ error: "guest_type_change_requires_staff" }, 409);
+    }
+    if (registration?.guestType === "foreign" || registrationStatus === "passport_pending") {
+      return json({ error: "guest_type_selection_reset_required" }, 409);
     }
     const updatedAt = new Date().toISOString();
     await store.closePendingPassportLinksForReservation(session.reservationId, updatedAt);

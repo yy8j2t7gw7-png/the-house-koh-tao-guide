@@ -1952,6 +1952,41 @@ export class ConciergeStore extends DurableObject {
     };
   }
 
+  async resetPendingGuestTypeSelection(reservationId, nowValue) {
+    const cleanReservationId = cleanText(reservationId, 100);
+    const requirement = rows(this.ctx.storage.sql.exec(
+      `SELECT guest_type AS guestType, required_passports AS requiredPassports,
+              received_passports AS receivedPassports, status
+       FROM stay_registration_requirements WHERE reservation_id = ? LIMIT 1`,
+      cleanReservationId
+    ))[0];
+    const current = requirement || rows(this.ctx.storage.sql.exec(
+      "SELECT status FROM stay_registration_status WHERE reservation_id = ? LIMIT 1",
+      cleanReservationId
+    ))[0];
+    if (!current || !["passport_pending", "thai_id_pending"].includes(String(current.status || ""))) {
+      return { ok: false, error: "guest_type_change_requires_staff" };
+    }
+    const evidenceRow = rows(this.ctx.storage.sql.exec(
+      `SELECT COUNT(*) AS total
+       FROM passport_reservation_links l
+       JOIN passport_uploads p ON p.id = l.passport_id
+       WHERE l.reservation_id = ? AND p.status = 'uploaded'`,
+      cleanReservationId
+    ))[0];
+    const evidenceCount = Math.max(Number(current.receivedPassports) || 0, Number(evidenceRow?.total) || 0);
+    if (evidenceCount > 0) return { ok: false, error: "guest_type_change_requires_staff" };
+
+    const updatedAt = cleanText(nowValue, 40) || new Date().toISOString();
+    await this.closePendingPassportLinksForReservation(cleanReservationId, updatedAt);
+    this.ctx.storage.sql.exec(
+      "DELETE FROM stay_registration_requirements WHERE reservation_id = ?",
+      cleanReservationId
+    );
+    await this.setStayRegistrationStatus(cleanReservationId, "not_started", updatedAt);
+    return { ok: true, status: "not_started", updatedAt };
+  }
+
   async resetPendingInPersonRegistration(reservationId, nowValue) {
     const cleanReservationId = cleanText(reservationId, 100);
     const current = rows(this.ctx.storage.sql.exec(

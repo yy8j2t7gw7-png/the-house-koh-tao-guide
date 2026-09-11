@@ -496,6 +496,21 @@ function createStore() {
       this.registrationStatuses.set(reservationId, value);
       return { ok: true, ...value };
     },
+    async resetPendingGuestTypeSelection(reservationId, updatedAt) {
+      const current = this.registrationStatuses.get(reservationId);
+      if (!current || !["passport_pending", "thai_id_pending"].includes(String(current.status || ""))) {
+        return { ok: false, error: "guest_type_change_requires_staff" };
+      }
+      const evidenceCount = this.passportRecords.filter(
+        (item) => item.reservationId === reservationId && item.status === "uploaded"
+      ).length;
+      if (Math.max(Number(current.receivedPassports) || 0, evidenceCount) > 0) {
+        return { ok: false, error: "guest_type_change_requires_staff" };
+      }
+      await this.closePendingPassportLinksForReservation(reservationId, updatedAt);
+      this.registrationStatuses.set(reservationId, { status: "not_started", updatedAt });
+      return { ok: true, status: "not_started", updatedAt };
+    },
     async resetPendingInPersonRegistration(reservationId, updatedAt) {
       const current = this.registrationStatuses.get(reservationId);
       if (!current || current.status !== "in_person_pending") {
@@ -3361,7 +3376,7 @@ test("guest localization supports seven languages and keeps the owner dashboard 
   assert.doesNotMatch(admin, /src="\/i18n\.js"/);
   assert.match(runtime, /exploreContentDeferred/);
   assert.match(runtime, /element\.closest\("\.section,\.footer"\)/);
-  assert.match(runtime, /houseGuideTranslations:v5\.11\.47:/);
+  assert.match(runtime, /houseGuideTranslations:v5\.11\.48:/);
   assert.match(runtime, /MAX_REQUEST_RETRIES = 2/);
   assert.match(runtime, /let flushRunning = false/);
 });
@@ -7951,8 +7966,13 @@ test("registration and Owner Admin UI expose Thai ID verification and TM30 proce
   assert.match(roomAccess, /upload one clear Thai ID-card image/i);
   assert.match(registrationEntry, /thai_id_pending/);
   assert.match(registrationEntry, /\/api\/stay\/thai-id-link/);
+  assert.match(registrationEntry, /\/api\/stay\/registration-selection-reset/);
+  assert.match(registrationEntry, /guestTypeReset/);
   assert.match(passportUpload, /Thai ID-card image/);
   assert.match(passportScript, /documentType === "thai_id"/);
+  const roomAccessHtml = await readFile(new URL("../public/room-access.html", import.meta.url), "utf8");
+  assert.match(roomAccessHtml, /Selected the wrong guest type\? Change selection/);
+  assert.match(roomAccessHtml, /id="changeGuestTypeSelection"/);
   assert.match(adminHtml, /Guest identity documents &amp; TM30 tracking/);
   assert.match(adminScript, /Mark TM30 registered/);
   assert.match(adminScript, /tm30-register/);
@@ -7996,7 +8016,7 @@ test("Airbnb reservation sync fixes each listing to its verified room and hashes
   assert.equal(Object.values(listingRoomMap).includes("7"), false);
 });
 
-test("verified Airbnb stay creates its own passport form and prevents nationality downgrade", async () => {
+test("verified Airbnb stay keeps pending passport links protected until explicit guest-type reset", async () => {
   const { env, store } = createEnvironment();
   await handleReservationSyncRequest(new Request("https://guide.example/api/reservations/sync", {
     method: "POST",
@@ -8055,8 +8075,142 @@ test("verified Airbnb stay creates its own passport form and prevents nationalit
     body: JSON.stringify({ allGuestsThai: true })
   }), env, "/api/stay/thai-exemption");
   assert.equal(exempt.status, 409);
-  assert.equal((await exempt.json()).error, "guest_type_change_requires_staff");
+  assert.equal((await exempt.json()).error, "guest_type_selection_reset_required");
   assert.equal(store.registrationStatuses.get(store.stayReservations[0].id).status, "passport_pending");
+
+  const reset = await handleStayGuestRequest(new Request("https://guide.example/api/stay/registration-selection-reset", {
+    method: "POST",
+    headers: { origin: "https://guide.example", cookie, "content-type": "application/json" },
+    body: "{}"
+  }), env, "/api/stay/registration-selection-reset", null, new Date("2027-08-13T08:01:00.000Z"));
+  assert.equal(reset.status, 200);
+  const resetBody = await reset.json();
+  assert.equal(resetBody.registrationStatus, "not_started");
+  assert.equal(resetBody.guestType, "");
+  assert.equal(store.passportRecords.at(-1).status, "deleted");
+
+  const thaiRegistration = await handleStayGuestRequest(new Request("https://guide.example/api/stay/nationality", {
+    method: "POST",
+    headers: { origin: "https://guide.example", cookie, "content-type": "application/json" },
+    body: JSON.stringify({ nationality: "thai", allGuestsThai: true })
+  }), env, "/api/stay/nationality");
+  assert.equal(thaiRegistration.status, 200);
+  const thaiBody = await thaiRegistration.json();
+  assert.equal(thaiBody.guestType, "thai");
+  assert.equal(thaiBody.registrationStatus, "thai_id_pending");
+});
+
+test("Thai-only pending selection can be reset and changed to foreign before Thai ID evidence is uploaded", async () => {
+  const { env, store } = createEnvironment();
+  await handleReservationSyncRequest(new Request("https://guide.example/api/reservations/sync", {
+    method: "POST",
+    headers: { authorization: "Bearer reservation_sync_test_5500", "content-type": "application/json" },
+    body: JSON.stringify({
+      room: "1",
+      listingId: "1376393324098439141",
+      records: [{ confirmationCode: "HMTHAIRESET1", checkInDate: "2027-08-13", checkOutDate: "2027-08-15" }]
+    })
+  }), env);
+  const verified = await handleStayGuestRequest(new Request("https://guide.example/api/stay/verify", {
+    method: "POST",
+    headers: { origin: "https://guide.example", "content-type": "application/json" },
+    body: JSON.stringify({ room: "1", confirmationCode: "HMTHAIRESET1" })
+  }), env, "/api/stay/verify", null, new Date("2027-08-13T08:00:00.000Z"));
+  const cookie = verified.headers.get("set-cookie").split(";")[0];
+
+  const thai = await handleStayGuestRequest(new Request("https://guide.example/api/stay/nationality", {
+    method: "POST",
+    headers: { origin: "https://guide.example", cookie, "content-type": "application/json" },
+    body: JSON.stringify({ nationality: "thai", allGuestsThai: true })
+  }), env, "/api/stay/nationality");
+  assert.equal(thai.status, 200);
+
+  const thaiIdLink = await handleStayGuestRequest(new Request("https://guide.example/api/stay/thai-id-link", {
+    method: "POST",
+    headers: { origin: "https://guide.example", cookie, "content-type": "application/json" },
+    body: "{}"
+  }), env, "/api/stay/thai-id-link");
+  assert.equal(thaiIdLink.status, 200);
+  assert.equal(store.passportRecords.at(-1).documentType, "thai_id");
+  assert.equal(store.passportRecords.at(-1).status, "pending");
+
+  const directForeignSwitch = await handleStayGuestRequest(new Request("https://guide.example/api/stay/nationality", {
+    method: "POST",
+    headers: { origin: "https://guide.example", cookie, "content-type": "application/json" },
+    body: JSON.stringify({ nationality: "foreign", nonThaiGuestCount: 1, allNonThaiGuestsIncluded: true })
+  }), env, "/api/stay/nationality");
+  assert.equal(directForeignSwitch.status, 409);
+  assert.equal((await directForeignSwitch.json()).error, "guest_type_selection_reset_required");
+
+  const reset = await handleStayGuestRequest(new Request("https://guide.example/api/stay/registration-selection-reset", {
+    method: "POST",
+    headers: { origin: "https://guide.example", cookie, "content-type": "application/json" },
+    body: "{}"
+  }), env, "/api/stay/registration-selection-reset", null, new Date("2027-08-13T08:01:00.000Z"));
+  assert.equal(reset.status, 200);
+  assert.equal(store.passportRecords.at(-1).status, "deleted");
+
+  const foreign = await handleStayGuestRequest(new Request("https://guide.example/api/stay/nationality", {
+    method: "POST",
+    headers: { origin: "https://guide.example", cookie, "content-type": "application/json" },
+    body: JSON.stringify({ nationality: "foreign", nonThaiGuestCount: 2, allNonThaiGuestsIncluded: true })
+  }), env, "/api/stay/nationality");
+  assert.equal(foreign.status, 200);
+  const foreignBody = await foreign.json();
+  assert.equal(foreignBody.guestType, "foreign");
+  assert.equal(foreignBody.requiredPassports, 2);
+  assert.equal(foreignBody.registrationStatus, "passport_pending");
+});
+
+test("guest type self-service reset is blocked after registration evidence has been uploaded", async () => {
+  const { env, store } = createEnvironment();
+  await handleReservationSyncRequest(new Request("https://guide.example/api/reservations/sync", {
+    method: "POST",
+    headers: { authorization: "Bearer reservation_sync_test_5500", "content-type": "application/json" },
+    body: JSON.stringify({
+      room: "1",
+      listingId: "1376393324098439141",
+      records: [{ confirmationCode: "HMEVIDENCE1", checkInDate: "2027-08-13", checkOutDate: "2027-08-15" }]
+    })
+  }), env);
+  const verified = await handleStayGuestRequest(new Request("https://guide.example/api/stay/verify", {
+    method: "POST",
+    headers: { origin: "https://guide.example", "content-type": "application/json" },
+    body: JSON.stringify({ room: "1", confirmationCode: "HMEVIDENCE1" })
+  }), env, "/api/stay/verify", null, new Date("2027-08-13T08:00:00.000Z"));
+  const cookie = verified.headers.get("set-cookie").split(";")[0];
+  await handleStayGuestRequest(new Request("https://guide.example/api/stay/nationality", {
+    method: "POST",
+    headers: { origin: "https://guide.example", cookie, "content-type": "application/json" },
+    body: JSON.stringify({ nationality: "foreign", nonThaiGuestCount: 2, allNonThaiGuestsIncluded: true })
+  }), env, "/api/stay/nationality");
+
+  const linkResponse = await handleStayGuestRequest(new Request("https://guide.example/api/stay/passport-link", {
+    method: "POST",
+    headers: { origin: "https://guide.example", cookie, "content-type": "application/json" },
+    body: "{}"
+  }), env, "/api/stay/passport-link");
+  const token = new URL((await linkResponse.json()).uploadUrl).hash.replace("#token=", "");
+  const jpeg = new Uint8Array(1024);
+  jpeg.set([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46]);
+  const upload = await handlePassportGuestRequest(new Request("https://guide.example/api/passport-upload", {
+    method: "POST",
+    headers: { authorization: `Bearer ${token}`, "content-type": "image/jpeg" },
+    body: jpeg
+  }), env, "/api/passport-upload");
+  assert.equal(upload.status, 200);
+
+  const reset = await handleStayGuestRequest(new Request("https://guide.example/api/stay/registration-selection-reset", {
+    method: "POST",
+    headers: { origin: "https://guide.example", cookie, "content-type": "application/json" },
+    body: "{}"
+  }), env, "/api/stay/registration-selection-reset");
+  assert.equal(reset.status, 409);
+  assert.equal((await reset.json()).error, "guest_type_change_requires_staff");
+  const current = store.registrationStatuses.get(store.stayReservations[0].id);
+  assert.equal(current.guestType, "foreign");
+  assert.equal(current.status, "passport_pending");
+  assert.equal(current.receivedPassports, 1);
 });
 
 test("private guide stays locked until every declared non-Thai overnight guest passport is submitted", async () => {

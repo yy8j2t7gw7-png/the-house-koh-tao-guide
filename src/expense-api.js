@@ -333,6 +333,57 @@ export async function handleExpenseAdminRequest(request, env, path, store, actor
     });
   }
 
+
+  if (path === "/api/concierge/admin/expenses/update") {
+    if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405, { allow: "POST" });
+    const denied = ownerOnly(access);
+    if (denied) return denied;
+    const body = await request.json().catch(() => ({}));
+    const id = String(body.id || "");
+    const scope = scopedBusinessId(body.business || HOUSE_FINANCE_BUSINESS_ID, access);
+    if (scope.error) return json({ error: scope.error }, scope.status);
+    const businessId = scope.businessId;
+    if (!EXPENSE_ID_PATTERN.test(id)) return json({ error: "invalid_expense" }, 400);
+    const configuration = expenseConfiguration(env, businessId);
+    const expenseDate = cleanText(body.date, 10);
+    const amountMinor = amountToMinorUnits(body.amount, configuration.minorUnitDigits);
+    const category = cleanText(body.category, 40);
+    const description = cleanText(body.description, 240);
+    const vendor = cleanText(body.vendor, 160);
+    const paymentMethod = cleanText(body.paymentMethod, 40);
+    const roomArea = cleanText(body.roomArea, 80);
+    const notes = cleanText(body.notes, 500);
+    const confirmDuplicate = body.confirmDuplicate === true;
+    if (!validDate(expenseDate) || !amountMinor || !configuration.categories.includes(category) || description.length < 2) {
+      return json({ error: "invalid_expense" }, 400);
+    }
+    if (!configuration.paymentMethods.includes(paymentMethod)) return json({ error: "invalid_expense" }, 400);
+    const current = await store.getExpense?.(id, businessId);
+    if (!current) return json({ error: "not_found" }, 404);
+    const duplicates = (await store.findExpenseDuplicates?.(expenseDate, amountMinor, vendor, configuration.currency, businessId) || [])
+      .filter((item) => item.id !== id);
+    if (duplicates.length && !confirmDuplicate) {
+      return json({
+        error: "possible_duplicate",
+        duplicates: duplicates.map((item) => ({
+          id: item.id,
+          expenseDate: item.expenseDate,
+          amount: minorUnitsToAmount(item.amountMinor, configuration.minorUnitDigits),
+          currency: item.currency || configuration.currency,
+          vendor: item.vendor,
+          description: item.description,
+          category: item.category
+        }))
+      }, 409);
+    }
+    const outcome = await store.updateExpense?.(id, {
+      expenseDate, category, description, amountMinor, vendor, paymentMethod, roomArea, notes
+    }, actorHash, access?.role === "staff" ? "staff" : "owner", new Date().toISOString(), businessId);
+    return outcome?.ok
+      ? json({ ok: true, id, updated: true, possibleDuplicateConfirmed: Boolean(duplicates.length && confirmDuplicate) })
+      : json({ error: outcome?.error || "expense_update_failed" }, outcome?.error === "not_found" ? 404 : 503);
+  }
+
   if (path === "/api/concierge/admin/expenses/delete") {
     if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405, { allow: "POST" });
     const denied = ownerOnly(access);

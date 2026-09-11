@@ -281,6 +281,19 @@ export class ConciergeStore extends DurableObject {
         CREATE INDEX IF NOT EXISTS expense_records_category
           ON expense_records(category, expense_date);
 
+        CREATE TABLE IF NOT EXISTS expense_edit_audit (
+          id TEXT PRIMARY KEY,
+          expense_id TEXT NOT NULL,
+          business_id TEXT NOT NULL,
+          previous_values_json TEXT NOT NULL,
+          new_values_json TEXT NOT NULL,
+          actor_hash TEXT NOT NULL DEFAULT '',
+          actor_role TEXT NOT NULL DEFAULT 'owner',
+          edited_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS expense_edit_audit_expense
+          ON expense_edit_audit(expense_id, edited_at);
+
         CREATE TABLE IF NOT EXISTS income_records (
           id TEXT PRIMARY KEY,
           business_id TEXT NOT NULL DEFAULT 'the-house-koh-tao',
@@ -1204,6 +1217,49 @@ export class ConciergeStore extends DurableObject {
       vendorValue,
       vendorValue
     ));
+  }
+
+  async updateExpense(id, record, actorHash, actorRole, nowValue, businessId = HOUSE_FINANCE_BUSINESS_ID) {
+    const expenseId = cleanText(id, 100);
+    const business = cleanText(businessId, 80) || HOUSE_FINANCE_BUSINESS_ID;
+    const previous = await this.getExpense(expenseId, business);
+    if (!previous) return { ok: false, error: "not_found" };
+    const editedAt = cleanText(nowValue, 40) || new Date().toISOString();
+    const next = {
+      expenseDate: cleanText(record.expenseDate, 10),
+      category: cleanText(record.category, 40),
+      description: cleanText(record.description, 240),
+      amountMinor: Math.max(1, Math.round(Number(record.amountMinor) || 0)),
+      vendor: cleanText(record.vendor, 160),
+      paymentMethod: cleanText(record.paymentMethod, 40),
+      roomArea: cleanText(record.roomArea, 80),
+      notes: cleanText(record.notes, 500)
+    };
+    this.ctx.storage.sql.exec(
+      `UPDATE expense_records
+       SET expense_date = ?, category = ?, description = ?, amount_minor = ?, vendor = ?, payment_method = ?, room_area = ?, notes = ?
+       WHERE id = ? AND business_id = ?`,
+      next.expenseDate, next.category, next.description, next.amountMinor, next.vendor, next.paymentMethod, next.roomArea, next.notes, expenseId, business
+    );
+    const auditPrevious = {
+      expenseDate: previous.expenseDate, category: previous.category, description: previous.description, amountMinor: previous.amountMinor,
+      vendor: previous.vendor, paymentMethod: previous.paymentMethod, roomArea: previous.roomArea, notes: previous.notes
+    };
+    this.ctx.storage.sql.exec(
+      `INSERT INTO expense_edit_audit
+       (id, expense_id, business_id, previous_values_json, new_values_json, actor_hash, actor_role, edited_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      `expense_edit_${crypto.randomUUID()}`,
+      expenseId,
+      business,
+      JSON.stringify(auditPrevious),
+      JSON.stringify(next),
+      cleanText(actorHash, 100),
+      cleanText(actorRole, 20) === "staff" ? "staff" : "owner",
+      editedAt
+    );
+    await this.recordAdminAudit("expense_edited", `expense:${expenseId}`, editedAt);
+    return { ok: true, updated: true };
   }
 
   async deleteExpense(id, actorHash, nowValue, businessId = HOUSE_FINANCE_BUSINESS_ID) {

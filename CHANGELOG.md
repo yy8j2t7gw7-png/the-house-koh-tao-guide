@@ -1,3 +1,12 @@
+# v5.11.51 — Editable Saved Expenses
+
+- Adds owner-only **Edit expense** to The House and Bamboo saved-expense history, including bills originally entered by staff.
+- Corrects existing structured fields in place while preserving the original private receipt and original creator role.
+- Recalculates Finance totals/reports naturally from the corrected record and keeps duplicate protection.
+- Adds before/after expense edit audit history plus the existing general admin audit trail.
+- Keeps staff Finance entry-only and preserves business isolation and all unrelated production behavior.
+- Full automated suite: **274 passed / 0 failed** before final package validation.
+
 # v5.11.50 — Housekeeping Timing & Ready Owner Notification
 
 - Keeps guest-requested cleaning times attached to their housekeeping request even when a later maintenance issue is reported in the same conversation.

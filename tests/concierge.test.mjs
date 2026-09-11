@@ -102,6 +102,7 @@ function createStore() {
     spareKeyRotations: new Map(),
     maintenanceReports: [],
     expenseRecords: [],
+    expenseEditAudit: [],
     incomeRecords: [],
     alerts: [],
     alertDeliveries: [],
@@ -167,6 +168,15 @@ function createStore() {
     async findExpenseDuplicates(expenseDate, amountMinor, vendor, currency = "THB", businessId = HOUSE_FINANCE_BUSINESS_ID) {
       const vendorValue = String(vendor || "").toLowerCase();
       return this.expenseRecords.filter((item) => (item.businessId || HOUSE_FINANCE_BUSINESS_ID) === businessId && item.expenseDate === expenseDate && item.amountMinor === amountMinor && item.currency === currency && (!vendorValue || String(item.vendor || "").toLowerCase() === vendorValue));
+    },
+    async updateExpense(id, record, actorHash, actorRole, now, businessId = HOUSE_FINANCE_BUSINESS_ID) {
+      const index = this.expenseRecords.findIndex((item) => item.id === id && (item.businessId || HOUSE_FINANCE_BUSINESS_ID) === businessId);
+      if (index < 0) return { ok: false, error: "not_found" };
+      const previous = { ...this.expenseRecords[index] };
+      this.expenseRecords[index] = { ...this.expenseRecords[index], ...record };
+      this.expenseEditAudit.push({ id, businessId, previous, next: { ...this.expenseRecords[index] }, actorHash, actorRole, editedAt: now });
+      this.adminAudit.push({ action: "expense_edited", reference: `expense:${id}`, actorHash, createdAt: now });
+      return { ok: true, updated: true };
     },
     async deleteExpense(id, actorHash, now, businessId = HOUSE_FINANCE_BUSINESS_ID) {
       const index = this.expenseRecords.findIndex((item) => item.id === id && (item.businessId || HOUSE_FINANCE_BUSINESS_ID) === businessId);
@@ -3376,7 +3386,7 @@ test("guest localization supports seven languages and keeps the owner dashboard 
   assert.doesNotMatch(admin, /src="\/i18n\.js"/);
   assert.match(runtime, /exploreContentDeferred/);
   assert.match(runtime, /element\.closest\("\.section,\.footer"\)/);
-  assert.match(runtime, /houseGuideTranslations:v5\.11\.50:/);
+  assert.match(runtime, /houseGuideTranslations:v5\.11\.51:/);
   assert.match(runtime, /MAX_REQUEST_RETRIES = 2/);
   assert.match(runtime, /let flushRunning = false/);
 });
@@ -11831,6 +11841,84 @@ test("owner expense save stores private receipt, reports monthly totals, warns d
   assert.match(text, /2026-08-23,Maintenance,Stair construction \/ repair,8190\.00,Island Hardware,Cash,Room 7/);
 });
 
+test("v5.11.51 owner can edit staff- or owner-entered expenses while the original receipt and audit history stay intact", async () => {
+  const { env, store, passportBucket } = createEnvironment();
+  const form = new FormData();
+  form.set("date", "2026-09-10");
+  form.set("amount", "1250");
+  form.set("category", "Cleaning");
+  form.set("description", "Cleaning supplies misread by AI");
+  form.set("vendor", "Old Vendor");
+  form.set("paymentMethod", "Cash");
+  form.set("roomArea", "Room 6");
+  form.set("notes", "Needs correction");
+  const png = new Uint8Array(240);
+  png.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  form.set("receipt", new Blob([png], { type: "image/png" }), "staff-bill.png");
+
+  const created = await handleExpenseAdminRequest(
+    new Request("https://guide.example/api/concierge/admin/expenses", { method: "POST", body: form }),
+    env, "/api/concierge/admin/expenses", store, "staff_actor", { role: "staff" }
+  );
+  assert.equal(created.status, 201);
+  const id = (await created.json()).id;
+  const original = await store.getExpense(id);
+  assert.equal(original.createdByRole, "staff");
+  const originalReceiptKey = original.receiptObjectKey;
+  assert.ok(originalReceiptKey);
+  assert.equal(passportBucket.objects.has(originalReceiptKey), true);
+
+  const updatePayload = {
+    id,
+    date: "2026-09-11",
+    amount: "1450",
+    category: "Maintenance",
+    description: "Corrected plumbing supplies",
+    vendor: "Correct Vendor",
+    paymentMethod: "Bank transfer",
+    roomArea: "Room 6 bathroom",
+    notes: "Corrected after checking the original receipt"
+  };
+  const updated = await handleExpenseAdminRequest(
+    new Request("https://guide.example/api/concierge/admin/expenses/update", {
+      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(updatePayload)
+    }),
+    env, "/api/concierge/admin/expenses/update", store, "owner_actor", { role: "owner" }
+  );
+  assert.equal(updated.status, 200);
+  const corrected = await store.getExpense(id);
+  assert.equal(corrected.expenseDate, "2026-09-11");
+  assert.equal(corrected.amountMinor, 145000);
+  assert.equal(corrected.category, "Maintenance");
+  assert.equal(corrected.vendor, "Correct Vendor");
+  assert.equal(corrected.paymentMethod, "Bank transfer");
+  assert.equal(corrected.roomArea, "Room 6 bathroom");
+  assert.equal(corrected.createdByRole, "staff", "editing must preserve who originally entered the bill");
+  assert.equal(corrected.receiptObjectKey, originalReceiptKey, "editing structured fields must preserve the original receipt attachment");
+  assert.equal(passportBucket.objects.has(originalReceiptKey), true);
+  assert.equal(store.expenseEditAudit.length, 1);
+  assert.equal(store.expenseEditAudit[0].previous.amountMinor, 125000);
+  assert.equal(store.expenseEditAudit[0].next.amountMinor, 145000);
+  assert.equal(store.expenseEditAudit[0].actorRole, "owner");
+  assert.ok(store.adminAudit.some((entry) => entry.action === "expense_edited" && entry.reference === `expense:${id}`));
+
+  const September = await handleExpenseAdminRequest(
+    new Request("https://guide.example/api/concierge/admin/expenses?month=2026-09"),
+    env, "/api/concierge/admin/expenses", store, "owner_actor", { role: "owner" }
+  );
+  const month = await September.json();
+  assert.equal(month.totals.amount, 1450);
+  assert.equal(month.totals.categories.Maintenance, 1450);
+
+  const staffDenied = await handleExpenseAdminRequest(
+    new Request("https://guide.example/api/concierge/admin/expenses/update", {
+      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ...updatePayload, amount: "1500" })
+    }),
+    env, "/api/concierge/admin/expenses/update", store, "staff_actor", { role: "staff" }
+  );
+  assert.equal(staffDenied.status, 403, "staff entry permissions stay entry-only");
+});
+
 test("owner can privately download and delete an expense receipt without exposing it publicly", async () => {
   const { env, store, passportBucket } = createEnvironment();
   const objectKey = "expenses/2026-08/private-expense.png";
@@ -11870,6 +11958,9 @@ test("expense admin module is isolated, mobile-friendly and routes only through 
   assert.match(html, />Export finance CSV</);
   assert.match(script, /\/api\/concierge\/admin\/expenses\/analyze/);
   assert.match(script, /Possible duplicate expense/);
+  assert.match(script, /Edit expense/);
+  assert.match(script, /\/api\/concierge\/admin\/expenses\/update/);
+  assert.match(script, /original receipt stays attached/i);
   assert.match(apiSource, /handleExpenseAdminRequest/);
   assert.match(apiSource, /path\.includes\("\/expenses"\) \|\| path\.includes\("\/expense-files\/"\)/);
   assert.doesNotMatch(apiSource, /dispatchConciergeAlert\([^)]*expense/i);
@@ -12278,6 +12369,8 @@ test("Bamboo has a dedicated owner-only finance dashboard using the shared engin
   assert.match(script, /const BUSINESS_ID = "bamboo-beach-bar"/);
   assert.match(script, /\/api\/concierge\/admin\/expenses\/analyze/);
   assert.match(script, /\/api\/concierge\/admin\/finance\/export\.csv/);
+  assert.match(script, /Edit expense/);
+  assert.match(script, /\/api\/concierge\/admin\/expenses\/update/);
   assert.doesNotMatch(script, /\/api\/concierge(?:\?|"|')/);
   assert.match(indexSource, /url\.pathname === "\/bamboo-finance"/);
   assert.match(storeSource, /business_id TEXT NOT NULL DEFAULT 'the-house-koh-tao'/);

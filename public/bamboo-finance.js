@@ -38,6 +38,8 @@
   let expenseCategories = [];
   let incomeCategories = [];
   let paymentMethods = ["", "Cash", "QR code", "Card", "Bank transfer", "Other"];
+  let expenseRecords = [];
+  let expenseEditingRecord = null;
 
   function element(tag, className, text) {
     const node = document.createElement(tag);
@@ -256,6 +258,7 @@
   }
 
   function renderExpenses(records = []) {
+    expenseRecords = records.map((item) => ({ ...item }));
     expenseEntries.replaceChildren();
     if (!records.length) {
       expenseEntries.appendChild(element("div", "concierge-admin-empty", "No Bamboo expenses recorded for this month."));
@@ -274,6 +277,10 @@
       if (item.notes) meta.appendChild(element("span", "", item.notes));
       meta.appendChild(element("span", "", item.createdByRole === "staff" ? "Entered by staff" : "Entered by owner"));
       const actions = element("div", "concierge-admin-card-actions");
+      const edit = element("button", "secondary", "Edit expense");
+      edit.type = "button";
+      edit.dataset.expenseEditId = item.id;
+      actions.appendChild(edit);
       if (item.hasReceipt) {
         const receipt = element("button", "secondary", "Open receipt");
         receipt.type = "button";
@@ -321,9 +328,39 @@
   }
 
   function resetExpenseForm() {
+    expenseEditingRecord = null;
     expenseForm.reset();
+    expenseReceipt.disabled = false;
+    expenseAnalyze.disabled = false;
+    expenseClearReceipt.disabled = false;
+    document.getElementById("expenseSave").textContent = "Save expense";
+    expenseReset.textContent = "Clear form";
     expenseAnalysisStatus.textContent = "Upload is optional. You can also enter an expense manually.";
     resetDateDefaults(true);
+  }
+
+  function startExpenseEdit(id) {
+    const item = expenseRecords.find((record) => record.id === id);
+    if (!item) return;
+    expenseEditingRecord = item;
+    expenseReceipt.value = "";
+    expenseReceipt.disabled = true;
+    expenseAnalyze.disabled = true;
+    expenseClearReceipt.disabled = true;
+    document.getElementById("expenseDate").value = item.expenseDate || "";
+    document.getElementById("expenseAmount").value = Number(item.amount) > 0 ? String(item.amount) : "";
+    document.getElementById("expenseCategory").value = item.category || "";
+    document.getElementById("expenseVendor").value = item.vendor || "";
+    document.getElementById("expenseDescription").value = item.description || "";
+    document.getElementById("expensePaymentMethod").value = item.paymentMethod || "";
+    document.getElementById("expenseRoomArea").value = item.roomArea || "";
+    document.getElementById("expenseNotes").value = item.notes || "";
+    document.getElementById("expenseSave").textContent = "Save changes";
+    expenseReset.textContent = "Cancel edit";
+    expenseAnalysisStatus.textContent = item.hasReceipt
+      ? "Editing saved expense. The original receipt stays attached and will not be changed."
+      : "Editing saved expense. This record has no receipt attachment.";
+    expenseForm.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
   function updateIncomeNetPreview() {
@@ -358,6 +395,22 @@
     const file = expenseReceipt.files?.[0];
     if (file) form.set("receipt", file, file.name);
     return form;
+  }
+
+  function expenseEditPayload(confirmDuplicate = false) {
+    return {
+      id: expenseEditingRecord?.id || "",
+      business: BUSINESS_ID,
+      date: document.getElementById("expenseDate").value,
+      amount: document.getElementById("expenseAmount").value,
+      category: document.getElementById("expenseCategory").value,
+      vendor: document.getElementById("expenseVendor").value,
+      description: document.getElementById("expenseDescription").value,
+      paymentMethod: document.getElementById("expensePaymentMethod").value,
+      roomArea: document.getElementById("expenseRoomArea").value,
+      notes: document.getElementById("expenseNotes").value,
+      confirmDuplicate
+    };
   }
 
   async function loginWith(value) {
@@ -479,7 +532,13 @@
     event.preventDefault();
     const submit = document.getElementById("expenseSave");
     submit.disabled = true;
-    const save = (confirmDuplicate = false) => apiForm("/api/concierge/admin/expenses", expenseFormData(confirmDuplicate));
+    const save = (confirmDuplicate = false) => expenseEditingRecord
+      ? api("/api/concierge/admin/expenses/update", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(expenseEditPayload(confirmDuplicate))
+        })
+      : apiForm("/api/concierge/admin/expenses", expenseFormData(confirmDuplicate));
     try {
       try {
         await save(false);
@@ -488,7 +547,9 @@
         const duplicate = error.data?.duplicates?.[0];
         const confirmed = await confirmAction({
           title: "Possible duplicate expense",
-          message: duplicate ? `A ${formatAmount(duplicate.amount)} Bamboo expense on ${duplicate.expenseDate}${duplicate.vendor ? ` for ${duplicate.vendor}` : ""} may already exist. Save this separately anyway?` : "A matching Bamboo expense may already exist. Save this separately anyway?",
+          message: duplicate
+            ? `A ${formatAmount(duplicate.amount)} Bamboo expense on ${duplicate.expenseDate}${duplicate.vendor ? ` for ${duplicate.vendor}` : ""} may already exist. ${expenseEditingRecord ? "Save these corrected values anyway?" : "Save this separately anyway?"}`
+            : (expenseEditingRecord ? "A matching Bamboo expense may already exist. Save these corrected values anyway?" : "A matching Bamboo expense may already exist. Save this separately anyway?"),
           confirmLabel: "Save anyway"
         });
         if (!confirmed) return;
@@ -529,6 +590,11 @@
   });
 
   expenseEntries.addEventListener("click", async (event) => {
+    const editButton = event.target.closest("[data-expense-edit-id]");
+    if (editButton) {
+      startExpenseEdit(editButton.dataset.expenseEditId);
+      return;
+    }
     const receiptButton = event.target.closest("[data-expense-receipt-id]");
     if (receiptButton) {
       try {

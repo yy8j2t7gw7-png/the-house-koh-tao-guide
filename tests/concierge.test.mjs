@@ -859,6 +859,18 @@ function createStore() {
       await this.recordAdminAudit("whatsapp_diagnostic_dismissed", `alert:${target.alertId}`, now);
       return { ok: true, dismissed: true };
     },
+    async dismissWhatsAppDiagnostics(ids, now) {
+      const requested = Array.from(new Set(Array.isArray(ids) ? ids : [])).slice(0, 100);
+      let dismissed = 0;
+      requested.forEach((id) => {
+        const target = this.whatsappDiagnostics.find((item) => item.id === id);
+        if (!target) return;
+        this.dismissedDiagnostics.add(id);
+        dismissed += 1;
+      });
+      if (dismissed) await this.recordAdminAudit("whatsapp_diagnostics_bulk_dismissed", `diagnostics:${dismissed}`, now);
+      return { ok: true, requested: requested.length, dismissed };
+    },
     async clearWhatsAppDiagnosticsForAlert(alertId, now) {
       const alert = this.alerts.find((item) => item.id === alertId);
       if (!alert) return { ok: false, error: "not_found" };
@@ -3408,7 +3420,7 @@ test("guest localization supports seven languages and keeps the owner dashboard 
   assert.doesNotMatch(admin, /src="\/i18n\.js"/);
   assert.match(runtime, /exploreContentDeferred/);
   assert.match(runtime, /element\.closest\("\.section,\.footer"\)/);
-  assert.match(runtime, /houseGuideTranslations:v5\.11\.54:/);
+  assert.match(runtime, /houseGuideTranslations:v5\.11\.55:/);
   assert.match(runtime, /MAX_REQUEST_RETRIES = 2/);
   assert.match(runtime, /let flushRunning = false/);
 });
@@ -9322,6 +9334,55 @@ test("diagnostic dismissal changes visibility only and clearing remains limited 
   assert.match(adminScript, /parent alert and delivery result will not change/i);
   assert.match(adminScript, /DISMISS DIAGNOSTIC/);
   assert.match(adminScript, /CLEAR RESOLVED DIAGNOSTICS/);
+});
+
+test("v5.11.55 owner admin can select one, several or all WhatsApp diagnostics for bulk removal from view", async () => {
+  const { env, store } = createEnvironment();
+  const alertId = "alert_bulkdiagnostics-123456789012";
+  store.alerts.push({ id: alertId, status: "open", alertType: "service_request", severity: "attention", summary: "Test", createdAt: "2026-09-12T06:00:00.000Z" });
+  const ids = [
+    "diagnostic_bulk_first_1234567890",
+    "diagnostic_bulk_second_1234567890",
+    "diagnostic_bulk_third_1234567890"
+  ];
+  ids.forEach((id, index) => {
+    const deliveryId = `delivery_bulk_${index}_1234567890`;
+    store.alertDeliveries.push({ id: deliveryId, alertId, status: "failed", errorCode: "131042", createdAt: "2026-09-12T06:00:00.000Z" });
+    store.whatsappDiagnostics.push({ id, deliveryId, alertId, templateName: "Earlier delivery failure", errorCode: "131042", createdAt: "2026-09-12T06:00:00.000Z" });
+  });
+
+  const post = (body) => handleAdminRequest(new Request("https://guide.example/api/concierge/admin/diagnostics/bulk-dismiss", {
+    method: "POST",
+    headers: { authorization: "Bearer admin_token_test_5500", "content-type": "application/json" },
+    body: JSON.stringify(body)
+  }), env, "/api/concierge/admin/diagnostics/bulk-dismiss");
+
+  const rejected = await post({ ids: [ids[0]] });
+  assert.equal(rejected.status, 400);
+  const selected = await post({ ids: [ids[0], ids[2]], confirmation: "DISMISS SELECTED DIAGNOSTICS" });
+  assert.equal(selected.status, 200);
+  assert.deepEqual(await selected.json(), { ok: true, requested: 2, dismissed: 2 });
+  const overviewAfterSelected = await store.getAdminOverview();
+  assert.deepEqual(overviewAfterSelected.deliveryDiagnostics.map((item) => item.id), [ids[1]]);
+  assert.equal(store.alertDeliveries.every((item) => item.status === "failed"), true);
+  assert.equal(store.alerts[0].status, "open");
+
+  const remaining = await post({ ids: [ids[1]], confirmation: "DISMISS SELECTED DIAGNOSTICS" });
+  assert.equal(remaining.status, 200);
+  assert.equal((await store.getAdminOverview()).deliveryDiagnostics.length, 0);
+  assert.deepEqual(store.adminAudit.map((item) => item.action), [
+    "whatsapp_diagnostics_bulk_dismissed",
+    "whatsapp_diagnostics_bulk_dismissed"
+  ]);
+
+  const adminHtml = await readFile(new URL("../public/concierge-admin.html", import.meta.url), "utf8");
+  const adminScript = await readFile(new URL("../public/concierge-admin.js", import.meta.url), "utf8");
+  assert.match(adminHtml, /id="whatsappDiagnosticSelectAll"/);
+  assert.match(adminHtml, /id="whatsappDiagnosticDeleteSelected"[^>]*>Delete selected</);
+  assert.match(adminHtml, /id="whatsappDiagnosticDeleteAll"[^>]*>Delete all</);
+  assert.match(adminScript, /data-diagnostic-select/);
+  assert.match(adminScript, /DISMISS SELECTED DIAGNOSTICS/);
+  assert.match(adminScript, /Parent alerts and WhatsApp delivery history remain unchanged/);
 });
 
 test("24-hour spare-key release uses the verified session, confirms the current fee and never alerts the code", async () => {

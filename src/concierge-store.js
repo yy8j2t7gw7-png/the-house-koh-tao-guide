@@ -1455,6 +1455,37 @@ export class ConciergeStore extends DurableObject {
     return { ok: true, dismissed: true };
   }
 
+  async dismissWhatsAppDiagnostics(diagnosticKeys, nowValue) {
+    const keys = Array.from(new Set((Array.isArray(diagnosticKeys) ? diagnosticKeys : [])
+      .map((item) => cleanText(item, 120))
+      .filter(Boolean)))
+      .slice(0, 100);
+    const now = cleanText(nowValue, 40) || new Date().toISOString();
+    let dismissed = 0;
+    for (const key of keys) {
+      const record = rows(this.ctx.storage.sql.exec(
+        `SELECT COALESCE(x.id, 'legacy_' || d.id) AS diagnosticKey, d.alert_id AS alertId
+         FROM concierge_alert_deliveries d
+         LEFT JOIN whatsapp_delivery_diagnostics x ON x.delivery_id = d.id
+         WHERE COALESCE(x.id, 'legacy_' || d.id) = ?
+           AND d.status IN ('failed', 'not_configured')
+         LIMIT 1`,
+        key
+      ))[0];
+      if (!record) continue;
+      this.ctx.storage.sql.exec(
+        `INSERT OR IGNORE INTO whatsapp_diagnostic_dismissals
+         (diagnostic_key, alert_id, dismissed_at) VALUES (?, ?, ?)`,
+        key,
+        cleanText(record.alertId, 100),
+        now
+      );
+      dismissed += 1;
+    }
+    if (dismissed) await this.recordAdminAudit("whatsapp_diagnostics_bulk_dismissed", `diagnostics:${dismissed}`, now);
+    return { ok: true, requested: keys.length, dismissed };
+  }
+
   async clearWhatsAppDiagnosticsForAlert(alertId, nowValue) {
     const id = cleanText(alertId, 100);
     const now = cleanText(nowValue, 40) || new Date().toISOString();

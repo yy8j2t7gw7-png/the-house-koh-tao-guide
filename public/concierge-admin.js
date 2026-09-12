@@ -19,6 +19,11 @@
   const passportLinkResult = document.getElementById("passportLinkResult");
   const alerts = document.getElementById("conciergeAlerts");
   const whatsappDeliveryDiagnostics = document.getElementById("whatsappDeliveryDiagnostics");
+  const whatsappDiagnosticBulkActions = document.getElementById("whatsappDiagnosticBulkActions");
+  const whatsappDiagnosticSelectAll = document.getElementById("whatsappDiagnosticSelectAll");
+  const whatsappDiagnosticSelectionCount = document.getElementById("whatsappDiagnosticSelectionCount");
+  const whatsappDiagnosticDeleteSelected = document.getElementById("whatsappDiagnosticDeleteSelected");
+  const whatsappDiagnosticDeleteAll = document.getElementById("whatsappDiagnosticDeleteAll");
   const maintenanceReports = document.getElementById("maintenanceReports");
   const expenseMonth = document.getElementById("expenseMonth");
   const expenseSummary = document.getElementById("expenseSummary");
@@ -523,8 +528,56 @@
     });
   }
 
+  function updateDiagnosticBulkSelection() {
+    const checkboxes = Array.from(whatsappDeliveryDiagnostics.querySelectorAll("[data-diagnostic-select]"));
+    const selected = checkboxes.filter((checkbox) => checkbox.checked);
+    whatsappDiagnosticSelectionCount.textContent = `${selected.length} selected`;
+    whatsappDiagnosticDeleteSelected.disabled = selected.length === 0;
+    whatsappDiagnosticSelectAll.checked = checkboxes.length > 0 && selected.length === checkboxes.length;
+    whatsappDiagnosticSelectAll.indeterminate = selected.length > 0 && selected.length < checkboxes.length;
+  }
+
+  function selectedDiagnosticIds(all = false) {
+    return Array.from(whatsappDeliveryDiagnostics.querySelectorAll("[data-diagnostic-select]"))
+      .filter((checkbox) => all || checkbox.checked)
+      .map((checkbox) => checkbox.value)
+      .filter(Boolean);
+  }
+
+  async function deleteDiagnostics(ids, all = false) {
+    if (!ids.length) return;
+    const confirmed = await confirmAdminAction({
+      title: all ? "Delete all diagnostics?" : `Delete ${ids.length} selected diagnostic${ids.length === 1 ? "" : "s"}?`,
+      message: all
+        ? `Remove all ${ids.length} visible failed-delivery diagnostics from this operational view. Parent alerts and WhatsApp delivery history remain unchanged.`
+        : `Remove ${ids.length} selected failed-delivery diagnostic${ids.length === 1 ? "" : "s"} from this operational view. Parent alerts and WhatsApp delivery history remain unchanged.`,
+      confirmLabel: all ? "Delete all" : "Delete selected",
+      danger: true
+    });
+    if (!confirmed) return;
+    whatsappDiagnosticDeleteSelected.disabled = true;
+    whatsappDiagnosticDeleteAll.disabled = true;
+    try {
+      await api("/api/concierge/admin/diagnostics/bulk-dismiss", {
+        method: "POST",
+        body: JSON.stringify({ ids, confirmation: "DISMISS SELECTED DIAGNOSTICS" })
+      });
+      await loadOverview();
+    } catch (_error) {
+      whatsappDiagnosticDeleteAll.disabled = false;
+      updateDiagnosticBulkSelection();
+      window.alert("The selected diagnostics could not be removed from the operational view.");
+    }
+  }
+
   function renderWhatsAppDeliveryDiagnostics(items, alertItems = []) {
     whatsappDeliveryDiagnostics.replaceChildren();
+    whatsappDiagnosticSelectAll.checked = false;
+    whatsappDiagnosticSelectAll.indeterminate = false;
+    whatsappDiagnosticSelectionCount.textContent = "0 selected";
+    whatsappDiagnosticDeleteSelected.disabled = true;
+    whatsappDiagnosticDeleteAll.disabled = !items.length;
+    whatsappDiagnosticBulkActions.hidden = !items.length;
     if (!items.length) {
       whatsappDeliveryDiagnostics.appendChild(element("div", "concierge-admin-empty", "No failed WhatsApp submissions in the last 30 days."));
       return;
@@ -537,7 +590,17 @@
       const title = item.templateName || "Earlier delivery failure";
       const code = item.errorCode || item.storedErrorCode || "unknown";
       const parentAlert = alertItems.find((alert) => alert.id === item.alertId) || {};
-      card.append(element("h4", "", title));
+      const cardHead = element("div", "concierge-admin-diagnostic-card-head");
+      cardHead.appendChild(element("h4", "", title));
+      const selectLabel = element("label", "concierge-admin-diagnostic-card-select");
+      const select = document.createElement("input");
+      select.type = "checkbox";
+      select.value = item.id;
+      select.dataset.diagnosticSelect = "";
+      select.setAttribute("aria-label", `Select diagnostic ${title}`);
+      selectLabel.append(select, element("span", "", "Select"));
+      cardHead.appendChild(selectLabel);
+      card.appendChild(cardHead);
       card.appendChild(diagnosticGrid([
         { label: "Provider", value: "Meta" },
         { label: "Route", value: parentAlert.recipientGroup || "Not retained" },
@@ -2162,6 +2225,21 @@
       expenseExport.disabled = false;
     }
   });
+
+  whatsappDeliveryDiagnostics.addEventListener("change", (event) => {
+    if (!event.target.matches("[data-diagnostic-select]")) return;
+    updateDiagnosticBulkSelection();
+  });
+
+  whatsappDiagnosticSelectAll.addEventListener("change", () => {
+    whatsappDeliveryDiagnostics.querySelectorAll("[data-diagnostic-select]").forEach((checkbox) => {
+      checkbox.checked = whatsappDiagnosticSelectAll.checked;
+    });
+    updateDiagnosticBulkSelection();
+  });
+
+  whatsappDiagnosticDeleteSelected.addEventListener("click", () => deleteDiagnostics(selectedDiagnosticIds(false), false));
+  whatsappDiagnosticDeleteAll.addEventListener("click", () => deleteDiagnostics(selectedDiagnosticIds(true), true));
 
   whatsappDeliveryDiagnostics.addEventListener("click", async (event) => {
     const button = event.target.closest("[data-diagnostic-action]");

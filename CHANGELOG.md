@@ -1,3 +1,11 @@
+# v5.11.55 — Bulk WhatsApp Diagnostic Management
+
+- Adds per-diagnostic checkboxes plus Select all in Owner Admin.
+- Adds Delete selected and Delete all for safe bulk cleanup of the diagnostics view.
+- Preserves parent alerts and WhatsApp delivery history; bulk cleanup only hides the selected diagnostic records from the operational view.
+- Keeps the existing individual Dismiss / Clear diagnostics actions.
+- Full automated suite: **281 passed / 0 failed** before final package validation.
+
 # v5.11.54 — Room Readiness & Integration Guidance
 
 - Adds Dirty / Clean / Ready controls directly to Calendar & Operations room cards while retaining the existing fallback housekeeping controls.

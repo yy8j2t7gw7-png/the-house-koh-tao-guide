@@ -254,6 +254,12 @@
         <div class="concierge-admin-operations-block">
           <h3>WhatsApp delivery diagnostics</h3>
           <p>Failed submissions only. This view contains the template request shape and Meta’s sanitized response, never recipients, message values, contacts, tokens or protected guest data.</p>
+          <div id="whatsappDiagnosticBulkActions" class="concierge-admin-diagnostic-toolbar" hidden>
+            <label class="concierge-admin-diagnostic-select-all"><input id="whatsappDiagnosticSelectAll" type="checkbox"> <span>Select all</span></label>
+            <span id="whatsappDiagnosticSelectionCount" class="concierge-admin-diagnostic-selection-count">0 selected</span>
+            <button id="whatsappDiagnosticDeleteSelected" type="button" class="secondary" disabled>Delete selected</button>
+            <button id="whatsappDiagnosticDeleteAll" type="button" class="danger">Delete all</button>
+          </div>
           <div id="whatsappDeliveryDiagnostics" class="concierge-admin-queue"></div>
         </div>
       </details>

@@ -45,7 +45,7 @@ import {
   specialtyChoiceLabels
 } from "./diving-catalog.js";
 
-const RELEASE = "5.11.54";
+const RELEASE = "5.11.55";
 const ROOM_OPTIONS = new Set(["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11"]);
 const MAX_HISTORY_ITEMS = 10;
 const MAX_QUESTION_LENGTH = 800;
@@ -4482,6 +4482,21 @@ export async function handleAdminRequest(request, env, path) {
       return json({ error: "confirmation_required" }, 400);
     }
     const outcome = await store.dismissWhatsAppDiagnostic?.(id, new Date().toISOString());
+    return json(outcome || { ok: false, error: "not_found" }, outcome?.ok ? 200 : 404);
+  }
+  if (path === "/api/concierge/admin/diagnostics/bulk-dismiss" && request.method === "POST") {
+    let body;
+    try {
+      body = await readJson(request, 16_000);
+    } catch (response) {
+      if (response instanceof Response) return response;
+      return json({ error: "invalid_request" }, 400);
+    }
+    const ids = Array.isArray(body.ids) ? Array.from(new Set(body.ids.map((item) => String(item || "")))) : [];
+    if (!ids.length || ids.length > 100 || ids.some((id) => !/^(?:diagnostic|legacy)_[A-Za-z0-9_-]{12,}$/.test(id)) || body.confirmation !== "DISMISS SELECTED DIAGNOSTICS") {
+      return json({ error: "confirmation_required" }, 400);
+    }
+    const outcome = await store.dismissWhatsAppDiagnostics?.(ids, new Date().toISOString());
     return json(outcome || { ok: false, error: "not_found" }, outcome?.ok ? 200 : 404);
   }
   if (path === "/api/concierge/admin/diagnostics/clear" && request.method === "POST") {

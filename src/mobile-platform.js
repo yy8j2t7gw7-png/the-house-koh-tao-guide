@@ -3,7 +3,7 @@ import { expenseConfiguration, handleExpenseAdminRequest } from "./expense-api.j
 import { incomeConfiguration, summarizeFinance } from "./finance-api.js";
 import { beds24FinanceSyncConfiguration } from "./beds24-finance-sync.js";
 import { integrationAdminOverview } from "./integration-catalog.js";
-import { handleUnifiedMessagingAdminRequest, unifiedMessagingConfiguration } from "./unified-messaging.js";
+import { beds24ApiRequest, handleUnifiedMessagingAdminRequest, roomForBeds24Booking, unifiedMessagingConfiguration } from "./unified-messaging.js";
 import { handleStayAdminRequest } from "./stay-api.js";
 import { createProtectedOperationsAlert, dispatchConciergeAlert } from "./whatsapp-alerts.js";
 
@@ -253,6 +253,60 @@ function rangeContains(date, from, to) {
   return (!from || date >= from) && (!to || date <= to);
 }
 
+
+function shiftedDateOnly(dateOnly, days) {
+  const date = new Date(`${dateOnly}T12:00:00Z`);
+  if (!Number.isFinite(date.getTime())) return "";
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+function beds24GuestDisplayName(booking = {}) {
+  return cleanText([booking.firstName, booking.lastName].filter(Boolean).join(" "), 100);
+}
+
+function reservationWindowKey(room, checkInDate, checkOutDate) {
+  return `${cleanText(room, 4)}|${cleanText(checkInDate, 10)}|${cleanText(checkOutDate, 10)}`;
+}
+
+function reservationGuestDisplayName(item, role = "owner") {
+  const value = cleanText(item?.guestDisplayName || item?.guestFirstName, 100);
+  if (!value) return "";
+  return role === "staff" ? value.split(/\s+/)[0] : value;
+}
+
+async function enrichReservationsWithBeds24GuestNames(reservations, env, store, from, to) {
+  const source = Array.isArray(reservations) ? reservations : [];
+  if (!source.length || !env.BEDS24_REFRESH_TOKEN || !store) return source;
+  const start = validDate(from) ? from : bangkokDate(-30);
+  const end = validDate(to) ? to : bangkokDate(90);
+  try {
+    const bookings = [];
+    for (let page = 1; page <= 4; page += 1) {
+      const response = await beds24ApiRequest(env, store, "bookings", {
+        query: { departureFrom: shiftedDateOnly(start, -1), arrivalTo: shiftedDateOnly(end, 1), includeGuests: true, page }
+      });
+      if (Array.isArray(response?.data)) bookings.push(...response.data);
+      if (!response?.pages?.nextPageExists) break;
+    }
+    const guestNames = new Map();
+    for (const booking of bookings) {
+      const room = roomForBeds24Booking(booking, env);
+      const arrival = cleanText(booking?.arrival, 10);
+      const departure = cleanText(booking?.departure, 10);
+      const name = beds24GuestDisplayName(booking);
+      if (!room || !validDate(arrival) || !validDate(departure) || !name) continue;
+      guestNames.set(reservationWindowKey(room, arrival, departure), name);
+    }
+    return source.map((item) => {
+      const name = guestNames.get(reservationWindowKey(item.room, item.checkInDate, item.checkOutDate));
+      return name ? { ...item, guestDisplayName: name } : item;
+    });
+  } catch (_error) {
+    return source;
+  }
+}
+
 function providerLabel(provider) {
   const value = cleanText(provider, 50).toLowerCase();
   const labels = {
@@ -269,7 +323,7 @@ function publicReservation(item, role) {
     provider: item.provider,
     sourceLabel: providerLabel(item.provider),
     room: String(item.room || ""),
-    guestName: cleanText(item.guestFirstName, 80),
+    guestName: reservationGuestDisplayName(item, role),
     checkInDate: item.checkInDate,
     checkOutDate: item.checkOutDate,
     status: item.status,
@@ -455,8 +509,8 @@ function homePayload(operations, overview, threads, finance, access) {
   const pendingTasks = (operations.housekeepingTasks || []).filter((item) => ["pending", "received"].includes(item.status));
   const urgentMaintenance = (overview.maintenanceReports || []).filter((item) => item.status !== "resolved" && ["critical", "urgent"].includes(item.severity));
   const events = [
-    ...arrivals.map((item) => ({ id: `arrival:${item.id}`, type: "arrival", room: item.room, title: `Room ${item.room} arrival`, subtitle: item.guestFirstName || providerLabel(item.provider), time: "14:00", severity: "normal" })),
-    ...departures.map((item) => ({ id: `departure:${item.id}`, type: "departure", room: item.room, title: `Room ${item.room} departure`, subtitle: item.guestFirstName || providerLabel(item.provider), time: item.lateCheckoutTime || "11:00", severity: "normal" })),
+    ...arrivals.map((item) => ({ id: `arrival:${item.id}`, type: "arrival", room: item.room, title: `Room ${item.room} arrival`, subtitle: reservationGuestDisplayName(item, access?.record?.role) || providerLabel(item.provider), time: "14:00", severity: "normal" })),
+    ...departures.map((item) => ({ id: `departure:${item.id}`, type: "departure", room: item.room, title: `Room ${item.room} departure`, subtitle: reservationGuestDisplayName(item, access?.record?.role) || providerLabel(item.provider), time: item.lateCheckoutTime || "11:00", severity: "normal" })),
     ...pendingTasks.slice(0, 8).map((item) => ({ id: `housekeeping:${item.id}`, type: "housekeeping", room: item.room, title: `Room ${item.room} housekeeping`, subtitle: item.priority ? "Priority turnover" : "Turnover", time: item.requestedArrival || "", severity: item.priority ? "urgent" : "normal" })),
     ...urgentMaintenance.slice(0, 6).map((item) => ({ id: `maintenance:${item.id}`, type: "maintenance", room: item.room, title: `Room ${item.room} maintenance`, subtitle: item.issueType || "Issue reported", time: "", severity: item.severity || "urgent" }))
   ];
@@ -499,9 +553,10 @@ async function handleProtected(request, env, path, store) {
   if (path === `${MOBILE_API_PREFIX}/home` && request.method === "GET") {
     const denied = requirePermission(publicAccess, "home.view");
     if (denied) return denied;
-    const [operations, overview, threads] = await Promise.all([
+    const [operationsRaw, overview, threads] = await Promise.all([
       store.getStayOperationsOverview(), store.getAdminOverview(), store.listMessagingThreads(80)
     ]);
+    const operations = { ...operationsRaw, reservations: await enrichReservationsWithBeds24GuestNames(operationsRaw.reservations || [], env, store, bangkokDate(-1), bangkokDate(2)) };
     let finance = null;
     if (hasPermission(publicAccess, "finance.view")) {
       const month = currentMonth();
@@ -519,9 +574,10 @@ async function handleProtected(request, env, path, store) {
     const from = validDate(url.searchParams.get("from")) ? url.searchParams.get("from") : "";
     const to = validDate(url.searchParams.get("to")) ? url.searchParams.get("to") : "";
     const operations = await store.getStayOperationsOverview();
-    const reservations = (operations.reservations || [])
-      .filter((item) => (!from || item.checkOutDate >= from) && (!to || item.checkInDate <= to))
-      .map((item) => publicReservation(item, record.role));
+    const filteredReservations = (operations.reservations || [])
+      .filter((item) => (!from || item.checkOutDate >= from) && (!to || item.checkInDate <= to));
+    const enrichedReservations = await enrichReservationsWithBeds24GuestNames(filteredReservations, env, store, from || bangkokDate(-30), to || bangkokDate(90));
+    const reservations = enrichedReservations.map((item) => publicReservation(item, record.role));
     return json({ ok: true, from, to, reservations });
   }
 
@@ -532,7 +588,9 @@ async function handleProtected(request, env, path, store) {
     const from = validDate(url.searchParams.get("from")) ? url.searchParams.get("from") : bangkokDate(-2);
     const to = validDate(url.searchParams.get("to")) ? url.searchParams.get("to") : bangkokDate(28);
     const operations = await store.getStayOperationsOverview();
-    const reservations = (operations.reservations || []).filter((item) => item.checkOutDate >= from && item.checkInDate <= to).map((item) => publicReservation(item, record.role));
+    const filteredReservations = (operations.reservations || []).filter((item) => item.checkOutDate >= from && item.checkInDate <= to);
+    const enrichedReservations = await enrichReservationsWithBeds24GuestNames(filteredReservations, env, store, from, to);
+    const reservations = enrichedReservations.map((item) => publicReservation(item, record.role));
     return json({ ok: true, from, to, rooms: operations.housekeepingStatuses || [], reservations });
   }
 

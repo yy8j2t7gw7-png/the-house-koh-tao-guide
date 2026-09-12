@@ -1,3 +1,13 @@
+# Changelog
+
+## v5.11.60 — Mobile reservation guest-name enrichment
+
+- Mobile Home, Bookings and Calendar now enrich canonical reservations with live Beds24 personal booking names when available.
+- Matching is constrained to the same room and stay dates and falls back safely to existing canonical reservation data if Beds24 is unavailable.
+- Owner/manager views may receive the full booking-holder name; staff remains limited to the first name.
+- Provider credentials remain server-side and no mobile client secret is introduced.
+- Existing Beds24 Channel Manager, Beds24 Finance and AI auto-send safety flags are unchanged.
+
 ## v5.11.59 — Mobile Bootstrap PBKDF2 Runtime Compatibility Hotfix
 
 - Fixed Cloudflare Workers `NotSupportedError` during first-owner mobile bootstrap.

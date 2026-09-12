@@ -14332,3 +14332,16 @@ test("v5.11.59 mobile password hashing stays within the Cloudflare Workers PBKDF
   assert.match(storeSource, /password_iterations INTEGER NOT NULL DEFAULT 100000/);
   assert.doesNotMatch(storeSource, /210000/);
 });
+
+
+test("v5.11.60 mobile owner views enrich reservation names from Beds24 personal booking data without exposing provider credentials", async () => {
+  const source = await readFile(new URL("../src/mobile-platform.js", import.meta.url), "utf8");
+  assert.match(source, /beds24ApiRequest/);
+  assert.match(source, /roomForBeds24Booking/);
+  assert.match(source, /includeGuests:\s*true/);
+  assert.match(source, /beds24GuestDisplayName/);
+  assert.match(source, /guestDisplayName/);
+  assert.match(source, /reservationGuestDisplayName/);
+  assert.match(source, /BEDS24_REFRESH_TOKEN/);
+  assert.match(source, /catch \(_error\) \{\s*return source;\s*\}/);
+});

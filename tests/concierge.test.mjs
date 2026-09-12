@@ -323,19 +323,20 @@ function createStore() {
       return this.lateCheckoutApprovals.get(reservationId) || null;
     },
     async getRoomHousekeepingStatus(room) {
-      return this.housekeepingStatuses.get(room) || { room, status: "unknown", currentTaskId: "", serviceDate: "", arrivingReservationId: "", updatedAt: "" };
+      return this.housekeepingStatuses.get(room) || { room, status: "unknown", currentTaskId: "", serviceDate: "", arrivingReservationId: "", updatedAt: "", updatedByHash: "" };
     },
     async listRoomHousekeepingStatuses() {
       return Array.from({ length: 11 }, (_, index) => this.getRoomHousekeepingStatus(String(index + 1)));
     },
-    async setRoomHousekeepingStatus(room, status, updatedAt, _actorHash = "", context = {}) {
+    async setRoomHousekeepingStatus(room, status, updatedAt, actorHash = "", context = {}) {
       const current = await this.getRoomHousekeepingStatus(room);
       const value = {
         room, status,
         currentTaskId: Object.prototype.hasOwnProperty.call(context, "currentTaskId") ? context.currentTaskId : current.currentTaskId,
         serviceDate: Object.prototype.hasOwnProperty.call(context, "serviceDate") ? context.serviceDate : current.serviceDate,
         arrivingReservationId: Object.prototype.hasOwnProperty.call(context, "arrivingReservationId") ? context.arrivingReservationId : current.arrivingReservationId,
-        updatedAt
+        updatedAt,
+        updatedByHash: actorHash
       };
       this.housekeepingStatuses.set(room, value);
       this.adminAudit.push({ action: `housekeeping_room_${status}`, reference: `room:${room}`, createdAt: updatedAt });
@@ -353,6 +354,7 @@ function createStore() {
       let readyForReservation = false;
       if (!blockingStay && roomStatus.status === "ready") {
         if (roomStatus.arrivingReservationId === reservation.id && roomStatus.serviceDate === reservation.checkInDate) readyForReservation = true;
+        else if (roomStatus.updatedByHash === "owner-admin" && !roomStatus.currentTaskId && !roomStatus.serviceDate && !roomStatus.arrivingReservationId) readyForReservation = true;
         else if (!prior) readyForReservation = true;
         else if (roomStatus.serviceDate === prior.checkOutDate) readyForReservation = true;
       }
@@ -446,6 +448,19 @@ function createStore() {
       this.lateCheckoutApprovals.delete(reservationId);
       this.staySessions.filter((item) => item.reservationId === reservationId && !item.revokedAt).forEach((item) => { item.revokedAt = updatedAt; });
       await this.closePendingPassportLinksForReservation(reservationId, updatedAt);
+      const roomStatus = await this.getRoomHousekeepingStatus(reservation.room);
+      if (roomStatus.status === "ready") {
+        this.housekeepingStatuses.set(reservation.room, {
+          room: reservation.room,
+          status: "unknown",
+          currentTaskId: "",
+          serviceDate: "",
+          arrivingReservationId: "",
+          updatedAt,
+          updatedByHash: "system"
+        });
+        this.adminAudit.push({ action: "housekeeping_ready_invalidated_after_stay_delete", reference: `room:${reservation.room}`, createdAt: updatedAt });
+      }
       this.adminAudit.push({ action: "owner_managed_stay_deleted", reference: `reservation:${reservationId}`, createdAt: updatedAt });
       return { ok: true, reservationId, room: reservation.room, deleted: true };
     },
@@ -3393,7 +3408,7 @@ test("guest localization supports seven languages and keeps the owner dashboard 
   assert.doesNotMatch(admin, /src="\/i18n\.js"/);
   assert.match(runtime, /exploreContentDeferred/);
   assert.match(runtime, /element\.closest\("\.section,\.footer"\)/);
-  assert.match(runtime, /houseGuideTranslations:v5\.11\.53:/);
+  assert.match(runtime, /houseGuideTranslations:v5\.11\.54:/);
   assert.match(runtime, /MAX_REQUEST_RETRIES = 2/);
   assert.match(runtime, /let flushRunning = false/);
 });
@@ -8965,7 +8980,7 @@ test("owner operations separates active and upcoming stays and labels manual rec
   assert.doesNotMatch(script, /Reference \$\{item\.id\}/);
 });
 
-test("Calendar & Operations dashboard combines room, reservation, housekeeping and stay-timing context without adding a new write workflow", async () => {
+test("Calendar & Operations dashboard combines room, reservation, housekeeping and stay-timing context and reuses the existing housekeeping write workflow", async () => {
   const [html, script, styles, storeSource] = await Promise.all([
     readFile(new URL("../public/concierge-admin.html", import.meta.url), "utf8"),
     readFile(new URL("../public/concierge-admin.js", import.meta.url), "utf8"),
@@ -8992,6 +9007,8 @@ test("Calendar & Operations dashboard combines room, reservation, housekeeping a
   assert.match(script, /lateCheckoutTime/);
   assert.match(script, /Array\.from\(\{ length: 14 \}/);
   assert.match(script, /renderOperationsDashboard\(data\.stayOperations \|\| \{\}\)/);
+  assert.match(script, /housekeepingStatusButtons\(room, String\(housekeeping\.status \|\| "unknown"\), true\)/);
+  assert.match(script, /todayOperationsRooms\.addEventListener\("click", housekeepingStatusAction\)/);
 
   assert.match(storeSource, /LEFT JOIN stay_late_checkout_approvals l ON l\.reservation_id = r\.id/);
   assert.match(storeSource, /AS lateCheckoutMinutes/);
@@ -8999,7 +9016,7 @@ test("Calendar & Operations dashboard combines room, reservation, housekeeping a
   assert.match(styles, /\.concierge-admin-room-board/);
   assert.match(styles, /\.concierge-admin-operations-calendar/);
 
-  // Existing operational write controls stay in the established Guest stays section.
+  // Reservation write controls remain in Guest stays; room-state buttons simply reuse the existing housekeeping endpoint.
   assert.match(html, /id="manualStayForm"/);
   assert.match(html, /id="directStayForm"/);
   assert.match(html, /id="roomHousekeepingStatuses"/);
@@ -13143,6 +13160,57 @@ test("ready vacant rooms allow early check-in at any time while walk-ins and ext
   assert.ok(reservation);
 });
 
+test("v5.11.54 owner Ready is explicit after stale task context is cleared and guest wording avoids internal status language", async () => {
+  const now = new Date("2027-09-09T06:00:00.000Z");
+  const { env, store } = createEnvironment({ GUEST_ACCESS_ENFORCEMENT: "true" });
+  const cookie = await syncAndVerifyStay(env, {
+    room: "5", confirmationCode: "HMMANUALREADY5", checkInDate: "2027-09-10", checkOutDate: "2027-09-12", now
+  });
+  await completeThaiRegistration(env, cookie, new Date(now.getTime() + 10));
+  store.stayReservations.push({
+    id: `stay_${crypto.randomUUID()}`,
+    provider: "direct",
+    listingId: "previous-room-5",
+    room: "5",
+    confirmationCodeHash: `hash_${crypto.randomUUID()}`,
+    checkInDate: "2027-09-07",
+    checkOutDate: "2027-09-09",
+    status: "confirmed",
+    updatedAt: now.toISOString()
+  });
+  await store.setRoomHousekeepingStatus("5", "ready", now.toISOString(), "owner-admin", {
+    currentTaskId: "old-task",
+    serviceDate: "2027-09-08",
+    arrivingReservationId: "old-arrival"
+  });
+
+  const updated = await handleStayAdminRequest(new Request("https://guide.example/api/concierge/admin/housekeeping-status", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ room: "5", status: "ready" })
+  }), env, "/api/concierge/admin/housekeeping-status", store);
+  assert.equal(updated.status, 200);
+  const status = await store.getRoomHousekeepingStatus("5");
+  assert.equal(status.currentTaskId, "");
+  assert.equal(status.serviceDate, "");
+  assert.equal(status.arrivingReservationId, "");
+  assert.equal(status.updatedByHash, "owner-admin");
+
+  const ready = await handleConciergeRequest(verifiedConciergeRequest("Can I check in at 9am?", cookie), env, undefined, now);
+  const readyBody = await ready.json();
+  assert.equal(readyBody.intentId, "early_checkin_ready");
+  assert.match(readyBody.answer, /your room is ready/i);
+  assert.doesNotMatch(readyBody.answer, /marked ready|housekeeping status/i);
+
+  await store.setRoomHousekeepingStatus("5", "dirty", new Date(now.getTime() + 1000).toISOString(), "owner-admin", {
+    currentTaskId: "", serviceDate: "", arrivingReservationId: ""
+  });
+  const notReady = await handleConciergeRequest(verifiedConciergeRequest("Can I check in earlier?", cookie), env, undefined, new Date(now.getTime() + 2000));
+  const notReadyBody = await notReady.json();
+  assert.match(notReadyBody.answer, /room still needs to be prepared before check-in/i);
+  assert.doesNotMatch(notReadyBody.answer, /marked ready|housekeeping status/i);
+});
+
 test("door locking and office location use short deterministic hotel-concierge answers", async () => {
   const { env } = createEnvironment();
   const lock = await handleConciergeRequest(guestRequest("How do I lock my door from outside?"), env);
@@ -13194,6 +13262,11 @@ test("owner can delete a direct stay and revoke its guest access while Airbnb st
   const createdBody = await created.json();
   const directReservation = store.stayReservations.find((item) => item.provider === "direct" && item.room === "7");
   assert.ok(directReservation);
+  await store.setRoomHousekeepingStatus("7", "ready", now.toISOString(), "owner-admin", {
+    currentTaskId: "",
+    serviceDate: "",
+    arrivingReservationId: ""
+  });
 
   const verified = await handleStayGuestRequest(new Request("https://guide.example/api/stay/verify", {
     method: "POST",
@@ -13217,6 +13290,8 @@ test("owner can delete a direct stay and revoke its guest access while Airbnb st
   }), env, "/api/concierge/admin/manual-stay-delete");
   assert.equal(deleted.status, 200);
   assert.equal(store.stayReservations.find((item) => item.id === directReservation.id)?.status, "cancelled");
+  assert.equal((await store.getRoomHousekeepingStatus("7")).status, "unknown", "deleting a stay invalidates an older Ready marker for the room");
+  assert.ok(store.adminAudit.some((item) => item.action === "housekeeping_ready_invalidated_after_stay_delete" && item.reference === "room:7"));
   assert.ok(store.adminAudit.some((item) => item.action === "owner_managed_stay_deleted" && item.reference === `reservation:${directReservation.id}`));
 
   const statusAfterDelete = await handleStayGuestRequest(new Request("https://guide.example/api/stay/status?room=7", {
@@ -13532,7 +13607,7 @@ test("v5.11.52 reservation sync normalization is provider-agnostic without enabl
   });
 });
 
-test("v5.11.53 integrations dashboard exposes House sources without enabling unsupported booking channels", () => {
+test("v5.11.54 integrations dashboard exposes major channels with honest connector requirements and official guidance", () => {
   const configured = integrationAdminOverview({
     CONCIERGE_STORE: {},
     RESERVATION_SYNC_TOKEN: "sync-secret",
@@ -13546,30 +13621,44 @@ test("v5.11.53 integrations dashboard exposes House sources without enabling uns
   assert.equal(byId.airbnb.connectorInstalled, true);
   assert.equal(byId.direct.status, "active");
   assert.equal(byId.direct.liveAtHouse, true);
-  for (const id of ["booking-com", "agoda", "pms-api"]) {
+  assert.match(byId["expedia-group"].name, /Expedia.*Hotels\.com.*Vrbo/i);
+  for (const id of ["booking-com", "agoda", "hostelworld", "expedia-group", "trip-com", "pms-api"]) {
     assert.equal(byId[id].status, "not_connected");
     assert.equal(byId[id].liveAtHouse, false);
     assert.equal(byId[id].connectorInstalled, false);
+    assert.equal(byId[id].connectorStatus, "not_installed");
     assert.equal(byId[id].connectAction, "connector_required");
+    assert.ok(byId[id].connectionGuide.propertySteps.length >= 3);
+    assert.ok(byId[id].connectionGuide.platformSteps.length >= 3);
   }
+  assert.ok(byId["booking-com"].connectionGuide.officialLinks.some((item) => item.url.startsWith("https://developers.booking.com/")));
+  assert.ok(byId.agoda.connectionGuide.officialLinks.some((item) => item.url.startsWith("https://developer.agoda.com/")));
+  assert.ok(byId.hostelworld.connectionGuide.officialLinks.some((item) => item.url.includes("hostelworld.com")));
+  assert.ok(byId["expedia-group"].connectionGuide.officialLinks.some((item) => item.url.startsWith("https://developers.expediagroup.com/")));
+  assert.ok(byId["trip-com"].connectionGuide.officialLinks.some((item) => item.url.startsWith("https://connect.trip.com/")));
 });
 
-test("v5.11.53 integrations dashboard never claims Airbnb is connected when House sync credentials are incomplete", () => {
+test("v5.11.54 integrations dashboard never claims Airbnb is connected when House sync credentials are incomplete", () => {
   const overview = integrationAdminOverview({ CONCIERGE_STORE: {} });
   const airbnb = overview.providers.find((provider) => provider.id === "airbnb");
   assert.equal(airbnb.status, "not_connected");
   assert.equal(airbnb.liveAtHouse, true);
 });
 
-test("v5.11.53 owner admin renders integrations as a read-only safe connector surface", async () => {
-  const [html, js] = await Promise.all([
+test("v5.11.54 owner admin renders integrations as a read-only connector surface with actionable connection guidance", async () => {
+  const [html, js, css] = await Promise.all([
     readFile(new URL("../public/concierge-admin.html", import.meta.url), "utf8"),
-    readFile(new URL("../public/concierge-admin.js", import.meta.url), "utf8")
+    readFile(new URL("../public/concierge-admin.js", import.meta.url), "utf8"),
+    readFile(new URL("../public/concierge-admin.css", import.meta.url), "utf8")
   ]);
   assert.match(html, /data-admin-section="integrations"/);
   assert.match(html, /id="integrationProviders"/);
   assert.match(js, /renderIntegrations\(data\.integrations \|\| \{\}\)/);
+  assert.match(js, /How to connect/);
+  assert.match(js, /Official provider information/);
+  assert.match(js, /Connector status:/);
   assert.match(js, /button\.disabled = true/);
-  assert.match(js, /Connector required before this button can be enabled\./);
+  assert.match(css, /\.concierge-admin-integration-guide/);
+  assert.match(css, /\.concierge-admin-integration-links/);
 });
 

@@ -2452,22 +2452,24 @@ export class ConciergeStore extends DurableObject {
     if (!cleanRoom) return null;
     const record = rows(this.ctx.storage.sql.exec(
       `SELECT room, status, current_task_id AS currentTaskId, service_date AS serviceDate,
-              arriving_reservation_id AS arrivingReservationId, updated_at AS updatedAt
+              arriving_reservation_id AS arrivingReservationId, updated_at AS updatedAt,
+              updated_by_hash AS updatedByHash
        FROM room_housekeeping_status WHERE room = ? LIMIT 1`,
       cleanRoom
     ))[0] || null;
-    return record || { room: cleanRoom, status: "unknown", currentTaskId: "", serviceDate: "", arrivingReservationId: "", updatedAt: "" };
+    return record || { room: cleanRoom, status: "unknown", currentTaskId: "", serviceDate: "", arrivingReservationId: "", updatedAt: "", updatedByHash: "" };
   }
 
   async listRoomHousekeepingStatuses() {
     const existing = new Map(rows(this.ctx.storage.sql.exec(
       `SELECT room, status, current_task_id AS currentTaskId, service_date AS serviceDate,
-              arriving_reservation_id AS arrivingReservationId, updated_at AS updatedAt
+              arriving_reservation_id AS arrivingReservationId, updated_at AS updatedAt,
+              updated_by_hash AS updatedByHash
        FROM room_housekeeping_status ORDER BY CAST(room AS INTEGER) ASC`
     )).map((item) => [String(item.room), item]));
     return Array.from({ length: 11 }, (_, index) => {
       const room = String(index + 1);
-      return existing.get(room) || { room, status: "unknown", currentTaskId: "", serviceDate: "", arrivingReservationId: "", updatedAt: "" };
+      return existing.get(room) || { room, status: "unknown", currentTaskId: "", serviceDate: "", arrivingReservationId: "", updatedAt: "", updatedByHash: "" };
     });
   }
 
@@ -2499,7 +2501,7 @@ export class ConciergeStore extends DurableObject {
       cleanRoom, cleanStatus, taskId, serviceDate, arrivingReservationId, now, cleanText(actorHash, 100)
     );
     await this.recordAdminAudit(`housekeeping_room_${cleanStatus}`, `room:${cleanRoom}`, now);
-    return { ok: true, room: cleanRoom, status: cleanStatus, currentTaskId: taskId, serviceDate, arrivingReservationId, updatedAt: now };
+    return { ok: true, room: cleanRoom, status: cleanStatus, currentTaskId: taskId, serviceDate, arrivingReservationId, updatedAt: now, updatedByHash: cleanText(actorHash, 100) };
   }
 
   async claimHousekeepingTask(payload = {}) {
@@ -2721,6 +2723,12 @@ export class ConciergeStore extends DurableObject {
     if (!blockingStay && roomStatus?.status === "ready") {
       if (roomStatus.arrivingReservationId === reservation.id && roomStatus.serviceDate === reservation.checkInDate) {
         readyForReservation = true;
+      } else if (roomStatus.updatedByHash === "owner-admin"
+        && !roomStatus.currentTaskId && !roomStatus.serviceDate && !roomStatus.arrivingReservationId) {
+        // A manual owner Ready action is an explicit statement about the room's
+        // current physical state. The Admin API clears old turnover context so
+        // a stale task cannot remain attached to that manual confirmation.
+        readyForReservation = true;
       } else if (!previous) {
         readyForReservation = true;
       } else if (roomStatus.serviceDate === previous.checkOutDate) {
@@ -2753,8 +2761,25 @@ export class ConciergeStore extends DurableObject {
     this.ctx.storage.sql.exec("DELETE FROM stay_checkout_overrides WHERE reservation_id = ?", id);
     this.ctx.storage.sql.exec("DELETE FROM stay_late_checkout_approvals WHERE reservation_id = ?", id);
     await this.closePendingPassportLinksForReservation(id, now);
+
+    // Changing the reservation topology can make an existing Ready marker
+    // misleading. Clear Ready for this room so the dashboard and Concierge do
+    // not carry a pre-deletion readiness decision into the new stay context.
+    const room = cleanText(reservation.room, 4);
+    const roomStatus = await this.getRoomHousekeepingStatus(room);
+    if (roomStatus?.status === "ready") {
+      this.ctx.storage.sql.exec(
+        `UPDATE room_housekeeping_status
+         SET status = 'unknown', current_task_id = '', service_date = '', arriving_reservation_id = '',
+             updated_at = ?, updated_by_hash = 'system'
+         WHERE room = ?`,
+        now, room
+      );
+      await this.recordAdminAudit("housekeeping_ready_invalidated_after_stay_delete", `room:${room}`, now);
+    }
+
     await this.recordAdminAudit("owner_managed_stay_deleted", `reservation:${id}`, now);
-    return { ok: true, reservationId: id, room: cleanText(reservation.room, 4), deleted: true };
+    return { ok: true, reservationId: id, room, deleted: true };
   }
 
   async replaceDirectStayConfirmationCode(reservationId, confirmationCodeHash, updatedAt) {

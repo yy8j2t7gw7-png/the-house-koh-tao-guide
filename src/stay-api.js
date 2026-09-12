@@ -870,7 +870,11 @@ export async function handleStayAdminRequest(request, env, path, store) {
       return json({ error: "invalid_housekeeping_status" }, 400);
     }
     if (typeof store.setRoomHousekeepingStatus !== "function") return json({ error: "housekeeping_status_unavailable" }, 503);
-    const result = await store.setRoomHousekeepingStatus(room, status, new Date().toISOString(), "owner-admin", {});
+    const result = await store.setRoomHousekeepingStatus(room, status, new Date().toISOString(), "owner-admin", {
+      currentTaskId: "",
+      serviceDate: "",
+      arrivingReservationId: ""
+    });
     return json(result, result?.ok ? 200 : 400);
   }
 

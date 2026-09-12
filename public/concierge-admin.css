@@ -159,6 +159,8 @@ tr:last-child td{border-bottom:0}
 .concierge-admin-housekeeping-state.is-ready{border-color:#b7d5c8;background:#edf8f2;color:#2d6650}
 .concierge-admin-housekeeping-state.is-dirty{border-color:#d8aaa6;background:var(--admin-danger-soft);color:var(--admin-danger)}
 .concierge-admin-housekeeping-state.is-clean{border-color:#c8d9e0;background:#f1f7f9;color:#3e6170}
+.concierge-admin-room-housekeeping-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.concierge-admin-room-housekeeping-actions button{min-height:31px;padding:5px 9px;font-size:10px}
 .concierge-admin-room-task{background:#fff;color:var(--admin-attention)}
 .concierge-admin-operations-note{margin:0 0 9px;color:var(--admin-muted);font-size:11px;line-height:1.45}
 .concierge-admin-calendar-wrap{overflow:auto;border:1px solid var(--admin-line);border-radius:12px;background:#fff}
@@ -297,5 +299,15 @@ tr:last-child td{border-bottom:0}
 .concierge-admin-integration-description{margin:10px 0 4px;color:var(--admin-ink);font-size:12px;font-weight:700;line-height:1.45}
 .concierge-admin-integration-note{margin:0;color:var(--admin-muted);font-size:11px;line-height:1.45}
 .concierge-admin-integration-action-note{align-self:center;color:var(--admin-muted);font-size:10px;line-height:1.4}
-@media(max-width:760px){.concierge-admin-integration-grid{grid-template-columns:1fr}.concierge-admin-integration-architecture{flex-direction:column}}
+.concierge-admin-integration-connector-state{align-self:center;color:var(--admin-muted);font-size:10px;font-weight:800;line-height:1.4}
+.concierge-admin-integration-guide{margin-top:11px;border-top:1px solid var(--admin-line);padding-top:9px}
+.concierge-admin-integration-guide>summary{cursor:pointer;color:var(--admin-accent-dark);font-size:11px;font-weight:900;list-style-position:inside}
+.concierge-admin-integration-guide-body{display:grid;gap:7px;margin-top:9px;padding:10px;border:1px solid var(--admin-line);border-radius:10px;background:#fff}
+.concierge-admin-integration-guide-heading{color:var(--admin-ink);font-size:11px}
+.concierge-admin-integration-steps{margin:0;padding-left:19px;color:var(--admin-muted);font-size:10px;line-height:1.5}
+.concierge-admin-integration-steps li+li{margin-top:4px}
+.concierge-admin-integration-links{display:flex;flex-wrap:wrap;gap:7px}
+.concierge-admin-integration-links a{display:inline-flex;align-items:center;justify-content:center;min-height:34px;padding:6px 9px;border:1px solid var(--admin-line-strong);border-radius:9px;background:#fff;color:var(--admin-accent-dark);font-size:10px;font-weight:850;text-decoration:none}
+.concierge-admin-integration-links a:hover{border-color:var(--admin-accent);background:var(--admin-soft)}
+@media(max-width:760px){.concierge-admin-integration-grid{grid-template-columns:1fr}.concierge-admin-integration-architecture{flex-direction:column}.concierge-admin-integration-links{display:grid}.concierge-admin-integration-links a{width:100%;box-sizing:border-box}}
 

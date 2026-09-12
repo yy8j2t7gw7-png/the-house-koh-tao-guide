@@ -1,3 +1,12 @@
+# v5.11.54 — Room Readiness & Integration Guidance
+
+- Adds Dirty / Clean / Ready controls directly to Calendar & Operations room cards while retaining the existing fallback housekeeping controls.
+- Invalidates stale Ready state when deletion of an owner-managed stay changes the room's reservation context; trusted Owner Admin can explicitly mark the current room Ready again.
+- Replaces internal guest-facing readiness wording such as “marked ready” with natural hotel language.
+- Expands Integrations with Booking.com, Agoda, Hostelworld, Expedia Group (Expedia, Hotels.com, Vrbo, Orbitz, Travelocity), Trip.com and Other PMS / API, each with actionable How to connect guidance and official provider references.
+- Keeps all unsupported external providers disconnected until a real approved/configured connector exists; The House live booking behavior is unchanged.
+- Full automated suite: **280 passed / 0 failed** before final package validation.
+
 # v5.11.53 — Integrations Dashboard
 
 - Adds a protected Owner Admin Integrations section showing current House reservation sources and product-ready connector slots.

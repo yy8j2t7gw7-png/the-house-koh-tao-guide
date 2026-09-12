@@ -45,7 +45,7 @@ import {
   specialtyChoiceLabels
 } from "./diving-catalog.js";
 
-const RELEASE = "5.11.53";
+const RELEASE = "5.11.54";
 const ROOM_OPTIONS = new Set(["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11"]);
 const MAX_HISTORY_ITEMS = 10;
 const MAX_QUESTION_LENGTH = 800;
@@ -1246,10 +1246,10 @@ async function applyEarlyCheckinPolicy(question, workflowState, access, store) {
 
   if (!requestedTime) {
     const context = roomReady
-      ? "Your room is already marked ready, so you can arrive earlier."
+      ? "Your room is ready, so you can arrive earlier."
       : previousSameDay
         ? "There is still a guest in your room. As soon as they check out, housekeeping will prepare it as quickly as possible. We’ll let you know if early check-in becomes possible. Please do not expect the room to be ready before 12:00 PM, and early check-in is not guaranteed."
-        : "The room is not marked ready yet, so housekeeping must prepare it first. We’ll let you know if early check-in becomes possible. Please do not expect the room to be ready before 12:00 PM, and early check-in is not guaranteed.";
+        : "Your room still needs to be prepared before check-in. We’ll let you know if early check-in becomes possible. Please do not expect the room to be ready before 12:00 PM, and early check-in is not guaranteed.";
     return { handled: true, result: {
       answer: `Your scheduled check-in is ${dateLabel} from 2:00 PM. ${context} What time are you hoping to arrive?`,
       intentId: "early_check_in", category: "arrival", confidence: 1, needsHuman: false, handoff: "stay_support",
@@ -1272,7 +1272,7 @@ async function applyEarlyCheckinPolicy(question, workflowState, access, store) {
 
   const context = previousSameDay
     ? "There is still a guest in your room. As soon as they check out, housekeeping will prepare it as quickly as possible."
-    : "The room is not marked ready yet, so housekeeping still needs to prepare it.";
+    : "Your room still needs to be prepared before check-in.";
   const alertQuestion = `Early check-in request. Scheduled check-in: ${dateLabel} from 2:00 PM. Requested arrival: ${requestedTime}. ${previousSameDay ? "Previous same-day stay is recorded." : "No previous same-day stay is recorded."}`;
   return { handled: true, result: {
     answer: `${context} I’ll ask housekeeping to prioritize the room if possible. We’ll let you know if early check-in becomes available. Please do not expect the room to be ready before 12:00 PM, and early check-in is not guaranteed.`,
@@ -4228,7 +4228,7 @@ export async function handleConciergeRequest(request, env, ctx, now = new Date()
         ...result,
         answer: result.staySupportRequest.sameDayDeparture
           ? `There is another guest in the room before your stay. As soon as they check out, housekeeping will prepare it as quickly as possible. We’ve asked housekeeping to prioritize the room if possible. We’ll let you know if early check-in becomes available. Please do not expect the room to be ready before 12:00 PM, and early check-in is not guaranteed.`
-          : `The room is not marked ready yet. We’ve asked housekeeping to prepare it as soon as possible and prioritize it if possible. We’ll let you know if early check-in becomes available. Please do not expect the room to be ready before 12:00 PM, and early check-in is not guaranteed.`,
+          : `Your room still needs to be prepared before check-in. We’ve asked housekeeping to prepare it as soon as possible and prioritize it if possible. We’ll let you know if early check-in becomes available. Please do not expect the room to be ready before 12:00 PM, and early check-in is not guaranteed.`,
         actions: []
       };
     } else if (result.propertyIssueRequest) {

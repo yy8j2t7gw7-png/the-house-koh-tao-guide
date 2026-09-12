@@ -159,6 +159,43 @@
     return "Not connected";
   }
 
+  function integrationGuide(provider) {
+    const guide = provider?.connectionGuide;
+    if (!guide || provider.connectAction !== "connector_required") return null;
+    const details = element("details", "concierge-admin-integration-guide");
+    const summary = element("summary", "", "How to connect");
+    details.appendChild(summary);
+
+    const body = element("div", "concierge-admin-integration-guide-body");
+    const addSteps = (heading, steps) => {
+      const items = Array.isArray(steps) ? steps.filter(Boolean) : [];
+      if (!items.length) return;
+      body.appendChild(element("strong", "concierge-admin-integration-guide-heading", heading));
+      const list = document.createElement("ol");
+      list.className = "concierge-admin-integration-steps";
+      items.forEach((step) => list.appendChild(element("li", "", step)));
+      body.appendChild(list);
+    };
+    addSteps("For the property owner", guide.propertySteps);
+    addSteps("What the software connector requires", guide.platformSteps);
+
+    const links = Array.isArray(guide.officialLinks) ? guide.officialLinks.filter((item) => item?.url && item?.label) : [];
+    if (links.length) {
+      body.appendChild(element("strong", "concierge-admin-integration-guide-heading", "Official provider information"));
+      const linkRow = element("div", "concierge-admin-integration-links");
+      links.forEach((item) => {
+        const link = element("a", "secondary", item.label);
+        link.href = item.url;
+        link.target = "_blank";
+        link.rel = "noopener noreferrer";
+        linkRow.appendChild(link);
+      });
+      body.appendChild(linkRow);
+    }
+    details.appendChild(body);
+    return details;
+  }
+
   function renderIntegrations(integrations = {}) {
     if (!integrationProviders || !integrationArchitectureStatus) return;
     const providers = Array.isArray(integrations.providers) ? integrations.providers : [];
@@ -168,7 +205,7 @@
     integrationArchitectureStatus.replaceChildren(
       element("strong", "", architectureReady ? "Canonical reservation layer ready" : "Integration architecture unavailable"),
       element("span", "", architectureReady
-        ? "New provider connectors can feed the same reservation, operations, housekeeping and guest-access model without changing The House's live booking setup."
+        ? "Every future booking connector can feed the same reservations, calendar, housekeeping and guest-access workflows. The House itself stays on its existing Airbnb + direct/walk-in setup unless you deliberately add another live connector."
         : "Provider connectors should not be added until the canonical reservation layer is available.")
     );
 
@@ -178,7 +215,7 @@
       const title = element("div");
       title.append(
         element("strong", "", provider.name || provider.id || "Provider"),
-        element("span", "", provider.liveAtHouse ? "The House production" : "Product-ready slot")
+        element("span", "", provider.liveAtHouse ? "The House production" : "Optional product integration")
       );
       const status = element("span", `concierge-admin-integration-status is-${provider.status || "not_connected"}`, integrationStatusLabel(provider.status));
       head.append(title, status);
@@ -198,12 +235,14 @@
       } else {
         button.textContent = "Connect";
         button.disabled = true;
-        button.title = "A provider-specific connector must be installed before this connection can be enabled.";
-        const hint = element("span", "concierge-admin-integration-action-note", "Connector required before this button can be enabled.");
-        actions.append(button, hint);
+        button.title = "A real provider connector must be installed and approved before this connection can be enabled.";
+        const connectorState = element("span", "concierge-admin-integration-connector-state", `Connector status: ${provider.connectorInstalled ? "Installed" : "Not installed"}`);
+        actions.append(button, connectorState);
       }
       if (!actions.childNodes.length) actions.append(button);
       card.append(head, description, note, actions);
+      const guide = integrationGuide(provider);
+      if (guide) card.appendChild(guide);
       integrationProviders.appendChild(card);
     });
     setAdminSectionCount("integrations", providers.length);
@@ -656,6 +695,19 @@
     return Number.isFinite(late) && late > 660 ? late : 660;
   }
 
+  function housekeepingStatusButtons(room, currentStatus, compact = false) {
+    const actions = element("div", compact ? "concierge-admin-room-housekeeping-actions" : "concierge-admin-card-actions");
+    actions.dataset.housekeepingRoom = String(room || "");
+    ["dirty", "clean", "ready"].forEach((status) => {
+      const button = element("button", status === currentStatus ? "" : "secondary", status[0].toUpperCase() + status.slice(1));
+      button.type = "button";
+      button.dataset.housekeepingStatus = status;
+      if (status === currentStatus) button.disabled = true;
+      actions.appendChild(button);
+    });
+    return actions;
+  }
+
   function renderOperationsDashboard(data = {}) {
     if (!todayOperationsSummary || !todayOperationsRooms || !todayHousekeepingTasks || !operationsCalendar) return;
     const reservations = Array.isArray(data.reservations) ? data.reservations : [];
@@ -751,6 +803,7 @@
         housekeepingRow.appendChild(element("span", "concierge-admin-room-task", taskText));
       }
       card.appendChild(housekeepingRow);
+      card.appendChild(housekeepingStatusButtons(room, String(housekeeping.status || "unknown"), true));
       todayOperationsRooms.appendChild(card);
     }
 
@@ -945,15 +998,7 @@
         element("span", "", `Housekeeping: ${String(item.status || "unknown").toUpperCase()}`),
         element("span", "", item.updatedAt ? `Updated ${bangkokDate(item.updatedAt)}` : "No housekeeping status recorded yet")
       );
-      const actions = element("div", "concierge-admin-card-actions");
-      ["dirty", "clean", "ready"].forEach((status) => {
-        const button = element("button", status === item.status ? "" : "secondary", status[0].toUpperCase() + status.slice(1));
-        button.type = "button";
-        button.dataset.housekeepingStatus = status;
-        if (status === item.status) button.disabled = true;
-        actions.appendChild(button);
-      });
-      card.appendChild(actions);
+      card.appendChild(housekeepingStatusButtons(item.room, item.status));
       roomHousekeepingStatuses.appendChild(card);
     });
 
@@ -1698,12 +1743,13 @@
   activeStayReservations.addEventListener("click", stayOperationAction);
   upcomingStayReservations.addEventListener("click", stayOperationAction);
 
-  roomHousekeepingStatuses.addEventListener("click", async (event) => {
+  async function housekeepingStatusAction(event) {
     const button = event.target.closest("[data-housekeeping-status]");
     if (!button) return;
     const card = button.closest("[data-housekeeping-room]");
     if (!card?.dataset.housekeepingRoom) return;
-    button.disabled = true;
+    const buttons = [...card.querySelectorAll("[data-housekeeping-status]")];
+    buttons.forEach((item) => { item.disabled = true; });
     try {
       await api("/api/concierge/admin/housekeeping-status", {
         method: "POST",
@@ -1711,10 +1757,13 @@
       });
       await loadOverview();
     } catch (_error) {
-      button.disabled = false;
+      buttons.forEach((item) => { item.disabled = false; });
       window.alert("The room housekeeping status could not be updated.");
     }
-  });
+  }
+
+  roomHousekeepingStatuses.addEventListener("click", housekeepingStatusAction);
+  todayOperationsRooms.addEventListener("click", housekeepingStatusAction);
 
   keyRotations.addEventListener("click", async (event) => {
     const button = event.target.closest("[data-rotation-action]");

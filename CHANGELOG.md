@@ -1,5 +1,16 @@
 # Changelog
 
+## v5.11.61 — Commercial security, WhatsApp guest contact and OTA Finance onboarding
+
+- Adds server-signed tenant licensing with module entitlements, validity/status controls and device limits.
+- Adds optional device-bound mobile sessions, owner-visible security audit and rate-limited license administration.
+- Keeps provider and licensing secrets server-side; bootstrap remains disabled.
+- Adds historical Airbnb Finance backfill by date range for mid-month onboarding while preserving idempotent payout reconciliation.
+- Adds provider-neutral OTA Finance adapter metadata for future Booking.com, Expedia, Vrbo, Agoda, Hostelworld and Trip.com integrations.
+- Adds reservation-level WhatsApp guest contact from the mobile app using existing threads or an approved guest-initiation template.
+- Ships license enforcement, device binding and scheduled Beds24 Finance automation staged/off until controlled production activation.
+- Full automated suite: **322 passed / 0 failed**.
+
 ## v5.11.60 — Mobile reservation guest-name enrichment
 
 - Mobile Home, Bookings and Calendar now enrich canonical reservations with live Beds24 personal booking names when available.

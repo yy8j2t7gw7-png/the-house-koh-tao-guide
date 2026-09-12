@@ -698,7 +698,29 @@ export class ConciergeStore extends DurableObject {
         );
         CREATE INDEX IF NOT EXISTS platform_audit_tenant_created
           ON platform_audit(tenant_id, created_at);
+
+        CREATE TABLE IF NOT EXISTS platform_licenses (
+          tenant_id TEXT PRIMARY KEY,
+          license_id TEXT NOT NULL UNIQUE,
+          status TEXT NOT NULL DEFAULT 'inactive',
+          plan_key TEXT NOT NULL DEFAULT 'standard',
+          valid_from TEXT NOT NULL DEFAULT '',
+          valid_until TEXT NOT NULL DEFAULT '',
+          max_devices INTEGER NOT NULL DEFAULT 3,
+          issued_by TEXT NOT NULL DEFAULT 'taoedge',
+          signature TEXT NOT NULL DEFAULT '',
+          modules_json TEXT NOT NULL DEFAULT '[]',
+          metadata_json TEXT NOT NULL DEFAULT '{}',
+          updated_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS platform_licenses_status
+          ON platform_licenses(status, valid_until, updated_at);
       `);
+      try {
+        this.ctx.storage.sql.exec("ALTER TABLE platform_licenses ADD COLUMN modules_json TEXT NOT NULL DEFAULT '[]'");
+      } catch (_error) {
+        // Existing schema already has the signed module list.
+      }
       try {
         this.ctx.storage.sql.exec("ALTER TABLE stay_reservations ADD COLUMN guest_first_name TEXT NOT NULL DEFAULT ''");
       } catch (_error) {
@@ -3652,6 +3674,22 @@ export class ConciergeStore extends DurableObject {
     return id ? this.getMessagingThread(id) : null;
   }
 
+  async findMessagingThreadByReservation(reservationIdValue, channelValue = "") {
+    const reservationId = cleanText(reservationIdValue, 100);
+    const channel = cleanText(channelValue, 30).toLowerCase();
+    if (!reservationId) return null;
+    const id = channel
+      ? rows(this.ctx.storage.sql.exec(
+          `SELECT id FROM messaging_threads WHERE reservation_id = ? AND lower(channel) = ? ORDER BY updated_at DESC LIMIT 1`,
+          reservationId, channel
+        ))[0]?.id
+      : rows(this.ctx.storage.sql.exec(
+          `SELECT id FROM messaging_threads WHERE reservation_id = ? ORDER BY updated_at DESC LIMIT 1`,
+          reservationId
+        ))[0]?.id;
+    return id ? this.getMessagingThread(id) : null;
+  }
+
   async linkMessagingThreadsByPhone(phone, record = {}) {
     const value = cleanText(phone, 20);
     const reservationId = cleanText(record.reservationId, 100);
@@ -4456,6 +4494,107 @@ export class ConciergeStore extends DurableObject {
        FROM platform_properties WHERE tenant_id = ? ORDER BY display_name ASC`,
       tenantId
     )).map((item) => ({ ...item, active: Boolean(item.active) }));
+  }
+
+  async mobileGetLicense(tenantIdValue) {
+    const tenantId = cleanText(tenantIdValue, 100);
+    if (!tenantId) return null;
+    return rows(this.ctx.storage.sql.exec(
+      `SELECT tenant_id AS tenantId, license_id AS licenseId, status, plan_key AS planKey,
+              valid_from AS validFrom, valid_until AS validUntil, max_devices AS maxDevices,
+              issued_by AS issuedBy, signature, modules_json AS modulesJson, metadata_json AS metadataJson, updated_at AS updatedAt
+       FROM platform_licenses WHERE tenant_id = ? LIMIT 1`,
+      tenantId
+    ))[0] || null;
+  }
+
+  async mobileUpsertLicense(record = {}) {
+    const tenantId = cleanText(record.tenantId, 100);
+    const licenseId = cleanText(record.licenseId, 120);
+    if (!tenantId || !licenseId) return { ok: false, error: "invalid_license" };
+    const now = cleanText(record.updatedAt, 40) || new Date().toISOString();
+    this.ctx.storage.sql.exec(
+      `INSERT INTO platform_licenses
+       (tenant_id, license_id, status, plan_key, valid_from, valid_until, max_devices, issued_by, signature, modules_json, metadata_json, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(tenant_id) DO UPDATE SET
+         license_id = excluded.license_id, status = excluded.status, plan_key = excluded.plan_key,
+         valid_from = excluded.valid_from, valid_until = excluded.valid_until, max_devices = excluded.max_devices,
+         issued_by = excluded.issued_by, signature = excluded.signature, modules_json = excluded.modules_json, metadata_json = excluded.metadata_json,
+         updated_at = excluded.updated_at`,
+      tenantId, licenseId, cleanText(record.status, 30) || "inactive", cleanText(record.planKey, 60) || "standard",
+      cleanText(record.validFrom, 40), cleanText(record.validUntil, 40), Math.max(1, Math.min(50, Number(record.maxDevices) || 3)),
+      cleanText(record.issuedBy, 80) || "taoedge", cleanText(record.signature, 180), JSON.stringify(Array.isArray(record.modules) ? record.modules : []), JSON.stringify(record.metadata || {}), now
+    );
+    return { ok: true, tenantId, licenseId };
+  }
+
+  async mobileUpsertEntitlements(tenantIdValue, modules = [], record = {}) {
+    const tenantId = cleanText(tenantIdValue, 100);
+    if (!tenantId) return { ok: false, error: "invalid_tenant" };
+    const now = cleanText(record.updatedAt, 40) || new Date().toISOString();
+    const validFrom = cleanText(record.validFrom, 40);
+    const validUntil = cleanText(record.validUntil, 40);
+    const status = cleanText(record.status, 30) || "active";
+    const source = cleanText(record.source, 80) || "license";
+    for (const raw of Array.isArray(modules) ? modules : []) {
+      const moduleKey = cleanText(raw, 80);
+      if (!moduleKey) continue;
+      this.ctx.storage.sql.exec(
+        `INSERT INTO platform_entitlements
+         (tenant_id, module_key, status, valid_from, valid_until, source, metadata_json, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, '{}', ?)
+         ON CONFLICT(tenant_id, module_key) DO UPDATE SET
+           status = excluded.status, valid_from = excluded.valid_from, valid_until = excluded.valid_until,
+           source = excluded.source, updated_at = excluded.updated_at`,
+        tenantId, moduleKey, status, validFrom, validUntil, source, now
+      );
+    }
+    return { ok: true };
+  }
+
+  async mobileReplaceEntitlements(tenantIdValue, modules = [], record = {}) {
+    const tenantId = cleanText(tenantIdValue, 100);
+    if (!tenantId) return { ok: false, error: "invalid_tenant" };
+    const now = cleanText(record.updatedAt, 40) || new Date().toISOString();
+    const validFrom = cleanText(record.validFrom, 40);
+    const validUntil = cleanText(record.validUntil, 40);
+    const status = cleanText(record.status, 30) || "active";
+    const source = cleanText(record.source, 80) || "license";
+    this.ctx.storage.sql.exec(
+      `UPDATE platform_entitlements SET status = 'inactive', source = ?, updated_at = ? WHERE tenant_id = ?`,
+      source, now, tenantId
+    );
+    return this.mobileUpsertEntitlements(tenantId, modules, { status, validFrom, validUntil, source, updatedAt: now });
+  }
+
+  async mobileCountActiveDevices(tenantIdValue, nowValue, deviceIdValue = "") {
+    const tenantId = cleanText(tenantIdValue, 100);
+    const now = cleanText(nowValue, 40) || new Date().toISOString();
+    const deviceId = cleanText(deviceIdValue, 180);
+    const rowsOut = rows(this.ctx.storage.sql.exec(
+      `SELECT device_id AS deviceId, MAX(last_seen_at) AS lastSeenAt
+       FROM platform_sessions
+       WHERE tenant_id = ? AND revoked_at = '' AND expires_at > ? AND device_id <> ''
+       GROUP BY device_id`,
+      tenantId, now
+    ));
+    return {
+      total: rowsOut.length,
+      sameDevice: deviceId ? rowsOut.some((item) => item.deviceId === deviceId) : false
+    };
+  }
+
+  async mobileListAudit(tenantIdValue, limitValue = 100) {
+    const tenantId = cleanText(tenantIdValue, 100);
+    const limit = Math.max(1, Math.min(250, Number(limitValue) || 100));
+    return rows(this.ctx.storage.sql.exec(
+      `SELECT a.id, a.user_id AS userId, u.display_name AS displayName, a.action, a.reference,
+              a.metadata_json AS metadataJson, a.created_at AS createdAt
+       FROM platform_audit a LEFT JOIN platform_users u ON u.id = a.user_id
+       WHERE a.tenant_id = ? ORDER BY a.created_at DESC LIMIT ?`,
+      tenantId, limit
+    ));
   }
 
   async mobileUpsertPushDevice(record = {}) {

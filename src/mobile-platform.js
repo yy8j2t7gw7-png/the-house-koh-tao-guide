@@ -1,9 +1,9 @@
 import { HOUSE_FINANCE_BUSINESS_ID } from "./finance-businesses.js";
 import { expenseConfiguration, handleExpenseAdminRequest } from "./expense-api.js";
 import { incomeConfiguration, summarizeFinance } from "./finance-api.js";
-import { beds24FinanceSyncConfiguration } from "./beds24-finance-sync.js";
+import { beds24FinanceSyncConfiguration, reconcileBeds24FinanceRange } from "./beds24-finance-sync.js";
 import { integrationAdminOverview } from "./integration-catalog.js";
-import { beds24ApiRequest, handleUnifiedMessagingAdminRequest, roomForBeds24Booking, unifiedMessagingConfiguration } from "./unified-messaging.js";
+import { beds24ApiRequest, handleUnifiedMessagingAdminRequest, roomForBeds24Booking, startWhatsAppGuestConversation, unifiedMessagingConfiguration, whatsAppGuestInitiationConfiguration } from "./unified-messaging.js";
 import { handleStayAdminRequest } from "./stay-api.js";
 import { createProtectedOperationsAlert, dispatchConciergeAlert } from "./whatsapp-alerts.js";
 
@@ -34,7 +34,7 @@ export const MOBILE_PERMISSION_MATRIX = Object.freeze({
     "home.view", "bookings.view", "calendar.view",
     "messaging.view", "messaging.send", "messaging.ai_control",
     "operations.view", "housekeeping.update", "maintenance.view", "maintenance.create", "maintenance.resolve",
-    "registration.status", "finance.view", "finance.expense_submit", "analytics.view", "integrations.view",
+    "registration.status", "finance.view", "finance.import", "finance.expense_submit", "analytics.view", "integrations.view",
     "staff.manage", "licenses.view", "licenses.manage", "security.sessions",
     "direct_stays.manage", "guest_documents.view"
   ]),
@@ -195,12 +195,14 @@ function parsePermissions(record) {
   return [...base].sort();
 }
 
-function publicIdentity(record, properties = [], entitlements = []) {
+function publicIdentity(record, properties = [], entitlements = [], moduleOverride = null) {
   const permissions = parsePermissions(record);
-  const modules = entitlements
-    .filter((item) => item.status === "active" && (!item.validUntil || item.validUntil > new Date().toISOString()))
-    .map((item) => item.moduleKey)
-    .sort();
+  const modules = moduleOverride
+    ? [...moduleOverride].sort()
+    : entitlements
+      .filter((item) => item.status === "active" && (!item.validUntil || item.validUntil > new Date().toISOString()))
+      .map((item) => item.moduleKey)
+      .sort();
   return {
     user: {
       id: record.userId,
@@ -228,6 +230,103 @@ function hasPermission(access, permission) {
 
 function requirePermission(access, permission) {
   return hasPermission(access, permission) ? null : json({ error: "forbidden", permission }, 403);
+}
+
+function activeModuleKeys(entitlements = [], now = new Date().toISOString()) {
+  return new Set((Array.isArray(entitlements) ? entitlements : [])
+    .filter((item) => item?.status === "active" && (!item.validFrom || item.validFrom <= now) && (!item.validUntil || item.validUntil > now))
+    .map((item) => cleanText(item.moduleKey, 80))
+    .filter(Boolean));
+}
+
+function hasModule(access, moduleKey) {
+  return access?.modules?.has(moduleKey) === true;
+}
+
+function requireCapability(access, permission, moduleKey = "core") {
+  const denied = requirePermission(access, permission);
+  if (denied) return denied;
+  return hasModule(access, moduleKey) ? null : json({ error: "module_not_licensed", module: moduleKey }, 402);
+}
+
+function licenseEnforcementEnabled(env) {
+  return bool(env.MOBILE_LICENSE_ENFORCEMENT_ENABLED);
+}
+
+function deviceBindingEnabled(env) {
+  return bool(env.MOBILE_DEVICE_BINDING_ENABLED);
+}
+
+function canonicalLicenseModules(value) {
+  const source = Array.isArray(value) ? value : safeJson(value, []);
+  return [...new Set((Array.isArray(source) ? source : []).map((item) => cleanText(item, 80)).filter((item) => DEFAULT_MODULES.includes(item)))].sort();
+}
+
+function licenseCanonical(record = {}) {
+  return [
+    cleanText(record.tenantId, 100), cleanText(record.licenseId, 120), cleanText(record.status, 30),
+    cleanText(record.planKey, 60), cleanText(record.validFrom, 40), cleanText(record.validUntil, 40),
+    String(Math.max(1, Math.min(50, Number(record.maxDevices) || 3))), cleanText(record.issuedBy || "taoedge", 80),
+    canonicalLicenseModules(record.modules || record.modulesJson).join(",")
+  ].join("|");
+}
+
+async function hmacHex(secret, value) {
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(String(secret || "")), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const signature = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(String(value || "")));
+  return Array.from(new Uint8Array(signature), (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+async function signLicense(record, env) {
+  if (!env.MOBILE_LICENSE_SIGNING_SECRET) return "";
+  return hmacHex(env.MOBILE_LICENSE_SIGNING_SECRET, licenseCanonical(record));
+}
+
+async function licenseValidation(record, env, now = new Date().toISOString()) {
+  if (!licenseEnforcementEnabled(env)) return { ok: true, enforced: false, license: record || null };
+  if (!env.MOBILE_LICENSE_SIGNING_SECRET) return { ok: false, error: "license_service_unavailable" };
+  if (!record) return { ok: false, error: "license_required" };
+  if (!["active", "trial"].includes(cleanText(record.status, 30))) return { ok: false, error: "license_inactive" };
+  if (record.validFrom && record.validFrom > now) return { ok: false, error: "license_not_started" };
+  if (record.validUntil && record.validUntil <= now) return { ok: false, error: "license_expired" };
+  const expected = await signLicense(record, env);
+  if (!expected || !constantTimeEqual(expected, record.signature)) return { ok: false, error: "license_invalid" };
+  return { ok: true, enforced: true, license: record };
+}
+
+function publicLicense(record, validation = null) {
+  if (!record) return { status: validation?.enforced ? "required" : "not_enforced", planKey: "", validUntil: "", maxDevices: 0, enforced: Boolean(validation?.enforced) };
+  return {
+    status: record.status,
+    planKey: record.planKey,
+    validFrom: record.validFrom,
+    validUntil: record.validUntil,
+    maxDevices: Number(record.maxDevices) || 0,
+    modules: canonicalLicenseModules(record.modules || record.modulesJson),
+    enforced: Boolean(validation?.enforced)
+  };
+}
+
+async function ensureHouseLicense(store, tenantId, env, now = new Date().toISOString()) {
+  let license = typeof store.mobileGetLicense === "function" ? await store.mobileGetLicense(tenantId) : null;
+  if (license || tenantId !== HOUSE_TENANT_ID || !env.MOBILE_LICENSE_SIGNING_SECRET || typeof store.mobileUpsertLicense !== "function") return license;
+  const record = {
+    tenantId,
+    licenseId: "lic_house_owner_preview",
+    status: "active",
+    planKey: "house-owner-preview",
+    validFrom: now,
+    validUntil: "",
+    maxDevices: 8,
+    issuedBy: "taoedge-legacy-migration",
+    modules: DEFAULT_MODULES,
+    metadata: { protectedMigration: true },
+    updatedAt: now
+  };
+  record.signature = await signLicense(record, env);
+  await store.mobileUpsertLicense(record);
+  license = await store.mobileGetLicense(tenantId);
+  return license;
 }
 
 function validMonth(value) {
@@ -265,6 +364,21 @@ function beds24GuestDisplayName(booking = {}) {
   return cleanText([booking.firstName, booking.lastName].filter(Boolean).join(" "), 100);
 }
 
+function beds24GuestPhone(booking = {}) {
+  const guests = Array.isArray(booking.guests) ? booking.guests : [];
+  const candidates = [booking.phone, booking.mobile, booking.guestPhone, booking.phoneNumber, booking.mobileNumber, guests[0]?.phone, guests[0]?.mobile];
+  for (const value of candidates) {
+    const phone = String(value || "").replace(/\D/g, "").slice(0, 20);
+    if (phone.length >= 8) return phone;
+  }
+  return "";
+}
+
+function maskedPhone(value) {
+  const phone = String(value || "").replace(/\D/g, "");
+  return phone.length >= 8 ? `•••• ${phone.slice(-4)}` : "";
+}
+
 function reservationWindowKey(room, checkInDate, checkOutDate) {
   return `${cleanText(room, 4)}|${cleanText(checkInDate, 10)}|${cleanText(checkOutDate, 10)}`;
 }
@@ -275,7 +389,7 @@ function reservationGuestDisplayName(item, role = "owner") {
   return role === "staff" ? value.split(/\s+/)[0] : value;
 }
 
-async function enrichReservationsWithBeds24GuestNames(reservations, env, store, from, to) {
+async function enrichReservationsWithBeds24GuestContacts(reservations, env, store, from, to) {
   const source = Array.isArray(reservations) ? reservations : [];
   if (!source.length || !env.BEDS24_REFRESH_TOKEN || !store) return source;
   const start = validDate(from) ? from : bangkokDate(-30);
@@ -289,18 +403,19 @@ async function enrichReservationsWithBeds24GuestNames(reservations, env, store, 
       if (Array.isArray(response?.data)) bookings.push(...response.data);
       if (!response?.pages?.nextPageExists) break;
     }
-    const guestNames = new Map();
+    const contacts = new Map();
     for (const booking of bookings) {
       const room = roomForBeds24Booking(booking, env);
       const arrival = cleanText(booking?.arrival, 10);
       const departure = cleanText(booking?.departure, 10);
-      const name = beds24GuestDisplayName(booking);
-      if (!room || !validDate(arrival) || !validDate(departure) || !name) continue;
-      guestNames.set(reservationWindowKey(room, arrival, departure), name);
+      if (!room || !validDate(arrival) || !validDate(departure)) continue;
+      contacts.set(reservationWindowKey(room, arrival, departure), {
+        name: beds24GuestDisplayName(booking), phone: beds24GuestPhone(booking), beds24BookingId: String(booking.id || "")
+      });
     }
     return source.map((item) => {
-      const name = guestNames.get(reservationWindowKey(item.room, item.checkInDate, item.checkOutDate));
-      return name ? { ...item, guestDisplayName: name } : item;
+      const contact = contacts.get(reservationWindowKey(item.room, item.checkInDate, item.checkOutDate));
+      return contact ? { ...item, ...(contact.name ? { guestDisplayName: contact.name } : {}), ...(contact.phone ? { guestPhone: contact.phone } : {}), beds24BookingId: contact.beds24BookingId } : item;
     });
   } catch (_error) {
     return source;
@@ -332,7 +447,9 @@ function publicReservation(item, role) {
     requiredPassports: role === "staff" ? undefined : Number(item.requiredPassports) || 0,
     receivedPassports: role === "staff" ? undefined : Number(item.receivedPassports) || 0,
     lateCheckoutTime: item.lateCheckoutTime || "",
-    lateCheckoutFeeThb: role === "owner" ? Number(item.lateCheckoutFeeThb) || 0 : undefined
+    lateCheckoutFeeThb: role === "owner" ? Number(item.lateCheckoutFeeThb) || 0 : undefined,
+    whatsAppAvailable: role === "staff" ? false : Boolean(item.guestPhone),
+    guestPhoneMasked: role === "staff" ? "" : maskedPhone(item.guestPhone)
   };
 }
 
@@ -380,11 +497,25 @@ async function authenticate(request, env, store) {
   if (!record || record.userStatus !== "active" || record.membershipStatus !== "active" || record.tenantStatus !== "active") {
     return { error: json({ error: "unauthorized" }, 401) };
   }
+  if (deviceBindingEnabled(env)) {
+    const suppliedDeviceId = cleanText(request.headers.get("x-mobile-device-id"), 180);
+    if (!record.deviceId || !suppliedDeviceId || !constantTimeEqual(record.deviceId, suppliedDeviceId)) {
+      return { error: json({ error: "device_binding_failed" }, 401) };
+    }
+  }
   const permissions = new Set(parsePermissions(record));
   const properties = await store.mobileListProperties(record.tenantId);
   const entitlements = await store.mobileListEntitlements(record.tenantId);
+  let modules = activeModuleKeys(entitlements, now);
+  const license = await ensureHouseLicense(store, record.tenantId, env, now);
+  const licenseCheck = await licenseValidation(license, env, now);
+  if (!licenseCheck.ok) return { error: json({ error: licenseCheck.error }, licenseCheck.error === "license_service_unavailable" ? 503 : 402) };
+  if (licenseCheck.enforced) {
+    const licensedModules = new Set(canonicalLicenseModules(license?.modules || license?.modulesJson));
+    modules = new Set([...modules].filter((moduleKey) => licensedModules.has(moduleKey)));
+  }
   await store.mobileTouchSession(record.sessionId, now);
-  return { record, permissions, properties, entitlements, now, token };
+  return { record, permissions, properties, entitlements, modules, license, licenseCheck, now, token };
 }
 
 async function bootstrap(request, env, store) {
@@ -442,9 +573,20 @@ async function login(request, env, store) {
   }
   const derived = await derivePassword(password, record.passwordSalt, env.MOBILE_PASSWORD_PEPPER, Number(record.passwordIterations) || PASSWORD_ITERATIONS);
   if (!constantTimeEqual(derived, record.passwordHash)) return json({ error: "invalid_credentials" }, 401);
+  const now = new Date().toISOString();
+  const deviceId = cleanText(body.deviceId, 180);
+  if (deviceBindingEnabled(env) && !deviceId) return json({ error: "device_id_required" }, 400);
+  const license = await ensureHouseLicense(store, record.tenantId, env, now);
+  const licenseCheck = await licenseValidation(license, env, now);
+  if (!licenseCheck.ok) return json({ error: licenseCheck.error }, licenseCheck.error === "license_service_unavailable" ? 503 : 402);
+  if (licenseCheck.enforced && Number(license?.maxDevices) > 0 && typeof store.mobileCountActiveDevices === "function") {
+    const deviceCount = await store.mobileCountActiveDevices(record.tenantId, now, deviceId);
+    if (!deviceCount.sameDevice && deviceCount.total >= Number(license.maxDevices)) {
+      return json({ error: "device_limit_reached", maxDevices: Number(license.maxDevices) }, 403);
+    }
+  }
   const token = randomToken("mob");
   const tokenHash = await sessionHash(token, env);
-  const now = new Date().toISOString();
   const sessionDays = Math.max(1, Math.min(90, Number(env.MOBILE_SESSION_TTL_DAYS) || DEFAULT_SESSION_DAYS));
   const expiresAt = new Date(Date.now() + sessionDays * 86_400_000).toISOString();
   const sessionId = `psess_${crypto.randomUUID()}`;
@@ -454,7 +596,7 @@ async function login(request, env, store) {
     userId: record.userId,
     membershipId: record.membershipId,
     tenantId: record.tenantId,
-    deviceId: cleanText(body.deviceId, 180),
+    deviceId,
     deviceName: cleanText(body.deviceName, 160),
     platform: cleanText(body.platform, 30),
     appVersion: cleanText(body.appVersion, 40),
@@ -465,7 +607,8 @@ async function login(request, env, store) {
   const properties = await store.mobileListProperties(record.tenantId);
   const entitlements = await store.mobileListEntitlements(record.tenantId);
   await store.mobileRecordAudit({ tenantId: record.tenantId, userId: record.userId, membershipId: record.membershipId, action: "mobile_login", reference: `session:${sessionId}`, createdAt: now });
-  return json({ ok: true, sessionToken: token, expiresAt, ...publicIdentity(record, properties, entitlements) });
+  const loginModules = licenseCheck.enforced ? new Set([...activeModuleKeys(entitlements, now)].filter((moduleKey) => new Set(canonicalLicenseModules(license?.modules || license?.modulesJson)).has(moduleKey))) : activeModuleKeys(entitlements, now);
+  return json({ ok: true, sessionToken: token, expiresAt, license: publicLicense(license, licenseCheck), ...publicIdentity(record, properties, entitlements, loginModules) });
 }
 
 async function acceptInvite(request, env, store) {
@@ -541,7 +684,7 @@ async function handleProtected(request, env, path, store) {
   const publicAccess = { ...access, permissions: access.permissions };
 
   if (path === `${MOBILE_API_PREFIX}/session` && request.method === "GET") {
-    return json({ ok: true, ...publicIdentity(record, access.properties, access.entitlements) });
+    return json({ ok: true, license: publicLicense(access.license, access.licenseCheck), ...publicIdentity(record, access.properties, access.entitlements, access.modules) });
   }
 
   if (path === `${MOBILE_API_PREFIX}/auth/logout` && request.method === "POST") {
@@ -551,14 +694,14 @@ async function handleProtected(request, env, path, store) {
   }
 
   if (path === `${MOBILE_API_PREFIX}/home` && request.method === "GET") {
-    const denied = requirePermission(publicAccess, "home.view");
+    const denied = requireCapability(publicAccess, "home.view", "core");
     if (denied) return denied;
     const [operationsRaw, overview, threads] = await Promise.all([
       store.getStayOperationsOverview(), store.getAdminOverview(), store.listMessagingThreads(80)
     ]);
-    const operations = { ...operationsRaw, reservations: await enrichReservationsWithBeds24GuestNames(operationsRaw.reservations || [], env, store, bangkokDate(-1), bangkokDate(2)) };
+    const operations = { ...operationsRaw, reservations: await enrichReservationsWithBeds24GuestContacts(operationsRaw.reservations || [], env, store, bangkokDate(-1), bangkokDate(2)) };
     let finance = null;
-    if (hasPermission(publicAccess, "finance.view")) {
+    if (hasPermission(publicAccess, "finance.view") && hasModule(publicAccess, "finance")) {
       const month = currentMonth();
       const [expenses, income] = await Promise.all([store.listExpenses(month, HOUSE_FINANCE_BUSINESS_ID), store.listIncome(month, HOUSE_FINANCE_BUSINESS_ID)]);
       const configuration = incomeConfiguration(env, HOUSE_FINANCE_BUSINESS_ID);
@@ -568,7 +711,7 @@ async function handleProtected(request, env, path, store) {
   }
 
   if (path === `${MOBILE_API_PREFIX}/bookings` && request.method === "GET") {
-    const denied = requirePermission(publicAccess, "bookings.view");
+    const denied = requireCapability(publicAccess, "bookings.view", "bookings");
     if (denied) return denied;
     const url = new URL(request.url);
     const from = validDate(url.searchParams.get("from")) ? url.searchParams.get("from") : "";
@@ -576,33 +719,33 @@ async function handleProtected(request, env, path, store) {
     const operations = await store.getStayOperationsOverview();
     const filteredReservations = (operations.reservations || [])
       .filter((item) => (!from || item.checkOutDate >= from) && (!to || item.checkInDate <= to));
-    const enrichedReservations = await enrichReservationsWithBeds24GuestNames(filteredReservations, env, store, from || bangkokDate(-30), to || bangkokDate(90));
+    const enrichedReservations = await enrichReservationsWithBeds24GuestContacts(filteredReservations, env, store, from || bangkokDate(-30), to || bangkokDate(90));
     const reservations = enrichedReservations.map((item) => publicReservation(item, record.role));
     return json({ ok: true, from, to, reservations });
   }
 
   if (path === `${MOBILE_API_PREFIX}/calendar` && request.method === "GET") {
-    const denied = requirePermission(publicAccess, "calendar.view");
+    const denied = requireCapability(publicAccess, "calendar.view", "calendar");
     if (denied) return denied;
     const url = new URL(request.url);
     const from = validDate(url.searchParams.get("from")) ? url.searchParams.get("from") : bangkokDate(-2);
     const to = validDate(url.searchParams.get("to")) ? url.searchParams.get("to") : bangkokDate(28);
     const operations = await store.getStayOperationsOverview();
     const filteredReservations = (operations.reservations || []).filter((item) => item.checkOutDate >= from && item.checkInDate <= to);
-    const enrichedReservations = await enrichReservationsWithBeds24GuestNames(filteredReservations, env, store, from, to);
+    const enrichedReservations = await enrichReservationsWithBeds24GuestContacts(filteredReservations, env, store, from, to);
     const reservations = enrichedReservations.map((item) => publicReservation(item, record.role));
     return json({ ok: true, from, to, rooms: operations.housekeepingStatuses || [], reservations });
   }
 
   if (path === `${MOBILE_API_PREFIX}/inbox` && request.method === "GET") {
-    const denied = requirePermission(publicAccess, "messaging.view");
+    const denied = requireCapability(publicAccess, "messaging.view", "unified_messaging");
     if (denied) return denied;
     const threads = (await store.listMessagingThreads(80)).map(publicThread);
     return json({ ok: true, configuration: unifiedMessagingConfiguration(env), unread: threads.reduce((sum, item) => sum + item.unreadCount, 0), needsHuman: threads.filter((item) => item.needsHuman).length, threads });
   }
 
   if (path === `${MOBILE_API_PREFIX}/inbox/thread` && request.method === "GET") {
-    const denied = requirePermission(publicAccess, "messaging.view");
+    const denied = requireCapability(publicAccess, "messaging.view", "unified_messaging");
     if (denied) return denied;
     const id = cleanText(new URL(request.url).searchParams.get("id"), 100);
     const thread = await store.getMessagingThread(id);
@@ -613,7 +756,7 @@ async function handleProtected(request, env, path, store) {
   }
 
   if (path === `${MOBILE_API_PREFIX}/inbox/send` && request.method === "POST") {
-    const denied = requirePermission(publicAccess, "messaging.send");
+    const denied = requireCapability(publicAccess, "messaging.send", "unified_messaging");
     if (denied) return denied;
     let body; try { body = await readJson(request); } catch (response) { return response; }
     const actorHash = await sha256(`mobile:${record.userId}:${record.membershipId}`);
@@ -627,8 +770,31 @@ async function handleProtected(request, env, path, store) {
     return response || json({ error: "send_failed" }, 502);
   }
 
+  if (path === `${MOBILE_API_PREFIX}/inbox/whatsapp/start` && request.method === "POST") {
+    const denied = requireCapability(publicAccess, "messaging.send", "unified_messaging");
+    if (denied) return denied;
+    let body; try { body = await readJson(request); } catch (response) { return response; }
+    const reservationId = cleanText(body.reservationId, 100);
+    if (!reservationId) return json({ error: "invalid_reservation" }, 400);
+    const operations = await store.getStayOperationsOverview();
+    const reservation = (operations.reservations || []).find((item) => item.id === reservationId);
+    if (!reservation) return json({ error: "reservation_not_found" }, 404);
+    const [enriched] = await enrichReservationsWithBeds24GuestContacts([reservation], env, store, reservation.checkInDate, reservation.checkOutDate);
+    if (!enriched?.guestPhone) return json({ error: "guest_phone_unavailable" }, 409);
+    let outcome;
+    try {
+      outcome = await startWhatsAppGuestConversation({ env, store, reservation: enriched, phone: enriched.guestPhone, guestName: reservationGuestDisplayName(enriched, record.role) });
+    } catch (error) {
+      const code = error?.message || "whatsapp_start_failed";
+      return json({ error: code, configuration: whatsAppGuestInitiationConfiguration(env) }, code === "whatsapp_guest_template_not_configured" ? 409 : 502);
+    }
+    if (!outcome?.ok) return json({ error: outcome?.error || "whatsapp_start_failed" }, 409);
+    await store.mobileRecordAudit({ tenantId: record.tenantId, userId: record.userId, membershipId: record.membershipId, action: outcome.existing ? "whatsapp_thread_opened" : "whatsapp_thread_started", reference: `reservation:${reservationId}`, metadata: { threadId: outcome.threadId }, createdAt: access.now });
+    return json({ ok: true, threadId: outcome.threadId, existing: Boolean(outcome.existing) });
+  }
+
   if (path === `${MOBILE_API_PREFIX}/inbox/ai` && request.method === "POST") {
-    const denied = requirePermission(publicAccess, "messaging.ai_control");
+    const denied = requireCapability(publicAccess, "messaging.ai_control", "unified_messaging");
     if (denied) return denied;
     let body; try { body = await readJson(request); } catch (response) { return response; }
     const actorHash = await sha256(`mobile:${record.userId}:${record.membershipId}`);
@@ -640,7 +806,7 @@ async function handleProtected(request, env, path, store) {
   }
 
   if (path === `${MOBILE_API_PREFIX}/operations` && request.method === "GET") {
-    const denied = requirePermission(publicAccess, "operations.view");
+    const denied = requireCapability(publicAccess, "operations.view", "core");
     if (denied) return denied;
     const [operations, overview] = await Promise.all([store.getStayOperationsOverview(), store.getAdminOverview()]);
     return json({
@@ -659,7 +825,7 @@ async function handleProtected(request, env, path, store) {
   }
 
   if (path === `${MOBILE_API_PREFIX}/operations/housekeeping` && request.method === "POST") {
-    const denied = requirePermission(publicAccess, "housekeeping.update");
+    const denied = requireCapability(publicAccess, "housekeeping.update", "housekeeping");
     if (denied) return denied;
     let body; try { body = await readJson(request); } catch (response) { return response; }
     const room = cleanText(body.room, 4);
@@ -672,7 +838,7 @@ async function handleProtected(request, env, path, store) {
   }
 
   if (path === `${MOBILE_API_PREFIX}/operations/maintenance/report` && request.method === "POST") {
-    const denied = requirePermission(publicAccess, "maintenance.create");
+    const denied = requireCapability(publicAccess, "maintenance.create", "maintenance");
     if (denied) return denied;
     let body; try { body = await readJson(request); } catch (response) { return response; }
     const room = cleanText(body.room, 4);
@@ -706,7 +872,7 @@ async function handleProtected(request, env, path, store) {
   }
 
   if (path === `${MOBILE_API_PREFIX}/direct-stays` && request.method === "POST") {
-    const denied = requirePermission(publicAccess, "direct_stays.manage");
+    const denied = requireCapability(publicAccess, "direct_stays.manage", "bookings");
     if (denied) return denied;
     let body; try { body = await readJson(request); } catch (response) { return response; }
     const internalRequest = new Request("https://internal.taoedge.invalid/api/concierge/admin/direct-stays", {
@@ -720,7 +886,7 @@ async function handleProtected(request, env, path, store) {
   }
 
   if (path === `${MOBILE_API_PREFIX}/operations/maintenance/resolve` && request.method === "POST") {
-    const denied = requirePermission(publicAccess, "maintenance.resolve");
+    const denied = requireCapability(publicAccess, "maintenance.resolve", "maintenance");
     if (denied) return denied;
     let body; try { body = await readJson(request); } catch (response) { return response; }
     const id = cleanText(body.id, 100);
@@ -732,7 +898,7 @@ async function handleProtected(request, env, path, store) {
   }
 
   if (path === `${MOBILE_API_PREFIX}/finance/expense-config` && request.method === "GET") {
-    const denied = requirePermission(publicAccess, "finance.expense_submit");
+    const denied = requireCapability(publicAccess, "finance.expense_submit", "finance");
     if (denied) return denied;
     const configuration = expenseConfiguration(env, HOUSE_FINANCE_BUSINESS_ID);
     return json({
@@ -750,7 +916,7 @@ async function handleProtected(request, env, path, store) {
   }
 
   if (path === `${MOBILE_API_PREFIX}/finance/expense-analyze` && request.method === "POST") {
-    const denied = requirePermission(publicAccess, "finance.expense_submit");
+    const denied = requireCapability(publicAccess, "finance.expense_submit", "finance");
     if (denied) return denied;
     const actorHash = await sha256(`mobile:${record.userId}:${record.membershipId}`);
     const response = await handleExpenseAdminRequest(
@@ -761,7 +927,7 @@ async function handleProtected(request, env, path, store) {
   }
 
   if (path === `${MOBILE_API_PREFIX}/finance/expense-submit` && request.method === "POST") {
-    const denied = requirePermission(publicAccess, "finance.expense_submit");
+    const denied = requireCapability(publicAccess, "finance.expense_submit", "finance");
     if (denied) return denied;
     const actorHash = await sha256(`mobile:${record.userId}:${record.membershipId}`);
     const response = await handleExpenseAdminRequest(
@@ -777,17 +943,39 @@ async function handleProtected(request, env, path, store) {
     return response || json({ error: "expense_submit_failed" }, 502);
   }
 
+  if (path === `${MOBILE_API_PREFIX}/finance/import` && request.method === "POST") {
+    const denied = requireCapability(publicAccess, "finance.import", "finance");
+    if (denied) return denied;
+    let body; try { body = await readJson(request); } catch (response) { return response; }
+    const from = validDate(body.from) ? body.from : "";
+    const to = validDate(body.to) ? body.to : "";
+    const provider = cleanText(body.provider || "airbnb", 40).toLowerCase();
+    if (!from || !to || to < from) return json({ error: "invalid_finance_import_range" }, 400);
+    const result = await reconcileBeds24FinanceRange(env, { store, from, to, provider, force: true, now: new Date(access.now) });
+    if (!result?.ok) return json(result, result?.error === "finance_provider_not_implemented" ? 409 : 400);
+    await store.mobileRecordAudit({
+      tenantId: record.tenantId, userId: record.userId, membershipId: record.membershipId,
+      action: "finance_historical_import", reference: `provider:${provider}`,
+      metadata: { from, to, scanned: result.scanned, created: result.created, updated: result.updated, unchanged: result.unchanged, refunded: result.refunded }, createdAt: access.now
+    });
+    return json(result);
+  }
+
   if (path === `${MOBILE_API_PREFIX}/finance` && request.method === "GET") {
-    const denied = requirePermission(publicAccess, "finance.view");
+    const denied = requireCapability(publicAccess, "finance.view", "finance");
     if (denied) return denied;
     const month = new URL(request.url).searchParams.get("month") || currentMonth();
     if (!validMonth(month)) return json({ error: "invalid_month" }, 400);
-    const [expenses, income] = await Promise.all([store.listExpenses(month, HOUSE_FINANCE_BUSINESS_ID), store.listIncome(month, HOUSE_FINANCE_BUSINESS_ID)]);
+    const [expenses, income, lastImport] = await Promise.all([
+      store.listExpenses(month, HOUSE_FINANCE_BUSINESS_ID),
+      store.listIncome(month, HOUSE_FINANCE_BUSINESS_ID),
+      typeof store.getMessagingProviderState === "function" ? store.getMessagingProviderState("beds24-finance-sync").catch(() => null) : null
+    ]);
     const configuration = incomeConfiguration(env, HOUSE_FINANCE_BUSINESS_ID);
     return json({
       ok: true, month,
       configuration: { currency: configuration.currency, minorUnitDigits: configuration.minorUnitDigits, categories: configuration.categories },
-      automation: beds24FinanceSyncConfiguration(env),
+      automation: { ...beds24FinanceSyncConfiguration(env), lastImport: lastImport?.value || null },
       totals: summarizeFinance(expenses, income, configuration),
       income: income.map((item) => ({
         id: item.id, incomeDate: item.incomeDate, category: item.category, description: item.description,
@@ -805,13 +993,16 @@ async function handleProtected(request, env, path, store) {
   }
 
   if (path === `${MOBILE_API_PREFIX}/platform` && request.method === "GET") {
-    const integrationAllowed = hasPermission(publicAccess, "integrations.view");
+    const integrationAllowed = hasPermission(publicAccess, "integrations.view") && hasModule(publicAccess, "integrations");
+    const messagingAllowed = hasPermission(publicAccess, "messaging.view") && hasModule(publicAccess, "unified_messaging");
+    const financeAllowed = hasPermission(publicAccess, "finance.view") && hasModule(publicAccess, "finance");
     return json({
       ok: true,
-      identity: publicIdentity(record, access.properties, access.entitlements),
+      identity: publicIdentity(record, access.properties, access.entitlements, access.modules),
+      license: publicLicense(access.license, access.licenseCheck),
       integrations: integrationAllowed ? integrationAdminOverview(env) : undefined,
-      messaging: hasPermission(publicAccess, "messaging.view") ? unifiedMessagingConfiguration(env) : undefined,
-      financeAutomation: hasPermission(publicAccess, "finance.view") ? beds24FinanceSyncConfiguration(env) : undefined,
+      messaging: messagingAllowed ? unifiedMessagingConfiguration(env) : undefined,
+      financeAutomation: financeAllowed ? beds24FinanceSyncConfiguration(env) : undefined,
       product: {
         workingName: "Taoedge Owner App",
         commercialBrandPending: true,
@@ -821,7 +1012,7 @@ async function handleProtected(request, env, path, store) {
   }
 
   if (path === `${MOBILE_API_PREFIX}/team` && request.method === "GET") {
-    const denied = requirePermission(publicAccess, "staff.manage");
+    const denied = requireCapability(publicAccess, "staff.manage", "staff_access");
     if (denied) return denied;
     const users = await store.mobileListTenantUsers(record.tenantId);
     return json({ ok: true, users: users.map((item) => ({
@@ -833,7 +1024,7 @@ async function handleProtected(request, env, path, store) {
   }
 
   if (path === `${MOBILE_API_PREFIX}/team/invite` && request.method === "POST") {
-    const denied = requirePermission(publicAccess, "staff.manage");
+    const denied = requireCapability(publicAccess, "staff.manage", "staff_access");
     if (denied) return denied;
     let body; try { body = await readJson(request); } catch (response) { return response; }
     const email = normalizeEmail(body.email);
@@ -854,7 +1045,7 @@ async function handleProtected(request, env, path, store) {
   }
 
   if (path === `${MOBILE_API_PREFIX}/team/permissions` && request.method === "POST") {
-    const denied = requirePermission(publicAccess, "staff.manage");
+    const denied = requireCapability(publicAccess, "staff.manage", "staff_access");
     if (denied) return denied;
     let body; try { body = await readJson(request); } catch (response) { return response; }
     const userId = cleanText(body.userId, 100);
@@ -874,14 +1065,21 @@ async function handleProtected(request, env, path, store) {
   }
 
   if (path === `${MOBILE_API_PREFIX}/security/sessions` && request.method === "GET") {
-    const denied = requirePermission(publicAccess, "security.sessions");
+    const denied = requireCapability(publicAccess, "security.sessions", "core");
     if (denied) return denied;
     const sessions = await store.mobileListSessions(record.tenantId);
     return json({ ok: true, currentSessionId: record.sessionId, sessions: sessions.map((item) => ({ ...item, active: !item.revokedAt && item.expiresAt > access.now })) });
   }
 
+  if (path === `${MOBILE_API_PREFIX}/security/audit` && request.method === "GET") {
+    const denied = requireCapability(publicAccess, "security.sessions", "core");
+    if (denied) return denied;
+    const audit = typeof store.mobileListAudit === "function" ? await store.mobileListAudit(record.tenantId, 100) : [];
+    return json({ ok: true, audit: audit.map((item) => ({ ...item, metadata: safeJson(item.metadataJson, {}) })) });
+  }
+
   if (path === `${MOBILE_API_PREFIX}/security/revoke` && request.method === "POST") {
-    const denied = requirePermission(publicAccess, "security.sessions");
+    const denied = requireCapability(publicAccess, "security.sessions", "core");
     if (denied) return denied;
     let body; try { body = await readJson(request); } catch (response) { return response; }
     const id = cleanText(body.sessionId, 100);
@@ -913,8 +1111,62 @@ export function mobilePlatformConfiguration(env = {}) {
     sessionTtlDays: Math.max(1, Math.min(90, Number(env.MOBILE_SESSION_TTL_DAYS) || DEFAULT_SESSION_DAYS)),
     passwordPepperConfigured: Boolean(env.MOBILE_PASSWORD_PEPPER),
     sessionPepperConfigured: Boolean(env.MOBILE_SESSION_PEPPER),
-    invitePepperConfigured: Boolean(env.MOBILE_INVITE_PEPPER || env.MOBILE_SESSION_PEPPER)
+    invitePepperConfigured: Boolean(env.MOBILE_INVITE_PEPPER || env.MOBILE_SESSION_PEPPER),
+    licenseEnforcementEnabled: licenseEnforcementEnabled(env),
+    licenseSigningSecretConfigured: Boolean(env.MOBILE_LICENSE_SIGNING_SECRET),
+    deviceBindingEnabled: deviceBindingEnabled(env),
+    licenseAdminTokenConfigured: Boolean(env.TAOEDGE_LICENSE_ADMIN_TOKEN)
   };
+}
+
+export async function handleMobileLicenseAdminRequest(request, env, path) {
+  if (path !== "/api/licensing/v1/tenant/license") return null;
+  if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405, { allow: "POST" });
+  if (env.LICENSE_ADMIN_RATE_LIMITER?.limit) {
+    const ip = cleanText(request.headers.get("cf-connecting-ip"), 80) || "unknown";
+    const key = (await sha256(`license-admin:${ip}`)).slice(0, 32);
+    try {
+      if (!(await env.LICENSE_ADMIN_RATE_LIMITER.limit({ key }))?.success) return json({ error: "rate_limited" }, 429);
+    } catch (_error) {
+      return json({ error: "license_service_unavailable" }, 503);
+    }
+  }
+  const expected = String(env.TAOEDGE_LICENSE_ADMIN_TOKEN || "");
+  const supplied = String(request.headers.get("x-taoedge-license-admin-token") || "");
+  if (!expected || !supplied || !constantTimeEqual(expected, supplied)) return json({ error: "unauthorized" }, 401);
+  if (!env.MOBILE_LICENSE_SIGNING_SECRET) return json({ error: "license_signing_not_configured" }, 503);
+  const store = getStore(env);
+  if (!store || typeof store.mobileUpsertLicense !== "function") return json({ error: "mobile_store_unavailable" }, 503);
+  let body; try { body = await readJson(request); } catch (response) { return response; }
+  const tenantId = cleanText(body.tenantId, 100);
+  const status = ["active", "trial", "suspended", "revoked"].includes(cleanText(body.status, 30)) ? cleanText(body.status, 30) : "active";
+  const properties = tenantId ? await store.mobileListProperties(tenantId) : [];
+  if (!tenantId || !properties.length) return json({ error: "tenant_not_found" }, 404);
+  const now = new Date().toISOString();
+  const modules = canonicalLicenseModules(body.modules);
+  if (!modules.length && ["active", "trial"].includes(status)) return json({ error: "license_modules_required" }, 400);
+  const record = {
+    tenantId,
+    licenseId: cleanText(body.licenseId, 120) || `lic_${crypto.randomUUID()}`,
+    status,
+    planKey: cleanText(body.planKey, 60) || "standard",
+    validFrom: cleanText(body.validFrom, 40) || now,
+    validUntil: cleanText(body.validUntil, 40),
+    maxDevices: Math.max(1, Math.min(50, Number(body.maxDevices) || 3)),
+    issuedBy: "taoedge-license-service",
+    modules,
+    metadata: body.metadata && typeof body.metadata === "object" && !Array.isArray(body.metadata) ? body.metadata : {},
+    updatedAt: now
+  };
+  record.signature = await signLicense(record, env);
+  const outcome = await store.mobileUpsertLicense(record);
+  if (typeof store.mobileReplaceEntitlements === "function") {
+    await store.mobileReplaceEntitlements(tenantId, modules, { status: status === "active" || status === "trial" ? "active" : "inactive", validFrom: record.validFrom, validUntil: record.validUntil, source: "license", updatedAt: now });
+  } else if (typeof store.mobileUpsertEntitlements === "function") {
+    await store.mobileUpsertEntitlements(tenantId, modules, { status: status === "active" || status === "trial" ? "active" : "inactive", validFrom: record.validFrom, validUntil: record.validUntil, source: "license", updatedAt: now });
+  }
+  await store.mobileRecordAudit({ tenantId, action: `license_${status}`, reference: `license:${record.licenseId}`, metadata: { planKey: record.planKey, validUntil: record.validUntil, maxDevices: record.maxDevices, modules }, createdAt: now });
+  return json({ ok: Boolean(outcome?.ok), license: publicLicense(record, { enforced: true }), modules }, outcome?.ok ? 200 : 400);
 }
 
 export async function handleMobilePlatformRequest(request, env, path) {

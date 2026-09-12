@@ -71,12 +71,16 @@ import {
   beds24AirbnbPaymentSummary,
   beds24FinanceSyncConfiguration,
   beds24FinanceSyncEnabled,
-  reconcileBeds24Finance
+  beds24ProviderIncomeRecord,
+  otaFinanceProviderCatalog,
+  reconcileBeds24Finance,
+  reconcileBeds24FinanceRange
 } from "../src/beds24-finance-sync.js";
 import {
   MOBILE_DEFAULT_MODULES,
   MOBILE_DELEGATABLE_PERMISSIONS,
   MOBILE_PERMISSION_MATRIX,
+  handleMobileLicenseAdminRequest,
   handleMobilePlatformRequest,
   mobilePlatformConfiguration
 } from "../src/mobile-platform.js";
@@ -14107,7 +14111,7 @@ test("v5.11.57 Airbnb finance record stores actual payout as net and preserves b
   assert.equal(record.feesMinor, 135000);
   assert.equal(record.unit, "Room 5");
   assert.equal(record.category, "Airbnb");
-  assert.equal(record.incomeDate, "2026-09-24");
+  assert.equal(record.incomeDate, "2026-09-20");
   assert.equal(record.sourceSystem, "beds24");
   assert.equal(record.sourceExternalId, "airbnb-booking:880055");
   assert.match(record.reference, /HMABC123/);
@@ -14166,12 +14170,12 @@ test("v5.11.57 Beds24 finance reconciliation upserts one provider-managed income
   };
   try {
     const env = { CONCIERGE_STORE: { getByName: () => store }, BEDS24_FINANCE_SYNC_ENABLED: "true", BEDS24_REFRESH_TOKEN: "refresh", BEDS24_ROOM_MAP: roomMap };
-    const first = await reconcileBeds24Finance(env, { store, now: new Date("2026-09-14T03:00:00Z") });
+    const first = await reconcileBeds24Finance(env, { store, from: "2026-09-01", to: "2026-09-30", now: new Date("2026-09-14T03:00:00Z") });
     assert.equal(first.created, 1);
     assert.equal(records.length, 1);
     assert.equal(records[0].netMinor, 765000);
     paid = 7000;
-    const second = await reconcileBeds24Finance(env, { store, now: new Date("2026-09-15T03:00:00Z") });
+    const second = await reconcileBeds24Finance(env, { store, from: "2026-09-01", to: "2026-09-30", now: new Date("2026-09-15T03:00:00Z") });
     assert.equal(second.updated, 1);
     assert.equal(records.length, 1);
     assert.equal(records[0].netMinor, 700000);
@@ -14219,7 +14223,7 @@ test("v5.11.57 Finance UI and scheduler expose safe Airbnb payout automation wit
 });
 
 
-test("v5.11.58 mobile platform ships disabled by default with revocable-session security configuration", async () => {
+test("v5.11.58 mobile platform defaults fail-closed while the deployed v5.11.61 app flag stays enabled", async () => {
   const config = mobilePlatformConfiguration({});
   assert.equal(config.enabled, false);
   assert.equal(config.bootstrapEnabled, false);
@@ -14227,7 +14231,7 @@ test("v5.11.58 mobile platform ships disabled by default with revocable-session 
   assert.equal(config.sessionPepperConfigured, false);
   assert.equal(config.sessionTtlDays, 30);
   const wrangler = await readFile(new URL("../wrangler.jsonc", import.meta.url), "utf8");
-  assert.match(wrangler, /"MOBILE_APP_ENABLED": "false"/);
+  assert.match(wrangler, /"MOBILE_APP_ENABLED": "true"/);
   assert.match(wrangler, /"MOBILE_BOOTSTRAP_ENABLED": "false"/);
   assert.match(wrangler, /"MOBILE_SESSION_TTL_DAYS": "30"/);
 });
@@ -14344,4 +14348,128 @@ test("v5.11.60 mobile owner views enrich reservation names from Beds24 personal 
   assert.match(source, /reservationGuestDisplayName/);
   assert.match(source, /BEDS24_REFRESH_TOKEN/);
   assert.match(source, /catch \(_error\) \{\s*return source;\s*\}/);
+});
+
+
+test("v5.11.61 historical Airbnb Finance backfill uses payment-observed dates and remains idempotent across onboarding reruns", async () => {
+  const originalFetch = globalThis.fetch;
+  const roomMap = JSON.stringify(Object.fromEntries(Array.from({ length: 11 }, (_, index) => [String(99701 + index), String(index + 1)])));
+  const records = [];
+  const state = new Map([["beds24-auth", { value: { accessToken: "access" }, expiresAt: new Date(Date.now() + 3_600_000).toISOString() }]]);
+  const store = {
+    async getMessagingProviderState(key) { return state.get(key) || { value: { accessToken: "access" }, expiresAt: new Date(Date.now() + 3_600_000).toISOString() }; },
+    async setMessagingProviderState(key, value, expiresAt) { state.set(key, { value, expiresAt }); return { ok: true }; },
+    async getProviderIncome(businessId, sourceSystem, sourceExternalId) {
+      return records.find((item) => item.businessId === businessId && item.sourceSystem === sourceSystem && item.sourceExternalId === sourceExternalId) || null;
+    },
+    async upsertProviderIncome(record) {
+      const existing = await this.getProviderIncome(record.businessId, record.sourceSystem, record.sourceExternalId);
+      if (existing) {
+        const changed = ["incomeDate", "grossMinor", "feesMinor", "netMinor", "sourceStatus"].some((key) => String(existing[key]) !== String(record[key]));
+        Object.assign(existing, record);
+        return { ok: true, created: false, updated: changed, id: existing.id };
+      }
+      records.push({ ...record, id: `inc_${crypto.randomUUID()}` });
+      return { ok: true, created: true, updated: false, id: records.at(-1).id };
+    }
+  };
+  globalThis.fetch = async (url) => {
+    assert.match(String(url), /channel=airbnb/);
+    return new Response(JSON.stringify({ success: true, pages: { nextPageExists: false }, data: [
+      {
+        id: 991201, roomId: 99701, channel: "airbnb", apiReference: "HMSEP01",
+        arrival: "2026-09-03", departure: "2026-09-06", modifiedTime: "2026-09-06T12:00:00",
+        status: "confirmed", price: 6000, commission: 900,
+        invoiceItems: [{ id: 501, type: "payment", subType: 202, amount: 5100, lineTotal: 5100, createTime: "2026-09-07T03:00:00" }]
+      },
+      {
+        id: 991202, roomId: 99702, channel: "airbnb", apiReference: "HMAUG31",
+        arrival: "2026-08-28", departure: "2026-08-31", modifiedTime: "2026-08-31T12:00:00",
+        status: "confirmed", price: 5000, commission: 750,
+        invoiceItems: [{ id: 502, type: "payment", subType: 202, amount: 4250, lineTotal: 4250, createTime: "2026-08-31T03:00:00" }]
+      }
+    ] }), { status: 200 });
+  };
+  try {
+    const env = { BEDS24_REFRESH_TOKEN: "refresh", BEDS24_ROOM_MAP: roomMap, EXPENSE_CURRENCY: "THB" };
+    const first = await reconcileBeds24FinanceRange(env, { store, provider: "airbnb", from: "2026-09-01", to: "2026-09-15", force: true, now: new Date("2026-09-15T08:00:00Z") });
+    assert.equal(first.ok, true);
+    assert.equal(first.created, 1);
+    assert.equal(first.outsideRange, 1);
+    assert.equal(records.length, 1);
+    assert.equal(records[0].incomeDate, "2026-09-07");
+    assert.equal(records[0].netMinor, 510000);
+    const second = await reconcileBeds24FinanceRange(env, { store, provider: "airbnb", from: "2026-09-01", to: "2026-09-15", force: true, now: new Date("2026-09-15T09:00:00Z") });
+    assert.equal(second.created, 0);
+    assert.equal(second.updated, 0);
+    assert.equal(second.unchanged, 1);
+    assert.equal(records.length, 1);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("v5.11.61 OTA Finance adapter catalog is provider-neutral while only Airbnb is activated for production ingestion", () => {
+  const providers = Object.fromEntries(otaFinanceProviderCatalog().map((item) => [item.key, item]));
+  assert.equal(providers.airbnb.implemented, true);
+  for (const key of ["booking", "expedia", "vrbo", "agoda", "hostelworld", "trip"]) assert.equal(providers[key].implemented, false, key);
+  const roomMap = JSON.stringify({ "99701": "1" });
+  assert.equal(beds24ProviderIncomeRecord({ id: 1, roomId: 99701, channel: "booking", invoiceItems: [] }, { BEDS24_ROOM_MAP: roomMap }, null, new Date(), "booking"), null);
+});
+
+test("v5.11.61 commercial protection keeps licensing secrets server-side and gates protected routes by both permission and module entitlement", async () => {
+  const [mobileSource, storeSource, wrangler] = await Promise.all([
+    readFile(new URL("../src/mobile-platform.js", import.meta.url), "utf8"),
+    readFile(new URL("../src/concierge-store.js", import.meta.url), "utf8"),
+    readFile(new URL("../wrangler.jsonc", import.meta.url), "utf8")
+  ]);
+  assert.match(mobileSource, /requireCapability/);
+  assert.match(mobileSource, /module_not_licensed/);
+  assert.match(mobileSource, /MOBILE_LICENSE_SIGNING_SECRET/);
+  assert.match(mobileSource, /TAOEDGE_LICENSE_ADMIN_TOKEN/);
+  assert.match(mobileSource, /device_binding_failed/);
+  assert.match(mobileSource, /x-mobile-device-id/);
+  assert.match(storeSource, /CREATE TABLE IF NOT EXISTS platform_licenses/);
+  assert.match(storeSource, /modules_json/);
+  assert.match(storeSource, /mobileReplaceEntitlements/);
+  assert.match(mobileSource, /canonicalLicenseModules/);
+  assert.match(storeSource, /mobileCountActiveDevices/);
+  assert.match(storeSource, /mobileListAudit/);
+  for (const secret of ["MOBILE_LICENSE_SIGNING_SECRET", "TAOEDGE_LICENSE_ADMIN_TOKEN"]) assert.doesNotMatch(wrangler, new RegExp(`"${secret}"\\s*:`));
+  assert.match(wrangler, /"MOBILE_LICENSE_ENFORCEMENT_ENABLED": "false"/);
+  assert.match(wrangler, /"MOBILE_DEVICE_BINDING_ENABLED": "false"/);
+  assert.match(wrangler, /"name": "LICENSE_ADMIN_RATE_LIMITER"/);
+  assert.match(mobileSource, /LICENSE_ADMIN_RATE_LIMITER/);
+});
+
+test("v5.11.61 licensing admin endpoint is separately authenticated and never exposed under the mobile client API", async () => {
+  const response = await handleMobileLicenseAdminRequest(new Request("https://guide.example/api/licensing/v1/tenant/license", {
+    method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ tenantId: "tenant_the_house_koh_tao" })
+  }), {}, "/api/licensing/v1/tenant/license");
+  assert.equal(response.status, 401);
+  assert.equal((await response.json()).error, "unauthorized");
+});
+
+test("v5.11.61 direct WhatsApp guest initiation uses a server-side approved template and keeps Meta credentials out of the app", async () => {
+  const [messagingSource, mobileSource, wrangler] = await Promise.all([
+    readFile(new URL("../src/unified-messaging.js", import.meta.url), "utf8"),
+    readFile(new URL("../src/mobile-platform.js", import.meta.url), "utf8"),
+    readFile(new URL("../wrangler.jsonc", import.meta.url), "utf8")
+  ]);
+  assert.match(messagingSource, /sendWhatsAppGuestTemplate/);
+  assert.match(messagingSource, /WHATSAPP_GUEST_INIT_TEMPLATE_NAME/);
+  assert.match(messagingSource, /type:\s*"template"/);
+  assert.match(mobileSource, /inbox\/whatsapp\/start/);
+  assert.match(mobileSource, /guest_phone_unavailable/);
+  assert.doesNotMatch(wrangler, /"WHATSAPP_ACCESS_TOKEN"\s*:/);
+  assert.match(wrangler, /"WHATSAPP_GUEST_INIT_TEMPLATE_NAME": ""/);
+});
+
+test("v5.11.61 deployed mobile app remains enabled while bootstrap and high-impact provider automation flags remain safe", async () => {
+  const wrangler = await readFile(new URL("../wrangler.jsonc", import.meta.url), "utf8");
+  assert.match(wrangler, /"MOBILE_APP_ENABLED": "true"/);
+  assert.match(wrangler, /"MOBILE_BOOTSTRAP_ENABLED": "false"/);
+  assert.match(wrangler, /"BEDS24_CHANNEL_MANAGER_ENABLED": "false"/);
+  assert.match(wrangler, /"BEDS24_FINANCE_SYNC_ENABLED": "false"/);
+  assert.match(wrangler, /"UNIFIED_MESSAGING_AI_AUTO_SEND_ENABLED": "false"/);
 });

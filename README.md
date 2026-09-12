@@ -1,6 +1,11 @@
-# Guest Guide Platform with AI Concierge — The House v5.11.42
+# Guest Guide Platform with AI Concierge — The House v5.11.61
 
 The House – Koh Tao guest guide is a production-oriented, mobile-first digital guest guide and concierge platform. It combines property information, curated island guidance, structured place and activity data, and centralized contact and booking routes.
+
+
+## v5.11.61 release focus
+
+v5.11.61 adds the server-side commercial protection layer for the Taoedge Owner App, historical and scheduled Airbnb Finance reconciliation suitable for mid-month property onboarding, and authorized direct WhatsApp guest contact from mobile reservations. Licensing and device binding are feature-gated for safe rollout; `MOBILE_BOOTSTRAP_ENABLED`, Beds24 Channel Manager and Unified Messaging AI auto-send remain disabled. See `SECURITY_LICENSING_SETUP_v5.11.61.md`, `OTA_FINANCE_ONBOARDING_v5.11.61.md` and `WHATSAPP_GUEST_COMMUNICATION_SETUP_v5.11.61.md` before enabling the new production controls.
 
 ## Current modules
 

@@ -39,9 +39,13 @@
     "UNIFIED_MESSAGING_AI_AUTO_SEND_ENABLED": "false",
     "BEDS24_CHANNEL_MANAGER_ENABLED": "false",
     "BEDS24_FINANCE_SYNC_ENABLED": "false",
-    "MOBILE_APP_ENABLED": "false",
+    "MOBILE_APP_ENABLED": "true",
     "MOBILE_BOOTSTRAP_ENABLED": "false",
-    "MOBILE_SESSION_TTL_DAYS": "30"
+    "MOBILE_SESSION_TTL_DAYS": "30",
+    "MOBILE_LICENSE_ENFORCEMENT_ENABLED": "false",
+    "MOBILE_DEVICE_BINDING_ENABLED": "false",
+    "WHATSAPP_GUEST_INIT_TEMPLATE_NAME": "",
+    "WHATSAPP_GUEST_INIT_TEMPLATE_LANGUAGE": "en_US"
   },
   "r2_buckets": [
     {
@@ -91,6 +95,14 @@
     {
       "name": "MOBILE_AUTH_RATE_LIMITER",
       "namespace_id": "550004",
+      "simple": {
+        "limit": 10,
+        "period": 60
+      }
+    },
+    {
+      "name": "LICENSE_ADMIN_RATE_LIMITER",
+      "namespace_id": "550005",
       "simple": {
         "limit": 10,
         "period": 60

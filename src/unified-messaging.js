@@ -134,6 +134,11 @@ export function unifiedMessagingConfiguration(env = {}) {
     aiInternalTokenReady,
     aiReplyReady: aiReplyEnabled(env) && aiInternalTokenReady,
     whatsAppReady,
+    guestInitiation: {
+      ready: Boolean(whatsAppReady && String(env.WHATSAPP_GUEST_INIT_TEMPLATE_NAME || "").trim()),
+      templateConfigured: Boolean(String(env.WHATSAPP_GUEST_INIT_TEMPLATE_NAME || "").trim()),
+      language: String(env.WHATSAPP_GUEST_INIT_TEMPLATE_LANGUAGE || "en_US").trim() || "en_US"
+    },
     beds24Ready,
     otaViaBeds24Ready: beds24Ready,
     roomMapConfigured,
@@ -467,6 +472,91 @@ export async function sendWhatsAppGuestText(env, phone, text) {
   }
   return { providerMessageId: String(data.messages[0].id) };
 }
+
+export function whatsAppGuestInitiationConfiguration(env = {}) {
+  const templateName = cleanText(env.WHATSAPP_GUEST_INIT_TEMPLATE_NAME, 160);
+  const language = cleanText(env.WHATSAPP_GUEST_INIT_TEMPLATE_LANGUAGE || "en_US", 30) || "en_US";
+  const whatsAppReady = Boolean(env.WHATSAPP_ACCESS_TOKEN && digits(env.WHATSAPP_PHONE_NUMBER_ID));
+  return {
+    ready: Boolean(whatsAppReady && templateName),
+    whatsAppReady,
+    templateConfigured: Boolean(templateName),
+    language
+  };
+}
+
+export async function sendWhatsAppGuestTemplate(env, phone) {
+  const to = digits(phone);
+  const phoneNumberId = digits(env.WHATSAPP_PHONE_NUMBER_ID);
+  const templateName = cleanText(env.WHATSAPP_GUEST_INIT_TEMPLATE_NAME, 160);
+  const language = cleanText(env.WHATSAPP_GUEST_INIT_TEMPLATE_LANGUAGE || "en_US", 30) || "en_US";
+  if (!to || !env.WHATSAPP_ACCESS_TOKEN || !phoneNumberId) throw new Error("whatsapp_not_configured");
+  if (!templateName) throw new Error("whatsapp_guest_template_not_configured");
+  const graphVersion = String(env.WHATSAPP_GRAPH_API_VERSION || "v23.0").replace(/[^A-Za-z0-9.]/g, "") || "v23.0";
+  const response = await fetch(`https://graph.facebook.com/${graphVersion}/${phoneNumberId}/messages`, {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${env.WHATSAPP_ACCESS_TOKEN}`,
+      "content-type": "application/json"
+    },
+    body: JSON.stringify({
+      messaging_product: "whatsapp",
+      recipient_type: "individual",
+      to,
+      type: "template",
+      template: { name: templateName, language: { code: language } }
+    })
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || !data?.messages?.[0]?.id) {
+    const error = new Error("whatsapp_template_send_failed");
+    error.status = response.status;
+    error.provider = data;
+    throw error;
+  }
+  return { providerMessageId: String(data.messages[0].id), templateName, language };
+}
+
+export async function startWhatsAppGuestConversation({ env, store, reservation, phone, guestName = "" }) {
+  const reservationId = cleanText(reservation?.id, 100);
+  if (!store || !reservationId) return { ok: false, error: "invalid_reservation" };
+  if (typeof store.findMessagingThreadByReservation === "function") {
+    const existing = await store.findMessagingThreadByReservation(reservationId, "whatsapp").catch(() => null);
+    if (existing?.id) return { ok: true, existing: true, threadId: existing.id };
+  }
+  const targetPhone = digits(phone);
+  if (!targetPhone) return { ok: false, error: "guest_phone_unavailable" };
+  const sent = await sendWhatsAppGuestTemplate(env, targetPhone);
+  const now = new Date().toISOString();
+  const thread = await store.upsertMessagingThread({
+    id: `thread_${crypto.randomUUID()}`,
+    channel: "whatsapp",
+    sourceLabel: "WhatsApp",
+    externalThreadId: threadExternalId("whatsapp", targetPhone),
+    externalReservationId: cleanText(reservation?.externalBookingId || reservation?.providerReservationId, 120),
+    reservationId,
+    room: cleanText(reservation?.room, 4),
+    guestName: cleanText(guestName || reservation?.guestDisplayName || reservation?.guestFirstName, 80) || "Guest",
+    guestPhone: targetPhone,
+    checkInDate: cleanText(reservation?.checkInDate, 10),
+    checkOutDate: cleanText(reservation?.checkOutDate, 10),
+    updatedAt: now
+  });
+  await store.recordMessagingMessage({
+    id: `msg_${crypto.randomUUID()}`,
+    threadId: thread.id,
+    providerMessageId: `whatsapp:${sent.providerMessageId}`,
+    direction: "outbound",
+    sender: "owner",
+    body: `[Approved WhatsApp template: ${sent.templateName}]`,
+    automated: false,
+    deliveryStatus: "accepted",
+    createdAt: now
+  });
+  await store.updateMessagingThreadState(thread.id, { needsHuman: false, aiDraft: false, lastError: "", updatedAt: now });
+  return { ok: true, existing: false, threadId: thread.id, templateName: sent.templateName };
+}
+
 
 async function sendAndRecordReply({ env, store, thread, result, channel }) {
   const now = new Date().toISOString();

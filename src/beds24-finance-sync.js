@@ -3,10 +3,28 @@ import { houseRoomToBeds24RoomId } from "./beds24-channel-manager.js";
 import { HOUSE_FINANCE_BUSINESS_ID } from "./finance-businesses.js";
 
 const HOUSE_ROOMS = Object.freeze(["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11"]);
-const AIRBNB_CHANNEL = "airbnb";
 const DEFAULT_LOOKBACK_DAYS = 180;
 const MAX_LOOKBACK_DAYS = 730;
-const MAX_PAGES = 20;
+const MAX_IMPORT_RANGE_DAYS = 730;
+const MAX_PAGES = 40;
+const PROVIDER_FETCH_MARGIN_DAYS = 120;
+
+const OTA_PROVIDERS = Object.freeze({
+  airbnb: Object.freeze({
+    key: "airbnb",
+    label: "Airbnb",
+    channelValues: Object.freeze(["airbnb"]),
+    category: "Airbnb",
+    externalPrefix: "airbnb-booking",
+    implemented: true
+  }),
+  booking: Object.freeze({ key: "booking", label: "Booking.com", channelValues: Object.freeze(["booking", "booking.com"]), category: "Booking.com", externalPrefix: "bookingcom-booking", implemented: false }),
+  expedia: Object.freeze({ key: "expedia", label: "Expedia", channelValues: Object.freeze(["expedia"]), category: "Expedia", externalPrefix: "expedia-booking", implemented: false }),
+  vrbo: Object.freeze({ key: "vrbo", label: "Vrbo", channelValues: Object.freeze(["vrbo"]), category: "Vrbo", externalPrefix: "vrbo-booking", implemented: false }),
+  agoda: Object.freeze({ key: "agoda", label: "Agoda", channelValues: Object.freeze(["agoda"]), category: "Agoda", externalPrefix: "agoda-booking", implemented: false }),
+  hostelworld: Object.freeze({ key: "hostelworld", label: "Hostelworld", channelValues: Object.freeze(["hostelworld"]), category: "Hostelworld", externalPrefix: "hostelworld-booking", implemented: false }),
+  trip: Object.freeze({ key: "trip", label: "Trip.com", channelValues: Object.freeze(["trip.com", "trip"]), category: "Trip.com", externalPrefix: "tripcom-booking", implemented: false })
+});
 
 function cleanText(value, maximum = 240) {
   return String(value || "").replace(/\u0000/g, "").trim().replace(/\s+/g, " ").slice(0, maximum);
@@ -28,6 +46,13 @@ function shiftedDateOnly(dateOnly, days) {
   if (!Number.isFinite(date.getTime())) return "";
   date.setUTCDate(date.getUTCDate() + days);
   return date.toISOString().slice(0, 10);
+}
+
+function daysBetweenInclusive(from, to) {
+  const start = new Date(`${from}T12:00:00Z`).getTime();
+  const end = new Date(`${to}T12:00:00Z`).getTime();
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) return Infinity;
+  return Math.floor((end - start) / 86_400_000) + 1;
 }
 
 function bangkokDateOnly(date = new Date()) {
@@ -73,6 +98,25 @@ function channelCollectPayment(item = {}) {
 function refundPayment(item = {}) {
   const subtype = Number(item.subType);
   return subtype === 213 || /\brefund(?:ed)?\b/i.test(invoiceItemText(item));
+}
+
+function normalizeProviderKey(value) {
+  const key = cleanText(value, 40).toLowerCase();
+  if (key === "booking.com") return "booking";
+  if (key === "trip.com") return "trip";
+  return key || "airbnb";
+}
+
+function providerDefinition(value) {
+  return OTA_PROVIDERS[normalizeProviderKey(value)] || null;
+}
+
+export function otaFinanceProviderCatalog() {
+  return Object.values(OTA_PROVIDERS).map((provider) => ({
+    key: provider.key,
+    label: provider.label,
+    implemented: provider.implemented
+  }));
 }
 
 export function beds24AirbnbPaymentSummary(booking = {}, minorUnitDigits = 2) {
@@ -122,27 +166,36 @@ export function beds24FinanceSyncConfiguration(env = {}) {
   return {
     enabled,
     ready: enabled && refreshTokenReady && roomMapComplete,
+    historicalImportReady: refreshTokenReady && roomMapComplete,
     refreshTokenReady,
     roomMapComplete,
     channel: "Airbnb",
+    provider: "airbnb",
+    providers: otaFinanceProviderCatalog(),
     accountingBasis: "actual_channel_collect_payment",
     lookbackDays,
+    maxHistoricalImportDays: MAX_IMPORT_RANGE_DAYS,
     schedule: "daily",
     requiredBeds24Scopes: ["read:bookings", "read:bookings-financial"]
   };
 }
 
-function bookingExternalSourceId(booking = {}) {
+function bookingExternalSourceId(booking = {}, providerKey = "airbnb") {
+  const provider = providerDefinition(providerKey);
   const id = Number(booking.id);
-  return Number.isSafeInteger(id) && id > 0 ? `airbnb-booking:${id}` : "";
+  return provider && Number.isSafeInteger(id) && id > 0 ? `${provider.externalPrefix}:${id}` : "";
 }
 
-function bookingReference(booking = {}) {
+function bookingReference(booking = {}, providerKey = "airbnb") {
+  const provider = providerDefinition(providerKey);
   const reference = cleanText(booking.apiReference || booking.reference, 80);
-  return reference ? `Airbnb ${reference}`.slice(0, 120) : `Beds24 ${String(booking.id || "")}`.slice(0, 120);
+  return reference ? `${provider?.label || "OTA"} ${reference}`.slice(0, 120) : `Beds24 ${String(booking.id || "")}`.slice(0, 120);
 }
 
-function paymentObservedDate(booking = {}, existing = null) {
+function paymentObservedDate(booking = {}, summary = {}, existing = null) {
+  const paymentDates = (Array.isArray(summary.paymentItemCreateTimes) ? summary.paymentItemCreateTimes : [])
+    .map(dateFromDateTime).filter(Boolean).sort();
+  if (paymentDates.length) return paymentDates[paymentDates.length - 1];
   if (existing?.incomeDate) return validDate(existing.incomeDate);
   return dateFromDateTime(booking.modifiedTime)
     || dateFromDateTime(booking.bookingTime)
@@ -151,8 +204,14 @@ function paymentObservedDate(booking = {}, existing = null) {
 }
 
 export function beds24AirbnbIncomeRecord(booking = {}, env = {}, existing = null, now = new Date()) {
-  if (cleanText(booking.channel, 40).toLowerCase() !== AIRBNB_CHANNEL) return null;
-  const externalSourceId = bookingExternalSourceId(booking);
+  return beds24ProviderIncomeRecord(booking, env, existing, now, "airbnb");
+}
+
+export function beds24ProviderIncomeRecord(booking = {}, env = {}, existing = null, now = new Date(), providerKey = "airbnb") {
+  const provider = providerDefinition(providerKey);
+  if (!provider?.implemented) return null;
+  if (!provider.channelValues.includes(cleanText(booking.channel, 40).toLowerCase())) return null;
+  const externalSourceId = bookingExternalSourceId(booking, provider.key);
   const room = roomForBeds24Booking(booking, env);
   if (!externalSourceId || !room) return null;
 
@@ -168,7 +227,7 @@ export function beds24AirbnbIncomeRecord(booking = {}, env = {}, existing = null
   const netMinor = refunded ? 0 : Math.max(0, summary.actualPaymentMinor);
   const arrival = validDate(booking.arrival);
   const departure = validDate(booking.departure);
-  const dates = arrival && departure ? `${arrival}–${departure}` : "Airbnb stay";
+  const dates = arrival && departure ? `${arrival}–${departure}` : `${provider.label} stay`;
   const bookingPriceText = summary.bookingPriceMinor > 0 ? minorToAmount(summary.bookingPriceMinor, minorUnitDigits) : "not supplied";
   const commissionText = summary.feesMinor > 0 ? minorToAmount(summary.feesMinor, minorUnitDigits) : "0";
   const paymentItemText = summary.paymentItemIds.length ? summary.paymentItemIds.join(",") : "provider payment";
@@ -178,27 +237,28 @@ export function beds24AirbnbIncomeRecord(booking = {}, env = {}, existing = null
     sourceSystem: "beds24",
     sourceExternalId: externalSourceId,
     sourceStatus,
-    incomeDate: paymentObservedDate(booking, existing),
-    category: "Airbnb",
-    description: refunded ? `Airbnb payout refunded · Room ${room} · ${dates}` : `Airbnb payout · Room ${room} · ${dates}`,
+    incomeDate: paymentObservedDate(booking, summary, existing),
+    category: provider.category,
+    description: refunded ? `${provider.label} payout refunded · Room ${room} · ${dates}` : `${provider.label} payout · Room ${room} · ${dates}`,
     grossMinor,
     feesMinor,
     netMinor,
     currency: cleanText(env.BEDS24_FINANCE_CURRENCY || env.EXPENSE_CURRENCY || "THB", 3).toUpperCase(),
     unit: `Room ${room}`,
     paymentMethod: "Bank transfer",
-    reference: bookingReference(booking),
+    reference: bookingReference(booking, provider.key),
     notes: cleanText(`Auto-synced from Beds24 booking ${String(booking.id)}. Actual channel-collected payment is authoritative for net income. Beds24 booking value: ${bookingPriceText}; commission: ${commissionText}; payment item(s): ${paymentItemText}.`, 500),
     syncedAt: now.toISOString()
   };
 }
 
-async function fetchAirbnbBookings(env, store, lookbackDays) {
-  const today = bangkokDateOnly();
+async function fetchProviderBookings(env, store, providerKey, from, to) {
+  const provider = providerDefinition(providerKey);
+  if (!provider?.implemented) return [];
   const query = {
-    channel: AIRBNB_CHANNEL,
-    departureFrom: shiftedDateOnly(today, -lookbackDays),
-    arrivalTo: shiftedDateOnly(today, 365),
+    channel: provider.channelValues[0],
+    departureFrom: shiftedDateOnly(from, -PROVIDER_FETCH_MARGIN_DAYS),
+    arrivalTo: shiftedDateOnly(to, PROVIDER_FETCH_MARGIN_DAYS),
     includeInvoiceItems: true,
     status: ["confirmed", "new", "request", "cancelled"]
   };
@@ -211,29 +271,44 @@ async function fetchAirbnbBookings(env, store, lookbackDays) {
   return bookings;
 }
 
-export async function reconcileBeds24Finance(env, options = {}) {
-  if (!beds24FinanceSyncEnabled(env)) return { ok: true, ignored: "finance_sync_disabled" };
+function rangeValid(from, to) {
+  return Boolean(validDate(from) && validDate(to) && daysBetweenInclusive(from, to) <= MAX_IMPORT_RANGE_DAYS);
+}
+
+export async function reconcileBeds24FinanceRange(env, options = {}) {
+  const providerKey = normalizeProviderKey(options.provider || "airbnb");
+  const provider = providerDefinition(providerKey);
+  if (!provider?.implemented) return { ok: false, error: "finance_provider_not_implemented", provider: providerKey };
   const configuration = beds24FinanceSyncConfiguration(env);
-  if (!configuration.ready) return { ok: false, error: "beds24_finance_sync_not_ready", configuration };
+  if (!options.force && !beds24FinanceSyncEnabled(env)) return { ok: true, ignored: "finance_sync_disabled", provider: providerKey };
+  if (!configuration.historicalImportReady) return { ok: false, error: "beds24_finance_sync_not_ready", configuration };
+
+  const now = options.now instanceof Date ? options.now : new Date();
+  const today = bangkokDateOnly(now);
+  const from = validDate(options.from) || shiftedDateOnly(today, -configuration.lookbackDays);
+  const to = validDate(options.to) || today;
+  if (!rangeValid(from, to)) return { ok: false, error: "invalid_finance_import_range", maxDays: MAX_IMPORT_RANGE_DAYS };
+
   const store = options.store || env.CONCIERGE_STORE?.getByName?.("the-house-concierge-global");
   if (!store || typeof store.upsertProviderIncome !== "function") return { ok: false, error: "finance_store_unavailable" };
 
-  const bookings = await fetchAirbnbBookings(env, store, configuration.lookbackDays);
+  const bookings = await fetchProviderBookings(env, store, providerKey, from, to);
   let created = 0;
   let updated = 0;
   let unchanged = 0;
   let skipped = 0;
   let refunded = 0;
-  const now = options.now instanceof Date ? options.now : new Date();
+  let outsideRange = 0;
 
   for (const booking of bookings) {
-    const externalSourceId = bookingExternalSourceId(booking);
+    const externalSourceId = bookingExternalSourceId(booking, providerKey);
     if (!externalSourceId) { skipped += 1; continue; }
     const existing = typeof store.getProviderIncome === "function"
       ? await store.getProviderIncome(HOUSE_FINANCE_BUSINESS_ID, "beds24", externalSourceId)
       : null;
-    const record = beds24AirbnbIncomeRecord(booking, env, existing, now);
+    const record = beds24ProviderIncomeRecord(booking, env, existing, now, providerKey);
     if (!record) { skipped += 1; continue; }
+    if (record.incomeDate < from || record.incomeDate > to) { outsideRange += 1; continue; }
     const result = await store.upsertProviderIncome(record);
     if (record.sourceStatus === "refunded") refunded += 1;
     if (result?.created) created += 1;
@@ -241,10 +316,39 @@ export async function reconcileBeds24Finance(env, options = {}) {
     else unchanged += 1;
   }
 
+  const result = {
+    ok: true,
+    provider: providerKey,
+    providerLabel: provider.label,
+    from,
+    to,
+    scanned: bookings.length,
+    imported: created + updated + unchanged,
+    created,
+    updated,
+    unchanged,
+    skipped,
+    outsideRange,
+    refunded,
+    completedAt: now.toISOString()
+  };
   if (typeof store.setMessagingProviderState === "function") {
-    await store.setMessagingProviderState("beds24-finance-sync", {
-      lastRunAt: now.toISOString(), created, updated, unchanged, skipped, refunded, scanned: bookings.length
-    }, new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000).toISOString()).catch(() => {});
+    await store.setMessagingProviderState(`beds24-finance-sync:${providerKey}`, result, new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000).toISOString()).catch(() => {});
+    await store.setMessagingProviderState("beds24-finance-sync", result, new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000).toISOString()).catch(() => {});
   }
-  return { ok: true, scanned: bookings.length, created, updated, unchanged, skipped, refunded };
+  return result;
+}
+
+export async function reconcileBeds24Finance(env, options = {}) {
+  const configuration = beds24FinanceSyncConfiguration(env);
+  const now = options.now instanceof Date ? options.now : new Date();
+  const today = bangkokDateOnly(now);
+  return reconcileBeds24FinanceRange(env, {
+    ...options,
+    provider: options.provider || "airbnb",
+    from: options.from || shiftedDateOnly(today, -configuration.lookbackDays),
+    to: options.to || today,
+    force: options.force === true,
+    now
+  });
 }

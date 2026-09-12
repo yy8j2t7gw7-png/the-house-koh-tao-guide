@@ -26,7 +26,7 @@ import {
 import { processHousekeepingTurnovers } from "./housekeeping-operations.js";
 import { reconcileBeds24Finance } from "./beds24-finance-sync.js";
 import { servePublicLegalPage } from "./public-legal.js";
-import { handleMobilePlatformRequest } from "./mobile-platform.js";
+import { handleMobileLicenseAdminRequest, handleMobilePlatformRequest } from "./mobile-platform.js";
 import {
   getGuestAccess,
   handleReservationSyncRequest,
@@ -173,6 +173,11 @@ export default {
 
     if (url.pathname === "/api/maintenance/report") {
       return handleMaintenanceGuestRequest(request, env);
+    }
+
+    if (url.pathname.startsWith("/api/licensing/v1/")) {
+      const response = await handleMobileLicenseAdminRequest(request, env, url.pathname);
+      if (response) return response;
     }
 
     if (url.pathname.startsWith("/api/mobile/v1/")) {

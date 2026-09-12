@@ -1,3 +1,10 @@
+# v5.11.53 — Integrations Dashboard
+
+- Adds a protected Owner Admin Integrations section showing current House reservation sources and product-ready connector slots.
+- Shows Airbnb as connected only when the existing House reservation-sync configuration is present and Direct / Walk-in as built in.
+- Shows Booking.com, Agoda and Other PMS / API as not connected with disabled Connect controls until real provider-specific connectors exist.
+- Keeps all live booking, guest, operations, WhatsApp and Finance behavior unchanged.
+
 # v5.11.52 — Canonical Reservation Model
 
 - Added a provider-neutral internal reservation model for existing Airbnb, direct and manual/walk-in stays.

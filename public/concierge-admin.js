@@ -44,6 +44,8 @@
   const todayOperationsRooms = document.getElementById("todayOperationsRooms");
   const todayHousekeepingTasks = document.getElementById("todayHousekeepingTasks");
   const operationsCalendar = document.getElementById("operationsCalendar");
+  const integrationArchitectureStatus = document.getElementById("integrationArchitectureStatus");
+  const integrationProviders = document.getElementById("integrationProviders");
   const keyRotations = document.getElementById("keyRotations");
   const keyRotationActivity = document.getElementById("keyRotationActivity");
   const manualStayForm = document.getElementById("manualStayForm");
@@ -150,10 +152,68 @@
     if (urgent) setAdminSectionOpen(section, true, false);
   }
 
+  function integrationStatusLabel(status) {
+    if (status === "connected") return "Connected";
+    if (status === "active") return "Active";
+    if (status === "error") return "Error";
+    return "Not connected";
+  }
+
+  function renderIntegrations(integrations = {}) {
+    if (!integrationProviders || !integrationArchitectureStatus) return;
+    const providers = Array.isArray(integrations.providers) ? integrations.providers : [];
+    integrationProviders.replaceChildren();
+
+    const architectureReady = integrations.canonicalReservationModel === true;
+    integrationArchitectureStatus.replaceChildren(
+      element("strong", "", architectureReady ? "Canonical reservation layer ready" : "Integration architecture unavailable"),
+      element("span", "", architectureReady
+        ? "New provider connectors can feed the same reservation, operations, housekeeping and guest-access model without changing The House's live booking setup."
+        : "Provider connectors should not be added until the canonical reservation layer is available.")
+    );
+
+    providers.forEach((provider) => {
+      const card = element("article", "concierge-admin-integration-card");
+      const head = element("div", "concierge-admin-integration-head");
+      const title = element("div");
+      title.append(
+        element("strong", "", provider.name || provider.id || "Provider"),
+        element("span", "", provider.liveAtHouse ? "The House production" : "Product-ready slot")
+      );
+      const status = element("span", `concierge-admin-integration-status is-${provider.status || "not_connected"}`, integrationStatusLabel(provider.status));
+      head.append(title, status);
+
+      const description = element("p", "concierge-admin-integration-description", provider.description || "");
+      const note = element("p", "concierge-admin-integration-note", provider.note || "");
+      const actions = element("div", "concierge-admin-card-actions");
+      const button = element("button", "secondary");
+      button.type = "button";
+
+      if (provider.connectAction === "managed_existing_sync") {
+        button.textContent = provider.status === "connected" ? "Connected" : "Existing sync needs configuration";
+        button.disabled = true;
+      } else if (provider.connectAction === "built_in") {
+        button.textContent = "Built in";
+        button.disabled = true;
+      } else {
+        button.textContent = "Connect";
+        button.disabled = true;
+        button.title = "A provider-specific connector must be installed before this connection can be enabled.";
+        const hint = element("span", "concierge-admin-integration-action-note", "Connector required before this button can be enabled.");
+        actions.append(button, hint);
+      }
+      if (!actions.childNodes.length) actions.append(button);
+      card.append(head, description, note, actions);
+      integrationProviders.appendChild(card);
+    });
+    setAdminSectionCount("integrations", providers.length);
+  }
+
   function updateAdminSectionSummaries(data) {
     const stayOperations = data.stayOperations || {};
     const operationsCount = Number(todayOperationsSummary?.dataset.count || 0);
     setAdminSectionCount("operations", operationsCount);
+    setAdminSectionCount("integrations", (data.integrations?.providers || []).length);
     setAdminSectionCount("stays", (stayOperations.reservations || []).length + (stayOperations.rotations || []).length);
     setAdminSectionCount("alerts", (data.alerts || []).length);
     setAdminSectionCount("maintenance", (data.maintenanceReports || []).length);
@@ -1380,6 +1440,7 @@
     renderWhatsAppDeliveryDiagnostics(data.deliveryDiagnostics || [], data.alerts || []);
     renderOperationsDashboard(data.stayOperations || {});
     renderStayOperations(data.stayOperations || {});
+    renderIntegrations(data.integrations || {});
     renderRecent(data.recent || []);
     updateAdminSectionSummaries(data);
     await loadFinance();

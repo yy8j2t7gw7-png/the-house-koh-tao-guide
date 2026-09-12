@@ -28,6 +28,7 @@ import {
 } from "./whatsapp-alerts.js";
 import { getGuestAccess, handleStayAdminRequest, stayConfiguration } from "./stay-api.js";
 import { submitEarlyCheckinHousekeepingTask } from "./housekeeping-operations.js";
+import { integrationAdminOverview } from "./integration-catalog.js";
 import {
   DIVING_ACTIVITY_CHOICES,
   DIVING_AGENCY_CHOICES,
@@ -44,7 +45,7 @@ import {
   specialtyChoiceLabels
 } from "./diving-catalog.js";
 
-const RELEASE = "5.11.49";
+const RELEASE = "5.11.53";
 const ROOM_OPTIONS = new Set(["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11"]);
 const MAX_HISTORY_ITEMS = 10;
 const MAX_QUESTION_LENGTH = 800;
@@ -4464,6 +4465,7 @@ export async function handleAdminRequest(request, env, path) {
     return json({
       ...(await store.getAdminOverview()),
       stayOperations: await store.getStayOperationsOverview(),
+      integrations: integrationAdminOverview(env),
       alertConfiguration: whatsappAlertConfiguration(env)
     });
   }

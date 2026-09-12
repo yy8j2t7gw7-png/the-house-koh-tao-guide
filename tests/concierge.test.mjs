@@ -49,6 +49,7 @@ import {
   normalizeReservationSyncPayload,
   reservationSourceCapabilities
 } from "../src/reservation-model.js";
+import { integrationAdminOverview } from "../src/integration-catalog.js";
 import knowledge from "../public/data/concierge-knowledge.json" with { type: "json" };
 import activities from "../public/data/activities.json" with { type: "json" };
 import bars from "../public/data/bars.json" with { type: "json" };
@@ -3322,7 +3323,7 @@ test("owner dashboard major sections are independently collapsible, persistent a
     readFile(new URL("../public/concierge-admin.css", import.meta.url), "utf8")
   ]);
   const sections = [...html.matchAll(/<details class="concierge-admin-section" data-admin-section="([^"]+)"( open)?>/g)];
-  assert.deepEqual(sections.map((match) => match[1]), ["operations", "stays", "finance", "alerts", "maintenance", "passports", "learning", "approved", "recent"]);
+  assert.deepEqual(sections.map((match) => match[1]), ["integrations", "operations", "stays", "finance", "alerts", "maintenance", "passports", "learning", "approved", "recent"]);
   assert.deepEqual(sections.filter((match) => match[2]).map((match) => match[1]), ["operations", "stays", "alerts"]);
   assert.equal((html.match(/<summary class="concierge-admin-section-head">/g) || []).length, sections.length);
   assert.equal((html.match(/data-section-count/g) || []).length, sections.length);
@@ -3392,7 +3393,7 @@ test("guest localization supports seven languages and keeps the owner dashboard 
   assert.doesNotMatch(admin, /src="\/i18n\.js"/);
   assert.match(runtime, /exploreContentDeferred/);
   assert.match(runtime, /element\.closest\("\.section,\.footer"\)/);
-  assert.match(runtime, /houseGuideTranslations:v5\.11\.52:/);
+  assert.match(runtime, /houseGuideTranslations:v5\.11\.53:/);
   assert.match(runtime, /MAX_REQUEST_RETRIES = 2/);
   assert.match(runtime, /let flushRunning = false/);
 });
@@ -13529,5 +13530,46 @@ test("v5.11.52 reservation sync normalization is provider-agnostic without enabl
     synchronized: false,
     directConfirmationCode: false
   });
+});
+
+test("v5.11.53 integrations dashboard exposes House sources without enabling unsupported booking channels", () => {
+  const configured = integrationAdminOverview({
+    CONCIERGE_STORE: {},
+    RESERVATION_SYNC_TOKEN: "sync-secret",
+    STAY_TOKEN_PEPPER: "stay-pepper"
+  });
+  assert.equal(configured.canonicalReservationModel, true);
+  assert.equal(configured.connectorContract, "canonical-reservation-v1");
+  const byId = Object.fromEntries(configured.providers.map((provider) => [provider.id, provider]));
+  assert.equal(byId.airbnb.status, "connected");
+  assert.equal(byId.airbnb.liveAtHouse, true);
+  assert.equal(byId.airbnb.connectorInstalled, true);
+  assert.equal(byId.direct.status, "active");
+  assert.equal(byId.direct.liveAtHouse, true);
+  for (const id of ["booking-com", "agoda", "pms-api"]) {
+    assert.equal(byId[id].status, "not_connected");
+    assert.equal(byId[id].liveAtHouse, false);
+    assert.equal(byId[id].connectorInstalled, false);
+    assert.equal(byId[id].connectAction, "connector_required");
+  }
+});
+
+test("v5.11.53 integrations dashboard never claims Airbnb is connected when House sync credentials are incomplete", () => {
+  const overview = integrationAdminOverview({ CONCIERGE_STORE: {} });
+  const airbnb = overview.providers.find((provider) => provider.id === "airbnb");
+  assert.equal(airbnb.status, "not_connected");
+  assert.equal(airbnb.liveAtHouse, true);
+});
+
+test("v5.11.53 owner admin renders integrations as a read-only safe connector surface", async () => {
+  const [html, js] = await Promise.all([
+    readFile(new URL("../public/concierge-admin.html", import.meta.url), "utf8"),
+    readFile(new URL("../public/concierge-admin.js", import.meta.url), "utf8")
+  ]);
+  assert.match(html, /data-admin-section="integrations"/);
+  assert.match(html, /id="integrationProviders"/);
+  assert.match(js, /renderIntegrations\(data\.integrations \|\| \{\}\)/);
+  assert.match(js, /button\.disabled = true/);
+  assert.match(js, /Connector required before this button can be enabled\./);
 });
 

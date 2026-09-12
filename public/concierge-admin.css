@@ -281,3 +281,21 @@ tr:last-child td{border-bottom:0}
   .concierge-admin-portal-card>p:not(.concierge-admin-kicker){min-height:0}
   .concierge-admin-portal-actions{grid-template-columns:1fr}
 }
+/* Booking-source integrations */
+.concierge-admin-integration-architecture{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin:0 0 12px;padding:12px 14px;border:1px solid #c7ddd3;border-radius:12px;background:#edf8f2}
+.concierge-admin-integration-architecture strong{color:var(--admin-ink);font-size:13px}
+.concierge-admin-integration-architecture span{max-width:76ch;color:var(--admin-muted);font-size:11px;line-height:1.45}
+.concierge-admin-integration-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.concierge-admin-integration-card{padding:14px;border:1px solid var(--admin-line);border-radius:13px;background:var(--admin-soft)}
+.concierge-admin-integration-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.concierge-admin-integration-head strong,.concierge-admin-integration-head span{display:block}
+.concierge-admin-integration-head strong{color:var(--admin-ink);font-size:16px}
+.concierge-admin-integration-head>div>span{margin-top:3px;color:var(--admin-muted);font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.04em}
+.concierge-admin-integration-status{display:inline-flex!important;align-items:center;min-height:25px;padding:3px 8px;border:1px solid var(--admin-line);border-radius:999px;background:#fff;color:var(--admin-muted);font-size:10px!important;font-weight:900;white-space:nowrap}
+.concierge-admin-integration-status.is-connected,.concierge-admin-integration-status.is-active{border-color:#b7d5c8;background:#edf8f2;color:#2d6650}
+.concierge-admin-integration-status.is-error{border-color:#d8aaa6;background:var(--admin-danger-soft);color:var(--admin-danger)}
+.concierge-admin-integration-description{margin:10px 0 4px;color:var(--admin-ink);font-size:12px;font-weight:700;line-height:1.45}
+.concierge-admin-integration-note{margin:0;color:var(--admin-muted);font-size:11px;line-height:1.45}
+.concierge-admin-integration-action-note{align-self:center;color:var(--admin-muted);font-size:10px;line-height:1.4}
+@media(max-width:760px){.concierge-admin-integration-grid{grid-template-columns:1fr}.concierge-admin-integration-architecture{flex-direction:column}}
+

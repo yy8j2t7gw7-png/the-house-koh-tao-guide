@@ -1,3 +1,12 @@
+## v5.11.59 — Mobile Bootstrap PBKDF2 Runtime Compatibility Hotfix
+
+- Fixed Cloudflare Workers `NotSupportedError` during first-owner mobile bootstrap.
+- Reduced PBKDF2-SHA256 from the unsupported 210,000 iterations to the Workers-supported 100,000 maximum.
+- Updated new mobile-user persistence/defaults to 100,000 iterations while preserving unique salts and server-side password peppering.
+- Added regression coverage preventing the unsupported iteration count from returning.
+- No secrets, roles, permissions, finance logic, Beds24 behavior or guest-facing Concierge behavior changed.
+- Full automated suite: **315 passed / 0 failed**.
+
 ## v5.11.58 — Mobile Platform Foundation + Tenant/Role Security
 
 - Added secure `/api/mobile/v1` backend for the iPhone-first owner/operations application.

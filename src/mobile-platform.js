@@ -8,7 +8,7 @@ import { handleStayAdminRequest } from "./stay-api.js";
 import { createProtectedOperationsAlert, dispatchConciergeAlert } from "./whatsapp-alerts.js";
 
 const MOBILE_API_PREFIX = "/api/mobile/v1";
-const PASSWORD_ITERATIONS = 210000;
+const PASSWORD_ITERATIONS = 100000;
 const DEFAULT_SESSION_DAYS = 30;
 const MAX_BODY_BYTES = 24_000;
 const HOUSE_TENANT_ID = "tenant_the_house_koh_tao";

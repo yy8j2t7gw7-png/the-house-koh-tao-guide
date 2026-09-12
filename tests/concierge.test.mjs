@@ -14321,3 +14321,14 @@ test("v5.11.58 mobile secrets remain uncommitted and existing production safety 
   assert.match(wrangler, /"BEDS24_FINANCE_SYNC_ENABLED": "false"/);
   assert.match(wrangler, /"UNIFIED_MESSAGING_AI_AUTO_SEND_ENABLED": "false"/);
 });
+
+test("v5.11.59 mobile password hashing stays within the Cloudflare Workers PBKDF2 runtime limit", async () => {
+  const [mobileSource, storeSource] = await Promise.all([
+    readFile(new URL("../src/mobile-platform.js", import.meta.url), "utf8"),
+    readFile(new URL("../src/concierge-store.js", import.meta.url), "utf8")
+  ]);
+  assert.match(mobileSource, /const PASSWORD_ITERATIONS = 100000;/);
+  assert.doesNotMatch(mobileSource, /210000/);
+  assert.match(storeSource, /password_iterations INTEGER NOT NULL DEFAULT 100000/);
+  assert.doesNotMatch(storeSource, /210000/);
+});

@@ -597,7 +597,7 @@ export class ConciergeStore extends DurableObject {
           display_name TEXT NOT NULL,
           password_salt TEXT NOT NULL,
           password_hash TEXT NOT NULL,
-          password_iterations INTEGER NOT NULL DEFAULT 210000,
+          password_iterations INTEGER NOT NULL DEFAULT 100000,
           status TEXT NOT NULL DEFAULT 'active',
           created_at TEXT NOT NULL,
           updated_at TEXT NOT NULL,
@@ -4198,7 +4198,7 @@ export class ConciergeStore extends DurableObject {
       cleanText(record.displayName, 120) || "Owner",
       cleanText(record.passwordSalt, 240),
       cleanText(record.passwordHash, 240),
-      Math.max(100000, Math.floor(Number(record.passwordIterations) || 210000)),
+      Math.min(100000, Math.max(100000, Math.floor(Number(record.passwordIterations) || 100000))),
       now,
       now
     );
@@ -4427,7 +4427,7 @@ export class ConciergeStore extends DurableObject {
        (id, email_normalized, display_name, password_salt, password_hash, password_iterations, status, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, 'active', ?, ?)`,
       userId, invite.email, cleanText(record.displayName, 120), cleanText(record.passwordSalt, 240),
-      cleanText(record.passwordHash, 240), Math.max(100000, Math.floor(Number(record.passwordIterations) || 210000)), now, now
+      cleanText(record.passwordHash, 240), Math.min(100000, Math.max(100000, Math.floor(Number(record.passwordIterations) || 100000))), now, now
     );
     this.ctx.storage.sql.exec(
       `INSERT INTO platform_memberships

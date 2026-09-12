@@ -66,6 +66,13 @@ import {
   ingestBeds24ChannelBooking,
   updateBeds24HouseDirectExtension
 } from "../src/beds24-channel-manager.js";
+import {
+  beds24AirbnbIncomeRecord,
+  beds24AirbnbPaymentSummary,
+  beds24FinanceSyncConfiguration,
+  beds24FinanceSyncEnabled,
+  reconcileBeds24Finance
+} from "../src/beds24-finance-sync.js";
 import knowledge from "../public/data/concierge-knowledge.json" with { type: "json" };
 import activities from "../public/data/activities.json" with { type: "json" };
 import bars from "../public/data/bars.json" with { type: "json" };
@@ -229,9 +236,26 @@ function createStore() {
         && (!unitValue || String(item.unit || "").toLowerCase() === unitValue)
         && (!referenceValue || String(item.reference || "").toLowerCase() === referenceValue));
     },
+    async getProviderIncome(businessId, sourceSystem, sourceExternalId) {
+      return this.incomeRecords.find((item) => (item.businessId || HOUSE_FINANCE_BUSINESS_ID) === businessId
+        && item.sourceSystem === sourceSystem && item.sourceExternalId === sourceExternalId) || null;
+    },
+    async upsertProviderIncome(record) {
+      const existing = await this.getProviderIncome(record.businessId || HOUSE_FINANCE_BUSINESS_ID, record.sourceSystem, record.sourceExternalId);
+      if (existing) {
+        const changed = ["incomeDate", "category", "description", "grossMinor", "feesMinor", "netMinor", "currency", "unit", "paymentMethod", "reference", "notes", "sourceStatus"]
+          .some((key) => String(existing[key] ?? "") !== String(record[key] ?? ""));
+        Object.assign(existing, record, { createdByRole: "system" });
+        return { ok: true, created: false, updated: changed, id: existing.id };
+      }
+      const id = `inc_${crypto.randomUUID()}`;
+      this.incomeRecords.push({ ...record, id, businessId: record.businessId || HOUSE_FINANCE_BUSINESS_ID, createdByRole: "system", createdAt: record.syncedAt });
+      return { ok: true, created: true, updated: false, id };
+    },
     async deleteIncome(id, actorHash, now, businessId = HOUSE_FINANCE_BUSINESS_ID) {
       const index = this.incomeRecords.findIndex((item) => item.id === id && (item.businessId || HOUSE_FINANCE_BUSINESS_ID) === businessId);
       if (index < 0) return { ok: false, error: "not_found" };
+      if (this.incomeRecords[index].sourceSystem && this.incomeRecords[index].sourceSystem !== "manual") return { ok: false, error: "provider_managed_income" };
       this.incomeRecords.splice(index, 1);
       this.adminAudit.push({ action: "income_deleted", reference: `income:${id}`, actorHash, createdAt: now });
       return { ok: true, deleted: true };
@@ -3436,7 +3460,7 @@ test("guest localization supports seven languages and keeps the owner dashboard 
   assert.doesNotMatch(admin, /src="\/i18n\.js"/);
   assert.match(runtime, /exploreContentDeferred/);
   assert.match(runtime, /element\.closest\("\.section,\.footer"\)/);
-  assert.match(runtime, /houseGuideTranslations:v5\.11\.56:/);
+  assert.match(runtime, /houseGuideTranslations:v5\.11\.57:/);
   assert.match(runtime, /MAX_REQUEST_RETRIES = 2/);
   assert.match(runtime, /let flushRunning = false/);
 });
@@ -14023,3 +14047,166 @@ test("v5.11.56 Beds24 channel-manager source contract keeps central protection a
   assert.match(wrangler, /"BEDS24_CHANNEL_MANAGER_ENABLED": "false"/);
 });
 
+
+test("v5.11.57 Beds24 finance sync is deliberately disabled by default and requires financial access plus all 11 room mappings", async () => {
+  assert.equal(beds24FinanceSyncEnabled({}), false);
+  const roomMap = JSON.stringify(Object.fromEntries(Array.from({ length: 11 }, (_, index) => [String(99301 + index), String(index + 1)])));
+  const disabled = beds24FinanceSyncConfiguration({ BEDS24_FINANCE_SYNC_ENABLED: "false", BEDS24_REFRESH_TOKEN: "refresh", BEDS24_ROOM_MAP: roomMap });
+  assert.equal(disabled.ready, false);
+  assert.equal(disabled.roomMapComplete, true);
+  const ready = beds24FinanceSyncConfiguration({ BEDS24_FINANCE_SYNC_ENABLED: "true", BEDS24_REFRESH_TOKEN: "refresh", BEDS24_ROOM_MAP: roomMap });
+  assert.equal(ready.ready, true);
+  assert.equal(ready.channel, "Airbnb");
+  assert.deepEqual(ready.requiredBeds24Scopes, ["read:bookings", "read:bookings-financial"]);
+  const wrangler = await readFile(new URL("../wrangler.jsonc", import.meta.url), "utf8");
+  assert.match(wrangler, /"BEDS24_FINANCE_SYNC_ENABLED": "false"/);
+  assert.doesNotMatch(wrangler, /BEDS24_REFRESH_TOKEN/);
+});
+
+test("v5.11.57 Airbnb finance parser uses channel-collect payments and refunds while ignoring unrelated manual payments", () => {
+  const summary = beds24AirbnbPaymentSummary({
+    price: 12000,
+    commission: 1800,
+    invoiceItems: [
+      { id: 1, type: "charge", subType: 101, amount: 12000, qty: 1, lineTotal: 12000 },
+      { id: 2, type: "payment", subType: 202, amount: 10200, qty: 1, lineTotal: 10200, description: "Channel collect" },
+      { id: 3, type: "payment", subType: 200, amount: 500, qty: 1, lineTotal: 500, description: "Cash at property" },
+      { id: 4, type: "payment", subType: 213, amount: 700, qty: 1, lineTotal: 700, description: "Refund" }
+    ]
+  }, 2);
+  assert.equal(summary.grossMinor, 1200000);
+  assert.equal(summary.feesMinor, 180000);
+  assert.equal(summary.actualPaymentMinor, 950000);
+  assert.deepEqual(summary.paymentItemIds, ["2", "4"]);
+});
+
+test("v5.11.57 Airbnb finance record stores actual payout as net and preserves booking gross, commission, room and provider identity", () => {
+  const roomMap = JSON.stringify(Object.fromEntries(Array.from({ length: 11 }, (_, index) => [String(99401 + index), String(index + 1)])));
+  const record = beds24AirbnbIncomeRecord({
+    id: 880055,
+    roomId: 99405,
+    channel: "airbnb",
+    apiReference: "HMABC123",
+    arrival: "2026-09-20",
+    departure: "2026-09-23",
+    modifiedTime: "2026-09-24T04:00:00",
+    price: 9000,
+    commission: 1350,
+    invoiceItems: [{ id: 44, type: "payment", subType: 202, amount: 7650, lineTotal: 7650, createTime: "2026-09-20T01:00:00" }]
+  }, { BEDS24_ROOM_MAP: roomMap, EXPENSE_CURRENCY: "THB" }, null, new Date("2026-09-24T05:00:00Z"));
+  assert.ok(record);
+  assert.equal(record.netMinor, 765000);
+  assert.equal(record.grossMinor, 900000);
+  assert.equal(record.feesMinor, 135000);
+  assert.equal(record.unit, "Room 5");
+  assert.equal(record.category, "Airbnb");
+  assert.equal(record.incomeDate, "2026-09-24");
+  assert.equal(record.sourceSystem, "beds24");
+  assert.equal(record.sourceExternalId, "airbnb-booking:880055");
+  assert.match(record.reference, /HMABC123/);
+  assert.match(record.notes, /Actual channel-collected payment is authoritative/);
+});
+
+test("v5.11.57 Airbnb finance record is not created before an actual payout is reported", () => {
+  const roomMap = JSON.stringify(Object.fromEntries(Array.from({ length: 11 }, (_, index) => [String(99501 + index), String(index + 1)])));
+  const record = beds24AirbnbIncomeRecord({
+    id: 880066,
+    roomId: 99501,
+    channel: "airbnb",
+    arrival: "2026-10-01",
+    departure: "2026-10-04",
+    price: 10000,
+    commission: 1500,
+    invoiceItems: [{ id: 55, type: "payment", subType: 202, amount: 0, lineTotal: 0 }]
+  }, { BEDS24_ROOM_MAP: roomMap });
+  assert.equal(record, null);
+});
+
+test("v5.11.57 Beds24 finance reconciliation upserts one provider-managed income row and updates it instead of duplicating it", async () => {
+  const originalFetch = globalThis.fetch;
+  let paid = 7650;
+  const roomMap = JSON.stringify(Object.fromEntries(Array.from({ length: 11 }, (_, index) => [String(99601 + index), String(index + 1)])));
+  const records = [];
+  const store = {
+    async getMessagingProviderState() { return { value: { accessToken: "access" }, expiresAt: new Date(Date.now() + 3_600_000).toISOString() }; },
+    async setMessagingProviderState() { return { ok: true }; },
+    async getProviderIncome(businessId, sourceSystem, sourceExternalId) {
+      return records.find((item) => item.businessId === businessId && item.sourceSystem === sourceSystem && item.sourceExternalId === sourceExternalId) || null;
+    },
+    async upsertProviderIncome(record) {
+      const existing = await this.getProviderIncome(record.businessId, record.sourceSystem, record.sourceExternalId);
+      if (existing) {
+        const changed = existing.netMinor !== record.netMinor;
+        Object.assign(existing, record);
+        return { ok: true, created: false, updated: changed, id: existing.id };
+      }
+      records.push({ ...record, id: `inc_${crypto.randomUUID()}` });
+      return { ok: true, created: true, updated: false, id: records.at(-1).id };
+    }
+  };
+  globalThis.fetch = async (url) => {
+    assert.match(String(url), /\/bookings\?/);
+    return new Response(JSON.stringify({
+      success: true,
+      pages: { nextPageExists: false },
+      data: [{
+        id: 991122, roomId: 99603, channel: "airbnb", apiReference: "AIR991122",
+        arrival: "2026-09-10", departure: "2026-09-13", modifiedTime: "2026-09-14T02:00:00",
+        status: "confirmed", price: 9000, commission: 1350,
+        invoiceItems: [{ id: 88, type: "payment", subType: 202, amount: paid, lineTotal: paid }]
+      }]
+    }), { status: 200 });
+  };
+  try {
+    const env = { CONCIERGE_STORE: { getByName: () => store }, BEDS24_FINANCE_SYNC_ENABLED: "true", BEDS24_REFRESH_TOKEN: "refresh", BEDS24_ROOM_MAP: roomMap };
+    const first = await reconcileBeds24Finance(env, { store, now: new Date("2026-09-14T03:00:00Z") });
+    assert.equal(first.created, 1);
+    assert.equal(records.length, 1);
+    assert.equal(records[0].netMinor, 765000);
+    paid = 7000;
+    const second = await reconcileBeds24Finance(env, { store, now: new Date("2026-09-15T03:00:00Z") });
+    assert.equal(second.updated, 1);
+    assert.equal(records.length, 1);
+    assert.equal(records[0].netMinor, 700000);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("v5.11.57 provider-managed Beds24 income cannot be manually deleted from Finance", async () => {
+  const { env, store } = createEnvironment();
+  const id = `inc_${crypto.randomUUID()}`;
+  store.incomeRecords.push({
+    id, businessId: HOUSE_FINANCE_BUSINESS_ID, incomeDate: "2026-09-12", category: "Airbnb", description: "Airbnb payout",
+    grossMinor: 500000, feesMinor: 75000, netMinor: 425000, currency: "THB", unit: "Room 2", paymentMethod: "Bank transfer",
+    reference: "Airbnb TEST", notes: "Auto", sourceSystem: "beds24", sourceExternalId: "airbnb-booking:123", sourceStatus: "paid", syncedAt: "2026-09-12T00:00:00Z"
+  });
+  const response = await handleFinanceAdminRequest(new Request("https://guide.example/api/concierge/admin/income/delete", {
+    method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ id, confirmation: "DELETE INCOME" })
+  }), env, "/api/concierge/admin/income/delete", store, "actor");
+  assert.equal(response.status, 409);
+  assert.equal((await response.json()).error, "provider_managed_income");
+  assert.equal(store.incomeRecords.length, 1);
+});
+
+test("v5.11.57 Finance UI and scheduler expose safe Airbnb payout automation without enabling it", async () => {
+  const [html, js, indexSource, financeSource, storeSource, wrangler] = await Promise.all([
+    readFile(new URL("../public/concierge-admin.html", import.meta.url), "utf8"),
+    readFile(new URL("../public/concierge-admin.js", import.meta.url), "utf8"),
+    readFile(new URL("../src/index.js", import.meta.url), "utf8"),
+    readFile(new URL("../src/finance-api.js", import.meta.url), "utf8"),
+    readFile(new URL("../src/concierge-store.js", import.meta.url), "utf8"),
+    readFile(new URL("../wrangler.jsonc", import.meta.url), "utf8")
+  ]);
+  assert.match(html, /Airbnb payout automation/);
+  assert.match(html, /Sync Airbnb payouts now/);
+  assert.match(js, /providerManaged/);
+  assert.match(js, /\/api\/concierge\/admin\/finance\/beds24-sync/);
+  assert.match(indexSource, /reconcileBeds24Finance/);
+  assert.match(financeSource, /beds24FinanceSyncConfiguration/);
+  assert.match(storeSource, /income_records_provider_external/);
+  assert.match(storeSource, /income_provider_updated/);
+  assert.match(wrangler, /"BEDS24_FINANCE_SYNC_ENABLED": "false"/);
+  assert.match(wrangler, /"BEDS24_CHANNEL_MANAGER_ENABLED": "false"/);
+  assert.match(wrangler, /"UNIFIED_MESSAGING_AI_AUTO_SEND_ENABLED": "false"/);
+});

@@ -184,7 +184,12 @@
           </div>
           <span class="concierge-admin-section-summary"><span class="concierge-admin-section-count" data-section-count>0</span><span data-section-state>Collapsed</span><span class="concierge-admin-section-chevron" aria-hidden="true"></span></span>
         </summary>
-        <p>Track confirmed income and expenses in one private owner view. Income is entered manually and expenses can be prepared from a receipt, but every record is reviewed and confirmed by the owner before it is saved.</p>
+        <p>Track confirmed income and expenses in one private owner view. Manual income remains available, and Beds24 can add actual Airbnb channel-collected payouts automatically after the finance sync is deliberately enabled and tested. Expenses can still be prepared from a receipt and confirmed by the owner.</p>
+        <div class="concierge-admin-operations-block concierge-admin-finance-automation">
+          <h3>Airbnb payout automation</h3>
+          <p id="financeAutomationStatus">Beds24 payout sync is disabled until financial access is configured and tested.</p>
+          <div class="concierge-admin-card-actions"><button type="button" class="secondary" id="financeBeds24Sync" hidden>Sync Airbnb payouts now</button></div>
+        </div>
         <div class="concierge-admin-expense-toolbar">
           <div class="concierge-admin-field">
             <label for="expenseMonth">Month</label>

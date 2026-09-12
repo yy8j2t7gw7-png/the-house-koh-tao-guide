@@ -38,6 +38,8 @@
   const expenseReset = document.getElementById("expenseReset");
   const financeSummary = document.getElementById("financeSummary");
   const financeLocationSummary = document.getElementById("financeLocationSummary");
+  const financeAutomationStatus = document.getElementById("financeAutomationStatus");
+  const financeBeds24Sync = document.getElementById("financeBeds24Sync");
   const incomeForm = document.getElementById("incomeForm");
   const incomeEntries = document.getElementById("incomeEntries");
   const incomeReset = document.getElementById("incomeReset");
@@ -1597,6 +1599,19 @@
       });
   }
 
+  function renderFinanceAutomation(automation = {}) {
+    if (!financeAutomationStatus || !financeBeds24Sync) return;
+    if (automation.ready) {
+      financeAutomationStatus.textContent = "Airbnb payout sync is active. Net income uses the actual channel-collected payment reported by Beds24; gross booking value and commission remain visible for reconciliation.";
+      financeBeds24Sync.hidden = false;
+      return;
+    }
+    financeBeds24Sync.hidden = true;
+    financeAutomationStatus.textContent = automation.enabled
+      ? "Airbnb payout sync is enabled but not ready. Check the Beds24 refresh token, financial booking scope and explicit Room 1–11 mapping."
+      : "Airbnb payout sync is safely disabled. No OTA payment is imported until BEDS24_FINANCE_SYNC_ENABLED is deliberately set to true after Beds24 financial data has been verified.";
+  }
+
   function renderIncome(records = []) {
     incomeEntries.replaceChildren();
     incomeEntries.dataset.count = String(records.length);
@@ -1621,12 +1636,17 @@
       if (item.unit) meta.appendChild(element("span", "", item.unit));
       if (item.paymentMethod) meta.appendChild(element("span", "", item.paymentMethod));
       if (item.reference) meta.appendChild(element("span", "", `Ref: ${item.reference}`));
+      if (item.providerManaged) meta.appendChild(element("span", "", `Automated via ${item.sourceSystem === "beds24" ? "Beds24" : "provider"}${item.sourceStatus ? ` · ${item.sourceStatus.replaceAll("_", " ")}` : ""}`));
       if (item.notes) meta.appendChild(element("span", "", item.notes));
       const actions = element("div", "concierge-admin-card-actions");
-      const remove = element("button", "danger", "Delete income");
-      remove.type = "button";
-      remove.dataset.incomeDeleteId = item.id;
-      actions.appendChild(remove);
+      if (!item.providerManaged) {
+        const remove = element("button", "danger", "Delete income");
+        remove.type = "button";
+        remove.dataset.incomeDeleteId = item.id;
+        actions.appendChild(remove);
+      } else {
+        actions.appendChild(element("span", "concierge-admin-muted", "Managed automatically by Beds24"));
+      }
       card.append(head, meta, actions);
       incomeEntries.appendChild(card);
     });
@@ -1647,6 +1667,7 @@
       loadExpenses()
     ]);
     applyIncomeConfiguration(financeData.configuration || {});
+    renderFinanceAutomation(financeData.automation || {});
     renderFinanceSummary(financeData.totals || {});
     renderIncome(financeData.income || []);
   }
@@ -2278,6 +2299,22 @@
     } catch (_error) {
       deleteButton.disabled = false;
       window.alert("The income entry could not be deleted.");
+    }
+  });
+
+  financeBeds24Sync?.addEventListener("click", async () => {
+    financeBeds24Sync.disabled = true;
+    const previous = financeBeds24Sync.textContent;
+    financeBeds24Sync.textContent = "Syncing Airbnb payouts…";
+    try {
+      const result = await api("/api/concierge/admin/finance/beds24-sync", { method: "POST", body: "{}" });
+      await loadFinance();
+      window.alert(`Beds24 payout sync complete: ${Number(result.created) || 0} created, ${Number(result.updated) || 0} updated, ${Number(result.refunded) || 0} refunded.`);
+    } catch (_error) {
+      window.alert("Beds24 payout sync could not be completed. Check Beds24 financial access and the finance-sync flag.");
+    } finally {
+      financeBeds24Sync.disabled = false;
+      financeBeds24Sync.textContent = previous;
     }
   });
 

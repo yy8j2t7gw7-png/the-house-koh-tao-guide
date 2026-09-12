@@ -1,3 +1,18 @@
+# v5.11.57 — Beds24 Airbnb Finance Automation
+
+- Adds an opt-in Beds24 financial reconciliation layer for Airbnb payouts into The House Finance.
+- Uses actual Beds24 channel-collected Airbnb payments as authoritative **net cash income**; a reservation alone never creates Finance income.
+- Preserves Beds24 booking value as gross accommodation revenue context and Beds24 commission as the OTA fee field.
+- Reconciles refunds/cancelled paid bookings into the existing provider-managed Finance row instead of creating duplicates.
+- Adds a stable provider identity (`beds24` + Airbnb booking ID), idempotent upsert and provider-managed deletion protection.
+- Adds Owner Admin automation status plus an owner-only **Sync Airbnb payouts now** action for controlled testing.
+- Adds daily scheduled reconciliation while `BEDS24_FINANCE_SYNC_ENABLED=true`; it is a no-op while disabled.
+- Requires explicit Room 1–11 Beds24 mapping and API V2 financial read access before the sync is considered ready.
+- Ships with `BEDS24_FINANCE_SYNC_ENABLED=false`; no Airbnb/Beds24 income is imported until deliberate production testing and enablement.
+- Keeps `BEDS24_CHANNEL_MANAGER_ENABLED=false` and `UNIFIED_MESSAGING_AI_AUTO_SEND_ENABLED=false`.
+- Commits no Beds24 credentials or secrets and does not alter manual Finance entry/editing, passport/TM30, housekeeping, maintenance, lost-key, Meta templates or unrelated House behavior.
+- Full automated suite: **304 passed / 0 failed** before final archive validation.
+
 # v5.11.56 — Unified Messaging + Beds24 Channel Manager
 
 - Adds a protected Owner Admin unified inbox for Beds24-supported OTA conversations and direct Meta WhatsApp guest messages.

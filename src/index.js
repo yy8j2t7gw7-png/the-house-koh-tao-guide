@@ -24,6 +24,7 @@ import {
   reconcileBeds24ChannelManager
 } from "./beds24-channel-manager.js";
 import { processHousekeepingTurnovers } from "./housekeeping-operations.js";
+import { reconcileBeds24Finance } from "./beds24-finance-sync.js";
 import { servePublicLegalPage } from "./public-legal.js";
 import {
   getGuestAccess,
@@ -271,7 +272,8 @@ export default {
       cleanupPassportUploads(env),
       cleanupMaintenanceReports(env),
       maintainBeds24Authentication(env),
-      reconcileBeds24ChannelManager(env)
+      reconcileBeds24ChannelManager(env),
+      reconcileBeds24Finance(env)
     ]));
   }
 };

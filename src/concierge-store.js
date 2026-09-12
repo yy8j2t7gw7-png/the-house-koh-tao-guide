@@ -316,6 +316,10 @@ export class ConciergeStore extends DurableObject {
           notes TEXT NOT NULL DEFAULT '',
           created_by_hash TEXT NOT NULL DEFAULT '',
           created_by_role TEXT NOT NULL DEFAULT 'owner',
+          source_system TEXT NOT NULL DEFAULT 'manual',
+          source_external_id TEXT NOT NULL DEFAULT '',
+          source_status TEXT NOT NULL DEFAULT '',
+          synced_at TEXT NOT NULL DEFAULT '',
           created_at TEXT NOT NULL
         );
         CREATE INDEX IF NOT EXISTS income_records_date
@@ -610,11 +614,34 @@ export class ConciergeStore extends DurableObject {
       } catch (_error) {
         // Fresh databases and upgraded deployments already have finance creator-role auditing.
       }
+      try {
+        this.ctx.storage.sql.exec("ALTER TABLE income_records ADD COLUMN source_system TEXT NOT NULL DEFAULT 'manual'");
+      } catch (_error) {
+        // Fresh databases and upgraded deployments already have provider-sync source metadata.
+      }
+      try {
+        this.ctx.storage.sql.exec("ALTER TABLE income_records ADD COLUMN source_external_id TEXT NOT NULL DEFAULT ''");
+      } catch (_error) {
+        // Fresh databases and upgraded deployments already have provider-sync source metadata.
+      }
+      try {
+        this.ctx.storage.sql.exec("ALTER TABLE income_records ADD COLUMN source_status TEXT NOT NULL DEFAULT ''");
+      } catch (_error) {
+        // Fresh databases and upgraded deployments already have provider-sync source metadata.
+      }
+      try {
+        this.ctx.storage.sql.exec("ALTER TABLE income_records ADD COLUMN synced_at TEXT NOT NULL DEFAULT ''");
+      } catch (_error) {
+        // Fresh databases and upgraded deployments already have provider-sync source metadata.
+      }
       this.ctx.storage.sql.exec(
         "CREATE INDEX IF NOT EXISTS expense_records_business_date ON expense_records(business_id, expense_date, created_at)"
       );
       this.ctx.storage.sql.exec(
         "CREATE INDEX IF NOT EXISTS income_records_business_date ON income_records(business_id, income_date, created_at)"
+      );
+      this.ctx.storage.sql.exec(
+        "CREATE UNIQUE INDEX IF NOT EXISTS income_records_provider_external ON income_records(business_id, source_system, source_external_id) WHERE source_external_id <> ''"
       );
       this.ctx.storage.sql.exec(
         "CREATE UNIQUE INDEX IF NOT EXISTS spare_key_events_request ON spare_key_events(request_hash) WHERE request_hash <> ''"
@@ -1399,7 +1426,9 @@ export class ConciergeStore extends DurableObject {
     return rows(this.ctx.storage.sql.exec(
       `SELECT id, income_date AS incomeDate, category, description,
               gross_minor AS grossMinor, fees_minor AS feesMinor, net_minor AS netMinor, currency,
-              unit, payment_method AS paymentMethod, reference, notes, created_by_role AS createdByRole, created_at AS createdAt
+              unit, payment_method AS paymentMethod, reference, notes, created_by_role AS createdByRole,
+              source_system AS sourceSystem, source_external_id AS sourceExternalId, source_status AS sourceStatus,
+              synced_at AS syncedAt, created_at AS createdAt
        FROM income_records
        WHERE business_id = ? AND substr(income_date, 1, 7) = ?
        ORDER BY income_date DESC, created_at DESC
@@ -1414,7 +1443,9 @@ export class ConciergeStore extends DurableObject {
     return rows(this.ctx.storage.sql.exec(
       `SELECT id, income_date AS incomeDate, category, description,
               gross_minor AS grossMinor, fees_minor AS feesMinor, net_minor AS netMinor, currency,
-              unit, payment_method AS paymentMethod, reference, notes, created_by_role AS createdByRole, created_at AS createdAt
+              unit, payment_method AS paymentMethod, reference, notes, created_by_role AS createdByRole,
+              source_system AS sourceSystem, source_external_id AS sourceExternalId, source_status AS sourceStatus,
+              synced_at AS syncedAt, created_at AS createdAt
        FROM income_records WHERE id = ? AND business_id = ? LIMIT 1`,
       cleanText(id, 100),
       business
@@ -1442,14 +1473,83 @@ export class ConciergeStore extends DurableObject {
     ));
   }
 
+  async getProviderIncome(businessId, sourceSystem, sourceExternalId) {
+    const business = cleanText(businessId, 80) || HOUSE_FINANCE_BUSINESS_ID;
+    const system = cleanText(sourceSystem, 40);
+    const externalId = cleanText(sourceExternalId, 120);
+    if (!system || !externalId) return null;
+    return rows(this.ctx.storage.sql.exec(
+      `SELECT id, income_date AS incomeDate, category, description,
+              gross_minor AS grossMinor, fees_minor AS feesMinor, net_minor AS netMinor, currency,
+              unit, payment_method AS paymentMethod, reference, notes, created_by_role AS createdByRole,
+              source_system AS sourceSystem, source_external_id AS sourceExternalId, source_status AS sourceStatus,
+              synced_at AS syncedAt, created_at AS createdAt
+       FROM income_records
+       WHERE business_id = ? AND source_system = ? AND source_external_id = ? LIMIT 1`,
+      business, system, externalId
+    ))[0] || null;
+  }
+
+  async upsertProviderIncome(record) {
+    const business = cleanText(record.businessId, 80) || HOUSE_FINANCE_BUSINESS_ID;
+    const system = cleanText(record.sourceSystem, 40);
+    const externalId = cleanText(record.sourceExternalId, 120);
+    if (!system || system === "manual" || !externalId) return { ok: false, error: "invalid_provider_income" };
+    const existing = await this.getProviderIncome(business, system, externalId);
+    const values = {
+      incomeDate: cleanText(record.incomeDate, 10),
+      category: cleanText(record.category, 40),
+      description: cleanText(record.description, 240),
+      grossMinor: Math.max(0, Math.round(Number(record.grossMinor) || 0)),
+      feesMinor: Math.max(0, Math.round(Number(record.feesMinor) || 0)),
+      netMinor: Math.max(0, Math.round(Number(record.netMinor) || 0)),
+      currency: cleanText(record.currency, 3) || "THB",
+      unit: cleanText(record.unit, 80),
+      paymentMethod: cleanText(record.paymentMethod, 40),
+      reference: cleanText(record.reference, 120),
+      notes: cleanText(record.notes, 500),
+      sourceStatus: cleanText(record.sourceStatus, 40),
+      syncedAt: cleanText(record.syncedAt, 40) || new Date().toISOString()
+    };
+    if (!existing) {
+      const id = `inc_${crypto.randomUUID()}`;
+      this.ctx.storage.sql.exec(
+        `INSERT INTO income_records
+         (id, business_id, income_date, category, description, gross_minor, fees_minor, net_minor, currency,
+          unit, payment_method, reference, notes, created_by_hash, created_by_role, source_system,
+          source_external_id, source_status, synced_at, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '', 'system', ?, ?, ?, ?, ?)`,
+        id, business, values.incomeDate, values.category, values.description, values.grossMinor, values.feesMinor,
+        values.netMinor, values.currency, values.unit, values.paymentMethod, values.reference, values.notes,
+        system, externalId, values.sourceStatus, values.syncedAt, values.syncedAt
+      );
+      await this.recordAdminAudit("income_provider_created", `income:${id}`, values.syncedAt);
+      return { ok: true, created: true, updated: false, id };
+    }
+    const changed = ["incomeDate", "category", "description", "grossMinor", "feesMinor", "netMinor", "currency", "unit", "paymentMethod", "reference", "notes", "sourceStatus"]
+      .some((key) => String(existing[key] ?? "") !== String(values[key] ?? ""));
+    this.ctx.storage.sql.exec(
+      `UPDATE income_records SET
+         income_date = ?, category = ?, description = ?, gross_minor = ?, fees_minor = ?, net_minor = ?, currency = ?,
+         unit = ?, payment_method = ?, reference = ?, notes = ?, source_status = ?, synced_at = ?
+       WHERE id = ? AND business_id = ?`,
+      values.incomeDate, values.category, values.description, values.grossMinor, values.feesMinor, values.netMinor,
+      values.currency, values.unit, values.paymentMethod, values.reference, values.notes, values.sourceStatus,
+      values.syncedAt, existing.id, business
+    );
+    if (changed) await this.recordAdminAudit("income_provider_updated", `income:${existing.id}`, values.syncedAt);
+    return { ok: true, created: false, updated: changed, id: existing.id };
+  }
+
   async deleteIncome(id, actorHash, nowValue, businessId = HOUSE_FINANCE_BUSINESS_ID) {
     const incomeId = cleanText(id, 100);
     const business = cleanText(businessId, 80) || HOUSE_FINANCE_BUSINESS_ID;
     const exists = rows(this.ctx.storage.sql.exec(
-      "SELECT id FROM income_records WHERE id = ? AND business_id = ? LIMIT 1",
+      "SELECT id, source_system AS sourceSystem FROM income_records WHERE id = ? AND business_id = ? LIMIT 1",
       incomeId, business
     ))[0];
     if (!exists) return { ok: false, error: "not_found" };
+    if (exists.sourceSystem && exists.sourceSystem !== "manual") return { ok: false, error: "provider_managed_income" };
     this.ctx.storage.sql.exec("DELETE FROM income_records WHERE id = ? AND business_id = ?", incomeId, business);
     await this.recordAdminAudit("income_deleted", `income:${incomeId}`, nowValue);
     return { ok: true, deleted: true };

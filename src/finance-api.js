@@ -1,5 +1,6 @@
 import { expenseConfiguration } from "./expense-api.js";
 import { BAMBOO_FINANCE_BUSINESS_ID, BAMBOO_INCOME_CATEGORIES, HOUSE_FINANCE_BUSINESS_ID, resolveFinanceBusinessId } from "./finance-businesses.js";
+import { beds24FinanceSyncConfiguration, reconcileBeds24Finance } from "./beds24-finance-sync.js";
 
 const INCOME_ID_PATTERN = /^inc_[A-Za-z0-9-]{20,80}$/;
 const DEFAULT_INCOME_CATEGORIES = [
@@ -197,8 +198,23 @@ export async function handleFinanceAdminRequest(request, env, path, store, actor
         incomeCategories: [...incomeConfig.categories],
         expenseCategories: [...expenseConfig.categories],
         paymentMethods: [...expenseConfig.paymentMethods]
-      }
+      },
+      automation: scope.businessId === HOUSE_FINANCE_BUSINESS_ID ? beds24FinanceSyncConfiguration(env) : { enabled: false, ready: false, channel: "" }
     });
+  }
+
+  if (path === "/api/concierge/admin/finance/beds24-sync") {
+    if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405, { allow: "POST" });
+    const denied = ownerOnly(access);
+    if (denied) return denied;
+    const scope = scopedBusinessId(HOUSE_FINANCE_BUSINESS_ID, access);
+    if (scope.error) return json({ error: scope.error }, scope.status);
+    try {
+      const result = await reconcileBeds24Finance(env, { store });
+      return result?.ok ? json(result) : json(result || { error: "beds24_finance_sync_failed" }, 503);
+    } catch (error) {
+      return json({ error: cleanText(error?.code || error?.message || "beds24_finance_sync_failed", 120) }, 503);
+    }
   }
 
   if (path === "/api/concierge/admin/finance/export.csv") {
@@ -236,7 +252,9 @@ export async function handleFinanceAdminRequest(request, env, path, store, actor
     const businessId = scope.businessId;
     if (!INCOME_ID_PATTERN.test(id) || body.confirmation !== "DELETE INCOME") return json({ error: "confirmation_required" }, 400);
     const outcome = await store.deleteIncome?.(id, actorHash, new Date().toISOString(), businessId);
-    return outcome?.ok ? json(outcome) : json({ error: outcome?.error || "not_found" }, 404);
+    if (outcome?.ok) return json(outcome);
+    if (outcome?.error === "provider_managed_income") return json({ error: outcome.error }, 409);
+    return json({ error: outcome?.error || "not_found" }, 404);
   }
 
   if (path === "/api/concierge/admin/income") {
@@ -309,9 +327,11 @@ export async function handleFinanceAdminRequest(request, env, path, store, actor
     ok: true,
     month,
     configuration,
+    automation: businessId === HOUSE_FINANCE_BUSINESS_ID ? beds24FinanceSyncConfiguration(env) : { enabled: false, ready: false, channel: "" },
     totals: summarizeFinance(expenses, income, configuration),
     income: income.map((item) => ({
       ...item,
+      providerManaged: Boolean(item.sourceSystem && item.sourceSystem !== "manual"),
       gross: minorUnitsToAmount(item.grossMinor, configuration.minorUnitDigits),
       fees: minorUnitsToAmount(item.feesMinor, configuration.minorUnitDigits),
       net: minorUnitsToAmount(item.netMinor, configuration.minorUnitDigits)

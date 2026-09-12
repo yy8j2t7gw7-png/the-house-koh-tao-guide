@@ -1,3 +1,20 @@
+# v5.11.56 — Unified Messaging + Beds24 Channel Manager
+
+- Adds a protected Owner Admin unified inbox for Beds24-supported OTA conversations and direct Meta WhatsApp guest messages.
+- Adds Beds24 API V2 refresh-token authentication, short-lived token caching, explicit room mapping, provider/source preservation, owner replies, reservation-aware AI drafts, Pause/Resume AI, protected-topic review and WhatsApp delivery status.
+- Keeps unified OTA messaging claims limited to Airbnb, Booking.com, Expedia and Vrbo.
+- Adds an opt-in Beds24 channel-manager bridge for OTA booking/modification/cancellation ingestion into the House canonical reservation model.
+- Preserves reservation sources for Airbnb, Booking.com, Expedia, Vrbo, Agoda, Hostelworld and Trip.com.
+- Adds central double-booking protection for House Direct bookings: when the bridge is enabled, Beds24 availability is checked and the Beds24 booking is created before the House local reservation is committed.
+- Adds provider-first Direct extension protection: newly added nights are checked centrally and Beds24 is updated before the local House extension.
+- Adds cancellation propagation, compensation/retry jobs and scheduled Beds24 reconciliation.
+- Requires explicit one-to-one Beds24 ↔ House Room 1–11 mapping; provider room IDs are never guessed.
+- Ships with `BEDS24_CHANNEL_MANAGER_ENABLED=false`; the existing House Airbnb sync remains authoritative until Beds24 setup and live validation are complete.
+- Keeps `UNIFIED_MESSAGING_AI_AUTO_SEND_ENABLED=false`.
+- Commits no Beds24 credentials or secrets.
+- Does not change passport/TM30, Finance, housekeeping, maintenance, lost-key, Meta templates or unrelated House behavior; deferred Taoedge commercial-demo fixes remain deferred.
+- Full automated suite: **297 passed / 0 failed** before final archive validation.
+
 # v5.11.55 — Bulk WhatsApp Diagnostic Management
 
 - Adds per-diagnostic checkboxes plus Select all in Owner Admin.

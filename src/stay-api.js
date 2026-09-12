@@ -3,6 +3,14 @@ import {
   dispatchConciergeAlert,
   whatsappAlertConfiguration
 } from "./whatsapp-alerts.js";
+import {
+  beds24ChannelManagerEnabled,
+  cancelBeds24HouseDirectBooking,
+  createBeds24HouseDirectBooking,
+  queueBeds24Retry,
+  updateBeds24HouseDirectExtension
+} from "./beds24-channel-manager.js";
+import { reservationSourceCapabilities } from "./reservation-model.js";
 
 const ACTIVE_LISTINGS = Object.freeze({
   "1376393324098439141": "1",
@@ -924,6 +932,18 @@ export async function handleStayAdminRequest(request, env, path, store) {
     if (overlap) return json({ error: "room_date_conflict", conflict: overlap }, 409);
     const confirmationCode = randomDirectStayCode();
     const confirmationCodeHash = await hmac(`reservation:${confirmationCode}`, env.STAY_TOKEN_PEPPER);
+    let beds24Booking = null;
+    if (beds24ChannelManagerEnabled(env)) {
+      try {
+        beds24Booking = await createBeds24HouseDirectBooking(env, store, { room, checkInDate, checkOutDate });
+      } catch (error) {
+        return json({ error: error.code || error.message || "beds24_booking_create_failed" }, 502);
+      }
+      if (!beds24Booking?.ok) {
+        const status = beds24Booking?.error === "beds24_room_unavailable" ? 409 : 503;
+        return json({ error: beds24Booking?.error || "beds24_booking_create_failed" }, status);
+      }
+    }
     const result = await store.syncStayReservations({
       provider: "direct",
       listingId: `house-direct-${room}`,
@@ -933,13 +953,41 @@ export async function handleStayAdminRequest(request, env, path, store) {
       syncedAt: new Date().toISOString(),
       records: [{ confirmationCodeHash, checkInDate, checkOutDate, sourceRefHash: "" }]
     });
-    if (result.upserted !== 1) return json({ error: "stay_creation_failed" }, 503);
+    if (result.upserted !== 1) {
+      if (beds24Booking?.externalBookingId) {
+        await queueBeds24Retry(store, {
+          operation: "cancel_orphan",
+          externalBookingId: beds24Booking.externalBookingId,
+          lastError: "local_stay_creation_failed"
+        }).catch(() => {});
+      }
+      return json({ error: "stay_creation_failed" }, 503);
+    }
+    if (beds24Booking?.externalBookingId && typeof store.getStayReservationByCodeHash === "function" && typeof store.linkBeds24Reservation === "function") {
+      const localReservation = await store.getStayReservationByCodeHash(confirmationCodeHash, room);
+      const linked = localReservation?.id ? await store.linkBeds24Reservation({
+        reservationId: localReservation.id,
+        externalBookingId: beds24Booking.externalBookingId,
+        externalRoomId: beds24Booking.roomId,
+        sourceLabel: "Direct",
+        updatedAt: new Date().toISOString()
+      }) : { ok: false };
+      if (!linked?.ok) {
+        await queueBeds24Retry(store, {
+          operation: "cancel_orphan",
+          externalBookingId: beds24Booking.externalBookingId,
+          lastError: "beds24_link_failed"
+        }).catch(() => {});
+        return json({ error: "beds24_link_failed" }, 503);
+      }
+    }
     return json({
       ok: true,
       room,
       checkInDate,
       checkOutDate,
       confirmationCode,
+      beds24Synchronized: Boolean(beds24Booking?.externalBookingId),
       welcomeUrl: `${new URL(request.url).origin}/room/${encodeURIComponent(room)}`
     });
   }
@@ -952,7 +1000,24 @@ export async function handleStayAdminRequest(request, env, path, store) {
       return json({ error: "invalid_request" }, 400);
     }
     if (typeof store.cancelOwnerManagedStay !== "function") return json({ error: "stay_delete_unavailable" }, 503);
+    const beds24Link = beds24ChannelManagerEnabled(env) && typeof store.getBeds24ReservationLink === "function"
+      ? await store.getBeds24ReservationLink(reservationId)
+      : null;
     const result = await store.cancelOwnerManagedStay(reservationId, new Date().toISOString());
+    if (result.ok && beds24Link?.externalBookingId) {
+      try {
+        await cancelBeds24HouseDirectBooking(env, store, beds24Link.externalBookingId);
+        result.beds24Cancellation = "synchronized";
+      } catch (error) {
+        await queueBeds24Retry(store, {
+          operation: "cancel",
+          reservationId,
+          externalBookingId: beds24Link.externalBookingId,
+          lastError: error.code || error.message || "beds24_cancellation_failed"
+        }).catch(() => {});
+        result.beds24Cancellation = "retry_queued";
+      }
+    }
     const status = result.ok ? 200 : result.error === "reservation_not_found" ? 404 : 409;
     return json(result, status);
   }
@@ -996,6 +1061,37 @@ export async function handleStayAdminRequest(request, env, path, store) {
     const checkOutDate = validDate(body?.checkOutDate);
     if (!/^stay_[A-Za-z0-9-]{20,}$/.test(reservationId) || !checkOutDate) {
       return json({ error: "invalid_request" }, 400);
+    }
+    if (beds24ChannelManagerEnabled(env)) {
+      if (typeof store.getStayReservationForChannelManager !== "function" || typeof store.getBeds24ReservationLink !== "function") {
+        return json({ error: "beds24_channel_manager_store_unavailable" }, 503);
+      }
+      const current = await store.getStayReservationForChannelManager(reservationId);
+      if (!current) return json({ error: "reservation_not_found" }, 404);
+      if (!reservationSourceCapabilities(current.provider).ownerManaged) {
+        return json({ error: "owner_managed_stay_required" }, 409);
+      }
+      if (checkOutDate <= current.checkOutDate) return json({ error: "checkout_must_be_later" }, 400);
+      const localOverlap = typeof store.findStayOverlap === "function"
+        ? await store.findStayOverlap(current.room, current.checkInDate, checkOutDate, reservationId)
+        : null;
+      if (localOverlap) return json({ error: "room_date_conflict", conflict: localOverlap }, 409);
+      const link = await store.getBeds24ReservationLink(reservationId);
+      if (!link?.externalBookingId) return json({ error: "beds24_link_required" }, 409);
+      try {
+        const providerResult = await updateBeds24HouseDirectExtension(env, store, {
+          externalBookingId: link.externalBookingId,
+          room: current.room,
+          currentCheckOutDate: current.checkOutDate,
+          checkOutDate
+        });
+        if (!providerResult?.ok) {
+          const status = providerResult?.error === "beds24_room_unavailable" ? 409 : 503;
+          return json({ error: providerResult?.error || "beds24_extension_update_failed" }, status);
+        }
+      } catch (error) {
+        return json({ error: error.code || error.message || "beds24_extension_update_failed" }, 502);
+      }
     }
     const result = await store.extendStayReservation(reservationId, checkOutDate, new Date().toISOString());
     const status = result.ok ? 200 : result.error === "room_date_conflict" ? 409 : 400;

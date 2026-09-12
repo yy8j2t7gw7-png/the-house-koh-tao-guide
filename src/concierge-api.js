@@ -30,6 +30,10 @@ import { getGuestAccess, handleStayAdminRequest, stayConfiguration } from "./sta
 import { submitEarlyCheckinHousekeepingTask } from "./housekeeping-operations.js";
 import { integrationAdminOverview } from "./integration-catalog.js";
 import {
+  handleUnifiedMessagingAdminRequest,
+  unifiedMessagingConfiguration
+} from "./unified-messaging.js";
+import {
   DIVING_ACTIVITY_CHOICES,
   DIVING_AGENCY_CHOICES,
   courseChoiceLabels,
@@ -45,7 +49,7 @@ import {
   specialtyChoiceLabels
 } from "./diving-catalog.js";
 
-const RELEASE = "5.11.55";
+const RELEASE = "5.11.56";
 const ROOM_OPTIONS = new Set(["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11"]);
 const MAX_HISTORY_ITEMS = 10;
 const MAX_QUESTION_LENGTH = 800;
@@ -3153,6 +3157,38 @@ function getStore(env) {
   return env.CONCIERGE_STORE.getByName("the-house-concierge-global");
 }
 
+async function trustedMessagingAccess(request, body, env, store, requestedRoom) {
+  const expected = String(env.UNIFIED_MESSAGING_INTERNAL_TOKEN || "");
+  const supplied = String(request.headers.get("x-house-unified-messaging-token") || "");
+  const reservationId = String(body?.trustedReservationId || "").trim();
+  if (!expected || !supplied || !constantTimeEqual(expected, supplied) || !/^stay_[A-Za-z0-9_-]{12,}$/.test(reservationId)) {
+    return null;
+  }
+  if (!store || typeof store.getStayReservationById !== "function") return null;
+  const reservation = await store.getStayReservationById(reservationId).catch(() => null);
+  if (!reservation || reservation.status !== "confirmed" || !ROOM_OPTIONS.has(String(reservation.room || ""))) return null;
+  return {
+    verified: true,
+    accessGranted: true,
+    room: String(reservation.room),
+    registrationStatus: "trusted_messaging",
+    guestType: "",
+    requiredPassports: 0,
+    receivedPassports: 0,
+    trustedMessaging: true,
+    session: {
+      reservationId: reservation.id,
+      room: String(reservation.room),
+      provider: reservation.provider || "",
+      listingId: reservation.listingId || "",
+      guestFirstName: reservation.guestFirstName || "",
+      checkInDate: reservation.checkInDate || "",
+      checkOutDate: reservation.checkOutDate || "",
+      reservationStatus: reservation.status || "confirmed"
+    }
+  };
+}
+
 async function loadKnowledge(request, env) {
   const knowledgeUrl = new URL("/data/concierge-knowledge.json", request.url);
   const response = await env.ASSETS.fetch(new Request(knowledgeUrl, {
@@ -3845,13 +3881,14 @@ export async function handleConciergeRequest(request, env, ctx, now = new Date()
   }
 
   const store = getStore(env);
+  const trustedAccess = await trustedMessagingAccess(request, body, env, store, requestedRoom);
   const enforceGuestAccess = String(env.GUEST_ACCESS_ENFORCEMENT || "true").toLowerCase() !== "false";
-  const access = enforceGuestAccess ? await getGuestAccess(request, env).catch(() => ({
+  const access = trustedAccess || (enforceGuestAccess ? await getGuestAccess(request, env).catch(() => ({
     verified: false,
     accessGranted: false,
     room: requestedRoom,
     registrationStatus: "not_started"
-  })) : { verified: true, accessGranted: true, room: requestedRoom, registrationStatus: "test_bypass" };
+  })) : { verified: true, accessGranted: true, room: requestedRoom, registrationStatus: "test_bypass" });
   const room = access.verified ? access.room : requestedRoom;
   if (["confirm_urgent_property", "confirm_urgent_medical"].includes(body.action)) {
     const medical = body.action === "confirm_urgent_medical";
@@ -4378,6 +4415,69 @@ export async function handleConciergeRequest(request, env, ctx, now = new Date()
   });
 }
 
+const UNIFIED_MESSAGING_REVIEW_PATTERN = /\b(?:cancel|cancellation|refund|chargeback|dispute|compensation|discount|refund|payment|pay\b|invoice|deposit|money|price dispute|lost key|spare key|door code|key code|security|police|lawyer|legal|injur(?:y|ed)|hospital|ambulance|fire|threat|assault|complaint|angry|unsafe|stolen|theft)\b/i;
+
+function unifiedMessagingAutoSendDecision(question, result) {
+  if (!result?.answer) return { autoSend: false, reason: "empty_reply" };
+  if (result.needsHuman === true) return { autoSend: false, reason: "human_review_required" };
+  if (result.handoff && result.handoff !== "none") return { autoSend: false, reason: "handoff_required" };
+  if (["emergency", "property-emergency"].includes(result.category)) return { autoSend: false, reason: "emergency_review" };
+  if (UNIFIED_MESSAGING_REVIEW_PATTERN.test(String(question || ""))) return { autoSend: false, reason: "sensitive_topic" };
+  const riskyAction = (Array.isArray(result.actions) ? result.actions : []).some((action) =>
+    action?.style === "danger" || /(?:emergency|spare.?key|lost.?key|payment|refund|cancel)/i.test(`${action?.route || ""} ${action?.label || ""}`)
+  );
+  if (riskyAction) return { autoSend: false, reason: "protected_action" };
+  return { autoSend: true, reason: "routine_reply" };
+}
+
+export async function generateUnifiedMessageReply(context, env, ctx, now = new Date()) {
+  const internalToken = String(env.UNIFIED_MESSAGING_INTERNAL_TOKEN || "");
+  if (!internalToken) return { answer: "", autoSend: false, reason: "internal_token_missing" };
+  const reservationId = String(context?.reservationId || "");
+  const room = validRoom(context?.room);
+  if (!/^stay_[A-Za-z0-9_-]{12,}$/.test(reservationId) || !room) {
+    return { answer: "", autoSend: false, reason: "reservation_unlinked" };
+  }
+  const request = new Request("https://internal.the-house.invalid/api/concierge", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-house-unified-messaging-token": internalToken
+    },
+    body: JSON.stringify({
+      question: String(context?.question || ""),
+      sessionId: `msg_${crypto.randomUUID()}`,
+      room,
+      language: validLanguage(context?.language) || "en",
+      history: Array.isArray(context?.history) ? context.history : [],
+      privateReplyContact: String(context?.privateReplyContact || ""),
+      trustedReservationId: reservationId
+    })
+  });
+  const response = await handleConciergeRequest(request, env, ctx, now);
+  let result = {};
+  try { result = await response.json(); } catch (_error) { result = {}; }
+  if (!response.ok) {
+    return {
+      answer: String(result?.message || result?.answer || ""),
+      autoSend: false,
+      reason: String(result?.error || "concierge_reply_failed")
+    };
+  }
+  const decision = unifiedMessagingAutoSendDecision(context?.question, result);
+  return {
+    answer: String(result.answer || ""),
+    autoSend: decision.autoSend,
+    reason: decision.reason,
+    intentId: String(result.intentId || ""),
+    category: String(result.category || ""),
+    needsHuman: result.needsHuman === true,
+    handoff: String(result.handoff || "none"),
+    source: String(result.source || ""),
+    actions: Array.isArray(result.actions) ? result.actions : []
+  };
+}
+
 export async function handleEmergencyContactRequest(request, env) {
   if (request.method !== "GET") return json({ error: "method_not_allowed" }, 405, { allow: "GET" });
   const access = await getGuestAccess(request, env).catch(() => null);
@@ -4436,6 +4536,11 @@ export async function handleAdminRequest(request, env, path) {
     ? await hashSession(`admin:${authorization}`, env.CONCIERGE_HASH_SALT)
     : await hashSession(`bamboo-finance:${access.role}:${authorization}`, env.CONCIERGE_HASH_SALT);
 
+  if (path.includes("/messaging/")) {
+    const messagingResponse = await handleUnifiedMessagingAdminRequest(request, env, path, store, actorHash);
+    if (messagingResponse) return messagingResponse;
+  }
+
   if (path.includes("/passport-")) {
     const passportResponse = await handlePassportAdminRequest(request, env, path, store);
     if (passportResponse) return passportResponse;
@@ -4466,6 +4571,7 @@ export async function handleAdminRequest(request, env, path) {
       ...(await store.getAdminOverview()),
       stayOperations: await store.getStayOperationsOverview(),
       integrations: integrationAdminOverview(env),
+      unifiedMessaging: unifiedMessagingConfiguration(env),
       alertConfiguration: whatsappAlertConfiguration(env)
     });
   }
@@ -4575,6 +4681,7 @@ export function conciergeStatus(env) {
     learningEnabled: Boolean(env.CONCIERGE_STORE),
     passportUploadsConfigured: Boolean(env.PASSPORT_UPLOADS && env.PASSPORT_TOKEN_PEPPER),
     whatsappAlertsConfigured: whatsappAlertConfiguration(env).configured,
+    unifiedMessaging: unifiedMessagingConfiguration(env),
     ...stayConfiguration(env)
   });
 }

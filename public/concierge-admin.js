@@ -51,6 +51,10 @@
   const operationsCalendar = document.getElementById("operationsCalendar");
   const integrationArchitectureStatus = document.getElementById("integrationArchitectureStatus");
   const integrationProviders = document.getElementById("integrationProviders");
+  const unifiedMessagingStatus = document.getElementById("unifiedMessagingStatus");
+  const unifiedMessagingThreads = document.getElementById("unifiedMessagingThreads");
+  const unifiedMessagingConversation = document.getElementById("unifiedMessagingConversation");
+  const refreshUnifiedMessaging = document.getElementById("refreshUnifiedMessaging");
   const keyRotations = document.getElementById("keyRotations");
   const keyRotationActivity = document.getElementById("keyRotationActivity");
   const manualStayForm = document.getElementById("manualStayForm");
@@ -74,6 +78,8 @@
   let expenseMinorUnitDigits = 2;
   let expenseRecords = [];
   let expenseEditingRecord = null;
+  let activeMessagingThreadId = "";
+  let activeMessagingThread = null;
 
   function savedAdminSectionState() {
     try {
@@ -253,11 +259,175 @@
     setAdminSectionCount("integrations", providers.length);
   }
 
+  function messagingTime(value) {
+    if (!value) return "";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "";
+    return date.toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+  }
+
+  function renderUnifiedMessagingStatus(configuration = {}) {
+    if (!unifiedMessagingStatus) return;
+    const pills = [
+      [configuration.enabled === true, "Unified inbox", configuration.enabled === true ? "Enabled" : "Disabled"],
+      [configuration.otaViaBeds24Ready === true, "OTA via Beds24", configuration.otaViaBeds24Ready === true ? "Ready" : "Needs setup"],
+      [configuration.roomMapConfigured === true, "Beds24 room map", configuration.roomMapConfigured === true ? "Ready" : "Needs mapping"],
+      [configuration.whatsAppReady === true, "WhatsApp", configuration.whatsAppReady === true ? "Ready" : "Needs Meta configuration"],
+      [configuration.aiReplyReady === true, "AI assistant", configuration.aiReplyReady === true ? "Ready" : configuration.aiReplyEnabled === true ? "Needs internal token" : "Disabled"],
+      [configuration.aiAutoSendEnabled === true, "AI auto-send", configuration.aiAutoSendEnabled === true ? "On" : "Review only"]
+    ];
+    unifiedMessagingStatus.replaceChildren(...pills.map(([ready, label, value]) => {
+      const pill = element("span", ready ? "is-ready" : "is-waiting");
+      pill.textContent = `${label}: ${value}`;
+      return pill;
+    }));
+  }
+
+  function renderUnifiedMessagingThreads(data = {}) {
+    if (!unifiedMessagingThreads) return;
+    const threads = Array.isArray(data.threads) ? data.threads : [];
+    unifiedMessagingThreads.dataset.count = String(threads.length);
+    setAdminSectionCount("messaging", threads.length);
+    if (!threads.length) {
+      unifiedMessagingThreads.replaceChildren(element("div", "concierge-admin-empty", "No guest conversations yet. OTA messages will appear after Beds24 is connected; WhatsApp guest messages arrive through the existing Meta webhook."));
+      return;
+    }
+    const cards = threads.map((thread) => {
+      const button = element("button", `concierge-admin-message-thread${thread.id === activeMessagingThreadId ? " is-active" : ""}`);
+      button.type = "button";
+      button.dataset.messagingThreadId = thread.id;
+      const head = element("div", "concierge-admin-message-thread-head");
+      const identity = element("div");
+      identity.append(
+        element("div", "concierge-admin-message-thread-name", thread.guestName || "Guest"),
+        element("div", "concierge-admin-message-thread-source", thread.sourceLabel || thread.channel || "Message")
+      );
+      const badges = element("div");
+      if (Number(thread.unreadCount) > 0) badges.appendChild(element("span", "concierge-admin-message-badge", String(thread.unreadCount)));
+      if (thread.needsHuman) badges.appendChild(element("span", "concierge-admin-message-review", "Review"));
+      head.append(identity, badges);
+      const preview = element("div", "concierge-admin-message-thread-preview", thread.lastMessagePreview || "No message preview");
+      const meta = element("div", "concierge-admin-message-thread-meta");
+      if (thread.room) meta.appendChild(element("span", "", `Room ${thread.room}`));
+      if (thread.checkInDate && thread.checkOutDate) meta.appendChild(element("span", "", `${thread.checkInDate} → ${thread.checkOutDate}`));
+      if (thread.lastMessageAt) meta.appendChild(element("span", "", messagingTime(thread.lastMessageAt)));
+      button.append(head, preview, meta);
+      button.addEventListener("click", () => openMessagingThread(thread.id).catch(() => {}));
+      return button;
+    });
+    unifiedMessagingThreads.replaceChildren(...cards);
+  }
+
+  function renderMessagingConversation(data = {}) {
+    if (!unifiedMessagingConversation) return;
+    const thread = data.thread;
+    const messages = Array.isArray(data.messages) ? data.messages : [];
+    if (!thread) {
+      unifiedMessagingConversation.replaceChildren(element("div", "concierge-admin-messaging-empty", "Select a conversation to read and reply."));
+      return;
+    }
+    activeMessagingThread = thread;
+    const wrapper = document.createDocumentFragment();
+    const head = element("div", "concierge-admin-messaging-conversation-head");
+    const title = element("div");
+    title.append(
+      element("strong", "", `${thread.guestName || "Guest"}${thread.room ? ` · Room ${thread.room}` : ""}`),
+      element("span", "", `${thread.sourceLabel || thread.channel}${thread.guestPhone ? ` · ${thread.guestPhone}` : ""}`)
+    );
+    const aiToggle = element("button", "secondary", thread.aiPaused ? "Resume AI" : "Pause AI");
+    aiToggle.type = "button";
+    aiToggle.addEventListener("click", async () => {
+      await api("/api/concierge/admin/messaging/ai", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ threadId: thread.id, paused: !thread.aiPaused })
+      });
+      await openMessagingThread(thread.id);
+      await loadMessaging();
+    });
+    head.append(title, aiToggle);
+
+    const messageList = element("div", "concierge-admin-messaging-messages");
+    if (!messages.length) {
+      messageList.appendChild(element("div", "concierge-admin-messaging-empty", "No messages in this conversation yet."));
+    } else {
+      messages.forEach((message) => {
+        const direction = message.direction === "draft" ? "draft" : message.direction === "inbound" ? "inbound" : "outbound";
+        const bubble = element("div", `concierge-admin-message-bubble is-${direction}`, message.body || "");
+        const label = direction === "draft"
+          ? "AI draft · not sent"
+          : `${message.sender === "guest" ? "Guest" : message.sender === "ai" ? "AI" : message.sender === "system" ? "System" : "Owner"}${message.createdAt ? ` · ${messagingTime(message.createdAt)}` : ""}`;
+        bubble.appendChild(element("small", "", label));
+        messageList.appendChild(bubble);
+      });
+    }
+
+    const form = element("form", "concierge-admin-messaging-reply");
+    const textarea = document.createElement("textarea");
+    textarea.placeholder = `Reply via ${thread.sourceLabel || thread.channel || "guest channel"}…`;
+    textarea.maxLength = 3000;
+    textarea.required = true;
+    const actions = element("div", "concierge-admin-messaging-reply-actions");
+    const send = element("button", "", "Send reply");
+    send.type = "submit";
+    actions.appendChild(send);
+    form.append(textarea, actions);
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const message = textarea.value.trim();
+      if (!message) return;
+      send.disabled = true;
+      send.textContent = "Sending…";
+      try {
+        await api("/api/concierge/admin/messaging/send", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ threadId: thread.id, message })
+        });
+        textarea.value = "";
+        await openMessagingThread(thread.id);
+        await loadMessaging();
+      } catch (_error) {
+        send.textContent = "Send failed";
+      } finally {
+        send.disabled = false;
+        if (send.textContent !== "Send failed") send.textContent = "Send reply";
+      }
+    });
+    const note = element("div", "concierge-admin-messaging-note", thread.needsHuman
+      ? "This conversation needs owner review. Any AI draft is visible above and has not been sent."
+      : "Replies from this inbox are returned to the guest through the original channel.");
+    wrapper.append(head, messageList, form, note);
+    unifiedMessagingConversation.replaceChildren(wrapper);
+    messageList.scrollTop = messageList.scrollHeight;
+  }
+
+  async function openMessagingThread(id) {
+    activeMessagingThreadId = String(id || "");
+    if (!activeMessagingThreadId) return;
+    const data = await api(`/api/concierge/admin/messaging/thread?id=${encodeURIComponent(activeMessagingThreadId)}`);
+    renderMessagingConversation(data);
+    [...unifiedMessagingThreads?.querySelectorAll("[data-messaging-thread-id]") || []].forEach((node) => {
+      node.classList.toggle("is-active", node.dataset.messagingThreadId === activeMessagingThreadId);
+    });
+  }
+
+  async function loadMessaging() {
+    if (!unifiedMessagingThreads) return;
+    const data = await api("/api/concierge/admin/messaging/overview");
+    renderUnifiedMessagingStatus(data.configuration || {});
+    renderUnifiedMessagingThreads(data);
+    if (activeMessagingThreadId && (data.threads || []).some((thread) => thread.id === activeMessagingThreadId)) {
+      await openMessagingThread(activeMessagingThreadId);
+    }
+  }
+
   function updateAdminSectionSummaries(data) {
     const stayOperations = data.stayOperations || {};
     const operationsCount = Number(todayOperationsSummary?.dataset.count || 0);
     setAdminSectionCount("operations", operationsCount);
     setAdminSectionCount("integrations", (data.integrations?.providers || []).length);
+    setAdminSectionCount("messaging", Number(unifiedMessagingThreads?.dataset.count || 0));
     setAdminSectionCount("stays", (stayOperations.reservations || []).length + (stayOperations.rotations || []).length);
     setAdminSectionCount("alerts", (data.alerts || []).length);
     setAdminSectionCount("maintenance", (data.maintenanceReports || []).length);
@@ -1549,6 +1719,8 @@
     renderOperationsDashboard(data.stayOperations || {});
     renderStayOperations(data.stayOperations || {});
     renderIntegrations(data.integrations || {});
+    renderUnifiedMessagingStatus(data.unifiedMessaging || {});
+    await loadMessaging();
     renderRecent(data.recent || []);
     updateAdminSectionSummaries(data);
     await loadFinance();
@@ -2291,6 +2463,7 @@
     }
   });
 
+  refreshUnifiedMessaging?.addEventListener("click", () => loadMessaging().catch(() => {}));
   document.getElementById("refreshAdmin").addEventListener("click", () => loadOverview().catch(() => {}));
   document.getElementById("adminLogout").addEventListener("click", () => {
     token = "";

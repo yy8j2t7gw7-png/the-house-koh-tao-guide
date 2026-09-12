@@ -50,6 +50,22 @@ import {
   reservationSourceCapabilities
 } from "../src/reservation-model.js";
 import { integrationAdminOverview } from "../src/integration-catalog.js";
+import {
+  beds24MessageSyncPlan,
+  beds24SourceLabel,
+  roomForBeds24Booking,
+  unifiedMessagingConfiguration
+} from "../src/unified-messaging.js";
+import {
+  beds24AvailabilityAllowsStay,
+  beds24ChannelManagerConfiguration,
+  beds24ChannelManagerEnabled,
+  beds24ReservationProvider,
+  createBeds24HouseDirectBooking,
+  houseRoomToBeds24RoomId,
+  ingestBeds24ChannelBooking,
+  updateBeds24HouseDirectExtension
+} from "../src/beds24-channel-manager.js";
 import knowledge from "../public/data/concierge-knowledge.json" with { type: "json" };
 import activities from "../public/data/activities.json" with { type: "json" };
 import bars from "../public/data/bars.json" with { type: "json" };
@@ -3350,8 +3366,8 @@ test("owner dashboard major sections are independently collapsible, persistent a
     readFile(new URL("../public/concierge-admin.css", import.meta.url), "utf8")
   ]);
   const sections = [...html.matchAll(/<details class="concierge-admin-section" data-admin-section="([^"]+)"( open)?>/g)];
-  assert.deepEqual(sections.map((match) => match[1]), ["integrations", "operations", "stays", "finance", "alerts", "maintenance", "passports", "learning", "approved", "recent"]);
-  assert.deepEqual(sections.filter((match) => match[2]).map((match) => match[1]), ["operations", "stays", "alerts"]);
+  assert.deepEqual(sections.map((match) => match[1]), ["integrations", "messaging", "operations", "stays", "finance", "alerts", "maintenance", "passports", "learning", "approved", "recent"]);
+  assert.deepEqual(sections.filter((match) => match[2]).map((match) => match[1]), ["messaging", "operations", "stays", "alerts"]);
   assert.equal((html.match(/<summary class="concierge-admin-section-head">/g) || []).length, sections.length);
   assert.equal((html.match(/data-section-count/g) || []).length, sections.length);
   assert.equal((html.match(/data-section-state/g) || []).length, sections.length);
@@ -3420,7 +3436,7 @@ test("guest localization supports seven languages and keeps the owner dashboard 
   assert.doesNotMatch(admin, /src="\/i18n\.js"/);
   assert.match(runtime, /exploreContentDeferred/);
   assert.match(runtime, /element\.closest\("\.section,\.footer"\)/);
-  assert.match(runtime, /houseGuideTranslations:v5\.11\.55:/);
+  assert.match(runtime, /houseGuideTranslations:v5\.11\.56:/);
   assert.match(runtime, /MAX_REQUEST_RETRIES = 2/);
   assert.match(runtime, /let flushRunning = false/);
 });
@@ -13721,5 +13737,289 @@ test("v5.11.54 owner admin renders integrations as a read-only connector surface
   assert.match(js, /button\.disabled = true/);
   assert.match(css, /\.concierge-admin-integration-guide/);
   assert.match(css, /\.concierge-admin-integration-links/);
+});
+
+
+
+test("v5.11.56 Beds24 room mapping is explicit and never guesses a House room from provider ids", () => {
+  const env = { BEDS24_ROOM_MAP: JSON.stringify({ "77001": "1", "77011": "11" }) };
+  assert.equal(roomForBeds24Booking({ roomId: 77001 }, env), "1");
+  assert.equal(roomForBeds24Booking({ roomId: 77011 }, env), "11");
+  assert.equal(roomForBeds24Booking({ roomId: 7 }, env), "");
+  assert.equal(roomForBeds24Booking({ roomId: 77012 }, env), "");
+});
+
+test("v5.11.56 Beds24 source labels preserve the guest's original OTA channel", () => {
+  assert.equal(beds24SourceLabel({ channel: "airbnb" }), "Airbnb");
+  assert.equal(beds24SourceLabel({ channel: "booking" }), "Booking.com");
+  assert.equal(beds24SourceLabel({ channel: "expedia" }), "Expedia");
+  assert.equal(beds24SourceLabel({ channel: "vrbo" }), "Vrbo");
+  assert.equal(beds24SourceLabel({ channel: "agoda" }), "Agoda");
+  assert.equal(beds24SourceLabel({ channel: "hostelworld" }), "Hostelworld");
+  assert.equal(beds24SourceLabel({ channel: "trip" }), "Trip.com");
+});
+
+test("v5.11.56 Beds24 message sync keeps conversation order and only selects a guest reply when the guest is latest", () => {
+  const guestLatest = beds24MessageSyncPlan([
+    { id: 30, source: "host", message: "Welcome", time: "2026-09-12T09:00:00Z" },
+    { id: 31, source: "guest", message: "Can I arrive early?", time: "2026-09-12T09:05:00Z" },
+    { id: 29, source: "system", message: "Channel note", time: "2026-09-12T08:59:00Z" }
+  ]);
+  assert.deepEqual(guestLatest.messages.map((item) => item.id), ["29", "30", "31"]);
+  assert.equal(guestLatest.replyCandidate?.providerMessageId, "beds24:31");
+  assert.equal(guestLatest.messages[0].sender, "system");
+
+  const hostLatest = beds24MessageSyncPlan([
+    { id: 31, source: "guest", message: "Can I arrive early?", time: "2026-09-12T09:05:00Z" },
+    { id: 32, source: "host", message: "We will check for you.", time: "2026-09-12T09:06:00Z" }
+  ]);
+  assert.equal(hostLatest.replyCandidate, null);
+});
+
+test("v5.11.56 unified messaging configuration requires real Beds24 and Meta credentials", () => {
+  const disabled = unifiedMessagingConfiguration({ UNIFIED_MESSAGING_ENABLED: "true" });
+  assert.equal(disabled.enabled, true);
+  assert.equal(disabled.beds24Ready, false);
+  assert.equal(disabled.whatsAppReady, false);
+  assert.equal(disabled.aiReplyEnabled, false);
+  assert.equal(disabled.aiAutoSendEnabled, false);
+  assert.equal(disabled.aiInternalTokenReady, false);
+  assert.equal(disabled.aiReplyReady, false);
+
+  const ready = unifiedMessagingConfiguration({
+    UNIFIED_MESSAGING_ENABLED: "true",
+    UNIFIED_MESSAGING_AI_REPLY_ENABLED: "true",
+    UNIFIED_MESSAGING_AI_AUTO_SEND_ENABLED: "false",
+    BEDS24_REFRESH_TOKEN: "refresh-secret",
+    BEDS24_WEBHOOK_TOKEN: "webhook-secret",
+    BEDS24_ROOM_MAP: JSON.stringify({ "1": "1" }),
+    WHATSAPP_ACCESS_TOKEN: "meta-secret",
+    WHATSAPP_PHONE_NUMBER_ID: "123456789",
+    WHATSAPP_WEBHOOK_VERIFY_TOKEN: "verify-secret",
+    META_APP_SECRET: "app-secret",
+    UNIFIED_MESSAGING_INTERNAL_TOKEN: "internal-secret"
+  });
+  assert.equal(ready.beds24Ready, true);
+  assert.equal(ready.otaViaBeds24Ready, true);
+  assert.equal(ready.whatsAppReady, true);
+  assert.equal(ready.aiReplyEnabled, true);
+  assert.equal(ready.aiAutoSendEnabled, false);
+  assert.equal(ready.aiInternalTokenReady, true);
+  assert.equal(ready.aiReplyReady, true);
+  assert.equal(ready.roomMapConfigured, true);
+  assert.deepEqual(ready.supportedBeds24MessagingChannels, ["Airbnb", "Booking.com", "Expedia", "Vrbo"]);
+});
+
+test("v5.11.56 House routes and Owner Admin use Beds24 plus direct WhatsApp without retaining Smoobu code", async () => {
+  const indexSource = await readFile(new URL("../src/index.js", import.meta.url), "utf8");
+  const messagingSource = await readFile(new URL("../src/unified-messaging.js", import.meta.url), "utf8");
+  const adminHtml = await readFile(new URL("../public/concierge-admin.html", import.meta.url), "utf8");
+  const adminJs = await readFile(new URL("../public/concierge-admin.js", import.meta.url), "utf8");
+  assert.match(indexSource, /\/api\/messaging\/beds24\/webhook/);
+  assert.match(messagingSource, /https:\/\/beds24\.com\/api\/v2/);
+  assert.match(messagingSource, /bookings\/messages/);
+  assert.match(adminHtml, /OTA messaging via Beds24 \+ direct WhatsApp/);
+  assert.match(adminJs, /OTA via Beds24/);
+  assert.doesNotMatch(`${indexSource}\n${messagingSource}\n${adminHtml}\n${adminJs}`, /Smoobu|smoobu|SMOOBU/);
+  assert.match(messagingSource, /status: \["confirmed", "new"\]/);
+  assert.match(messagingSource, /latest_message_not_guest/);
+  assert.match(messagingSource, /auto_send_disabled/);
+});
+
+test("v5.11.56 Beds24 access tokens are cached in the Durable Object while the refresh token remains a secret", async () => {
+  const storeSource = await readFile(new URL("../src/concierge-store.js", import.meta.url), "utf8");
+  const messagingSource = await readFile(new URL("../src/unified-messaging.js", import.meta.url), "utf8");
+  const wrangler = await readFile(new URL("../wrangler.jsonc", import.meta.url), "utf8");
+  assert.match(storeSource, /CREATE TABLE IF NOT EXISTS messaging_provider_state/);
+  assert.match(storeSource, /getMessagingProviderState/);
+  assert.match(storeSource, /setMessagingProviderState/);
+  assert.match(messagingSource, /BEDS24_REFRESH_TOKEN/);
+  assert.doesNotMatch(wrangler, /BEDS24_REFRESH_TOKEN/);
+  assert.match(wrangler, /"UNIFIED_MESSAGING_AI_REPLY_ENABLED": "true"/);
+  assert.match(wrangler, /"UNIFIED_MESSAGING_AI_AUTO_SEND_ENABLED": "false"/);
+});
+
+
+test("v5.11.56 unified inbox loads the most recent message window while returning it chronologically", async () => {
+  const storeSource = await readFile(new URL("../src/concierge-store.js", import.meta.url), "utf8");
+  assert.match(storeSource, /ORDER BY created_at DESC, id DESC LIMIT \?/);
+  assert.match(storeSource, /ORDER BY createdAt ASC, id ASC/);
+});
+
+test("v5.11.56 Beds24 channel manager remains deliberately disabled by default", async () => {
+  assert.equal(beds24ChannelManagerEnabled({}), false);
+  assert.equal(beds24ChannelManagerEnabled({ BEDS24_CHANNEL_MANAGER_ENABLED: "false" }), false);
+  assert.equal(beds24ChannelManagerEnabled({ BEDS24_CHANNEL_MANAGER_ENABLED: "true" }), true);
+  const wrangler = await readFile(new URL("../wrangler.jsonc", import.meta.url), "utf8");
+  assert.match(wrangler, /"BEDS24_CHANNEL_MANAGER_ENABLED": "false"/);
+  assert.doesNotMatch(wrangler, /BEDS24_REFRESH_TOKEN|BEDS24_WEBHOOK_TOKEN|BEDS24_ROOM_MAP/);
+});
+
+test("v5.11.56 Beds24 channel manager requires an explicit one-to-one Room 1-11 map", () => {
+  const fullMap = Object.fromEntries(Array.from({ length: 11 }, (_, index) => [String(77001 + index), String(index + 1)]));
+  const env = { BEDS24_ROOM_MAP: JSON.stringify(fullMap) };
+  assert.equal(houseRoomToBeds24RoomId("1", env), "77001");
+  assert.equal(houseRoomToBeds24RoomId("11", env), "77011");
+  assert.equal(houseRoomToBeds24RoomId("12", env), "");
+  const duplicate = { ...fullMap, "88001": "1" };
+  assert.equal(houseRoomToBeds24RoomId("1", { BEDS24_ROOM_MAP: JSON.stringify(duplicate) }), "");
+});
+
+test("v5.11.56 Beds24 reservation ingestion preserves every supported OTA source independently of messaging support", () => {
+  const fixtures = [
+    ["airbnb", "airbnb"],
+    ["booking", "booking.com"],
+    ["expedia", "expedia"],
+    ["vrbo", "vrbo"],
+    ["agoda", "agoda"],
+    ["hostelworld", "hostelworld"],
+    ["trip", "trip.com"],
+    ["direct", "direct"]
+  ];
+  for (const [channel, expected] of fixtures) assert.equal(beds24ReservationProvider({ channel }), expected);
+});
+
+test("v5.11.56 Beds24 availability protection requires every booked night to be centrally available", () => {
+  const response = {
+    data: [{ roomId: 77001, availability: { "2026-10-01": true, "2026-10-02": true, "2026-10-03": true } }]
+  };
+  assert.equal(beds24AvailabilityAllowsStay(response, "77001", "2026-10-01", "2026-10-04"), true);
+  response.data[0].availability["2026-10-02"] = false;
+  assert.equal(beds24AvailabilityAllowsStay(response, "77001", "2026-10-01", "2026-10-04"), false);
+  assert.equal(beds24AvailabilityAllowsStay({ data: [] }, "77001", "2026-10-01", "2026-10-04"), false);
+});
+
+test("v5.11.56 Beds24 channel manager readiness needs the flag, credentials and all 11 mapped rooms", () => {
+  const roomMap = JSON.stringify(Object.fromEntries(Array.from({ length: 11 }, (_, index) => [String(88001 + index), String(index + 1)])));
+  const disabled = beds24ChannelManagerConfiguration({
+    BEDS24_CHANNEL_MANAGER_ENABLED: "false",
+    BEDS24_REFRESH_TOKEN: "refresh",
+    BEDS24_WEBHOOK_TOKEN: "webhook",
+    STAY_TOKEN_PEPPER: "pepper",
+    BEDS24_ROOM_MAP: roomMap
+  });
+  assert.equal(disabled.roomMapComplete, true);
+  assert.equal(disabled.ready, false);
+  const ready = beds24ChannelManagerConfiguration({
+    BEDS24_CHANNEL_MANAGER_ENABLED: "true",
+    BEDS24_REFRESH_TOKEN: "refresh",
+    BEDS24_WEBHOOK_TOKEN: "webhook",
+    STAY_TOKEN_PEPPER: "pepper",
+    BEDS24_ROOM_MAP: roomMap
+  });
+  assert.equal(ready.ready, true);
+  assert.equal(ready.centralAvailabilityAuthoritative, true);
+  assert.deepEqual(ready.supportedReservationSources, ["Airbnb", "Booking.com", "Expedia", "Vrbo", "Agoda", "Hostelworld", "Trip.com"]);
+});
+
+test("v5.11.56 Direct booking checks Beds24 central availability before creating the Beds24 booking", async () => {
+  const originalFetch = globalThis.fetch;
+  const calls = [];
+  globalThis.fetch = async (url, options = {}) => {
+    calls.push({ url: String(url), method: options.method || "GET", body: options.body || "" });
+    if (String(url).includes("inventory/rooms/availability")) {
+      return new Response(JSON.stringify({ data: [{ roomId: 99001, availability: { "2026-10-01": true, "2026-10-02": true } }] }), { status: 200 });
+    }
+    return new Response(JSON.stringify([{ success: true, new: { id: 551122 } }]), { status: 200 });
+  };
+  try {
+    const store = { async getMessagingProviderState() { return { value: { accessToken: "access" }, expiresAt: new Date(Date.now() + 3_600_000).toISOString() }; } };
+    const env = {
+      BEDS24_CHANNEL_MANAGER_ENABLED: "true",
+      BEDS24_REFRESH_TOKEN: "refresh",
+      BEDS24_WEBHOOK_TOKEN: "webhook",
+      STAY_TOKEN_PEPPER: "pepper",
+      BEDS24_ROOM_MAP: JSON.stringify(Object.fromEntries(Array.from({ length: 11 }, (_, index) => [String(99001 + index), String(index + 1)])))
+    };
+    const result = await createBeds24HouseDirectBooking(env, store, { room: "1", checkInDate: "2026-10-01", checkOutDate: "2026-10-03" });
+    assert.equal(result.ok, true);
+    assert.equal(result.externalBookingId, "551122");
+    assert.equal(calls.length, 2);
+    assert.match(calls[0].url, /inventory\/rooms\/availability/);
+    assert.match(calls[1].url, /\/bookings$/);
+    assert.equal(calls[1].method, "POST");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("v5.11.56 Direct extension checks only the added nights and updates Beds24 before local extension can proceed", async () => {
+  const originalFetch = globalThis.fetch;
+  const calls = [];
+  globalThis.fetch = async (url, options = {}) => {
+    calls.push({ url: String(url), method: options.method || "GET", body: options.body || "" });
+    if (String(url).includes("inventory/rooms/availability")) {
+      return new Response(JSON.stringify({ data: [{ roomId: 99101, availability: { "2026-10-03": true, "2026-10-04": true } }] }), { status: 200 });
+    }
+    return new Response(JSON.stringify([{ success: true, modified: { id: 661133 } }]), { status: 200 });
+  };
+  try {
+    const store = { async getMessagingProviderState() { return { value: { accessToken: "access" }, expiresAt: new Date(Date.now() + 3_600_000).toISOString() }; } };
+    const env = {
+      BEDS24_CHANNEL_MANAGER_ENABLED: "true",
+      BEDS24_REFRESH_TOKEN: "refresh",
+      BEDS24_WEBHOOK_TOKEN: "webhook",
+      STAY_TOKEN_PEPPER: "pepper",
+      BEDS24_ROOM_MAP: JSON.stringify(Object.fromEntries(Array.from({ length: 11 }, (_, index) => [String(99101 + index), String(index + 1)])))
+    };
+    const result = await updateBeds24HouseDirectExtension(env, store, {
+      externalBookingId: "661133", room: "1", currentCheckOutDate: "2026-10-03", checkOutDate: "2026-10-05"
+    });
+    assert.equal(result.ok, true);
+    const availabilityUrl = new URL(calls[0].url);
+    assert.equal(availabilityUrl.searchParams.get("startDate"), "2026-10-03");
+    assert.equal(availabilityUrl.searchParams.get("endDate"), "2026-10-04");
+    assert.match(calls[1].body, /"departure":"2026-10-05"/);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("v5.11.56 Beds24 webhook booking ingestion writes the canonical reservation with explicit room and provider source", async () => {
+  const captured = [];
+  const store = { async syncBeds24ChannelReservation(record) { captured.push(record); return { ok: true, reservationId: "stay_demo" }; } };
+  const roomMap = Object.fromEntries(Array.from({ length: 11 }, (_, index) => [String(99201 + index), String(index + 1)]));
+  const env = {
+    BEDS24_CHANNEL_MANAGER_ENABLED: "true",
+    BEDS24_REFRESH_TOKEN: "refresh",
+    BEDS24_WEBHOOK_TOKEN: "webhook",
+    STAY_TOKEN_PEPPER: "pepper",
+    BEDS24_ROOM_MAP: JSON.stringify(roomMap)
+  };
+  const result = await ingestBeds24ChannelBooking({
+    id: 771144,
+    roomId: 99207,
+    channel: "agoda",
+    apiReference: "AGODA77",
+    firstName: "Mina",
+    arrival: "2026-11-10",
+    departure: "2026-11-13",
+    status: "confirmed"
+  }, env, store);
+  assert.equal(result.ok, true);
+  assert.equal(captured.length, 1);
+  assert.equal(captured[0].provider, "agoda");
+  assert.equal(captured[0].room, "7");
+  assert.equal(captured[0].externalBookingId, "771144");
+  assert.equal(captured[0].guestFirstName, "Mina");
+  assert.equal(captured[0].status, "confirmed");
+});
+
+test("v5.11.56 Beds24 channel-manager source contract keeps central protection and retries while preserving AI auto-send false", async () => {
+  const [staySource, indexSource, storeSource, wrangler] = await Promise.all([
+    readFile(new URL("../src/stay-api.js", import.meta.url), "utf8"),
+    readFile(new URL("../src/index.js", import.meta.url), "utf8"),
+    readFile(new URL("../src/concierge-store.js", import.meta.url), "utf8"),
+    readFile(new URL("../wrangler.jsonc", import.meta.url), "utf8")
+  ]);
+  assert.ok(staySource.indexOf("createBeds24HouseDirectBooking") < staySource.indexOf("provider: \"direct\""));
+  assert.ok(staySource.indexOf("updateBeds24HouseDirectExtension") < staySource.indexOf("const result = await store.extendStayReservation"));
+  assert.match(staySource, /beds24Cancellation = "retry_queued"/);
+  assert.match(indexSource, /processBeds24ChannelManagerRetries/);
+  assert.match(indexSource, /reconcileBeds24ChannelManager/);
+  assert.match(storeSource, /CREATE TABLE IF NOT EXISTS beds24_reservation_links/);
+  assert.match(storeSource, /CREATE TABLE IF NOT EXISTS beds24_channel_retries/);
+  assert.match(wrangler, /"UNIFIED_MESSAGING_AI_AUTO_SEND_ENABLED": "false"/);
+  assert.match(wrangler, /"BEDS24_CHANNEL_MANAGER_ENABLED": "false"/);
 });
 

@@ -318,3 +318,38 @@ tr:last-child td{border-bottom:0}
 .concierge-admin-integration-links a:hover{border-color:var(--admin-accent);background:var(--admin-soft)}
 @media(max-width:760px){.concierge-admin-integration-grid{grid-template-columns:1fr}.concierge-admin-integration-architecture{flex-direction:column}.concierge-admin-integration-links{display:grid}.concierge-admin-integration-links a{width:100%;box-sizing:border-box}}
 
+
+/* Unified guest messaging */
+.concierge-admin-messaging-status{display:flex;flex-wrap:wrap;gap:7px;margin:0 0 12px}
+.concierge-admin-messaging-status span{display:inline-flex;align-items:center;gap:5px;padding:6px 9px;border:1px solid var(--admin-line);border-radius:999px;background:#fff;color:var(--admin-muted);font-size:10px;font-weight:850}
+.concierge-admin-messaging-status .is-ready{border-color:#b7d5c8;background:#edf8f2;color:#2d6650}
+.concierge-admin-messaging-status .is-waiting{background:var(--admin-soft)}
+.concierge-admin-messaging-layout{display:grid;grid-template-columns:minmax(260px,.82fr) minmax(0,1.65fr);gap:12px;align-items:start}
+.concierge-admin-messaging-list-head{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:0 0 8px}
+.concierge-admin-messaging-list-head h3{margin:0}
+.concierge-admin-messaging-threads{display:grid;gap:7px;max-height:560px;overflow:auto;padding-right:2px}
+.concierge-admin-message-thread{width:100%;display:block;text-align:left;padding:11px;border:1px solid var(--admin-line);border-radius:12px;background:#fff;color:var(--admin-ink);cursor:pointer}
+.concierge-admin-message-thread:hover,.concierge-admin-message-thread.is-active{border-color:var(--admin-accent);box-shadow:0 0 0 2px rgba(24,94,82,.07)}
+.concierge-admin-message-thread-head{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}
+.concierge-admin-message-thread-name{font-size:12px;font-weight:900}
+.concierge-admin-message-thread-source{font-size:9px;font-weight:900;text-transform:uppercase;letter-spacing:.04em;color:var(--admin-accent-dark)}
+.concierge-admin-message-thread-preview{margin-top:6px;color:var(--admin-muted);font-size:10px;line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.concierge-admin-message-thread-meta{display:flex;flex-wrap:wrap;gap:5px;margin-top:7px;color:var(--admin-muted);font-size:9px;font-weight:750}
+.concierge-admin-message-badge{display:inline-flex;align-items:center;justify-content:center;min-width:19px;height:19px;padding:0 5px;border-radius:999px;background:var(--admin-accent);color:#fff;font-size:9px;font-weight:900}
+.concierge-admin-message-review{background:#fff0d7;color:#815515;border:1px solid #e8c789;padding:3px 6px;border-radius:999px}
+.concierge-admin-messaging-conversation{min-height:320px;border:1px solid var(--admin-line);border-radius:13px;background:#fff;overflow:hidden}
+.concierge-admin-messaging-empty{padding:40px 20px;text-align:center;color:var(--admin-muted);font-size:12px}
+.concierge-admin-messaging-conversation-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;padding:13px 14px;border-bottom:1px solid var(--admin-line);background:var(--admin-soft)}
+.concierge-admin-messaging-conversation-head strong{display:block;font-size:14px;color:var(--admin-ink)}
+.concierge-admin-messaging-conversation-head span{display:block;margin-top:3px;color:var(--admin-muted);font-size:10px}
+.concierge-admin-messaging-messages{display:flex;flex-direction:column;gap:8px;min-height:220px;max-height:420px;overflow:auto;padding:14px;background:#f8faf9}
+.concierge-admin-message-bubble{max-width:82%;padding:9px 11px;border-radius:12px;font-size:11px;line-height:1.45;white-space:pre-wrap;word-break:break-word}
+.concierge-admin-message-bubble.is-inbound{align-self:flex-start;border:1px solid var(--admin-line);background:#fff;color:var(--admin-ink)}
+.concierge-admin-message-bubble.is-outbound{align-self:flex-end;background:var(--admin-accent-dark);color:#fff}
+.concierge-admin-message-bubble.is-draft{align-self:flex-end;border:1px dashed #c89642;background:#fff8e9;color:#684513}
+.concierge-admin-message-bubble small{display:block;margin-top:4px;opacity:.72;font-size:8px;font-weight:700}
+.concierge-admin-messaging-reply{display:grid;grid-template-columns:1fr auto;gap:8px;padding:11px;border-top:1px solid var(--admin-line)}
+.concierge-admin-messaging-reply textarea{min-height:64px;resize:vertical;border:1px solid var(--admin-line-strong);border-radius:10px;padding:9px;font:inherit;color:var(--admin-ink);background:#fff}
+.concierge-admin-messaging-reply-actions{display:flex;flex-direction:column;gap:7px;justify-content:flex-end}
+.concierge-admin-messaging-note{padding:0 12px 11px;color:var(--admin-muted);font-size:9px;line-height:1.4}
+@media(max-width:860px){.concierge-admin-messaging-layout{grid-template-columns:1fr}.concierge-admin-messaging-threads{max-height:320px}.concierge-admin-messaging-reply{grid-template-columns:1fr}.concierge-admin-messaging-reply-actions{flex-direction:row}.concierge-admin-message-bubble{max-width:92%}}

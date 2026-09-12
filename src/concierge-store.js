@@ -474,6 +474,91 @@ export class ConciergeStore extends DurableObject {
           rotation_confirmed_at TEXT NOT NULL DEFAULT '',
           updated_at TEXT NOT NULL
         );
+
+
+        CREATE TABLE IF NOT EXISTS messaging_threads (
+          id TEXT PRIMARY KEY,
+          channel TEXT NOT NULL,
+          source_label TEXT NOT NULL DEFAULT '',
+          external_thread_id TEXT NOT NULL,
+          external_reservation_id TEXT NOT NULL DEFAULT '',
+          reservation_id TEXT NOT NULL DEFAULT '',
+          room TEXT NOT NULL DEFAULT '',
+          guest_name TEXT NOT NULL DEFAULT '',
+          guest_phone TEXT NOT NULL DEFAULT '',
+          check_in_date TEXT NOT NULL DEFAULT '',
+          check_out_date TEXT NOT NULL DEFAULT '',
+          unread_count INTEGER NOT NULL DEFAULT 0,
+          needs_human INTEGER NOT NULL DEFAULT 0,
+          ai_paused INTEGER NOT NULL DEFAULT 0,
+          ai_draft INTEGER NOT NULL DEFAULT 0,
+          last_error TEXT NOT NULL DEFAULT '',
+          last_message_at TEXT NOT NULL DEFAULT '',
+          last_message_preview TEXT NOT NULL DEFAULT '',
+          last_direction TEXT NOT NULL DEFAULT '',
+          last_sender TEXT NOT NULL DEFAULT '',
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        );
+        CREATE UNIQUE INDEX IF NOT EXISTS messaging_threads_external
+          ON messaging_threads(channel, external_thread_id);
+        CREATE INDEX IF NOT EXISTS messaging_threads_phone
+          ON messaging_threads(guest_phone, updated_at);
+        CREATE INDEX IF NOT EXISTS messaging_threads_reservation
+          ON messaging_threads(reservation_id, updated_at);
+        CREATE INDEX IF NOT EXISTS messaging_threads_activity
+          ON messaging_threads(last_message_at, unread_count, needs_human);
+
+        CREATE TABLE IF NOT EXISTS messaging_messages (
+          id TEXT PRIMARY KEY,
+          thread_id TEXT NOT NULL,
+          provider_message_id TEXT NOT NULL DEFAULT '',
+          direction TEXT NOT NULL,
+          sender TEXT NOT NULL,
+          body TEXT NOT NULL,
+          automated INTEGER NOT NULL DEFAULT 0,
+          delivery_status TEXT NOT NULL DEFAULT '',
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS messaging_messages_thread
+          ON messaging_messages(thread_id, created_at);
+        CREATE UNIQUE INDEX IF NOT EXISTS messaging_messages_provider
+          ON messaging_messages(provider_message_id) WHERE provider_message_id <> '';
+
+
+        CREATE TABLE IF NOT EXISTS messaging_provider_state (
+          provider TEXT PRIMARY KEY,
+          value_json TEXT NOT NULL DEFAULT '{}',
+          expires_at TEXT NOT NULL DEFAULT '',
+          updated_at TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS beds24_reservation_links (
+          reservation_id TEXT PRIMARY KEY,
+          external_booking_id TEXT NOT NULL UNIQUE,
+          external_room_id TEXT NOT NULL DEFAULT '',
+          source_label TEXT NOT NULL DEFAULT '',
+          updated_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS beds24_reservation_links_external
+          ON beds24_reservation_links(external_booking_id);
+
+        CREATE TABLE IF NOT EXISTS beds24_channel_retries (
+          id TEXT PRIMARY KEY,
+          operation TEXT NOT NULL,
+          reservation_id TEXT NOT NULL DEFAULT '',
+          external_booking_id TEXT NOT NULL DEFAULT '',
+          payload_json TEXT NOT NULL DEFAULT '{}',
+          attempt_count INTEGER NOT NULL DEFAULT 0,
+          next_attempt_at TEXT NOT NULL DEFAULT '',
+          last_error TEXT NOT NULL DEFAULT '',
+          status TEXT NOT NULL DEFAULT 'pending',
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS beds24_channel_retries_due
+          ON beds24_channel_retries(status, next_attempt_at, created_at);
       `);
       try {
         this.ctx.storage.sql.exec("ALTER TABLE stay_reservations ADD COLUMN guest_first_name TEXT NOT NULL DEFAULT ''");
@@ -1774,6 +1859,185 @@ export class ConciergeStore extends DurableObject {
     return { ok: true, upserted };
   }
 
+  async syncBeds24ChannelReservation(record = {}) {
+    const externalBookingId = cleanText(record.externalBookingId, 40);
+    const externalRoomId = cleanText(record.externalRoomId, 40);
+    const provider = cleanText(record.provider, 24) || "beds24";
+    const sourceLabel = cleanText(record.sourceLabel, 50);
+    const listingId = cleanText(record.listingId, 32);
+    const room = cleanText(record.room, 4);
+    const confirmationCodeHash = cleanText(record.confirmationCodeHash, 100);
+    const guestFirstName = cleanText(record.guestFirstName, 40);
+    const checkInDate = cleanText(record.checkInDate, 10);
+    const checkOutDate = cleanText(record.checkOutDate, 10);
+    const status = record.status === "cancelled" ? "cancelled" : "confirmed";
+    const sourceRefHash = cleanText(record.sourceRefHash, 100);
+    const now = cleanText(record.updatedAt, 40) || new Date().toISOString();
+    if (!/^\d+$/.test(externalBookingId) || !/^(?:[1-9]|10|11)$/.test(room)
+      || !confirmationCodeHash || !/^\d{4}-\d{2}-\d{2}$/.test(checkInDate)
+      || !/^\d{4}-\d{2}-\d{2}$/.test(checkOutDate) || checkOutDate <= checkInDate) {
+      return { ok: false, error: "invalid_beds24_reservation" };
+    }
+    const linked = rows(this.ctx.storage.sql.exec(
+      "SELECT reservation_id AS reservationId FROM beds24_reservation_links WHERE external_booking_id = ? LIMIT 1",
+      externalBookingId
+    ))[0] || null;
+    const byCode = linked ? null : rows(this.ctx.storage.sql.exec(
+      "SELECT id AS reservationId FROM stay_reservations WHERE confirmation_code_hash = ? LIMIT 1",
+      confirmationCodeHash
+    ))[0] || null;
+    const reservationId = linked?.reservationId || byCode?.reservationId || `stay_${crypto.randomUUID()}`;
+    const existing = rows(this.ctx.storage.sql.exec(
+      "SELECT created_at AS createdAt FROM stay_reservations WHERE id = ? LIMIT 1",
+      reservationId
+    ))[0] || null;
+    const createdAt = existing?.createdAt || now;
+    this.ctx.storage.sql.exec(
+      `INSERT INTO stay_reservations
+       (id, provider, listing_id, room, confirmation_code_hash, guest_first_name, check_in_date,
+        check_out_date, status, source_ref_hash, last_seen_sync, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(id) DO UPDATE SET
+         provider = excluded.provider,
+         listing_id = excluded.listing_id,
+         room = excluded.room,
+         confirmation_code_hash = CASE WHEN excluded.confirmation_code_hash != '' THEN excluded.confirmation_code_hash ELSE stay_reservations.confirmation_code_hash END,
+         guest_first_name = CASE WHEN excluded.guest_first_name != '' THEN excluded.guest_first_name ELSE stay_reservations.guest_first_name END,
+         check_in_date = excluded.check_in_date,
+         check_out_date = excluded.check_out_date,
+         status = excluded.status,
+         source_ref_hash = excluded.source_ref_hash,
+         last_seen_sync = excluded.last_seen_sync,
+         updated_at = excluded.updated_at`,
+      reservationId, provider, listingId, room, confirmationCodeHash, guestFirstName,
+      checkInDate, checkOutDate, status, sourceRefHash, `beds24_${externalBookingId}`, createdAt, now
+    );
+    this.ctx.storage.sql.exec(
+      `INSERT INTO beds24_reservation_links
+       (reservation_id, external_booking_id, external_room_id, source_label, updated_at)
+       VALUES (?, ?, ?, ?, ?)
+       ON CONFLICT(reservation_id) DO UPDATE SET
+         external_booking_id = excluded.external_booking_id,
+         external_room_id = excluded.external_room_id,
+         source_label = excluded.source_label,
+         updated_at = excluded.updated_at`,
+      reservationId, externalBookingId, externalRoomId, sourceLabel, now
+    );
+    if (status === "cancelled") {
+      this.ctx.storage.sql.exec(
+        "UPDATE verified_stay_sessions SET revoked_at = ? WHERE reservation_id = ? AND revoked_at = ''",
+        now, reservationId
+      );
+      this.ctx.storage.sql.exec("DELETE FROM stay_checkout_overrides WHERE reservation_id = ?", reservationId);
+      this.ctx.storage.sql.exec("DELETE FROM stay_late_checkout_approvals WHERE reservation_id = ?", reservationId);
+    }
+    return { ok: true, reservationId, room, status, provider, externalBookingId };
+  }
+
+  async linkBeds24Reservation(record = {}) {
+    const reservationId = cleanText(record.reservationId, 100);
+    const externalBookingId = cleanText(record.externalBookingId, 40);
+    const externalRoomId = cleanText(record.externalRoomId, 40);
+    const sourceLabel = cleanText(record.sourceLabel, 50) || "Direct";
+    const now = cleanText(record.updatedAt, 40) || new Date().toISOString();
+    if (!reservationId || !/^\d+$/.test(externalBookingId)) return { ok: false, error: "invalid_beds24_link" };
+    const reservation = rows(this.ctx.storage.sql.exec(
+      "SELECT id FROM stay_reservations WHERE id = ? LIMIT 1", reservationId
+    ))[0] || null;
+    if (!reservation) return { ok: false, error: "reservation_not_found" };
+    this.ctx.storage.sql.exec(
+      `INSERT INTO beds24_reservation_links
+       (reservation_id, external_booking_id, external_room_id, source_label, updated_at)
+       VALUES (?, ?, ?, ?, ?)
+       ON CONFLICT(reservation_id) DO UPDATE SET
+         external_booking_id = excluded.external_booking_id,
+         external_room_id = excluded.external_room_id,
+         source_label = excluded.source_label,
+         updated_at = excluded.updated_at`,
+      reservationId, externalBookingId, externalRoomId, sourceLabel, now
+    );
+    return { ok: true, reservationId, externalBookingId };
+  }
+
+  async getBeds24ReservationLink(reservationId) {
+    return rows(this.ctx.storage.sql.exec(
+      `SELECT reservation_id AS reservationId, external_booking_id AS externalBookingId,
+              external_room_id AS externalRoomId, source_label AS sourceLabel, updated_at AS updatedAt
+       FROM beds24_reservation_links WHERE reservation_id = ? LIMIT 1`,
+      cleanText(reservationId, 100)
+    ))[0] || null;
+  }
+
+  async getStayReservationForChannelManager(reservationId) {
+    return rows(this.ctx.storage.sql.exec(
+      `SELECT r.id, r.provider, r.room, r.check_in_date AS checkInDate,
+              CASE WHEN o.check_out_date > r.check_out_date THEN o.check_out_date ELSE r.check_out_date END AS checkOutDate,
+              r.status
+       FROM stay_reservations r
+       LEFT JOIN stay_checkout_overrides o ON o.reservation_id = r.id
+       WHERE r.id = ? LIMIT 1`,
+      cleanText(reservationId, 100)
+    ))[0] || null;
+  }
+
+  async queueBeds24ChannelRetry(record = {}) {
+    const id = cleanText(record.id, 100);
+    const operation = cleanText(record.operation, 40);
+    const reservationId = cleanText(record.reservationId, 100);
+    const externalBookingId = cleanText(record.externalBookingId, 40);
+    const payloadJson = JSON.stringify(record.payload && typeof record.payload === "object" ? record.payload : {}).slice(0, 4000);
+    const lastError = cleanText(record.lastError, 160);
+    const now = cleanText(record.createdAt, 40) || new Date().toISOString();
+    if (!id || !operation) return { ok: false, error: "invalid_retry" };
+    this.ctx.storage.sql.exec(
+      `INSERT OR IGNORE INTO beds24_channel_retries
+       (id, operation, reservation_id, external_booking_id, payload_json, attempt_count,
+        next_attempt_at, last_error, status, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, 0, ?, ?, 'pending', ?, ?)`,
+      id, operation, reservationId, externalBookingId, payloadJson, now, lastError, now, now
+    );
+    return { ok: true, id };
+  }
+
+  async listBeds24ChannelRetries(nowValue, limitValue = 20) {
+    const now = cleanText(nowValue, 40) || new Date().toISOString();
+    const limit = Math.max(1, Math.min(50, Number(limitValue) || 20));
+    return rows(this.ctx.storage.sql.exec(
+      `SELECT id, operation, reservation_id AS reservationId, external_booking_id AS externalBookingId,
+              payload_json AS payloadJson, attempt_count AS attemptCount, next_attempt_at AS nextAttemptAt,
+              last_error AS lastError, created_at AS createdAt, updated_at AS updatedAt
+       FROM beds24_channel_retries
+       WHERE status = 'pending' AND (next_attempt_at = '' OR next_attempt_at <= ?)
+       ORDER BY created_at ASC LIMIT ?`,
+      now, limit
+    )).map((item) => {
+      let payload = {};
+      try { payload = JSON.parse(item.payloadJson || "{}"); } catch (_error) { payload = {}; }
+      return { ...item, payload };
+    });
+  }
+
+  async completeBeds24ChannelRetry(id, successful, lastError, nowValue) {
+    const now = cleanText(nowValue, 40) || new Date().toISOString();
+    this.ctx.storage.sql.exec(
+      `UPDATE beds24_channel_retries
+       SET status = ?, last_error = ?, updated_at = ? WHERE id = ?`,
+      successful ? "completed" : "failed", cleanText(lastError, 160), now, cleanText(id, 100)
+    );
+    return { ok: true };
+  }
+
+  async rescheduleBeds24ChannelRetry(id, nextAttemptAt, lastError, nowValue) {
+    const now = cleanText(nowValue, 40) || new Date().toISOString();
+    this.ctx.storage.sql.exec(
+      `UPDATE beds24_channel_retries
+       SET attempt_count = attempt_count + 1, next_attempt_at = ?, last_error = ?, updated_at = ?
+       WHERE id = ? AND status = 'pending'`,
+      cleanText(nextAttemptAt, 40), cleanText(lastError, 160), now, cleanText(id, 100)
+    );
+    return { ok: true };
+  }
+
   async getCanonicalStayReservationByCodeHash(codeHash, room) {
     const row = rows(this.ctx.storage.sql.exec(
       `SELECT id, provider, listing_id AS listingId, room, guest_first_name AS guestFirstName,
@@ -2929,6 +3193,324 @@ export class ConciergeStore extends DurableObject {
        ORDER BY service_date DESC, priority DESC, CAST(room AS INTEGER) ASC LIMIT 100`
     )).map((item) => ({ ...item, priority: Boolean(item.priority) }));
     return { reservations, rotations, rotationActivity, housekeepingStatuses, housekeepingTasks };
+  }
+
+  async findStayReservationForMessaging(room, checkInDate, checkOutDate, guestFirstName = "") {
+    const candidates = rows(this.ctx.storage.sql.exec(
+      `SELECT r.id, r.provider, r.listing_id AS listingId, r.room, r.guest_first_name AS guestFirstName,
+              r.check_in_date AS checkInDate,
+              CASE WHEN o.check_out_date > r.check_out_date THEN o.check_out_date ELSE r.check_out_date END AS checkOutDate,
+              r.status, r.updated_at AS updatedAt
+       FROM stay_reservations r
+       LEFT JOIN stay_checkout_overrides o ON o.reservation_id = r.id
+       WHERE r.status = 'confirmed' AND r.room = ? AND r.check_in_date = ?
+         AND (CASE WHEN o.check_out_date > r.check_out_date THEN o.check_out_date ELSE r.check_out_date END) = ?
+       ORDER BY r.updated_at DESC LIMIT 5`,
+      cleanText(room, 4),
+      cleanText(checkInDate, 10),
+      cleanText(checkOutDate, 10)
+    ));
+    if (!candidates.length) return null;
+    const guest = cleanText(guestFirstName, 40).toLowerCase();
+    if (guest) {
+      const named = candidates.find((item) => cleanText(item.guestFirstName, 40).toLowerCase() === guest);
+      if (named) return named;
+    }
+    return candidates.length === 1 ? candidates[0] : null;
+  }
+
+  async getStayReservationById(reservationId) {
+    return rows(this.ctx.storage.sql.exec(
+      `SELECT r.id, r.provider, r.listing_id AS listingId, r.room, r.guest_first_name AS guestFirstName,
+              r.check_in_date AS checkInDate,
+              CASE WHEN o.check_out_date > r.check_out_date THEN o.check_out_date ELSE r.check_out_date END AS checkOutDate,
+              r.status, r.updated_at AS updatedAt
+       FROM stay_reservations r
+       LEFT JOIN stay_checkout_overrides o ON o.reservation_id = r.id
+       WHERE r.id = ? LIMIT 1`,
+      cleanText(reservationId, 100)
+    ))[0] || null;
+  }
+
+  async upsertMessagingThread(record) {
+    const now = cleanText(record.updatedAt, 40) || new Date().toISOString();
+    const channel = cleanText(record.channel, 30);
+    const externalThreadId = cleanText(record.externalThreadId, 220);
+    if (!channel || !externalThreadId) return null;
+    const existing = rows(this.ctx.storage.sql.exec(
+      `SELECT id FROM messaging_threads WHERE channel = ? AND external_thread_id = ? LIMIT 1`,
+      channel,
+      externalThreadId
+    ))[0];
+    const id = existing?.id || cleanText(record.id, 100) || `thread_${crypto.randomUUID()}`;
+    if (existing) {
+      this.ctx.storage.sql.exec(
+        `UPDATE messaging_threads SET
+           source_label = CASE WHEN ? <> '' THEN ? ELSE source_label END,
+           external_reservation_id = CASE WHEN ? <> '' THEN ? ELSE external_reservation_id END,
+           reservation_id = CASE WHEN ? <> '' THEN ? ELSE reservation_id END,
+           room = CASE WHEN ? <> '' THEN ? ELSE room END,
+           guest_name = CASE WHEN ? <> '' THEN ? ELSE guest_name END,
+           guest_phone = CASE WHEN ? <> '' THEN ? ELSE guest_phone END,
+           check_in_date = CASE WHEN ? <> '' THEN ? ELSE check_in_date END,
+           check_out_date = CASE WHEN ? <> '' THEN ? ELSE check_out_date END,
+           updated_at = ?
+         WHERE id = ?`,
+        cleanText(record.sourceLabel, 50), cleanText(record.sourceLabel, 50),
+        cleanText(record.externalReservationId, 100), cleanText(record.externalReservationId, 100),
+        cleanText(record.reservationId, 100), cleanText(record.reservationId, 100),
+        cleanText(record.room, 4), cleanText(record.room, 4),
+        cleanText(record.guestName, 80), cleanText(record.guestName, 80),
+        cleanText(record.guestPhone, 20), cleanText(record.guestPhone, 20),
+        cleanText(record.checkInDate, 10), cleanText(record.checkInDate, 10),
+        cleanText(record.checkOutDate, 10), cleanText(record.checkOutDate, 10),
+        now,
+        id
+      );
+    } else {
+      this.ctx.storage.sql.exec(
+        `INSERT INTO messaging_threads
+         (id, channel, source_label, external_thread_id, external_reservation_id, reservation_id,
+          room, guest_name, guest_phone, check_in_date, check_out_date, unread_count, needs_human,
+          ai_paused, ai_draft, last_error, last_message_at, last_message_preview, last_direction,
+          last_sender, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, 0, 0, '', '', '', '', '', ?, ?)`,
+        id,
+        channel,
+        cleanText(record.sourceLabel, 50),
+        externalThreadId,
+        cleanText(record.externalReservationId, 100),
+        cleanText(record.reservationId, 100),
+        cleanText(record.room, 4),
+        cleanText(record.guestName, 80),
+        cleanText(record.guestPhone, 20),
+        cleanText(record.checkInDate, 10),
+        cleanText(record.checkOutDate, 10),
+        now,
+        now
+      );
+    }
+    return this.getMessagingThread(id);
+  }
+
+  async recordMessagingMessage(record) {
+    const providerMessageId = cleanText(record.providerMessageId, 220);
+    if (providerMessageId) {
+      const duplicate = rows(this.ctx.storage.sql.exec(
+        "SELECT id FROM messaging_messages WHERE provider_message_id = ? LIMIT 1",
+        providerMessageId
+      ))[0];
+      if (duplicate) return { inserted: false, id: duplicate.id };
+    }
+    const id = cleanText(record.id, 100) || `msg_${crypto.randomUUID()}`;
+    const threadId = cleanText(record.threadId, 100);
+    const direction = ["inbound", "outbound", "draft"].includes(record.direction) ? record.direction : "inbound";
+    const sender = ["guest", "ai", "owner", "system"].includes(record.sender) ? record.sender : "guest";
+    const body = cleanText(record.body, 3000);
+    const createdAt = cleanText(record.createdAt, 40) || new Date().toISOString();
+    if (!threadId || !body) return { inserted: false, error: "invalid_message" };
+    this.ctx.storage.sql.exec(
+      `INSERT INTO messaging_messages
+       (id, thread_id, provider_message_id, direction, sender, body, automated, delivery_status, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      id,
+      threadId,
+      providerMessageId,
+      direction,
+      sender,
+      body,
+      record.automated ? 1 : 0,
+      cleanText(record.deliveryStatus, 30),
+      createdAt,
+      createdAt
+    );
+    this.ctx.storage.sql.exec(
+      `UPDATE messaging_threads SET
+         unread_count = unread_count + ?,
+         needs_human = CASE WHEN ? = 'inbound' THEN 1 ELSE needs_human END,
+         last_message_at = ?, last_message_preview = ?, last_direction = ?, last_sender = ?, updated_at = ?
+       WHERE id = ?`,
+      direction === "inbound" ? 1 : 0,
+      direction,
+      createdAt,
+      body.slice(0, 240),
+      direction,
+      sender,
+      createdAt,
+      threadId
+    );
+    return { inserted: true, id };
+  }
+
+  async listMessagingThreads(limitValue = 80) {
+    const limit = Math.max(1, Math.min(200, Number(limitValue) || 80));
+    return rows(this.ctx.storage.sql.exec(
+      `SELECT id, channel, source_label AS sourceLabel, external_thread_id AS externalThreadId,
+              external_reservation_id AS externalReservationId, reservation_id AS reservationId,
+              room, guest_name AS guestName, guest_phone AS guestPhone, check_in_date AS checkInDate,
+              check_out_date AS checkOutDate, unread_count AS unreadCount, needs_human AS needsHuman,
+              ai_paused AS aiPaused, ai_draft AS aiDraft, last_error AS lastError,
+              last_message_at AS lastMessageAt, last_message_preview AS lastMessagePreview,
+              last_direction AS lastDirection, last_sender AS lastSender, created_at AS createdAt,
+              updated_at AS updatedAt
+       FROM messaging_threads
+       ORDER BY CASE WHEN needs_human = 1 THEN 0 ELSE 1 END, last_message_at DESC, updated_at DESC
+       LIMIT ?`,
+      limit
+    )).map((item) => ({
+      ...item,
+      unreadCount: Number(item.unreadCount) || 0,
+      needsHuman: Boolean(item.needsHuman),
+      aiPaused: Boolean(item.aiPaused),
+      aiDraft: Boolean(item.aiDraft)
+    }));
+  }
+
+  async getMessagingThread(id) {
+    const row = rows(this.ctx.storage.sql.exec(
+      `SELECT id, channel, source_label AS sourceLabel, external_thread_id AS externalThreadId,
+              external_reservation_id AS externalReservationId, reservation_id AS reservationId,
+              room, guest_name AS guestName, guest_phone AS guestPhone, check_in_date AS checkInDate,
+              check_out_date AS checkOutDate, unread_count AS unreadCount, needs_human AS needsHuman,
+              ai_paused AS aiPaused, ai_draft AS aiDraft, last_error AS lastError,
+              last_message_at AS lastMessageAt, last_message_preview AS lastMessagePreview,
+              last_direction AS lastDirection, last_sender AS lastSender, created_at AS createdAt,
+              updated_at AS updatedAt
+       FROM messaging_threads WHERE id = ? LIMIT 1`,
+      cleanText(id, 100)
+    ))[0] || null;
+    return row ? {
+      ...row,
+      unreadCount: Number(row.unreadCount) || 0,
+      needsHuman: Boolean(row.needsHuman),
+      aiPaused: Boolean(row.aiPaused),
+      aiDraft: Boolean(row.aiDraft)
+    } : null;
+  }
+
+  async listMessagingMessages(threadId, limitValue = 100) {
+    const limit = Math.max(1, Math.min(200, Number(limitValue) || 100));
+    return rows(this.ctx.storage.sql.exec(
+      `SELECT id, threadId, providerMessageId, direction, sender, body, automated, deliveryStatus, createdAt, updatedAt
+       FROM (
+         SELECT id, thread_id AS threadId, provider_message_id AS providerMessageId,
+                direction, sender, body, automated, delivery_status AS deliveryStatus,
+                created_at AS createdAt, updated_at AS updatedAt
+         FROM messaging_messages WHERE thread_id = ?
+         ORDER BY created_at DESC, id DESC LIMIT ?
+       )
+       ORDER BY createdAt ASC, id ASC`,
+      cleanText(threadId, 100),
+      limit
+    )).map((item) => ({ ...item, automated: Boolean(item.automated) }));
+  }
+
+  async findMessagingThreadByPhone(phone) {
+    const value = cleanText(phone, 20);
+    if (!value) return null;
+    const id = rows(this.ctx.storage.sql.exec(
+      `SELECT id FROM messaging_threads
+       WHERE guest_phone = ?
+       ORDER BY CASE WHEN reservation_id <> '' THEN 0 ELSE 1 END, updated_at DESC LIMIT 1`,
+      value
+    ))[0]?.id;
+    return id ? this.getMessagingThread(id) : null;
+  }
+
+  async linkMessagingThreadsByPhone(phone, record = {}) {
+    const value = cleanText(phone, 20);
+    const reservationId = cleanText(record.reservationId, 100);
+    if (!value || !reservationId) return { ok: false };
+    this.ctx.storage.sql.exec(
+      `UPDATE messaging_threads SET
+         reservation_id = ?,
+         room = CASE WHEN ? <> '' THEN ? ELSE room END,
+         guest_name = CASE WHEN ? <> '' THEN ? ELSE guest_name END,
+         check_in_date = CASE WHEN ? <> '' THEN ? ELSE check_in_date END,
+         check_out_date = CASE WHEN ? <> '' THEN ? ELSE check_out_date END,
+         updated_at = ?
+       WHERE guest_phone = ? AND (reservation_id = '' OR reservation_id = ?)`,
+      reservationId,
+      cleanText(record.room, 4), cleanText(record.room, 4),
+      cleanText(record.guestName, 80), cleanText(record.guestName, 80),
+      cleanText(record.checkInDate, 10), cleanText(record.checkInDate, 10),
+      cleanText(record.checkOutDate, 10), cleanText(record.checkOutDate, 10),
+      cleanText(record.updatedAt, 40) || new Date().toISOString(),
+      value,
+      reservationId
+    );
+    return { ok: true };
+  }
+
+  async markMessagingThreadRead(id, nowValue) {
+    this.ctx.storage.sql.exec(
+      "UPDATE messaging_threads SET unread_count = 0, updated_at = ? WHERE id = ?",
+      cleanText(nowValue, 40) || new Date().toISOString(),
+      cleanText(id, 100)
+    );
+    return { ok: true };
+  }
+
+  async updateMessagingThreadState(id, state = {}) {
+    const threadId = cleanText(id, 100);
+    const now = cleanText(state.updatedAt, 40) || new Date().toISOString();
+    const existing = await this.getMessagingThread(threadId);
+    if (!existing) return { ok: false, error: "not_found" };
+    this.ctx.storage.sql.exec(
+      `UPDATE messaging_threads SET needs_human = ?, ai_paused = ?, ai_draft = ?, last_error = ?, updated_at = ? WHERE id = ?`,
+      state.needsHuman === undefined ? (existing.needsHuman ? 1 : 0) : (state.needsHuman ? 1 : 0),
+      state.aiPaused === undefined ? (existing.aiPaused ? 1 : 0) : (state.aiPaused ? 1 : 0),
+      state.aiDraft === undefined ? (existing.aiDraft ? 1 : 0) : (state.aiDraft ? 1 : 0),
+      state.lastError === undefined ? cleanText(existing.lastError, 120) : cleanText(state.lastError, 120),
+      now,
+      threadId
+    );
+    return { ok: true };
+  }
+
+  async getMessagingProviderState(providerValue) {
+    const provider = cleanText(providerValue, 40);
+    if (!provider) return null;
+    const row = rows(this.ctx.storage.sql.exec(
+      `SELECT provider, value_json AS valueJson, expires_at AS expiresAt, updated_at AS updatedAt
+       FROM messaging_provider_state WHERE provider = ? LIMIT 1`,
+      provider
+    ))[0] || null;
+    if (!row) return null;
+    let value = {};
+    try { value = JSON.parse(row.valueJson || '{}'); } catch (_error) { value = {}; }
+    return { provider: row.provider, value, expiresAt: row.expiresAt, updatedAt: row.updatedAt };
+  }
+
+  async setMessagingProviderState(providerValue, value, expiresAtValue = '') {
+    const provider = cleanText(providerValue, 40);
+    if (!provider) return { ok: false, error: 'invalid_provider' };
+    const now = new Date().toISOString();
+    const valueJson = JSON.stringify(value && typeof value === 'object' ? value : {});
+    const expiresAt = cleanText(expiresAtValue, 40);
+    this.ctx.storage.sql.exec(
+      `INSERT INTO messaging_provider_state (provider, value_json, expires_at, updated_at)
+       VALUES (?, ?, ?, ?)
+       ON CONFLICT(provider) DO UPDATE SET value_json = excluded.value_json,
+         expires_at = excluded.expires_at, updated_at = excluded.updated_at`,
+      provider,
+      valueJson,
+      expiresAt,
+      now
+    );
+    return { ok: true };
+  }
+
+  async updateMessagingMessageDelivery(record = {}) {
+    const providerMessageId = cleanText(record.providerMessageId, 220);
+    if (!providerMessageId) return { ok: false };
+    this.ctx.storage.sql.exec(
+      `UPDATE messaging_messages SET delivery_status = ?, updated_at = ? WHERE provider_message_id = ?`,
+      cleanText(record.deliveryStatus, 30),
+      cleanText(record.updatedAt, 40) || new Date().toISOString(),
+      providerMessageId
+    );
+    return { ok: true };
   }
 
   async getTranslations(cacheKeys) {

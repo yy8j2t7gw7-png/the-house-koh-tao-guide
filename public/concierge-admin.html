@@ -80,6 +80,30 @@
         <div id="integrationProviders" class="concierge-admin-integration-grid" aria-label="Booking platform integrations"></div>
       </details>
 
+      <details class="concierge-admin-section" data-admin-section="messaging" open>
+        <summary class="concierge-admin-section-head">
+          <div>
+            <p class="concierge-admin-kicker">Guest conversations</p>
+            <h2>Unified Guest Messaging</h2>
+          </div>
+          <span class="concierge-admin-section-summary"><span class="concierge-admin-section-count" data-section-count>0</span><span data-section-state>Expanded</span><span class="concierge-admin-section-chevron" aria-hidden="true"></span></span>
+        </summary>
+        <p>OTA messaging via Beds24 + direct WhatsApp. Messages stay in the guest’s original channel; replies sent here return to the guest on that channel. AI replies can be enabled after the live connectors are tested.</p>
+        <div id="unifiedMessagingStatus" class="concierge-admin-messaging-status" aria-live="polite"></div>
+        <div class="concierge-admin-messaging-layout">
+          <div>
+            <div class="concierge-admin-messaging-list-head">
+              <h3>Inbox</h3>
+              <button type="button" class="secondary" id="refreshUnifiedMessaging">Refresh</button>
+            </div>
+            <div id="unifiedMessagingThreads" class="concierge-admin-messaging-threads" aria-label="Guest message conversations"></div>
+          </div>
+          <div id="unifiedMessagingConversation" class="concierge-admin-messaging-conversation" aria-live="polite">
+            <div class="concierge-admin-messaging-empty">Select a conversation to read and reply.</div>
+          </div>
+        </div>
+      </details>
+
       <details class="concierge-admin-section" data-admin-section="operations" open>
         <summary class="concierge-admin-section-head">
           <div>

@@ -1,5 +1,6 @@
 import {
   conciergeStatus,
+  generateUnifiedMessageReply,
   handleAdminRequest,
   handleConciergeRequest,
   handleEmergencyContactRequest,
@@ -10,6 +11,18 @@ import { processRegistrationReminderAlerts } from "./registration-alerts.js";
 import { cleanupMaintenanceReports, handleMaintenanceGuestRequest } from "./maintenance-api.js";
 import { handleTranslationRequest } from "./i18n-api.js";
 import { handleWhatsAppWebhook, processDueAlertEscalations } from "./whatsapp-alerts.js";
+import {
+  handleInboundWhatsAppGuestMessage,
+  handleBeds24MessagingWebhook,
+  handleWhatsAppMessagingStatus,
+  maintainBeds24Authentication
+} from "./unified-messaging.js";
+import {
+  beds24ChannelManagerEnabled,
+  ingestBeds24ChannelBooking,
+  processBeds24ChannelManagerRetries,
+  reconcileBeds24ChannelManager
+} from "./beds24-channel-manager.js";
 import { processHousekeepingTurnovers } from "./housekeeping-operations.js";
 import { servePublicLegalPage } from "./public-legal.js";
 import {
@@ -117,7 +130,27 @@ export default {
     }
 
     if (url.pathname === "/api/whatsapp/webhook") {
-      return handleWhatsAppWebhook(request, env);
+      return handleWhatsAppWebhook(request, env, {
+        onGuestMessage: (message) => handleInboundWhatsAppGuestMessage(
+          message,
+          env,
+          ctx,
+          (context) => generateUnifiedMessageReply(context, env, ctx)
+        ),
+        onStatus: (status) => handleWhatsAppMessagingStatus(status, env)
+      });
+    }
+
+    if (url.pathname === "/api/messaging/beds24/webhook") {
+      return handleBeds24MessagingWebhook(
+        request,
+        env,
+        ctx,
+        (context) => generateUnifiedMessageReply(context, env, ctx),
+        beds24ChannelManagerEnabled(env)
+          ? { onBooking: ({ booking, store }) => ingestBeds24ChannelBooking(booking, env, store) }
+          : {}
+      );
     }
 
     if (url.pathname === "/api/i18n/translate") {
@@ -228,12 +261,17 @@ export default {
       return;
     }
     if (controller.cron === "0 * * * *") {
-      ctx.waitUntil(processRegistrationReminderAlerts(env));
+      ctx.waitUntil(Promise.all([
+        processRegistrationReminderAlerts(env),
+        processBeds24ChannelManagerRetries(env)
+      ]));
       return;
     }
     ctx.waitUntil(Promise.all([
       cleanupPassportUploads(env),
-      cleanupMaintenanceReports(env)
+      cleanupMaintenanceReports(env),
+      maintainBeds24Authentication(env),
+      reconcileBeds24ChannelManager(env)
     ]));
   }
 };

@@ -1139,7 +1139,7 @@ async function notifyHousekeepingReadyOwners(alert, actorPhone, env, store) {
   });
 }
 
-export async function handleWhatsAppWebhook(request, env) {
+export async function handleWhatsAppWebhook(request, env, handlers = {}) {
   const url = new URL(request.url);
   if (request.method === "GET") {
     const mode = url.searchParams.get("hub.mode");
@@ -1171,11 +1171,23 @@ export async function handleWhatsAppWebhook(request, env) {
         errorCode: String(item.status?.errors?.[0]?.code || ""),
         updatedAt: new Date().toISOString()
       });
+      if (typeof handlers.onStatus === "function") {
+        await handlers.onStatus(item.status).catch(() => {});
+      }
       continue;
     }
     const from = digits(item.message?.from);
     const parsed = statusCommandFromMessage(item.message);
-    if (!parsed || !recipientIsAuthorized(from, env)) continue;
+    const authorizedStaff = recipientIsAuthorized(from, env);
+    if (!authorizedStaff) {
+      if (typeof handlers.onGuestMessage === "function") {
+        await handlers.onGuestMessage(item.message).catch(() => {});
+      }
+      continue;
+    }
+    // Preserve the existing staff quick-action contract. Staff messages that are
+    // not House alert commands are never reclassified as guest conversations.
+    if (!parsed) continue;
     const command = parsed.command;
     const before = store.getAlert ? await store.getAlert(parsed.alertId) : store.alerts?.find((alert) => alert.id === parsed.alertId);
     if (!before) continue;

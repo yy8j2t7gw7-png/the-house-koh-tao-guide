@@ -40,6 +40,14 @@
   const financeLocationSummary = document.getElementById("financeLocationSummary");
   const financeAutomationStatus = document.getElementById("financeAutomationStatus");
   const financeBeds24Sync = document.getElementById("financeBeds24Sync");
+  const financeHistoricalImportPanel = document.getElementById("financeHistoricalImportPanel");
+  const financeHistoricalImportStatus = document.getElementById("financeHistoricalImportStatus");
+  const financeImportThisMonth = document.getElementById("financeImportThisMonth");
+  const financeImportPreviousMonth = document.getElementById("financeImportPreviousMonth");
+  const financeImport90Days = document.getElementById("financeImport90Days");
+  const financeImportFrom = document.getElementById("financeImportFrom");
+  const financeImportTo = document.getElementById("financeImportTo");
+  const financeImportCustom = document.getElementById("financeImportCustom");
   const incomeForm = document.getElementById("incomeForm");
   const incomeEntries = document.getElementById("incomeEntries");
   const incomeReset = document.getElementById("incomeReset");
@@ -1404,6 +1412,28 @@
     return new Intl.NumberFormat("en", { style: "currency", currency: expenseCurrency, maximumFractionDigits: expenseMinorUnitDigits }).format(Number(value) || 0);
   }
 
+  function dateOnlyShift(dateOnly, days) {
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(dateOnly || ""));
+    if (!match) return "";
+    const date = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])));
+    date.setUTCDate(date.getUTCDate() + Number(days || 0));
+    return date.toISOString().slice(0, 10);
+  }
+
+  function previousMonthRange(currentDate) {
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(currentDate || ""));
+    if (!match) return { from: "", to: "" };
+    const year = Number(match[1]);
+    const monthIndex = Number(match[2]) - 1;
+    const firstThisMonth = new Date(Date.UTC(year, monthIndex, 1));
+    const lastPreviousMonth = new Date(firstThisMonth.getTime() - 86400000);
+    const firstPreviousMonth = new Date(Date.UTC(lastPreviousMonth.getUTCFullYear(), lastPreviousMonth.getUTCMonth(), 1));
+    return {
+      from: firstPreviousMonth.toISOString().slice(0, 10),
+      to: lastPreviousMonth.toISOString().slice(0, 10)
+    };
+  }
+
   function resetExpenseForm({ keepReceipt = false } = {}) {
     const file = keepReceipt ? expenseReceipt.files?.[0] : null;
     expenseEditingRecord = null;
@@ -1604,12 +1634,23 @@
     if (automation.ready) {
       financeAutomationStatus.textContent = "Airbnb payout sync is active. Net income uses the actual channel-collected payment reported by Beds24; gross booking value and commission remain visible for reconciliation.";
       financeBeds24Sync.hidden = false;
-      return;
+    } else {
+      financeBeds24Sync.hidden = true;
+      financeAutomationStatus.textContent = automation.enabled
+        ? "Airbnb payout sync is enabled but not ready. Check the Beds24 refresh token, financial booking scope and explicit Room 1–11 mapping."
+        : "Airbnb payout sync is safely disabled. Historical backfill can still be used below; automatic OTA payment import stays off until BEDS24_FINANCE_SYNC_ENABLED is deliberately enabled.";
     }
-    financeBeds24Sync.hidden = true;
-    financeAutomationStatus.textContent = automation.enabled
-      ? "Airbnb payout sync is enabled but not ready. Check the Beds24 refresh token, financial booking scope and explicit Room 1–11 mapping."
-      : "Airbnb payout sync is safely disabled. No OTA payment is imported until BEDS24_FINANCE_SYNC_ENABLED is deliberately set to true after Beds24 financial data has been verified.";
+
+    const historicalReady = automation.historicalImportReady === true;
+    if (financeHistoricalImportPanel) financeHistoricalImportPanel.dataset.ready = historicalReady ? "true" : "false";
+    [financeImportThisMonth, financeImportPreviousMonth, financeImport90Days, financeImportFrom, financeImportTo, financeImportCustom]
+      .filter(Boolean)
+      .forEach((control) => { control.disabled = !historicalReady; });
+    if (financeHistoricalImportStatus) {
+      financeHistoricalImportStatus.textContent = historicalReady
+        ? "Historical Airbnb import is ready. Re-running the same period reconciles existing provider-managed entries instead of creating duplicates."
+        : "Historical import needs the Beds24 refresh token, read:bookings + read:bookings-financial access, and the complete Room 1–11 mapping.";
+    }
   }
 
   function renderIncome(records = []) {
@@ -1670,6 +1711,51 @@
     renderFinanceAutomation(financeData.automation || {});
     renderFinanceSummary(financeData.totals || {});
     renderIncome(financeData.income || []);
+  }
+
+  function historicalFinanceImportSummary(result = {}) {
+    const scanned = Number(result.scanned) || 0;
+    const created = Number(result.created) || 0;
+    const updated = Number(result.updated) || 0;
+    const unchanged = Number(result.unchanged) || 0;
+    const refunded = Number(result.refunded) || 0;
+    const skipped = Number(result.skipped) || 0;
+    const outsideRange = Number(result.outsideRange) || 0;
+    if (created + updated + unchanged === 0) {
+      if (scanned > 0) {
+        return `Beds24 returned ${scanned} Airbnb booking${scanned === 1 ? "" : "s"}, but no channel-collected payment was imported for ${result.from} to ${result.to}. ${skipped} booking${skipped === 1 ? " was" : "s were"} skipped${outsideRange ? ` and ${outsideRange} payment${outsideRange === 1 ? " was" : "s were"} outside the selected payment-date range` : ""}. This usually means Airbnb financial/payout data is not present in Beds24 yet.`;
+      }
+      return `Beds24 returned no Airbnb bookings for ${result.from} to ${result.to}. No Finance records were changed.`;
+    }
+    return `Historical Airbnb import complete for ${result.from} to ${result.to}: ${created} created, ${updated} updated, ${unchanged} unchanged, ${refunded} refunded. ${scanned} Beds24 booking${scanned === 1 ? "" : "s"} scanned.`;
+  }
+
+  async function runHistoricalFinanceImport(from, to) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(from || "")) || !/^\d{4}-\d{2}-\d{2}$/.test(String(to || "")) || to < from) {
+      window.alert("Please choose a valid historical Finance date range.");
+      return;
+    }
+    const controls = [financeImportThisMonth, financeImportPreviousMonth, financeImport90Days, financeImportFrom, financeImportTo, financeImportCustom].filter(Boolean);
+    controls.forEach((control) => { control.disabled = true; });
+    if (financeHistoricalImportStatus) financeHistoricalImportStatus.textContent = `Importing Airbnb income from ${from} to ${to}…`;
+    try {
+      const result = await api("/api/concierge/admin/finance/import", {
+        method: "POST",
+        body: JSON.stringify({ provider: "airbnb", from, to })
+      });
+      if (from.slice(0, 7) === to.slice(0, 7)) expenseMonth.value = to.slice(0, 7);
+      await loadFinance();
+      if (financeHistoricalImportStatus) financeHistoricalImportStatus.textContent = historicalFinanceImportSummary(result);
+    } catch (error) {
+      if (financeHistoricalImportStatus) {
+        financeHistoricalImportStatus.textContent = error.message === "beds24_finance_sync_not_ready"
+          ? "Historical import is not ready. Check Beds24 financial API access and the complete Room 1–11 mapping."
+          : "Historical Airbnb income could not be imported. No existing Finance records were deleted.";
+      }
+    } finally {
+      const ready = financeHistoricalImportPanel?.dataset.ready === "true";
+      controls.forEach((control) => { control.disabled = !ready; });
+    }
   }
 
   function fillExpenseDraft(draft = {}) {
@@ -2318,6 +2404,25 @@
     }
   });
 
+  financeImportThisMonth?.addEventListener("click", () => {
+    const today = currentPropertyDateParts().date;
+    runHistoricalFinanceImport(`${today.slice(0, 7)}-01`, today);
+  });
+
+  financeImportPreviousMonth?.addEventListener("click", () => {
+    const range = previousMonthRange(currentPropertyDateParts().date);
+    runHistoricalFinanceImport(range.from, range.to);
+  });
+
+  financeImport90Days?.addEventListener("click", () => {
+    const today = currentPropertyDateParts().date;
+    runHistoricalFinanceImport(dateOnlyShift(today, -89), today);
+  });
+
+  financeImportCustom?.addEventListener("click", () => {
+    runHistoricalFinanceImport(financeImportFrom?.value || "", financeImportTo?.value || "");
+  });
+
   expenseMonth.addEventListener("change", () => {
     if (!expenseMonth.value) expenseMonth.value = currentPropertyDateParts().month;
     loadFinance().catch(() => window.alert("Finance records for that month could not be loaded."));
@@ -2560,5 +2665,8 @@
   resetExpenseForm();
   resetIncomeForm();
 
+  const initialFinanceDate = currentPropertyDateParts().date;
+  if (financeImportFrom) financeImportFrom.value = `${initialFinanceDate.slice(0, 7)}-01`;
+  if (financeImportTo) financeImportTo.value = initialFinanceDate;
   showPortalChooser();
 })();

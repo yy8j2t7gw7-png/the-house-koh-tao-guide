@@ -14436,8 +14436,8 @@ test("v5.11.61 commercial protection keeps licensing secrets server-side and gat
   assert.match(storeSource, /mobileCountActiveDevices/);
   assert.match(storeSource, /mobileListAudit/);
   for (const secret of ["MOBILE_LICENSE_SIGNING_SECRET", "TAOEDGE_LICENSE_ADMIN_TOKEN"]) assert.doesNotMatch(wrangler, new RegExp(`"${secret}"\\s*:`));
-  assert.match(wrangler, /"MOBILE_LICENSE_ENFORCEMENT_ENABLED": "false"/);
-  assert.match(wrangler, /"MOBILE_DEVICE_BINDING_ENABLED": "false"/);
+  assert.match(wrangler, /"MOBILE_LICENSE_ENFORCEMENT_ENABLED": "true"/);
+  assert.match(wrangler, /"MOBILE_DEVICE_BINDING_ENABLED": "true"/);
   assert.match(wrangler, /"name": "LICENSE_ADMIN_RATE_LIMITER"/);
   assert.match(mobileSource, /LICENSE_ADMIN_RATE_LIMITER/);
 });
@@ -14465,11 +14465,87 @@ test("v5.11.61 direct WhatsApp guest initiation uses a server-side approved temp
   assert.match(wrangler, /"WHATSAPP_GUEST_INIT_TEMPLATE_NAME": ""/);
 });
 
-test("v5.11.61 deployed mobile app remains enabled while bootstrap and high-impact provider automation flags remain safe", async () => {
+test("v5.11.62 preserves validated mobile license/device enforcement while high-impact provider automation stays staged", async () => {
   const wrangler = await readFile(new URL("../wrangler.jsonc", import.meta.url), "utf8");
   assert.match(wrangler, /"MOBILE_APP_ENABLED": "true"/);
   assert.match(wrangler, /"MOBILE_BOOTSTRAP_ENABLED": "false"/);
+  assert.match(wrangler, /"MOBILE_LICENSE_ENFORCEMENT_ENABLED": "true"/);
+  assert.match(wrangler, /"MOBILE_DEVICE_BINDING_ENABLED": "true"/);
   assert.match(wrangler, /"BEDS24_CHANNEL_MANAGER_ENABLED": "false"/);
   assert.match(wrangler, /"BEDS24_FINANCE_SYNC_ENABLED": "false"/);
   assert.match(wrangler, /"UNIFIED_MESSAGING_AI_AUTO_SEND_ENABLED": "false"/);
+});
+
+
+test("v5.11.62 desktop owner Finance exposes the same historical Airbnb onboarding ranges as mobile", async () => {
+  const [html, js, financeSource] = await Promise.all([
+    readFile(new URL("../public/concierge-admin.html", import.meta.url), "utf8"),
+    readFile(new URL("../public/concierge-admin.js", import.meta.url), "utf8"),
+    readFile(new URL("../src/finance-api.js", import.meta.url), "utf8")
+  ]);
+  for (const label of ["This month", "Previous month", "Last 90 days", "Import custom range"]) assert.match(html, new RegExp(label));
+  assert.match(html, /id="financeHistoricalImportStatus"/);
+  assert.match(js, /\/api\/concierge\/admin\/finance\/import/);
+  assert.match(js, /historicalFinanceImportSummary/);
+  assert.match(js, /This usually means Airbnb financial\/payout data is not present in Beds24 yet/);
+  assert.match(financeSource, /reconcileBeds24FinanceRange/);
+  assert.match(financeSource, /finance_historical_import/);
+});
+
+test("v5.11.62 desktop historical Airbnb import is owner-only, works while daily sync is disabled, and remains idempotent", async () => {
+  const originalFetch = globalThis.fetch;
+  const roomMap = JSON.stringify(Object.fromEntries(Array.from({ length: 11 }, (_, index) => [String(99801 + index), String(index + 1)])));
+  const records = [];
+  const audits = [];
+  const store = {
+    async getMessagingProviderState() { return { value: { accessToken: "access" }, expiresAt: new Date(Date.now() + 3_600_000).toISOString() }; },
+    async setMessagingProviderState() { return { ok: true }; },
+    async getProviderIncome(businessId, sourceSystem, sourceExternalId) {
+      return records.find((item) => item.businessId === businessId && item.sourceSystem === sourceSystem && item.sourceExternalId === sourceExternalId) || null;
+    },
+    async upsertProviderIncome(record) {
+      const existing = await this.getProviderIncome(record.businessId, record.sourceSystem, record.sourceExternalId);
+      if (existing) return { ok: true, created: false, updated: false, id: existing.id };
+      records.push({ ...record, id: `inc_${crypto.randomUUID()}` });
+      return { ok: true, created: true, updated: false, id: records.at(-1).id };
+    },
+    async recordAdminAudit(action, reference) { audits.push({ action, reference }); return { ok: true }; }
+  };
+  globalThis.fetch = async () => new Response(JSON.stringify({
+    success: true,
+    pages: { nextPageExists: false },
+    data: [{
+      id: 992201, roomId: 99804, channel: "airbnb", apiReference: "HM-DESKTOP-01",
+      arrival: "2026-09-02", departure: "2026-09-05", modifiedTime: "2026-09-05T12:00:00",
+      status: "confirmed", price: 7000, commission: 1050,
+      invoiceItems: [{ id: 601, type: "payment", subType: 202, amount: 5950, lineTotal: 5950, createTime: "2026-09-06T03:00:00" }]
+    }]
+  }), { status: 200 });
+
+  try {
+    const env = { BEDS24_FINANCE_SYNC_ENABLED: "false", BEDS24_REFRESH_TOKEN: "refresh", BEDS24_ROOM_MAP: roomMap, EXPENSE_CURRENCY: "THB" };
+    const request = () => new Request("https://guide.example/api/concierge/admin/finance/import", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ provider: "airbnb", from: "2026-09-01", to: "2026-09-13" })
+    });
+    const denied = await handleFinanceAdminRequest(request(), env, "/api/concierge/admin/finance/import", store, "staff", { role: "staff" });
+    assert.equal(denied.status, 403);
+
+    const first = await handleFinanceAdminRequest(request(), env, "/api/concierge/admin/finance/import", store, "owner", { role: "owner" });
+    assert.equal(first.status, 200);
+    const firstBody = await first.json();
+    assert.equal(firstBody.created, 1);
+    assert.equal(records.length, 1);
+
+    const second = await handleFinanceAdminRequest(request(), env, "/api/concierge/admin/finance/import", store, "owner", { role: "owner" });
+    assert.equal(second.status, 200);
+    const secondBody = await second.json();
+    assert.equal(secondBody.created, 0);
+    assert.equal(secondBody.unchanged, 1);
+    assert.equal(records.length, 1);
+    assert.equal(audits.at(-1).action, "finance_historical_import");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });

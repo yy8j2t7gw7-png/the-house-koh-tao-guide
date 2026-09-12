@@ -1,6 +1,6 @@
 import { expenseConfiguration } from "./expense-api.js";
 import { BAMBOO_FINANCE_BUSINESS_ID, BAMBOO_INCOME_CATEGORIES, HOUSE_FINANCE_BUSINESS_ID, resolveFinanceBusinessId } from "./finance-businesses.js";
-import { beds24FinanceSyncConfiguration, reconcileBeds24Finance } from "./beds24-finance-sync.js";
+import { beds24FinanceSyncConfiguration, reconcileBeds24Finance, reconcileBeds24FinanceRange } from "./beds24-finance-sync.js";
 
 const INCOME_ID_PATTERN = /^inc_[A-Za-z0-9-]{20,80}$/;
 const DEFAULT_INCOME_CATEGORIES = [
@@ -214,6 +214,38 @@ export async function handleFinanceAdminRequest(request, env, path, store, actor
       return result?.ok ? json(result) : json(result || { error: "beds24_finance_sync_failed" }, 503);
     } catch (error) {
       return json({ error: cleanText(error?.code || error?.message || "beds24_finance_sync_failed", 120) }, 503);
+    }
+  }
+
+  if (path === "/api/concierge/admin/finance/import") {
+    if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405, { allow: "POST" });
+    const denied = ownerOnly(access);
+    if (denied) return denied;
+    const scope = scopedBusinessId(HOUSE_FINANCE_BUSINESS_ID, access);
+    if (scope.error) return json({ error: scope.error }, scope.status);
+    const body = await request.json().catch(() => ({}));
+    const from = cleanText(body.from, 10);
+    const to = cleanText(body.to, 10);
+    const provider = cleanText(body.provider || "airbnb", 40).toLowerCase();
+    if (!validDate(from) || !validDate(to) || to < from) return json({ error: "invalid_finance_import_range" }, 400);
+    try {
+      const result = await reconcileBeds24FinanceRange(env, { store, from, to, provider, force: true });
+      if (!result?.ok) {
+        const status = result?.error === "finance_provider_not_implemented" ? 409
+          : result?.error === "beds24_finance_sync_not_ready" || result?.error === "finance_store_unavailable" ? 503
+          : 400;
+        return json(result || { error: "finance_import_failed" }, status);
+      }
+      if (typeof store.recordAdminAudit === "function") {
+        await store.recordAdminAudit(
+          "finance_historical_import",
+          `provider:${provider}:${from}:${to}`,
+          result.completedAt || new Date().toISOString()
+        ).catch(() => {});
+      }
+      return json(result);
+    } catch (error) {
+      return json({ error: cleanText(error?.code || error?.message || "finance_import_failed", 120) }, 503);
     }
   }
 

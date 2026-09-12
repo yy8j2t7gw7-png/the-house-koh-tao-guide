@@ -190,6 +190,21 @@
           <p id="financeAutomationStatus">Beds24 payout sync is disabled until financial access is configured and tested.</p>
           <div class="concierge-admin-card-actions"><button type="button" class="secondary" id="financeBeds24Sync" hidden>Sync Airbnb payouts now</button></div>
         </div>
+        <div class="concierge-admin-operations-block" id="financeHistoricalImportPanel">
+          <h3>Import historical Airbnb income</h3>
+          <p>Use this when a property joins mid-month or when earlier Airbnb income needs to be brought into Finance. The import is duplicate-safe and can be rerun. Automatic daily Finance sync can remain disabled while you backfill historical data.</p>
+          <div class="concierge-admin-card-actions">
+            <button type="button" class="secondary" id="financeImportThisMonth">This month</button>
+            <button type="button" class="secondary" id="financeImportPreviousMonth">Previous month</button>
+            <button type="button" class="secondary" id="financeImport90Days">Last 90 days</button>
+          </div>
+          <div class="concierge-admin-expense-fields">
+            <div class="concierge-admin-field"><label for="financeImportFrom">From</label><input id="financeImportFrom" type="date"></div>
+            <div class="concierge-admin-field"><label for="financeImportTo">To</label><input id="financeImportTo" type="date"></div>
+          </div>
+          <div class="concierge-admin-card-actions"><button type="button" id="financeImportCustom">Import custom range</button></div>
+          <p id="financeHistoricalImportStatus" role="status">Historical import is available once Beds24 financial access and the Room 1–11 mapping are configured.</p>
+        </div>
         <div class="concierge-admin-expense-toolbar">
           <div class="concierge-admin-field">
             <label for="expenseMonth">Month</label>

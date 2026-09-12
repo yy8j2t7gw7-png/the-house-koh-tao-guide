@@ -1,15 +1,16 @@
 # Changelog
 
-## v5.11.61 — Commercial security, WhatsApp guest contact and OTA Finance onboarding
+## v5.11.62 — Desktop historical Airbnb Finance onboarding
 
-- Adds server-signed tenant licensing with module entitlements, validity/status controls and device limits.
-- Adds optional device-bound mobile sessions, owner-visible security audit and rate-limited license administration.
-- Keeps provider and licensing secrets server-side; bootstrap remains disabled.
-- Adds historical Airbnb Finance backfill by date range for mid-month onboarding while preserving idempotent payout reconciliation.
-- Adds provider-neutral OTA Finance adapter metadata for future Booking.com, Expedia, Vrbo, Agoda, Hostelworld and Trip.com integrations.
-- Adds reservation-level WhatsApp guest contact from the mobile app using existing threads or an approved guest-initiation template.
-- Ships license enforcement, device binding and scheduled Beds24 Finance automation staged/off until controlled production activation.
-- Full automated suite: **322 passed / 0 failed**.
+- Adds the same owner-controlled historical Airbnb Finance backfill to the desktop Admin Dashboard that is already available in the mobile owner app.
+- Adds one-click **This month**, **Previous month**, **Last 90 days** and custom date-range imports.
+- Historical import works while automatic daily Finance sync remains disabled, allowing safe mid-month onboarding and controlled backfill.
+- Reuses the provider-neutral, idempotent Beds24 Finance reconciler: rerunning a period updates/reuses provider-managed records instead of duplicating income.
+- Adds clearer zero-import diagnostics when Beds24 returns reservations but no channel-collected payment data is available yet.
+- Keeps the route owner-only and records the historical import in the existing admin audit trail.
+- Preserves the already validated production security state by committing mobile license enforcement and device binding as enabled.
+- Keeps `BEDS24_FINANCE_SYNC_ENABLED=false`, `BEDS24_CHANNEL_MANAGER_ENABLED=false` and `UNIFIED_MESSAGING_AI_AUTO_SEND_ENABLED=false`.
+- Full automated suite: **324 passed / 0 failed**.
 
 ## v5.11.60 — Mobile reservation guest-name enrichment
 

@@ -563,6 +563,141 @@ export class ConciergeStore extends DurableObject {
         );
         CREATE INDEX IF NOT EXISTS beds24_channel_retries_due
           ON beds24_channel_retries(status, next_attempt_at, created_at);
+
+
+        CREATE TABLE IF NOT EXISTS platform_tenants (
+          id TEXT PRIMARY KEY,
+          slug TEXT NOT NULL UNIQUE,
+          display_name TEXT NOT NULL,
+          status TEXT NOT NULL DEFAULT 'active',
+          timezone TEXT NOT NULL DEFAULT 'Asia/Bangkok',
+          currency TEXT NOT NULL DEFAULT 'THB',
+          branding_json TEXT NOT NULL DEFAULT '{}',
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS platform_properties (
+          id TEXT PRIMARY KEY,
+          tenant_id TEXT NOT NULL,
+          external_key TEXT NOT NULL DEFAULT '',
+          display_name TEXT NOT NULL,
+          timezone TEXT NOT NULL DEFAULT 'Asia/Bangkok',
+          currency TEXT NOT NULL DEFAULT 'THB',
+          active INTEGER NOT NULL DEFAULT 1,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS platform_properties_tenant
+          ON platform_properties(tenant_id, active, display_name);
+
+        CREATE TABLE IF NOT EXISTS platform_users (
+          id TEXT PRIMARY KEY,
+          email_normalized TEXT NOT NULL UNIQUE,
+          display_name TEXT NOT NULL,
+          password_salt TEXT NOT NULL,
+          password_hash TEXT NOT NULL,
+          password_iterations INTEGER NOT NULL DEFAULT 210000,
+          status TEXT NOT NULL DEFAULT 'active',
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          last_login_at TEXT NOT NULL DEFAULT ''
+        );
+
+        CREATE TABLE IF NOT EXISTS platform_memberships (
+          id TEXT PRIMARY KEY,
+          tenant_id TEXT NOT NULL,
+          user_id TEXT NOT NULL,
+          role TEXT NOT NULL,
+          property_scope_json TEXT NOT NULL DEFAULT '[]',
+          permission_overrides_json TEXT NOT NULL DEFAULT '{}',
+          status TEXT NOT NULL DEFAULT 'active',
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        );
+        CREATE UNIQUE INDEX IF NOT EXISTS platform_memberships_tenant_user
+          ON platform_memberships(tenant_id, user_id);
+        CREATE INDEX IF NOT EXISTS platform_memberships_tenant_role
+          ON platform_memberships(tenant_id, role, status);
+
+        CREATE TABLE IF NOT EXISTS platform_sessions (
+          id TEXT PRIMARY KEY,
+          token_hash TEXT NOT NULL UNIQUE,
+          user_id TEXT NOT NULL,
+          membership_id TEXT NOT NULL,
+          tenant_id TEXT NOT NULL,
+          device_id TEXT NOT NULL DEFAULT '',
+          device_name TEXT NOT NULL DEFAULT '',
+          platform TEXT NOT NULL DEFAULT '',
+          app_version TEXT NOT NULL DEFAULT '',
+          created_at TEXT NOT NULL,
+          expires_at TEXT NOT NULL,
+          last_seen_at TEXT NOT NULL,
+          revoked_at TEXT NOT NULL DEFAULT ''
+        );
+        CREATE INDEX IF NOT EXISTS platform_sessions_lookup
+          ON platform_sessions(token_hash, revoked_at, expires_at);
+        CREATE INDEX IF NOT EXISTS platform_sessions_tenant
+          ON platform_sessions(tenant_id, revoked_at, last_seen_at);
+
+        CREATE TABLE IF NOT EXISTS platform_invites (
+          id TEXT PRIMARY KEY,
+          tenant_id TEXT NOT NULL,
+          email_normalized TEXT NOT NULL,
+          role TEXT NOT NULL,
+          token_hash TEXT NOT NULL UNIQUE,
+          property_scope_json TEXT NOT NULL DEFAULT '[]',
+          permission_overrides_json TEXT NOT NULL DEFAULT '{}',
+          created_by_user_id TEXT NOT NULL DEFAULT '',
+          created_at TEXT NOT NULL,
+          expires_at TEXT NOT NULL,
+          accepted_at TEXT NOT NULL DEFAULT '',
+          revoked_at TEXT NOT NULL DEFAULT ''
+        );
+        CREATE INDEX IF NOT EXISTS platform_invites_tenant
+          ON platform_invites(tenant_id, expires_at, accepted_at, revoked_at);
+
+        CREATE TABLE IF NOT EXISTS platform_entitlements (
+          tenant_id TEXT NOT NULL,
+          module_key TEXT NOT NULL,
+          status TEXT NOT NULL DEFAULT 'active',
+          valid_from TEXT NOT NULL DEFAULT '',
+          valid_until TEXT NOT NULL DEFAULT '',
+          source TEXT NOT NULL DEFAULT 'bootstrap',
+          metadata_json TEXT NOT NULL DEFAULT '{}',
+          updated_at TEXT NOT NULL,
+          PRIMARY KEY (tenant_id, module_key)
+        );
+        CREATE INDEX IF NOT EXISTS platform_entitlements_status
+          ON platform_entitlements(tenant_id, status, valid_until);
+
+        CREATE TABLE IF NOT EXISTS platform_push_devices (
+          id TEXT PRIMARY KEY,
+          tenant_id TEXT NOT NULL,
+          user_id TEXT NOT NULL,
+          device_id TEXT NOT NULL,
+          expo_push_token TEXT NOT NULL,
+          platform TEXT NOT NULL DEFAULT '',
+          app_version TEXT NOT NULL DEFAULT '',
+          enabled INTEGER NOT NULL DEFAULT 1,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        );
+        CREATE UNIQUE INDEX IF NOT EXISTS platform_push_devices_user_device
+          ON platform_push_devices(user_id, device_id);
+
+        CREATE TABLE IF NOT EXISTS platform_audit (
+          id TEXT PRIMARY KEY,
+          tenant_id TEXT NOT NULL,
+          user_id TEXT NOT NULL DEFAULT '',
+          membership_id TEXT NOT NULL DEFAULT '',
+          action TEXT NOT NULL,
+          reference TEXT NOT NULL DEFAULT '',
+          metadata_json TEXT NOT NULL DEFAULT '{}',
+          created_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS platform_audit_tenant_created
+          ON platform_audit(tenant_id, created_at);
       `);
       try {
         this.ctx.storage.sql.exec("ALTER TABLE stay_reservations ADD COLUMN guest_first_name TEXT NOT NULL DEFAULT ''");
@@ -4008,4 +4143,382 @@ export class ConciergeStore extends DurableObject {
     );
     return { records: expired };
   }
+
+  async mobilePlatformHasUsers() {
+    const row = rows(this.ctx.storage.sql.exec(
+      "SELECT COUNT(*) AS total FROM platform_users WHERE status = 'active'"
+    ))[0] || {};
+    return (Number(row.total) || 0) > 0;
+  }
+
+  async mobileBootstrapTenant(record = {}) {
+    if (await this.mobilePlatformHasUsers()) return { ok: false, error: "already_bootstrapped" };
+    const now = cleanText(record.createdAt, 40) || new Date().toISOString();
+    const tenantId = cleanText(record.tenantId, 100);
+    const tenantSlug = cleanText(record.tenantSlug, 100).toLowerCase();
+    const propertyId = cleanText(record.propertyId, 100);
+    const userId = cleanText(record.userId, 100);
+    const membershipId = cleanText(record.membershipId, 100);
+    const email = cleanText(record.emailNormalized, 240).toLowerCase();
+    if (!tenantId || !tenantSlug || !propertyId || !userId || !membershipId || !email) {
+      return { ok: false, error: "invalid_bootstrap" };
+    }
+    this.ctx.storage.sql.exec(
+      `INSERT INTO platform_tenants
+       (id, slug, display_name, status, timezone, currency, branding_json, created_at, updated_at)
+       VALUES (?, ?, ?, 'active', ?, ?, ?, ?, ?)`,
+      tenantId,
+      tenantSlug,
+      cleanText(record.tenantName, 160) || "The House - Koh Tao",
+      cleanText(record.timezone, 80) || "Asia/Bangkok",
+      cleanText(record.currency, 3) || "THB",
+      JSON.stringify(record.branding || {}),
+      now,
+      now
+    );
+    this.ctx.storage.sql.exec(
+      `INSERT INTO platform_properties
+       (id, tenant_id, external_key, display_name, timezone, currency, active, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)`,
+      propertyId,
+      tenantId,
+      cleanText(record.propertyExternalKey, 160),
+      cleanText(record.propertyName, 160) || "The House - Koh Tao",
+      cleanText(record.timezone, 80) || "Asia/Bangkok",
+      cleanText(record.currency, 3) || "THB",
+      now,
+      now
+    );
+    this.ctx.storage.sql.exec(
+      `INSERT INTO platform_users
+       (id, email_normalized, display_name, password_salt, password_hash, password_iterations, status, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, 'active', ?, ?)`,
+      userId,
+      email,
+      cleanText(record.displayName, 120) || "Owner",
+      cleanText(record.passwordSalt, 240),
+      cleanText(record.passwordHash, 240),
+      Math.max(100000, Math.floor(Number(record.passwordIterations) || 210000)),
+      now,
+      now
+    );
+    this.ctx.storage.sql.exec(
+      `INSERT INTO platform_memberships
+       (id, tenant_id, user_id, role, property_scope_json, permission_overrides_json, status, created_at, updated_at)
+       VALUES (?, ?, ?, 'owner', ?, '{}', 'active', ?, ?)`,
+      membershipId,
+      tenantId,
+      userId,
+      JSON.stringify([propertyId]),
+      now,
+      now
+    );
+    const modules = Array.isArray(record.modules) ? record.modules : [];
+    for (const moduleKey of modules) {
+      this.ctx.storage.sql.exec(
+        `INSERT INTO platform_entitlements
+         (tenant_id, module_key, status, valid_from, valid_until, source, metadata_json, updated_at)
+         VALUES (?, ?, 'active', ?, '', 'bootstrap', '{}', ?)
+         ON CONFLICT(tenant_id, module_key) DO UPDATE SET status = 'active', updated_at = excluded.updated_at`,
+        tenantId,
+        cleanText(moduleKey, 80),
+        now,
+        now
+      );
+    }
+    await this.mobileRecordAudit({
+      tenantId, userId, membershipId, action: "mobile_platform_bootstrapped", reference: `tenant:${tenantId}`, createdAt: now
+    });
+    return { ok: true, tenantId, propertyId, userId, membershipId };
+  }
+
+  async mobileGetUserAuthByEmail(emailValue) {
+    const email = cleanText(emailValue, 240).toLowerCase();
+    if (!email) return null;
+    return rows(this.ctx.storage.sql.exec(
+      `SELECT u.id AS userId, u.email_normalized AS email, u.display_name AS displayName,
+              u.password_salt AS passwordSalt, u.password_hash AS passwordHash,
+              u.password_iterations AS passwordIterations, u.status AS userStatus,
+              m.id AS membershipId, m.tenant_id AS tenantId, m.role,
+              m.property_scope_json AS propertyScopeJson,
+              m.permission_overrides_json AS permissionOverridesJson,
+              m.status AS membershipStatus,
+              t.slug AS tenantSlug, t.display_name AS tenantName, t.status AS tenantStatus,
+              t.timezone, t.currency, t.branding_json AS brandingJson
+       FROM platform_users u
+       JOIN platform_memberships m ON m.user_id = u.id
+       JOIN platform_tenants t ON t.id = m.tenant_id
+       WHERE u.email_normalized = ?
+       ORDER BY CASE m.role WHEN 'owner' THEN 0 WHEN 'manager' THEN 1 ELSE 2 END, m.created_at ASC
+       LIMIT 1`,
+      email
+    ))[0] || null;
+  }
+
+  async mobileGetUserById(userIdValue, tenantIdValue = "") {
+    const userId = cleanText(userIdValue, 100);
+    const tenantId = cleanText(tenantIdValue, 100);
+    if (!userId) return null;
+    const sql = tenantId
+      ? `SELECT u.id AS userId, u.email_normalized AS email, u.display_name AS displayName, u.status AS userStatus,
+                m.id AS membershipId, m.tenant_id AS tenantId, m.role, m.property_scope_json AS propertyScopeJson,
+                m.permission_overrides_json AS permissionOverridesJson, m.status AS membershipStatus,
+                t.slug AS tenantSlug, t.display_name AS tenantName, t.status AS tenantStatus,
+                t.timezone, t.currency, t.branding_json AS brandingJson
+         FROM platform_users u JOIN platform_memberships m ON m.user_id = u.id JOIN platform_tenants t ON t.id = m.tenant_id
+         WHERE u.id = ? AND m.tenant_id = ? LIMIT 1`
+      : `SELECT u.id AS userId, u.email_normalized AS email, u.display_name AS displayName, u.status AS userStatus,
+                m.id AS membershipId, m.tenant_id AS tenantId, m.role, m.property_scope_json AS propertyScopeJson,
+                m.permission_overrides_json AS permissionOverridesJson, m.status AS membershipStatus,
+                t.slug AS tenantSlug, t.display_name AS tenantName, t.status AS tenantStatus,
+                t.timezone, t.currency, t.branding_json AS brandingJson
+         FROM platform_users u JOIN platform_memberships m ON m.user_id = u.id JOIN platform_tenants t ON t.id = m.tenant_id
+         WHERE u.id = ? LIMIT 1`;
+    return rows(this.ctx.storage.sql.exec(sql, ...(tenantId ? [userId, tenantId] : [userId])))[0] || null;
+  }
+
+  async mobileMarkLogin(userIdValue, nowValue) {
+    const now = cleanText(nowValue, 40) || new Date().toISOString();
+    this.ctx.storage.sql.exec(
+      "UPDATE platform_users SET last_login_at = ?, updated_at = ? WHERE id = ?",
+      now, now, cleanText(userIdValue, 100)
+    );
+    return { ok: true };
+  }
+
+  async mobileCreateSession(record = {}) {
+    const now = cleanText(record.createdAt, 40) || new Date().toISOString();
+    this.ctx.storage.sql.exec(
+      `INSERT INTO platform_sessions
+       (id, token_hash, user_id, membership_id, tenant_id, device_id, device_name, platform, app_version,
+        created_at, expires_at, last_seen_at, revoked_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '')`,
+      cleanText(record.id, 100), cleanText(record.tokenHash, 128), cleanText(record.userId, 100),
+      cleanText(record.membershipId, 100), cleanText(record.tenantId, 100), cleanText(record.deviceId, 180),
+      cleanText(record.deviceName, 160), cleanText(record.platform, 30), cleanText(record.appVersion, 40),
+      now, cleanText(record.expiresAt, 40), now
+    );
+    return { ok: true, id: cleanText(record.id, 100) };
+  }
+
+  async mobileGetSession(tokenHashValue, nowValue) {
+    const tokenHash = cleanText(tokenHashValue, 128);
+    const now = cleanText(nowValue, 40) || new Date().toISOString();
+    if (!tokenHash) return null;
+    return rows(this.ctx.storage.sql.exec(
+      `SELECT s.id AS sessionId, s.user_id AS userId, s.membership_id AS membershipId, s.tenant_id AS tenantId,
+              s.device_id AS deviceId, s.device_name AS deviceName, s.platform, s.app_version AS appVersion,
+              s.created_at AS createdAt, s.expires_at AS expiresAt, s.last_seen_at AS lastSeenAt,
+              u.email_normalized AS email, u.display_name AS displayName, u.status AS userStatus,
+              m.role, m.property_scope_json AS propertyScopeJson, m.permission_overrides_json AS permissionOverridesJson,
+              m.status AS membershipStatus,
+              t.slug AS tenantSlug, t.display_name AS tenantName, t.status AS tenantStatus,
+              t.timezone, t.currency, t.branding_json AS brandingJson
+       FROM platform_sessions s
+       JOIN platform_users u ON u.id = s.user_id
+       JOIN platform_memberships m ON m.id = s.membership_id
+       JOIN platform_tenants t ON t.id = s.tenant_id
+       WHERE s.token_hash = ? AND s.revoked_at = '' AND s.expires_at > ?
+       LIMIT 1`,
+      tokenHash,
+      now
+    ))[0] || null;
+  }
+
+  async mobileTouchSession(sessionIdValue, nowValue) {
+    const now = cleanText(nowValue, 40) || new Date().toISOString();
+    this.ctx.storage.sql.exec(
+      "UPDATE platform_sessions SET last_seen_at = ? WHERE id = ? AND revoked_at = ''",
+      now, cleanText(sessionIdValue, 100)
+    );
+    return { ok: true };
+  }
+
+  async mobileRevokeSession(sessionIdValue, nowValue) {
+    const now = cleanText(nowValue, 40) || new Date().toISOString();
+    this.ctx.storage.sql.exec(
+      "UPDATE platform_sessions SET revoked_at = ? WHERE id = ? AND revoked_at = ''",
+      now, cleanText(sessionIdValue, 100)
+    );
+    return { ok: true };
+  }
+
+  async mobileListTenantUsers(tenantIdValue) {
+    const tenantId = cleanText(tenantIdValue, 100);
+    return rows(this.ctx.storage.sql.exec(
+      `SELECT u.id AS userId, u.email_normalized AS email, u.display_name AS displayName,
+              u.status AS userStatus, u.last_login_at AS lastLoginAt,
+              m.id AS membershipId, m.role, m.status AS membershipStatus,
+              m.property_scope_json AS propertyScopeJson,
+              m.permission_overrides_json AS permissionOverridesJson,
+              m.created_at AS joinedAt
+       FROM platform_memberships m JOIN platform_users u ON u.id = m.user_id
+       WHERE m.tenant_id = ? ORDER BY CASE m.role WHEN 'owner' THEN 0 WHEN 'manager' THEN 1 ELSE 2 END, u.display_name ASC`,
+      tenantId
+    ));
+  }
+
+  async mobileUpdateMembershipPermissions(tenantIdValue, userIdValue, permissionOverrides = {}, nowValue) {
+    const tenantId = cleanText(tenantIdValue, 100);
+    const userId = cleanText(userIdValue, 100);
+    const now = cleanText(nowValue, 40) || new Date().toISOString();
+    if (!tenantId || !userId) return { ok: false, error: "invalid_member" };
+    const existing = rows(this.ctx.storage.sql.exec(
+      `SELECT id, role FROM platform_memberships
+       WHERE tenant_id = ? AND user_id = ? AND status = 'active' LIMIT 1`,
+      tenantId, userId
+    ))[0] || null;
+    if (!existing || existing.role === "owner") return { ok: false, error: "member_not_found" };
+    this.ctx.storage.sql.exec(
+      `UPDATE platform_memberships SET permission_overrides_json = ?, updated_at = ?
+       WHERE tenant_id = ? AND user_id = ?`,
+      JSON.stringify(permissionOverrides && typeof permissionOverrides === "object" ? permissionOverrides : {}),
+      now, tenantId, userId
+    );
+    return { ok: true, membershipId: existing.id, role: existing.role };
+  }
+
+  async mobileCreateInvite(record = {}) {
+    this.ctx.storage.sql.exec(
+      `INSERT INTO platform_invites
+       (id, tenant_id, email_normalized, role, token_hash, property_scope_json, permission_overrides_json,
+        created_by_user_id, created_at, expires_at, accepted_at, revoked_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '', '')`,
+      cleanText(record.id, 100), cleanText(record.tenantId, 100), cleanText(record.emailNormalized, 240).toLowerCase(),
+      cleanText(record.role, 20), cleanText(record.tokenHash, 128), JSON.stringify(record.propertyScope || []),
+      JSON.stringify(record.permissionOverrides || {}), cleanText(record.createdByUserId, 100),
+      cleanText(record.createdAt, 40) || new Date().toISOString(), cleanText(record.expiresAt, 40)
+    );
+    return { ok: true, id: cleanText(record.id, 100) };
+  }
+
+  async mobileGetInviteByHash(tokenHashValue, nowValue) {
+    const tokenHash = cleanText(tokenHashValue, 128);
+    const now = cleanText(nowValue, 40) || new Date().toISOString();
+    return rows(this.ctx.storage.sql.exec(
+      `SELECT i.id, i.tenant_id AS tenantId, i.email_normalized AS email, i.role,
+              i.property_scope_json AS propertyScopeJson, i.permission_overrides_json AS permissionOverridesJson,
+              i.expires_at AS expiresAt, t.display_name AS tenantName, t.slug AS tenantSlug
+       FROM platform_invites i JOIN platform_tenants t ON t.id = i.tenant_id
+       WHERE i.token_hash = ? AND i.accepted_at = '' AND i.revoked_at = '' AND i.expires_at > ? LIMIT 1`,
+      tokenHash, now
+    ))[0] || null;
+  }
+
+  async mobileAcceptInvite(record = {}) {
+    const inviteId = cleanText(record.inviteId, 100);
+    const now = cleanText(record.acceptedAt, 40) || new Date().toISOString();
+    const invite = rows(this.ctx.storage.sql.exec(
+      `SELECT id, tenant_id AS tenantId, email_normalized AS email, role,
+              property_scope_json AS propertyScopeJson, permission_overrides_json AS permissionOverridesJson,
+              expires_at AS expiresAt, accepted_at AS acceptedAt, revoked_at AS revokedAt
+       FROM platform_invites WHERE id = ? LIMIT 1`,
+      inviteId
+    ))[0] || null;
+    if (!invite || invite.acceptedAt || invite.revokedAt || invite.expiresAt <= now) return { ok: false, error: "invite_invalid" };
+    const existing = rows(this.ctx.storage.sql.exec(
+      "SELECT id FROM platform_users WHERE email_normalized = ? LIMIT 1", invite.email
+    ))[0] || null;
+    if (existing) return { ok: false, error: "account_exists" };
+    const userId = cleanText(record.userId, 100);
+    const membershipId = cleanText(record.membershipId, 100);
+    this.ctx.storage.sql.exec(
+      `INSERT INTO platform_users
+       (id, email_normalized, display_name, password_salt, password_hash, password_iterations, status, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, 'active', ?, ?)`,
+      userId, invite.email, cleanText(record.displayName, 120), cleanText(record.passwordSalt, 240),
+      cleanText(record.passwordHash, 240), Math.max(100000, Math.floor(Number(record.passwordIterations) || 210000)), now, now
+    );
+    this.ctx.storage.sql.exec(
+      `INSERT INTO platform_memberships
+       (id, tenant_id, user_id, role, property_scope_json, permission_overrides_json, status, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, 'active', ?, ?)`,
+      membershipId, invite.tenantId, userId, invite.role, invite.propertyScopeJson || '[]', invite.permissionOverridesJson || '{}', now, now
+    );
+    this.ctx.storage.sql.exec("UPDATE platform_invites SET accepted_at = ? WHERE id = ?", now, inviteId);
+    return { ok: true, userId, membershipId, tenantId: invite.tenantId, role: invite.role };
+  }
+
+  async mobileListEntitlements(tenantIdValue) {
+    const tenantId = cleanText(tenantIdValue, 100);
+    return rows(this.ctx.storage.sql.exec(
+      `SELECT module_key AS moduleKey, status, valid_from AS validFrom, valid_until AS validUntil,
+              source, metadata_json AS metadataJson, updated_at AS updatedAt
+       FROM platform_entitlements WHERE tenant_id = ? ORDER BY module_key ASC`,
+      tenantId
+    ));
+  }
+
+  async mobileListProperties(tenantIdValue) {
+    const tenantId = cleanText(tenantIdValue, 100);
+    return rows(this.ctx.storage.sql.exec(
+      `SELECT id, external_key AS externalKey, display_name AS displayName, timezone, currency, active
+       FROM platform_properties WHERE tenant_id = ? ORDER BY display_name ASC`,
+      tenantId
+    )).map((item) => ({ ...item, active: Boolean(item.active) }));
+  }
+
+  async mobileUpsertPushDevice(record = {}) {
+    const now = cleanText(record.updatedAt, 40) || new Date().toISOString();
+    const userId = cleanText(record.userId, 100);
+    const deviceId = cleanText(record.deviceId, 180);
+    if (!userId || !deviceId) return { ok: false, error: "invalid_device" };
+    const existing = rows(this.ctx.storage.sql.exec(
+      "SELECT id FROM platform_push_devices WHERE user_id = ? AND device_id = ? LIMIT 1", userId, deviceId
+    ))[0] || null;
+    const id = existing?.id || cleanText(record.id, 100) || `push_${crypto.randomUUID()}`;
+    this.ctx.storage.sql.exec(
+      `INSERT INTO platform_push_devices
+       (id, tenant_id, user_id, device_id, expo_push_token, platform, app_version, enabled, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
+       ON CONFLICT(user_id, device_id) DO UPDATE SET
+         tenant_id = excluded.tenant_id, expo_push_token = excluded.expo_push_token,
+         platform = excluded.platform, app_version = excluded.app_version, enabled = 1, updated_at = excluded.updated_at`,
+      id, cleanText(record.tenantId, 100), userId, deviceId, cleanText(record.expoPushToken, 300),
+      cleanText(record.platform, 30), cleanText(record.appVersion, 40), now, now
+    );
+    return { ok: true, id };
+  }
+
+  async mobileListSessions(tenantIdValue) {
+    const tenantId = cleanText(tenantIdValue, 100);
+    return rows(this.ctx.storage.sql.exec(
+      `SELECT s.id, s.user_id AS userId, u.display_name AS displayName, u.email_normalized AS email,
+              s.device_id AS deviceId, s.device_name AS deviceName, s.platform, s.app_version AS appVersion,
+              s.created_at AS createdAt, s.expires_at AS expiresAt, s.last_seen_at AS lastSeenAt,
+              s.revoked_at AS revokedAt
+       FROM platform_sessions s JOIN platform_users u ON u.id = s.user_id
+       WHERE s.tenant_id = ? ORDER BY s.last_seen_at DESC LIMIT 200`,
+      tenantId
+    ));
+  }
+
+  async mobileRevokeTenantSession(tenantIdValue, sessionIdValue, nowValue) {
+    const tenantId = cleanText(tenantIdValue, 100);
+    const sessionId = cleanText(sessionIdValue, 100);
+    const now = cleanText(nowValue, 40) || new Date().toISOString();
+    const existing = rows(this.ctx.storage.sql.exec(
+      "SELECT id FROM platform_sessions WHERE id = ? AND tenant_id = ? LIMIT 1", sessionId, tenantId
+    ))[0] || null;
+    if (!existing) return { ok: false, error: "not_found" };
+    this.ctx.storage.sql.exec(
+      "UPDATE platform_sessions SET revoked_at = ? WHERE id = ? AND tenant_id = ? AND revoked_at = ''",
+      now, sessionId, tenantId
+    );
+    return { ok: true };
+  }
+
+  async mobileRecordAudit(record = {}) {
+    const now = cleanText(record.createdAt, 40) || new Date().toISOString();
+    this.ctx.storage.sql.exec(
+      `INSERT INTO platform_audit
+       (id, tenant_id, user_id, membership_id, action, reference, metadata_json, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      cleanText(record.id, 100) || `platform_audit_${crypto.randomUUID()}`,
+      cleanText(record.tenantId, 100), cleanText(record.userId, 100), cleanText(record.membershipId, 100),
+      cleanText(record.action, 100), cleanText(record.reference, 180), JSON.stringify(record.metadata || {}), now
+    );
+    return { ok: true };
+  }
+
 }

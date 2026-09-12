@@ -1,3 +1,15 @@
+## v5.11.58 — Mobile Platform Foundation + Tenant/Role Security
+
+- Added secure `/api/mobile/v1` backend for the iPhone-first owner/operations application.
+- Added tenant, property, user, membership, session, invite, entitlement, push-device and audit persistence.
+- Added PBKDF2 password hashing, server peppers, hashed revocable sessions, secure invite activation and login rate limiting.
+- Added server-enforced owner/manager/staff permission model and modular tenant entitlements.
+- Added granular `finance.expense_submit` delegation so selected staff can upload bills/create expenses without Finance-report access.
+- Reused existing receipt validation, R2 storage, AI extraction and duplicate protection instead of duplicating Finance logic.
+- Added mobile endpoints for Home, bookings, calendar, Unified Inbox, operations, direct stays, Finance, integrations/team/security and push registration.
+- Ships with mobile and bootstrap disabled; existing Beds24 channel-manager, Beds24 Finance sync and AI auto-send safety flags remain false.
+- Full automated suite: **314 passed / 0 failed**.
+
 # v5.11.57 — Beds24 Airbnb Finance Automation
 
 - Adds an opt-in Beds24 financial reconciliation layer for Airbnb payouts into The House Finance.

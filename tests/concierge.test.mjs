@@ -73,6 +73,13 @@ import {
   beds24FinanceSyncEnabled,
   reconcileBeds24Finance
 } from "../src/beds24-finance-sync.js";
+import {
+  MOBILE_DEFAULT_MODULES,
+  MOBILE_DELEGATABLE_PERMISSIONS,
+  MOBILE_PERMISSION_MATRIX,
+  handleMobilePlatformRequest,
+  mobilePlatformConfiguration
+} from "../src/mobile-platform.js";
 import knowledge from "../public/data/concierge-knowledge.json" with { type: "json" };
 import activities from "../public/data/activities.json" with { type: "json" };
 import bars from "../public/data/bars.json" with { type: "json" };
@@ -3460,7 +3467,7 @@ test("guest localization supports seven languages and keeps the owner dashboard 
   assert.doesNotMatch(admin, /src="\/i18n\.js"/);
   assert.match(runtime, /exploreContentDeferred/);
   assert.match(runtime, /element\.closest\("\.section,\.footer"\)/);
-  assert.match(runtime, /houseGuideTranslations:v5\.11\.57:/);
+  assert.match(runtime, /houseGuideTranslations:v5\.11\.58:/);
   assert.match(runtime, /MAX_REQUEST_RETRIES = 2/);
   assert.match(runtime, /let flushRunning = false/);
 });
@@ -14208,5 +14215,109 @@ test("v5.11.57 Finance UI and scheduler expose safe Airbnb payout automation wit
   assert.match(storeSource, /income_provider_updated/);
   assert.match(wrangler, /"BEDS24_FINANCE_SYNC_ENABLED": "false"/);
   assert.match(wrangler, /"BEDS24_CHANNEL_MANAGER_ENABLED": "false"/);
+  assert.match(wrangler, /"UNIFIED_MESSAGING_AI_AUTO_SEND_ENABLED": "false"/);
+});
+
+
+test("v5.11.58 mobile platform ships disabled by default with revocable-session security configuration", async () => {
+  const config = mobilePlatformConfiguration({});
+  assert.equal(config.enabled, false);
+  assert.equal(config.bootstrapEnabled, false);
+  assert.equal(config.passwordPepperConfigured, false);
+  assert.equal(config.sessionPepperConfigured, false);
+  assert.equal(config.sessionTtlDays, 30);
+  const wrangler = await readFile(new URL("../wrangler.jsonc", import.meta.url), "utf8");
+  assert.match(wrangler, /"MOBILE_APP_ENABLED": "false"/);
+  assert.match(wrangler, /"MOBILE_BOOTSTRAP_ENABLED": "false"/);
+  assert.match(wrangler, /"MOBILE_SESSION_TTL_DAYS": "30"/);
+});
+
+test("v5.11.58 staff permissions are operationally useful but exclude owner-sensitive surfaces", () => {
+  const staff = new Set(MOBILE_PERMISSION_MATRIX.staff);
+  for (const permission of ["home.view", "bookings.view", "calendar.view", "operations.view", "housekeeping.update", "maintenance.create", "maintenance.resolve", "registration.status"]) {
+    assert.equal(staff.has(permission), true, permission);
+  }
+  for (const permission of ["finance.view", "guest_documents.view", "integrations.view", "staff.manage", "licenses.view", "licenses.manage", "security.sessions", "messaging.view", "messaging.send"]) {
+    assert.equal(staff.has(permission), false, permission);
+  }
+  assert.equal(new Set(MOBILE_PERMISSION_MATRIX.owner).has("finance.view"), true);
+  assert.equal(new Set(MOBILE_PERMISSION_MATRIX.owner).has("guest_documents.view"), true);
+});
+
+test("v5.11.58 expense submission is granular: owners/managers have it, staff require an explicit grant", () => {
+  assert.equal(new Set(MOBILE_PERMISSION_MATRIX.owner).has("finance.expense_submit"), true);
+  assert.equal(new Set(MOBILE_PERMISSION_MATRIX.manager).has("finance.expense_submit"), true);
+  assert.equal(new Set(MOBILE_PERMISSION_MATRIX.staff).has("finance.expense_submit"), false);
+  assert.deepEqual(MOBILE_DELEGATABLE_PERMISSIONS.staff, ["finance.expense_submit"]);
+  assert.equal(new Set(MOBILE_DELEGATABLE_PERMISSIONS.staff).has("finance.view"), false);
+  assert.equal(new Set(MOBILE_DELEGATABLE_PERMISSIONS.manager).has("finance.view"), true);
+});
+
+test("v5.11.58 mobile expense routes reuse the existing receipt/AI Finance pipeline without exposing Finance reports", async () => {
+  const [mobileSource, storeSource] = await Promise.all([
+    readFile(new URL("../src/mobile-platform.js", import.meta.url), "utf8"),
+    readFile(new URL("../src/concierge-store.js", import.meta.url), "utf8")
+  ]);
+  assert.match(mobileSource, /finance\/expense-config/);
+  assert.match(mobileSource, /finance\/expense-analyze/);
+  assert.match(mobileSource, /finance\/expense-submit/);
+  assert.match(mobileSource, /handleExpenseAdminRequest/);
+  assert.match(mobileSource, /finance\.expense_submit/);
+  assert.match(mobileSource, /team\/permissions/);
+  assert.match(storeSource, /mobileUpdateMembershipPermissions/);
+});
+
+test("v5.11.58 tenant entitlements are modular and cover the House commercial feature set", () => {
+  const modules = new Set(MOBILE_DEFAULT_MODULES);
+  for (const module of ["core", "calendar", "bookings", "unified_messaging", "housekeeping", "maintenance", "guest_registration", "finance", "analytics", "integrations", "staff_access", "channel_manager"]) {
+    assert.equal(modules.has(module), true, module);
+  }
+});
+
+test("v5.11.58 mobile endpoints fail closed while the production mobile feature flag is disabled", async () => {
+  const env = { MOBILE_APP_ENABLED: "false", CONCIERGE_STORE: { getByName: () => ({}) } };
+  const response = await handleMobilePlatformRequest(new Request("https://guide.example/api/mobile/v1/home"), env, "/api/mobile/v1/home");
+  assert.equal(response.status, 503);
+  assert.equal((await response.json()).error, "mobile_app_disabled");
+});
+
+test("v5.11.58 mobile tenant tables and hashed credential/session storage exist in the Durable Object", async () => {
+  const source = await readFile(new URL("../src/concierge-store.js", import.meta.url), "utf8");
+  for (const table of ["platform_tenants", "platform_properties", "platform_users", "platform_memberships", "platform_sessions", "platform_invites", "platform_entitlements", "platform_push_devices", "platform_audit"]) {
+    assert.match(source, new RegExp(`CREATE TABLE IF NOT EXISTS ${table}`));
+  }
+  assert.match(source, /token_hash/);
+  assert.match(source, /password_hash/);
+  assert.match(source, /permission_overrides_json/);
+});
+
+test("v5.11.58 mobile API reuses protected House messaging and Direct-stay operations instead of exposing provider credentials", async () => {
+  const source = await readFile(new URL("../src/mobile-platform.js", import.meta.url), "utf8");
+  assert.match(source, /handleUnifiedMessagingAdminRequest/);
+  assert.match(source, /handleStayAdminRequest/);
+  assert.match(source, /MOBILE_API_PREFIX}\/direct-stays/);
+  assert.match(source, /maintenance_staff_report/);
+  assert.doesNotMatch(source, /BEDS24_REFRESH_TOKEN\s*[:=]\s*["'][^"']+["']/);
+  assert.doesNotMatch(source, /META_ACCESS_TOKEN\s*[:=]\s*["'][^"']+["']/);
+});
+
+test("v5.11.58 Worker routes mobile traffic before normal static handling and keeps authentication rate limited", async () => {
+  const [indexSource, wrangler] = await Promise.all([
+    readFile(new URL("../src/index.js", import.meta.url), "utf8"),
+    readFile(new URL("../wrangler.jsonc", import.meta.url), "utf8")
+  ]);
+  assert.match(indexSource, /handleMobilePlatformRequest/);
+  assert.match(indexSource, /url\.pathname\.startsWith\("\/api\/mobile\/v1\/"\)/);
+  assert.match(wrangler, /"name": "MOBILE_AUTH_RATE_LIMITER"/);
+  assert.match(wrangler, /"namespace_id": "550004"/);
+});
+
+test("v5.11.58 mobile secrets remain uncommitted and existing production safety flags stay false", async () => {
+  const wrangler = await readFile(new URL("../wrangler.jsonc", import.meta.url), "utf8");
+  for (const secret of ["MOBILE_BOOTSTRAP_TOKEN", "MOBILE_PASSWORD_PEPPER", "MOBILE_SESSION_PEPPER", "MOBILE_INVITE_PEPPER", "BEDS24_REFRESH_TOKEN", "BEDS24_WEBHOOK_TOKEN", "UNIFIED_MESSAGING_INTERNAL_TOKEN"]) {
+    assert.doesNotMatch(wrangler, new RegExp(`"${secret}"\\s*:`));
+  }
+  assert.match(wrangler, /"BEDS24_CHANNEL_MANAGER_ENABLED": "false"/);
+  assert.match(wrangler, /"BEDS24_FINANCE_SYNC_ENABLED": "false"/);
   assert.match(wrangler, /"UNIFIED_MESSAGING_AI_AUTO_SEND_ENABLED": "false"/);
 });

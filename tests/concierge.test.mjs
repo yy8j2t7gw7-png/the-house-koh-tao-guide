@@ -19,7 +19,7 @@ import {
 } from "../src/stay-api.js";
 import { handleMaintenanceAdminRequest, handleMaintenanceGuestRequest } from "../src/maintenance-api.js";
 import { handleExpenseAdminRequest } from "../src/expense-api.js";
-import { handleFinanceAdminRequest } from "../src/finance-api.js";
+import { handleFinanceAdminRequest, summarizeFinance } from "../src/finance-api.js";
 import { BAMBOO_FINANCE_BUSINESS_ID, HOUSE_FINANCE_BUSINESS_ID } from "../src/finance-businesses.js";
 import {
   learningClusterKey,
@@ -14118,7 +14118,7 @@ test("v5.11.57 Airbnb finance record stores actual payout as net and preserves b
   assert.match(record.notes, /Actual channel-collected payment is authoritative/);
 });
 
-test("v5.11.57 Airbnb finance record is not created before an actual payout is reported", () => {
+test("v5.11.63 Airbnb finance creates a clearly provisional expected payout before settlement", () => {
   const roomMap = JSON.stringify(Object.fromEntries(Array.from({ length: 11 }, (_, index) => [String(99501 + index), String(index + 1)])));
   const record = beds24AirbnbIncomeRecord({
     id: 880066,
@@ -14130,7 +14130,14 @@ test("v5.11.57 Airbnb finance record is not created before an actual payout is r
     commission: 1500,
     invoiceItems: [{ id: 55, type: "payment", subType: 202, amount: 0, lineTotal: 0 }]
   }, { BEDS24_ROOM_MAP: roomMap });
-  assert.equal(record, null);
+  assert.ok(record);
+  assert.equal(record.sourceStatus, "expected_payout");
+  assert.equal(record.grossMinor, 1000000);
+  assert.equal(record.feesMinor, 150000);
+  assert.equal(record.netMinor, 850000);
+  assert.equal(record.incomeDate, "2026-10-01");
+  assert.equal(record.paymentMethod, "Expected OTA payout");
+  assert.match(record.notes, /Provisional expected payout/);
 });
 
 test("v5.11.57 Beds24 finance reconciliation upserts one provider-managed income row and updates it instead of duplicating it", async () => {
@@ -14487,7 +14494,7 @@ test("v5.11.62 desktop owner Finance exposes the same historical Airbnb onboardi
   assert.match(html, /id="financeHistoricalImportStatus"/);
   assert.match(js, /\/api\/concierge\/admin\/finance\/import/);
   assert.match(js, /historicalFinanceImportSummary/);
-  assert.match(js, /This usually means Airbnb financial\/payout data is not present in Beds24 yet/);
+  assert.match(js, /no usable actual or expected payout was imported/);
   assert.match(financeSource, /reconcileBeds24FinanceRange/);
   assert.match(financeSource, /finance_historical_import/);
 });
@@ -14548,4 +14555,100 @@ test("v5.11.62 desktop historical Airbnb import is owner-only, works while daily
   } finally {
     globalThis.fetch = originalFetch;
   }
+});
+
+
+test("v5.11.63 historical Airbnb onboarding imports expected payout then reconciles the same row to actual payment", async () => {
+  const originalFetch = globalThis.fetch;
+  let settled = false;
+  const roomMap = JSON.stringify(Object.fromEntries(Array.from({ length: 11 }, (_, index) => [String(99901 + index), String(index + 1)])));
+  const records = [];
+  const store = {
+    async getMessagingProviderState() { return { value: { accessToken: "access" }, expiresAt: new Date(Date.now() + 3_600_000).toISOString() }; },
+    async setMessagingProviderState() { return { ok: true }; },
+    async getProviderIncome(businessId, sourceSystem, sourceExternalId) {
+      return records.find((item) => item.businessId === businessId && item.sourceSystem === sourceSystem && item.sourceExternalId === sourceExternalId) || null;
+    },
+    async upsertProviderIncome(record) {
+      const existing = await this.getProviderIncome(record.businessId, record.sourceSystem, record.sourceExternalId);
+      if (existing) {
+        const changed = ["incomeDate", "grossMinor", "feesMinor", "netMinor", "paymentMethod", "sourceStatus"].some((key) => String(existing[key]) !== String(record[key]));
+        Object.assign(existing, record);
+        return { ok: true, created: false, updated: changed, id: existing.id };
+      }
+      records.push({ ...record, id: `inc_${crypto.randomUUID()}` });
+      return { ok: true, created: true, updated: false, id: records.at(-1).id };
+    }
+  };
+  globalThis.fetch = async () => new Response(JSON.stringify({
+    success: true, pages: { nextPageExists: false }, data: [{
+      id: 993301, roomId: 99902, channel: "airbnb", apiReference: "HM-EXPECTED-01",
+      arrival: "2026-09-08", departure: "2026-09-12", modifiedTime: settled ? "2026-09-09T03:00:00" : "2026-09-08T03:00:00",
+      status: "confirmed", price: 27000, commission: 810,
+      invoiceItems: settled
+        ? [{ id: 701, type: "payment", subType: 202, amount: 26190, lineTotal: 26190, createTime: "2026-09-09T02:00:00", description: "Airbnb payment" }]
+        : [{ id: 700, type: "payment", subType: 202, amount: 0, lineTotal: 0, description: "Airbnb payment" }]
+    }]
+  }), { status: 200 });
+  try {
+    const env = { BEDS24_FINANCE_SYNC_ENABLED: "false", BEDS24_REFRESH_TOKEN: "refresh", BEDS24_ROOM_MAP: roomMap, EXPENSE_CURRENCY: "THB" };
+    const first = await reconcileBeds24FinanceRange(env, { store, provider: "airbnb", from: "2026-09-01", to: "2026-09-13", force: true, now: new Date("2026-09-13T01:00:00Z") });
+    assert.equal(first.created, 1);
+    assert.equal(first.expected, 1);
+    assert.equal(first.paid, 0);
+    assert.equal(records.length, 1);
+    assert.equal(records[0].sourceStatus, "expected_payout");
+    assert.equal(records[0].netMinor, 2619000);
+    assert.equal(records[0].incomeDate, "2026-09-08");
+
+    settled = true;
+    const second = await reconcileBeds24FinanceRange(env, { store, provider: "airbnb", from: "2026-09-01", to: "2026-09-13", force: true, now: new Date("2026-09-13T02:00:00Z") });
+    assert.equal(second.created, 0);
+    assert.equal(second.updated, 1);
+    assert.equal(second.reconciled, 1);
+    assert.equal(second.paid, 1);
+    assert.equal(records.length, 1);
+    assert.equal(records[0].sourceStatus, "paid");
+    assert.equal(records[0].netMinor, 2619000);
+    assert.equal(records[0].incomeDate, "2026-09-09");
+    assert.equal(records[0].paymentMethod, "Bank transfer");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("v5.11.63 Finance summary separates provisional expected income from settled income while keeping forecast total", () => {
+  const configuration = { minorUnitDigits: 2, currency: "THB" };
+  const totals = summarizeFinance(
+    [{ amountMinor: 200000, category: "Utilities", roomArea: "" }],
+    [
+      { grossMinor: 1000000, feesMinor: 150000, netMinor: 850000, category: "Airbnb", paymentMethod: "Expected OTA payout", unit: "Room 1", sourceStatus: "expected_payout" },
+      { grossMinor: 500000, feesMinor: 50000, netMinor: 450000, category: "Airbnb", paymentMethod: "Bank transfer", unit: "Room 2", sourceStatus: "paid" }
+    ],
+    configuration
+  );
+  assert.equal(totals.netIncome, 13000);
+  assert.equal(totals.expectedNetIncome, 8500);
+  assert.equal(totals.settledNetIncome, 4500);
+  assert.equal(totals.expectedEntries, 1);
+  assert.equal(totals.settledIncomeEntries, 1);
+  assert.equal(totals.operatingResult, 11000);
+  assert.equal(totals.settledOperatingResult, 2500);
+});
+
+test("v5.11.63 expected payout UI is clearly provisional on desktop and mobile", async () => {
+  const [adminHtml, adminJs, appFinance, appModels] = await Promise.all([
+    readFile(new URL("../public/concierge-admin.html", import.meta.url), "utf8"),
+    readFile(new URL("../public/concierge-admin.js", import.meta.url), "utf8"),
+    readFile(new URL("../../taoedge-owner-app-v0.1.4/app/finance.tsx", import.meta.url), "utf8").catch(() => ""),
+    readFile(new URL("../../taoedge-owner-app-v0.1.4/src/models/api.ts", import.meta.url), "utf8").catch(() => "")
+  ]);
+  assert.match(adminHtml, /expected payouts provisionally/);
+  assert.match(adminJs, /Expected \/ provisional Airbnb/);
+  assert.match(adminJs, /expected\/provisional/);
+  if (appFinance) {
+    assert.match(appFinance, /Provisional until Beds24 reports the actual payout/);
+    assert.match(appFinance, /expected\/provisional/);
+  }
+  if (appModels) assert.match(appModels, /expectedNetIncome/);
 });

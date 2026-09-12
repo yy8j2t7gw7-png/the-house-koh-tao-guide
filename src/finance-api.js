@@ -77,7 +77,7 @@ function financeCsv(expenses, income, configuration) {
     "Type", "Date", "Category / source", "Description",
     `Gross income (${configuration.currency})`, `Fees (${configuration.currency})`, `Net income (${configuration.currency})`,
     `Expense (${configuration.currency})`, `Operating effect (${configuration.currency})`,
-    "Vendor / reference", "Payment method", configuration.locationLabel || "Room / area", "Notes", "Receipt"
+    "Vendor / reference", "Payment method", configuration.locationLabel || "Room / area", "Notes", "Receipt", "Provider status", "Source system"
   ];
   if (includeCreatorRole) header.push("Entered by");
   const rows = [header];
@@ -89,7 +89,7 @@ function financeCsv(expenses, income, configuration) {
       minorUnitsToAmount(item.netMinor, digits).toFixed(digits),
       "",
       minorUnitsToAmount(item.netMinor, digits).toFixed(digits),
-      item.reference, item.paymentMethod, item.unit, item.notes, ""
+      item.reference, item.paymentMethod, item.unit, item.notes, "", item.sourceStatus || "", item.sourceSystem || "manual"
     ];
     if (includeCreatorRole) row.push(item.createdByRole === "staff" ? "Staff" : "Owner");
     rows.push(row);
@@ -100,7 +100,7 @@ function financeCsv(expenses, income, configuration) {
       "", "", "",
       minorUnitsToAmount(item.amountMinor, digits).toFixed(digits),
       (-minorUnitsToAmount(item.amountMinor, digits)).toFixed(digits),
-      item.vendor, item.paymentMethod, item.roomArea, item.notes, item.hasReceipt ? "Yes" : "No"
+      item.vendor, item.paymentMethod, item.roomArea, item.notes, item.hasReceipt ? "Yes" : "No", "", "manual"
     ];
     if (includeCreatorRole) row.push(item.createdByRole === "staff" ? "Staff" : "Owner");
     rows.push(row);
@@ -118,6 +118,10 @@ function summarizeFinance(expenses, income, configuration) {
   let grossIncomeMinor = 0;
   let feesMinor = 0;
   let netIncomeMinor = 0;
+  let expectedNetIncomeMinor = 0;
+  let settledNetIncomeMinor = 0;
+  let expectedEntries = 0;
+  let settledIncomeEntries = 0;
 
   const location = (name) => {
     const key = cleanLocation(name) || "Unassigned";
@@ -138,6 +142,14 @@ function summarizeFinance(expenses, income, configuration) {
     grossIncomeMinor += gross;
     feesMinor += fees;
     netIncomeMinor += net;
+    const expected = cleanText(item.sourceStatus, 40).toLowerCase().startsWith("expected");
+    if (expected) {
+      expectedNetIncomeMinor += net;
+      expectedEntries += 1;
+    } else {
+      settledNetIncomeMinor += net;
+      settledIncomeEntries += 1;
+    }
     incomeCategoryMinor[item.category] = (incomeCategoryMinor[item.category] || 0) + net;
     const paymentKey = cleanText(item.paymentMethod, 40) || "Not specified";
     incomePaymentMethodMinor[paymentKey] = (incomePaymentMethodMinor[paymentKey] || 0) + net;
@@ -155,8 +167,13 @@ function summarizeFinance(expenses, income, configuration) {
     grossIncome: minorUnitsToAmount(grossIncomeMinor, configuration.minorUnitDigits),
     fees: minorUnitsToAmount(feesMinor, configuration.minorUnitDigits),
     netIncome: minorUnitsToAmount(netIncomeMinor, configuration.minorUnitDigits),
+    expectedNetIncome: minorUnitsToAmount(expectedNetIncomeMinor, configuration.minorUnitDigits),
+    settledNetIncome: minorUnitsToAmount(settledNetIncomeMinor, configuration.minorUnitDigits),
+    expectedEntries,
+    settledIncomeEntries,
     expenses: minorUnitsToAmount(expensesMinor, configuration.minorUnitDigits),
     operatingResult: minorUnitsToAmount(netIncomeMinor - expensesMinor, configuration.minorUnitDigits),
+    settledOperatingResult: minorUnitsToAmount(settledNetIncomeMinor - expensesMinor, configuration.minorUnitDigits),
     incomeEntries: income.length,
     expenseEntries: expenses.length,
     entries: income.length + expenses.length,

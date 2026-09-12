@@ -1609,10 +1609,12 @@
 
   function renderFinanceSummary(totals = {}) {
     const result = Number(totals.operatingResult) || 0;
+    const expected = Number(totals.expectedNetIncome) || 0;
     const cards = [
-      [formatExpenseAmount(totals.netIncome), "Net income"],
+      [formatExpenseAmount(totals.netIncome), expected > 0 ? "Net income incl. expected" : "Net income"],
       [formatExpenseAmount(totals.expenses), "Expenses"],
-      [formatExpenseAmount(result), "Operating result"],
+      [formatExpenseAmount(result), expected > 0 ? "Operating result incl. expected" : "Operating result"],
+      ...(expected > 0 ? [[formatExpenseAmount(expected), "Expected / provisional Airbnb"]] : []),
       [String(Number(totals.entries) || 0), "Saved finance entries"]
     ].map(([value, label]) => {
       const card = element("article", "concierge-admin-expense-stat");
@@ -1632,7 +1634,7 @@
   function renderFinanceAutomation(automation = {}) {
     if (!financeAutomationStatus || !financeBeds24Sync) return;
     if (automation.ready) {
-      financeAutomationStatus.textContent = "Airbnb payout sync is active. Net income uses the actual channel-collected payment reported by Beds24; gross booking value and commission remain visible for reconciliation.";
+      financeAutomationStatus.textContent = "Airbnb Finance sync is active. Beds24 expected payouts are imported provisionally and automatically reconciled to the actual channel-collected payment when it arrives.";
       financeBeds24Sync.hidden = false;
     } else {
       financeBeds24Sync.hidden = true;
@@ -1648,7 +1650,7 @@
       .forEach((control) => { control.disabled = !historicalReady; });
     if (financeHistoricalImportStatus) {
       financeHistoricalImportStatus.textContent = historicalReady
-        ? "Historical Airbnb import is ready. Re-running the same period reconciles existing provider-managed entries instead of creating duplicates."
+        ? "Historical Airbnb import is ready. Expected payouts can be imported before settlement; re-running the same period reconciles them to actual payments instead of creating duplicates."
         : "Historical import needs the Beds24 refresh token, read:bookings + read:bookings-financial access, and the complete Room 1–11 mapping.";
     }
   }
@@ -1677,7 +1679,11 @@
       if (item.unit) meta.appendChild(element("span", "", item.unit));
       if (item.paymentMethod) meta.appendChild(element("span", "", item.paymentMethod));
       if (item.reference) meta.appendChild(element("span", "", `Ref: ${item.reference}`));
-      if (item.providerManaged) meta.appendChild(element("span", "", `Automated via ${item.sourceSystem === "beds24" ? "Beds24" : "provider"}${item.sourceStatus ? ` · ${item.sourceStatus.replaceAll("_", " ")}` : ""}`));
+      if (item.providerManaged) {
+        const status = String(item.sourceStatus || "").replaceAll("_", " ");
+        meta.appendChild(element("span", "", `Automated via ${item.sourceSystem === "beds24" ? "Beds24" : "provider"}${status ? ` · ${status}` : ""}`));
+        if (String(item.sourceStatus || "").startsWith("expected")) meta.appendChild(element("span", "", "Provisional: included in Finance until Beds24 reports the actual payout."));
+      }
       if (item.notes) meta.appendChild(element("span", "", item.notes));
       const actions = element("div", "concierge-admin-card-actions");
       if (!item.providerManaged) {
@@ -1719,15 +1725,19 @@
     const updated = Number(result.updated) || 0;
     const unchanged = Number(result.unchanged) || 0;
     const refunded = Number(result.refunded) || 0;
+    const expected = Number(result.expected) || 0;
+    const paid = Number(result.paid) || 0;
+    const reconciled = Number(result.reconciled) || 0;
+    const voided = Number(result.voided) || 0;
     const skipped = Number(result.skipped) || 0;
     const outsideRange = Number(result.outsideRange) || 0;
     if (created + updated + unchanged === 0) {
       if (scanned > 0) {
-        return `Beds24 returned ${scanned} Airbnb booking${scanned === 1 ? "" : "s"}, but no channel-collected payment was imported for ${result.from} to ${result.to}. ${skipped} booking${skipped === 1 ? " was" : "s were"} skipped${outsideRange ? ` and ${outsideRange} payment${outsideRange === 1 ? " was" : "s were"} outside the selected payment-date range` : ""}. This usually means Airbnb financial/payout data is not present in Beds24 yet.`;
+        return `Beds24 returned ${scanned} Airbnb booking${scanned === 1 ? "" : "s"}, but no usable actual or expected payout was imported for ${result.from} to ${result.to}. ${skipped} booking${skipped === 1 ? " was" : "s were"} skipped${outsideRange ? ` and ${outsideRange} financial record${outsideRange === 1 ? " was" : "s were"} outside the selected range` : ""}. Check that Beds24 exposes booking price/commission or invoice charges and actual payments.`;
       }
       return `Beds24 returned no Airbnb bookings for ${result.from} to ${result.to}. No Finance records were changed.`;
     }
-    return `Historical Airbnb import complete for ${result.from} to ${result.to}: ${created} created, ${updated} updated, ${unchanged} unchanged, ${refunded} refunded. ${scanned} Beds24 booking${scanned === 1 ? "" : "s"} scanned.`;
+    return `Historical Airbnb import complete for ${result.from} to ${result.to}: ${created} created, ${updated} updated, ${unchanged} unchanged. ${expected} expected/provisional, ${paid} paid, ${reconciled} reconciled to actual, ${refunded} refunded${voided ? `, ${voided} voided` : ""}. ${scanned} Beds24 booking${scanned === 1 ? "" : "s"} scanned.`;
   }
 
   async function runHistoricalFinanceImport(from, to) {

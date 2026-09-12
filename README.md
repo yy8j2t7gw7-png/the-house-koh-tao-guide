@@ -1,6 +1,10 @@
-# Guest Guide Platform with AI Concierge — The House v5.11.42
+# Guest Guide Platform with AI Concierge — The House v5.11.63
 
 The House – Koh Tao guest guide is a production-oriented, mobile-first digital guest guide and concierge platform. It combines property information, curated island guidance, structured place and activity data, and centralized contact and booking routes.
+
+## v5.11.63 release focus
+
+v5.11.63 upgrades Airbnb/Beds24 Finance onboarding to a two-stage ledger. If Beds24 has the booking economics but the actual channel-collected payment is still zero, the expected payout is imported as clearly marked provisional income. When settlement appears, the same provider-managed row is reconciled to the actual payment rather than duplicated. Monthly Finance now exposes expected-versus-settled amounts, CSV exports include provider status, and scheduled Finance sync remains disabled until the live expected→paid transition is verified. Commercial license enforcement and device binding remain enabled.
 
 ## Current modules
 

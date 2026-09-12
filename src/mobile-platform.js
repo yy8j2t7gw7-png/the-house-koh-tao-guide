@@ -956,7 +956,7 @@ async function handleProtected(request, env, path, store) {
     await store.mobileRecordAudit({
       tenantId: record.tenantId, userId: record.userId, membershipId: record.membershipId,
       action: "finance_historical_import", reference: `provider:${provider}`,
-      metadata: { from, to, scanned: result.scanned, created: result.created, updated: result.updated, unchanged: result.unchanged, refunded: result.refunded }, createdAt: access.now
+      metadata: { from, to, scanned: result.scanned, created: result.created, updated: result.updated, unchanged: result.unchanged, expected: result.expected, paid: result.paid, reconciled: result.reconciled, refunded: result.refunded, voided: result.voided }, createdAt: access.now
     });
     return json(result);
   }

@@ -1,5 +1,17 @@
 # Changelog
 
+## v5.11.63 — Airbnb expected-payout Finance reconciliation
+
+- Imports Beds24/Airbnb expected payouts as clearly marked provisional Finance income when actual channel-collected payment is still zero.
+- Reconciles the same provider-managed row to the actual payment when settlement arrives; no duplicate income row is created.
+- Preserves gross booking value and commission/fees separately from expected/actual net payout.
+- Adds expected, paid, reconciled, refunded and voided import counters.
+- Adds monthly expected-vs-settled Finance totals and a settled operating-result figure while preserving the working total including expected income.
+- Protects previously paid rows from being downgraded when a later Beds24 response temporarily omits payment rows.
+- Adds provider status/source to Finance CSV export.
+- Keeps scheduled Finance sync disabled pending live expected→paid validation.
+- Full automated suite: **327 passed / 0 failed**.
+
 ## v5.11.62 — Desktop historical Airbnb Finance onboarding
 
 - Adds the same owner-controlled historical Airbnb Finance backfill to the desktop Admin Dashboard that is already available in the mobile owner app.

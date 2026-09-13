@@ -15288,3 +15288,10 @@ test("v5.11.71 unified Concierge instructions use trusted adjacent-stay timeline
     globalThis.fetch = originalFetch;
   }
 });
+
+test("v5.11.73 integration health remains visible to integration-permitted sessions when a legacy license snapshot omits the module", async () => {
+  const source = await readFile(new URL("../src/mobile-platform.js", import.meta.url), "utf8");
+  assert.match(source, /const integrationPermission = hasPermission\(publicAccess, "integrations\.view"\)/);
+  assert.match(source, /const connectionHealth = integrationPermission \? mobileIntegrationHealth\(env\) : undefined/);
+  assert.match(source, /const integrationAllowed = integrationPermission && hasModule\(publicAccess, "integrations"\)/);
+});

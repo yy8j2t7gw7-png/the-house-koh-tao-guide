@@ -1,4 +1,8 @@
-# Guest Guide Platform with AI Concierge — The House v5.11.72
+# Guest Guide Platform with AI Concierge — The House v5.11.73
+
+## v5.11.73 — integration-health resilience hotfix
+
+v5.11.73 keeps provider secrets and integration operations capability-gated, but makes the read-only mobile connection-health summary available to authenticated users with `integrations.view` even when an older license snapshot is missing the newer `integrations` module key. This prevents the Integrations screen from collapsing to an empty payload during staged upgrades. Finance automation remains enabled, while Beds24 Channel Manager and AI auto-send remain off.
 
 ## v5.11.72 — truthful integration health + live Finance automation
 

@@ -1791,10 +1791,16 @@ async function handleProtected(request, env, path, store, handlers = {}) {
   }
 
   if (path === `${MOBILE_API_PREFIX}/platform` && request.method === "GET") {
-    const integrationAllowed = hasPermission(publicAccess, "integrations.view") && hasModule(publicAccess, "integrations");
+    const integrationPermission = hasPermission(publicAccess, "integrations.view");
+    const integrationAllowed = integrationPermission && hasModule(publicAccess, "integrations");
     const messagingAllowed = hasPermission(publicAccess, "messaging.view") && hasModule(publicAccess, "unified_messaging");
     const financeAllowed = hasPermission(publicAccess, "finance.view") && hasModule(publicAccess, "finance");
-    const connectionHealth = integrationAllowed ? mobileIntegrationHealth(env) : undefined;
+    // Connection health contains booleans/status only and no provider secrets. Return it
+    // to authenticated users who are allowed to inspect integrations even if a legacy
+    // license snapshot is missing the integrations entitlement, so the status screen
+    // never collapses to an empty payload. Actual integration operations remain
+    // capability/module-gated on their own routes.
+    const connectionHealth = integrationPermission ? mobileIntegrationHealth(env) : undefined;
     if (connectionHealth && !financeAllowed) delete connectionHealth.financeAutomation;
     return json({
       ok: true,

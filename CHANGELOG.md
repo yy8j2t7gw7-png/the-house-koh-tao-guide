@@ -1,5 +1,12 @@
 # Changelog
 
+## v5.11.73 — Integration-health resilience
+
+- Keep the server-owned connection-health contract available to authenticated `integrations.view` users even if a legacy license snapshot omits the newer Integrations module key.
+- Do not expose provider credentials or secrets; health remains booleans/status metadata only.
+- Keep actual integration operations and privileged routes module/permission gated.
+- Preserve `BEDS24_FINANCE_SYNC_ENABLED=true`, `BEDS24_CHANNEL_MANAGER_ENABLED=false`, and `UNIFIED_MESSAGING_AI_AUTO_SEND_ENABLED=false`.
+
 ## v5.11.72 — Integration health correction + Finance automation activation
 
 - Add server-owned mobile connection-health status for Beds24, Unified Messaging, Finance automation, WhatsApp and the Beds24 Channel Manager.

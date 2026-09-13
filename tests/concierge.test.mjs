@@ -83,6 +83,8 @@ import {
   MOBILE_DEFAULT_MODULES,
   MOBILE_DELEGATABLE_PERMISSIONS,
   MOBILE_PERMISSION_MATRIX,
+  analyticsRange,
+  buildAnalyticsPayload,
   handleMobileLicenseAdminRequest,
   handleMobilePlatformRequest,
   mobilePlatformConfiguration
@@ -15041,4 +15043,59 @@ test("v5.11.68 reservation booking tasks use Fah booking template while service 
   assert.equal(booking.name, "house_booking_alert_actions_v2");
   assert.equal(housekeeping.ok, true);
   assert.equal(housekeeping.name, "house_service_alert_actions_v3");
+});
+
+
+test("v5.11.69 analytics range and payload separate historic, forward, operations and Finance signals", () => {
+  const range = analyticsRange("30d");
+  assert.equal(range.key, "30d");
+  assert.equal(range.days, 30);
+  const reservations = [
+    { id: "a", provider: "airbnb", room: "1", checkInDate: range.from, checkOutDate: range.to, status: "confirmed" },
+    { id: "b", provider: "booking.com", room: "2", checkInDate: range.from, checkOutDate: range.from, status: "cancelled" },
+    { id: "c", provider: "direct", room: "3", checkInDate: range.forwardFrom, checkOutDate: range.forwardTo, status: "confirmed" }
+  ];
+  const operations = {
+    maintenance: { created: 2, resolved: 1, openNow: 1, byRoom: [{ room: "1", issues: 2, resolved: 1 }] },
+    housekeeping: { turnovers: 3, ready: 3, averageTurnaroundMinutes: 74, byRoom: [{ room: "1", turnovers: 2, ready: 2, averageTurnaroundMinutes: 70 }] },
+    concierge: { requests: 9, needsHuman: 2, learningGaps: 1, categories: [{ category: "room", count: 4, needsHuman: 2 }] },
+    messaging: { inbound: 7, outbound: 6, automatedOutbound: 0 }
+  };
+  const finance = {
+    currency: "THB",
+    totals: {
+      grossIncome: 10000, fees: 800, netIncome: 9200, expectedNetIncome: 1200, settledNetIncome: 8000,
+      expectedEntries: 1, settledIncomeEntries: 3, expenses: 3000, operatingResult: 6200, settledOperatingResult: 5000,
+      incomeEntries: 4, expenseEntries: 2, entries: 6, incomeCategories: {}, incomePaymentMethods: {}, expenseCategories: {},
+      locations: { "Room 1": { netIncome: 5000, expenses: 1200, operatingResult: 3800 } }
+    }
+  };
+  const payload = buildAnalyticsPayload({ range, reservations, roomsTotal: 11, operations, finance });
+  assert.equal(payload.ok, true);
+  assert.equal(payload.period.days, 30);
+  assert.equal(payload.finance.currency, "THB");
+  assert.equal(payload.rooms.find((item) => item.room === "1")?.maintenanceIssues, 2);
+  assert.equal(payload.rooms.find((item) => item.room === "1")?.netIncome, 5000);
+  assert.ok(payload.attention.some((item) => item.id === "repeat-maintenance"));
+  assert.ok(payload.forward.weekly.length >= 4);
+  assert.ok(payload.channels.some((item) => item.label === "Airbnb"));
+});
+
+test("v5.11.69 analytics endpoint is server-permissioned and uses canonical reservations, operations and Finance range data", async () => {
+  const [mobileSource, storeSource] = await Promise.all([
+    readFile(new URL("../src/mobile-platform.js", import.meta.url), "utf8"),
+    readFile(new URL("../src/concierge-store.js", import.meta.url), "utf8")
+  ]);
+  assert.match(mobileSource, /MOBILE_API_PREFIX}\/analytics/);
+  assert.match(mobileSource, /requireCapability\(publicAccess, "analytics\.view", "analytics"\)/);
+  assert.match(mobileSource, /mobileAnalyticsReservations/);
+  assert.match(mobileSource, /mobileAnalyticsOperations/);
+  assert.match(mobileSource, /listExpensesRange/);
+  assert.match(mobileSource, /listIncomeRange/);
+  assert.match(storeSource, /async mobileAnalyticsReservations/);
+  assert.match(storeSource, /async mobileAnalyticsOperations/);
+  assert.match(storeSource, /date\(created_at, '\+7 hours'\)/);
+  assert.match(storeSource, /FROM feedback/);
+  assert.match(mobileSource, /comparisonTotals/);
+  assert.match(mobileSource, /feedbackPositive/);
 });

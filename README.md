@@ -1,6 +1,9 @@
-# Guest Guide Platform with AI Concierge — The House v5.11.68
+# Guest Guide Platform with AI Concierge — The House v5.11.69
 
-## Current mobile/platform release
+## v5.11.69 — Taoedge Insights V1
+
+v5.11.69 adds the server-owned analytics contract for Taoedge Insights. The mobile analytics endpoint combines canonical reservation history, forward occupancy, channel mix, room performance, housekeeping/maintenance signals, Concierge demand patterns and protected Finance totals. Analytics remains permission/module gated and Finance fields are omitted unless `finance.view` is present. No OTA credentials or guest document data are exposed.
+
 
 v5.11.68 is a narrow backend routing hotfix on v5.11.67. It isolates Su/Fah/owner roles even when the legacy protected recipient secret contains overlapping members, and makes reservation tasks use the Fah booking WhatsApp template instead of the Su service template. Taoedge Owner App v0.1.8 remains current; no client rebuild is required. Existing multilingual Concierge review, security, Finance and staged automation boundaries remain unchanged.
 

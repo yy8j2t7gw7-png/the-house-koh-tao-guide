@@ -328,3 +328,19 @@ Live status: disabled through `EXPLORE_ENABLED=false`. Existing pages, data and 
 - [x] Collect additional nights and a transient international WhatsApp/phone contact, then route exactly one booking alert to Fah plus both owners.
 - [x] Keep stay-extension wording non-committal: availability, price/payment and final confirmation remain with the team.
 - [ ] Next narrow production fix: harden last-minute Airbnb reservation synchronization so a newly booked guest’s confirmation code becomes usable promptly without manual stay creation. Do not fold that sync change into v5.11.42.
+
+## v5.11.69 Taoedge Insights V1 checkpoint
+
+- [x] Taoedge Pulse with current/comparable occupancy and deterministic owner attention signals.
+- [x] Selected-period stay performance from canonical reservations.
+- [x] Next-30-day forward occupancy with weekly planning buckets.
+- [x] Channel concentration using confirmed stay-night share rather than decorative booking-share charts.
+- [x] Room intelligence linking occupancy, turnover timing, maintenance and authorized Finance location totals.
+- [x] Operations intelligence for maintenance, turnovers, Concierge demand, human handoffs, knowledge gaps and messaging volume.
+- [x] Guest-experience signals from Taoedge Concierge feedback and operational completion, without fabricating OTA review scores.
+- [x] Permission-gated Finance performance with equal-length previous-period comparison and expected-vs-settled disclosure.
+- [x] Explicit retention/data-quality disclosure for 90-day operational views.
+- [ ] V2: authoritative OTA review ingestion and sentiment/topic intelligence.
+- [ ] V2: true provider booking-created timestamps for pickup/lead-time analytics.
+- [ ] V2: canonical per-stay value for ADR/RevPAR and channel net-profit attribution.
+- [ ] V2: Revenue Engine recommendations driven by forward demand, booking pace and net economics.

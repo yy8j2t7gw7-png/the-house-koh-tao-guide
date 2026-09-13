@@ -1,5 +1,17 @@
 # Changelog
 
+## v5.11.69 — Taoedge Insights V1
+
+- Add protected `/api/mobile/v1/analytics` with This Month / 30-day / 90-day ranges.
+- Compute historic occupancy, comparable-period delta, room nights, arrivals/departures, average stay and cancellation rate from canonical reservations.
+- Add 30-day forward occupancy with weekly pickup buckets.
+- Add channel mix by confirmed stay nights rather than decorative booking-share only.
+- Add room intelligence combining occupancy, turnovers, turnaround time, maintenance incidents and protected room-level Finance where available.
+- Add operations intelligence from housekeeping, maintenance, Concierge interactions and Unified Messaging.
+- Add deterministic owner attention signals and explicit data-retention context.
+- Finance remains permission gated; managers without `finance.view` receive operational analytics without financial values.
+- Preserve v5.11.68 routing hotfix and all staged provider automation flags.
+
 ## v5.11.68 — Operational routing hotfix
 - Normalizes legacy overlapping protected recipient groups into authoritative support, booking and owner roles before dispatch.
 - Housekeeping / maintenance / general service now resolve to Su + owners even when Fah remains in the legacy raw support group.
@@ -220,6 +232,18 @@
 - Deleting an owner-managed stay revokes guest access, closes unused passport links and records an audit event.
 
 # Changelog
+
+## v5.11.69 — Taoedge Insights V1
+
+- Add protected `/api/mobile/v1/analytics` with This Month / 30-day / 90-day ranges.
+- Compute historic occupancy, comparable-period delta, room nights, arrivals/departures, average stay and cancellation rate from canonical reservations.
+- Add 30-day forward occupancy with weekly pickup buckets.
+- Add channel mix by confirmed stay nights rather than decorative booking-share only.
+- Add room intelligence combining occupancy, turnovers, turnaround time, maintenance incidents and protected room-level Finance where available.
+- Add operations intelligence from housekeeping, maintenance, Concierge interactions and Unified Messaging.
+- Add deterministic owner attention signals and explicit data-retention context.
+- Finance remains permission gated; managers without `finance.view` receive operational analytics without financial values.
+- Preserve v5.11.68 routing hotfix and all staged provider automation flags.
 
 All notable changes to The House – Koh Tao guest guide are recorded here.
 

@@ -3461,6 +3461,175 @@ export class ConciergeStore extends DurableObject {
     return { ok: true, reservationId: id, checkOutDate: nextCheckout, updatedAt: now };
   }
 
+  async mobileAnalyticsReservations(fromDate, toDate) {
+    const from = cleanText(fromDate, 10);
+    const to = cleanText(toDate, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to) || to < from) return [];
+    return rows(this.ctx.storage.sql.exec(
+      `SELECT r.id, r.provider, r.room, r.check_in_date AS checkInDate,
+              CASE WHEN o.check_out_date > r.check_out_date THEN o.check_out_date ELSE r.check_out_date END AS checkOutDate,
+              r.status, r.created_at AS createdAt, r.updated_at AS updatedAt
+       FROM stay_reservations r
+       LEFT JOIN stay_checkout_overrides o ON o.reservation_id = r.id
+       WHERE r.check_in_date <= ?
+         AND (CASE WHEN o.check_out_date > r.check_out_date THEN o.check_out_date ELSE r.check_out_date END) >= ?
+       ORDER BY r.check_in_date ASC, CAST(r.room AS INTEGER) ASC`,
+      to,
+      from
+    ));
+  }
+
+  async mobileAnalyticsOperations(fromDate, toDate) {
+    const from = cleanText(fromDate, 10);
+    const to = cleanText(toDate, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to) || to < from) {
+      return {
+        maintenance: { created: 0, resolved: 0, openNow: 0, byRoom: [] },
+        housekeeping: { turnovers: 0, ready: 0, averageTurnaroundMinutes: 0, byRoom: [] },
+        concierge: { requests: 0, needsHuman: 0, learningGaps: 0, feedbackPositive: 0, feedbackNegative: 0, categories: [] },
+        messaging: { inbound: 0, outbound: 0, automatedOutbound: 0 }
+      };
+    }
+    const maintenanceTotals = rows(this.ctx.storage.sql.exec(
+      `SELECT COUNT(*) AS created,
+              SUM(CASE WHEN status = 'resolved' THEN 1 ELSE 0 END) AS resolved
+       FROM maintenance_reports
+       WHERE date(created_at, '+7 hours') BETWEEN ? AND ?`,
+      from, to
+    ))[0] || {};
+    const maintenanceOpen = rows(this.ctx.storage.sql.exec(
+      `SELECT COUNT(*) AS openNow FROM maintenance_reports WHERE status <> 'resolved'`
+    ))[0] || {};
+    const maintenanceByRoom = rows(this.ctx.storage.sql.exec(
+      `SELECT room, COUNT(*) AS issues,
+              SUM(CASE WHEN status = 'resolved' THEN 1 ELSE 0 END) AS resolved
+       FROM maintenance_reports
+       WHERE date(created_at, '+7 hours') BETWEEN ? AND ?
+       GROUP BY room
+       ORDER BY issues DESC, CAST(room AS INTEGER) ASC`,
+      from, to
+    ));
+    const housekeepingTotals = rows(this.ctx.storage.sql.exec(
+      `SELECT COUNT(*) AS turnovers,
+              SUM(CASE WHEN status = 'ready' THEN 1 ELSE 0 END) AS ready,
+              AVG(CASE WHEN status = 'ready' THEN MAX(0, (julianday(updated_at) - julianday(created_at)) * 1440.0) ELSE NULL END) AS averageTurnaroundMinutes
+       FROM housekeeping_tasks
+       WHERE service_date BETWEEN ? AND ?`,
+      from, to
+    ))[0] || {};
+    const housekeepingByRoom = rows(this.ctx.storage.sql.exec(
+      `SELECT room, COUNT(*) AS turnovers,
+              SUM(CASE WHEN status = 'ready' THEN 1 ELSE 0 END) AS ready,
+              AVG(CASE WHEN status = 'ready' THEN MAX(0, (julianday(updated_at) - julianday(created_at)) * 1440.0) ELSE NULL END) AS averageTurnaroundMinutes
+       FROM housekeeping_tasks
+       WHERE service_date BETWEEN ? AND ?
+       GROUP BY room
+       ORDER BY CAST(room AS INTEGER) ASC`,
+      from, to
+    ));
+    const conciergeTotals = rows(this.ctx.storage.sql.exec(
+      `SELECT COUNT(*) AS requests,
+              SUM(CASE WHEN needs_human = 1 THEN 1 ELSE 0 END) AS needsHuman,
+              SUM(CASE WHEN learning_gap = 1 THEN 1 ELSE 0 END) AS learningGaps
+       FROM interactions
+       WHERE date(created_at, '+7 hours') BETWEEN ? AND ?`,
+      from, to
+    ))[0] || {};
+    const conciergeCategories = rows(this.ctx.storage.sql.exec(
+      `SELECT CASE WHEN category = '' THEN 'other' ELSE category END AS category,
+              COUNT(*) AS count,
+              SUM(CASE WHEN needs_human = 1 THEN 1 ELSE 0 END) AS needsHuman
+       FROM interactions
+       WHERE date(created_at, '+7 hours') BETWEEN ? AND ?
+       GROUP BY CASE WHEN category = '' THEN 'other' ELSE category END
+       ORDER BY count DESC, category ASC
+       LIMIT 12`,
+      from, to
+    ));
+    const messagingTotals = rows(this.ctx.storage.sql.exec(
+      `SELECT SUM(CASE WHEN direction = 'inbound' THEN 1 ELSE 0 END) AS inbound,
+              SUM(CASE WHEN direction = 'outbound' THEN 1 ELSE 0 END) AS outbound,
+              SUM(CASE WHEN direction = 'outbound' AND automated = 1 THEN 1 ELSE 0 END) AS automatedOutbound
+       FROM messaging_messages
+       WHERE date(created_at, '+7 hours') BETWEEN ? AND ?`,
+      from, to
+    ))[0] || {};
+    const feedbackTotals = rows(this.ctx.storage.sql.exec(
+      `SELECT SUM(CASE WHEN rating = 'up' THEN 1 ELSE 0 END) AS positive,
+              SUM(CASE WHEN rating = 'down' THEN 1 ELSE 0 END) AS negative
+       FROM feedback
+       WHERE date(created_at, '+7 hours') BETWEEN ? AND ?`,
+      from, to
+    ))[0] || {};
+    return {
+      maintenance: {
+        created: Number(maintenanceTotals.created) || 0,
+        resolved: Number(maintenanceTotals.resolved) || 0,
+        openNow: Number(maintenanceOpen.openNow) || 0,
+        byRoom: maintenanceByRoom.map((item) => ({ room: String(item.room || ''), issues: Number(item.issues) || 0, resolved: Number(item.resolved) || 0 }))
+      },
+      housekeeping: {
+        turnovers: Number(housekeepingTotals.turnovers) || 0,
+        ready: Number(housekeepingTotals.ready) || 0,
+        averageTurnaroundMinutes: Math.max(0, Math.round(Number(housekeepingTotals.averageTurnaroundMinutes) || 0)),
+        byRoom: housekeepingByRoom.map((item) => ({
+          room: String(item.room || ''), turnovers: Number(item.turnovers) || 0, ready: Number(item.ready) || 0,
+          averageTurnaroundMinutes: Math.max(0, Math.round(Number(item.averageTurnaroundMinutes) || 0))
+        }))
+      },
+      concierge: {
+        requests: Number(conciergeTotals.requests) || 0,
+        needsHuman: Number(conciergeTotals.needsHuman) || 0,
+        learningGaps: Number(conciergeTotals.learningGaps) || 0,
+        feedbackPositive: Number(feedbackTotals.positive) || 0,
+        feedbackNegative: Number(feedbackTotals.negative) || 0,
+        categories: conciergeCategories.map((item) => ({ category: cleanText(item.category, 60) || 'other', count: Number(item.count) || 0, needsHuman: Number(item.needsHuman) || 0 }))
+      },
+      messaging: {
+        inbound: Number(messagingTotals.inbound) || 0,
+        outbound: Number(messagingTotals.outbound) || 0,
+        automatedOutbound: Number(messagingTotals.automatedOutbound) || 0
+      }
+    };
+  }
+
+  async listExpensesRange(fromDate, toDate, businessId = HOUSE_FINANCE_BUSINESS_ID) {
+    const from = cleanText(fromDate, 10);
+    const to = cleanText(toDate, 10);
+    const business = cleanText(businessId, 80) || HOUSE_FINANCE_BUSINESS_ID;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to) || to < from) return [];
+    return rows(this.ctx.storage.sql.exec(
+      `SELECT id, expense_date AS expenseDate, category, description, amount_minor AS amountMinor, currency,
+              vendor, payment_method AS paymentMethod, room_area AS roomArea, notes,
+              CASE WHEN receipt_object_key = '' THEN 0 ELSE 1 END AS hasReceipt,
+              created_by_role AS createdByRole, created_at AS createdAt
+       FROM expense_records
+       WHERE business_id = ? AND expense_date BETWEEN ? AND ?
+       ORDER BY expense_date DESC, created_at DESC
+       LIMIT 5000`,
+      business, from, to
+    )).map((item) => ({ ...item, hasReceipt: Boolean(item.hasReceipt) }));
+  }
+
+  async listIncomeRange(fromDate, toDate, businessId = HOUSE_FINANCE_BUSINESS_ID) {
+    const from = cleanText(fromDate, 10);
+    const to = cleanText(toDate, 10);
+    const business = cleanText(businessId, 80) || HOUSE_FINANCE_BUSINESS_ID;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to) || to < from) return [];
+    return rows(this.ctx.storage.sql.exec(
+      `SELECT id, income_date AS incomeDate, category, description,
+              gross_minor AS grossMinor, fees_minor AS feesMinor, net_minor AS netMinor, currency,
+              unit, payment_method AS paymentMethod, reference, notes, created_by_role AS createdByRole,
+              source_system AS sourceSystem, source_external_id AS sourceExternalId, source_status AS sourceStatus,
+              synced_at AS syncedAt, created_at AS createdAt
+       FROM income_records
+       WHERE business_id = ? AND income_date BETWEEN ? AND ?
+       ORDER BY income_date DESC, created_at DESC
+       LIMIT 5000`,
+      business, from, to
+    ));
+  }
+
   async getStayOperationsOverview() {
     const reservations = rows(this.ctx.storage.sql.exec(
       `SELECT r.id, r.provider, r.room, r.listing_id AS listingId, r.guest_first_name AS guestFirstName, r.check_in_date AS checkInDate,

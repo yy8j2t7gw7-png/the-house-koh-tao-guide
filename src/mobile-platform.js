@@ -361,6 +361,227 @@ function shiftedDateOnly(dateOnly, days) {
   return date.toISOString().slice(0, 10);
 }
 
+function dateSpanDays(from, to) {
+  if (!validDate(from) || !validDate(to) || to < from) return 0;
+  const start = new Date(`${from}T12:00:00Z`).getTime();
+  const end = new Date(`${to}T12:00:00Z`).getTime();
+  return Math.max(0, Math.round((end - start) / 86_400_000) + 1);
+}
+
+export function analyticsRange(value) {
+  const today = bangkokDate();
+  const key = ["month", "30d", "90d"].includes(cleanText(value, 12).toLowerCase()) ? cleanText(value, 12).toLowerCase() : "30d";
+  let from = key === "month" ? `${today.slice(0, 7)}-01` : shiftedDateOnly(today, key === "90d" ? -89 : -29);
+  const to = today;
+  const days = dateSpanDays(from, to);
+  const previousTo = shiftedDateOnly(from, -1);
+  const previousFrom = shiftedDateOnly(previousTo, -(days - 1));
+  const forwardFrom = today;
+  const forwardTo = shiftedDateOnly(today, 29);
+  return { key, from, to, days, previousFrom, previousTo, forwardFrom, forwardTo };
+}
+
+function overlapNights(reservation, from, to) {
+  if (!reservation || reservation.status !== "confirmed" || !validDate(reservation.checkInDate) || !validDate(reservation.checkOutDate)) return 0;
+  const endExclusive = shiftedDateOnly(to, 1);
+  const start = reservation.checkInDate > from ? reservation.checkInDate : from;
+  const end = reservation.checkOutDate < endExclusive ? reservation.checkOutDate : endExclusive;
+  if (!validDate(start) || !validDate(end) || end <= start) return 0;
+  return Math.max(0, dateSpanDays(start, shiftedDateOnly(end, -1)));
+}
+
+function fullStayNights(reservation) {
+  if (!reservation || !validDate(reservation.checkInDate) || !validDate(reservation.checkOutDate) || reservation.checkOutDate <= reservation.checkInDate) return 0;
+  return dateSpanDays(reservation.checkInDate, shiftedDateOnly(reservation.checkOutDate, -1));
+}
+
+function round1(value) {
+  return Math.round((Number(value) || 0) * 10) / 10;
+}
+
+function percent(value, total) {
+  const denominator = Number(total) || 0;
+  return denominator > 0 ? round1(((Number(value) || 0) / denominator) * 100) : 0;
+}
+
+function percentChange(value, previous) {
+  const prior = Number(previous) || 0;
+  if (!prior) return null;
+  return round1((((Number(value) || 0) - prior) / Math.abs(prior)) * 100);
+}
+
+function normalizedRoom(value) {
+  const match = cleanText(value, 80).match(/(?:^|\broom\s*)?(1[01]|[1-9])(?:\b|$)/i);
+  return match ? String(Number(match[1])) : "";
+}
+
+function reservationWindowStats(reservations, from, to, roomsTotal) {
+  const source = Array.isArray(reservations) ? reservations : [];
+  const days = Math.max(1, dateSpanDays(from, to));
+  const roomCount = Math.max(1, Number(roomsTotal) || 1);
+  const arrivalsAll = source.filter((item) => rangeContains(item.checkInDate, from, to));
+  const confirmedArrivals = arrivalsAll.filter((item) => item.status === "confirmed");
+  const cancellations = arrivalsAll.filter((item) => item.status === "cancelled");
+  const departures = source.filter((item) => item.status === "confirmed" && rangeContains(item.checkOutDate, from, to));
+  const roomNights = source.reduce((sum, item) => sum + overlapNights(item, from, to), 0);
+  const stayNights = confirmedArrivals.reduce((sum, item) => sum + fullStayNights(item), 0);
+  const channels = new Map();
+  for (const item of arrivalsAll) {
+    const key = cleanText(item.provider, 50).toLowerCase() || "other";
+    const row = channels.get(key) || { key, label: providerLabel(key), bookings: 0, confirmedBookings: 0, cancellations: 0, nights: 0 };
+    row.bookings += 1;
+    if (item.status === "cancelled") row.cancellations += 1;
+    else {
+      row.confirmedBookings += 1;
+      row.nights += fullStayNights(item);
+    }
+    channels.set(key, row);
+  }
+  const totalConfirmedNights = [...channels.values()].reduce((sum, item) => sum + item.nights, 0);
+  const totalBookings = [...channels.values()].reduce((sum, item) => sum + item.bookings, 0);
+  return {
+    days,
+    arrivals: confirmedArrivals.length,
+    departures: departures.length,
+    bookings: arrivalsAll.length,
+    confirmedBookings: confirmedArrivals.length,
+    cancellations: cancellations.length,
+    cancellationRate: percent(cancellations.length, arrivalsAll.length),
+    roomNights,
+    availableRoomNights: roomCount * days,
+    occupancyPercent: percent(roomNights, roomCount * days),
+    averageStayNights: confirmedArrivals.length ? round1(stayNights / confirmedArrivals.length) : 0,
+    channels: [...channels.values()].map((item) => ({
+      ...item,
+      bookingSharePercent: percent(item.bookings, totalBookings),
+      nightSharePercent: percent(item.nights, totalConfirmedNights)
+    })).sort((a, b) => b.nights - a.nights || b.bookings - a.bookings)
+  };
+}
+
+function analyticsWeeklyBuckets(reservations, from, to, roomsTotal) {
+  const output = [];
+  let cursor = from;
+  while (cursor <= to && output.length < 6) {
+    const bucketTo = shiftedDateOnly(cursor, 6) < to ? shiftedDateOnly(cursor, 6) : to;
+    const stats = reservationWindowStats(reservations, cursor, bucketTo, roomsTotal);
+    output.push({ from: cursor, to: bucketTo, occupancyPercent: stats.occupancyPercent, roomNights: stats.roomNights, arrivals: stats.arrivals, departures: stats.departures });
+    cursor = shiftedDateOnly(bucketTo, 1);
+  }
+  return output;
+}
+
+function buildAnalyticsAttention({ current, previous, forward, operations, finance, rooms }) {
+  const items = [];
+  const occupancyDelta = round1(current.occupancyPercent - previous.occupancyPercent);
+  if (forward.occupancyPercent < 40) items.push({ id: "forward-demand", tone: "warning", title: "Forward demand is light", detail: `Next 30 days are ${forward.occupancyPercent}% occupied. Keep an eye on pickup before changing rates.`, route: "" });
+  else if (forward.occupancyPercent >= 80) items.push({ id: "forward-demand", tone: "success", title: "Forward demand is strong", detail: `Next 30 days are already ${forward.occupancyPercent}% occupied. Remaining inventory deserves a rate review.`, route: "" });
+  if (occupancyDelta <= -10) items.push({ id: "occupancy-down", tone: "warning", title: "Occupancy has softened", detail: `${Math.abs(occupancyDelta)} points below the previous comparable period.`, route: "" });
+  if (current.cancellationRate >= 15 && current.bookings >= 4) items.push({ id: "cancellations", tone: "warning", title: "Cancellation rate needs attention", detail: `${current.cancellationRate}% of arrivals booked for this period are cancelled in the canonical reservation history.`, route: "/bookings" });
+  const repeatRoom = [...rooms].sort((a, b) => b.maintenanceIssues - a.maintenanceIssues)[0];
+  if (repeatRoom?.maintenanceIssues >= 2) items.push({ id: "repeat-maintenance", tone: "danger", title: `Room ${repeatRoom.room} has repeated maintenance`, detail: `${repeatRoom.maintenanceIssues} maintenance reports in this period.`, route: "/(tabs)/operations?focus=maintenance" });
+  if ((operations?.concierge?.learningGaps || 0) > 0) items.push({ id: "knowledge-gaps", tone: "accent", title: "Concierge knowledge can improve", detail: `${operations.concierge.learningGaps} request${operations.concierge.learningGaps === 1 ? "" : "s"} exposed a knowledge gap in this period.`, route: "" });
+  const feedbackPositive = Number(operations?.concierge?.feedbackPositive) || 0;
+  const feedbackNegative = Number(operations?.concierge?.feedbackNegative) || 0;
+  const feedbackTotal = feedbackPositive + feedbackNegative;
+  if (feedbackTotal >= 4 && percent(feedbackNegative, feedbackTotal) >= 25) items.push({ id: "concierge-feedback", tone: "warning", title: "Concierge feedback needs review", detail: `${feedbackNegative} of ${feedbackTotal} explicit Concierge ratings were negative in this period.`, route: "/(tabs)/inbox" });
+  const turnovers = Number(operations?.housekeeping?.turnovers) || 0;
+  const ready = Number(operations?.housekeeping?.ready) || 0;
+  if (turnovers >= 4 && percent(ready, turnovers) < 90) items.push({ id: "turnover-ready-rate", tone: "warning", title: "Some turnover tasks are not reaching Ready", detail: `${ready} of ${turnovers} turnover tasks reached Ready in this period.`, route: "/(tabs)/operations?focus=housekeeping" });
+  const topChannel = current.channels?.[0];
+  if (topChannel && topChannel.nightSharePercent >= 70 && current.confirmedBookings >= 4) items.push({ id: "channel-concentration", tone: "warning", title: `High dependency on ${topChannel.label}`, detail: `${topChannel.nightSharePercent}% of confirmed stay nights from arrivals in this period come from one channel.`, route: "/bookings" });
+  if ((finance?.totals?.expectedNetIncome || 0) > 0) items.push({ id: "expected-payout", tone: "accent", title: "Part of income is still provisional", detail: `${finance.currency} ${Math.round(finance.totals.expectedNetIncome).toLocaleString("en-US")} is expected OTA payout, not settled cash yet.`, route: "/finance" });
+  if (!items.length) items.push({ id: "stable", tone: "success", title: "No major exceptions detected", detail: "The current reservation, operations and Concierge signals do not show an obvious issue requiring attention.", route: "" });
+  return items.slice(0, 5);
+}
+
+export function buildAnalyticsPayload({ range, reservations, roomsTotal, operations, finance }) {
+  const current = reservationWindowStats(reservations, range.from, range.to, roomsTotal);
+  const previous = reservationWindowStats(reservations, range.previousFrom, range.previousTo, roomsTotal);
+  const forward = reservationWindowStats(reservations, range.forwardFrom, range.forwardTo, roomsTotal);
+  const roomMap = new Map(Array.from({ length: roomsTotal }, (_, index) => [String(index + 1), {
+    room: String(index + 1), occupiedNights: 0, occupancyPercent: 0, arrivals: 0, departures: 0, cancellations: 0,
+    maintenanceIssues: 0, turnovers: 0, averageTurnaroundMinutes: 0, netIncome: 0, operatingResult: 0
+  }]));
+  for (const reservation of reservations) {
+    const room = String(reservation.room || "");
+    if (!roomMap.has(room)) continue;
+    const row = roomMap.get(room);
+    row.occupiedNights += overlapNights(reservation, range.from, range.to);
+    if (rangeContains(reservation.checkInDate, range.from, range.to)) {
+      if (reservation.status === "cancelled") row.cancellations += 1;
+      else row.arrivals += 1;
+    }
+    if (reservation.status === "confirmed" && rangeContains(reservation.checkOutDate, range.from, range.to)) row.departures += 1;
+  }
+  for (const item of operations?.maintenance?.byRoom || []) {
+    if (roomMap.has(String(item.room))) roomMap.get(String(item.room)).maintenanceIssues = Number(item.issues) || 0;
+  }
+  for (const item of operations?.housekeeping?.byRoom || []) {
+    if (!roomMap.has(String(item.room))) continue;
+    const row = roomMap.get(String(item.room));
+    row.turnovers = Number(item.turnovers) || 0;
+    row.averageTurnaroundMinutes = Number(item.averageTurnaroundMinutes) || 0;
+  }
+  if (finance?.totals?.locations) {
+    for (const [key, value] of Object.entries(finance.totals.locations)) {
+      const room = normalizedRoom(key);
+      if (!room || !roomMap.has(room)) continue;
+      roomMap.get(room).netIncome += Number(value?.netIncome) || 0;
+      roomMap.get(room).operatingResult += Number(value?.operatingResult) || 0;
+    }
+  }
+  const rooms = [...roomMap.values()].map((item) => ({ ...item, occupancyPercent: percent(item.occupiedNights, current.days) }));
+  const attention = buildAnalyticsAttention({ current, previous, forward, operations, finance, rooms });
+  const financePayload = finance ? {
+    ...finance,
+    change: {
+      netIncomePercent: percentChange(finance.totals?.netIncome, finance.comparisonTotals?.netIncome),
+      operatingResultPercent: percentChange(finance.totals?.operatingResult, finance.comparisonTotals?.operatingResult),
+      expensesPercent: percentChange(finance.totals?.expenses, finance.comparisonTotals?.expenses)
+    }
+  } : null;
+  return {
+    ok: true,
+    generatedAt: new Date().toISOString(),
+    range: range.key,
+    period: { from: range.from, to: range.to, days: range.days },
+    comparison: { from: range.previousFrom, to: range.previousTo },
+    pulse: {
+      occupancyPercent: current.occupancyPercent,
+      occupancyDeltaPoints: round1(current.occupancyPercent - previous.occupancyPercent),
+      roomNights: current.roomNights,
+      arrivals: current.arrivals,
+      departures: current.departures,
+      confirmedBookings: current.confirmedBookings,
+      cancellations: current.cancellations,
+      cancellationRate: current.cancellationRate,
+      averageStayNights: current.averageStayNights
+    },
+    forward: {
+      from: range.forwardFrom,
+      to: range.forwardTo,
+      occupancyPercent: forward.occupancyPercent,
+      roomNights: forward.roomNights,
+      arrivals: forward.arrivals,
+      departures: forward.departures,
+      weekly: analyticsWeeklyBuckets(reservations, range.forwardFrom, range.forwardTo, roomsTotal)
+    },
+    channels: current.channels,
+    rooms,
+    operations,
+    finance: financePayload,
+    attention,
+    dataQuality: {
+      cancellationHistoryDays: 90,
+      resolvedMaintenanceHistoryDays: 30,
+      conciergeHistoryDays: 30,
+      operationsHistoryComplete: range.days <= 30,
+      note: range.days > 30 ? "Resolved maintenance and Concierge interaction/feedback records are retained for about 30 days, so those older operational signals may be incomplete. Reservation and Finance metrics use their own retained source records." : "Operational and Concierge history are within their current 30-day retention windows."
+    }
+  };
+}
+
 function beds24GuestDisplayName(booking = {}) {
   return cleanText([booking.firstName, booking.lastName].filter(Boolean).join(" "), 100);
 }
@@ -1109,6 +1330,35 @@ async function handleProtected(request, env, path, store, handlers = {}) {
       });
     }
     return json(outcome || { error: "draft_review_failed" }, status);
+  }
+
+  if (path === `${MOBILE_API_PREFIX}/analytics` && request.method === "GET") {
+    const denied = requireCapability(publicAccess, "analytics.view", "analytics");
+    if (denied) return denied;
+    const url = new URL(request.url);
+    const range = analyticsRange(url.searchParams.get("range"));
+    const [reservations, operations, statuses] = await Promise.all([
+      store.mobileAnalyticsReservations(range.previousFrom, range.forwardTo),
+      store.mobileAnalyticsOperations(range.from, range.to),
+      store.listRoomHousekeepingStatuses()
+    ]);
+    const roomsTotal = Math.max(1, Array.isArray(statuses) ? statuses.length : 11);
+    let finance = null;
+    if (hasPermission(publicAccess, "finance.view") && hasModule(publicAccess, "finance")) {
+      const [expenses, income, previousExpenses, previousIncome] = await Promise.all([
+        store.listExpensesRange(range.from, range.to, HOUSE_FINANCE_BUSINESS_ID),
+        store.listIncomeRange(range.from, range.to, HOUSE_FINANCE_BUSINESS_ID),
+        store.listExpensesRange(range.previousFrom, range.previousTo, HOUSE_FINANCE_BUSINESS_ID),
+        store.listIncomeRange(range.previousFrom, range.previousTo, HOUSE_FINANCE_BUSINESS_ID)
+      ]);
+      const configuration = incomeConfiguration(env, HOUSE_FINANCE_BUSINESS_ID);
+      finance = {
+        currency: configuration.currency,
+        totals: summarizeFinance(expenses, income, configuration),
+        comparisonTotals: summarizeFinance(previousExpenses, previousIncome, configuration)
+      };
+    }
+    return json(buildAnalyticsPayload({ range, reservations, roomsTotal, operations, finance }));
   }
 
   if (path === `${MOBILE_API_PREFIX}/operations` && request.method === "GET") {

@@ -1,4 +1,5 @@
 import { createProtectedOperationsAlert, dispatchConciergeAlert } from "./whatsapp-alerts.js";
+import { operationalRecipientGroup } from "./operations-routing.js";
 
 const BANGKOK_TIME_ZONE = "Asia/Bangkok";
 
@@ -35,7 +36,7 @@ async function createTaskAlert(env, store, task, now) {
     roomVerified: true,
     alertType: "housekeeping_turnover",
     severity: "attention",
-    recipientGroup: "support",
+    recipientGroup: operationalRecipientGroup("turnover"),
     summary: taskSummary(task),
     housekeepingTask: task,
     escalationRequired: false,

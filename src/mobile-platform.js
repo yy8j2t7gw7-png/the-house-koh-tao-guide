@@ -3,9 +3,10 @@ import { expenseConfiguration, handleExpenseAdminRequest } from "./expense-api.j
 import { incomeConfiguration, summarizeFinance } from "./finance-api.js";
 import { beds24FinanceSyncConfiguration, reconcileBeds24FinanceRange } from "./beds24-finance-sync.js";
 import { integrationAdminOverview } from "./integration-catalog.js";
-import { beds24ApiRequest, handleUnifiedMessagingAdminRequest, openBeds24ReservationConversation, roomForBeds24Booking, startWhatsAppGuestConversation, unifiedMessagingConfiguration, whatsAppGuestInitiationConfiguration } from "./unified-messaging.js";
+import { beds24ApiRequest, handleUnifiedMessagingAdminRequest, openBeds24ReservationConversation, reviewMessagingDraft, roomForBeds24Booking, startWhatsAppGuestConversation, unifiedMessagingConfiguration, whatsAppGuestInitiationConfiguration } from "./unified-messaging.js";
 import { handleStayAdminRequest } from "./stay-api.js";
 import { createProtectedOperationsAlert, dispatchConciergeAlert, operationalTaskAssignment, operationalTaskAssignments } from "./whatsapp-alerts.js";
+import { operationalRecipientGroup } from "./operations-routing.js";
 
 const MOBILE_API_PREFIX = "/api/mobile/v1";
 const PASSWORD_ITERATIONS = 100000;
@@ -559,6 +560,17 @@ function publicTaskAssignments(env) {
   }));
 }
 
+
+function bookingTaskRoutingKey(category) {
+  const value = cleanText(category, 60).toLowerCase();
+  if (value === "housekeeping") return "housekeeping";
+  if (value === "maintenance") return "maintenance";
+  if (value === "guest support") return "guest_support";
+  if (value === "reservations") return "reservations";
+  if (value === "owner") return "owner";
+  return "general";
+}
+
 function bookingTaskAlertType(category) {
   const value = cleanText(category, 60).toLowerCase();
   if (value === "housekeeping") return "booking_task_housekeeping";
@@ -824,7 +836,7 @@ function homePayload(operations, overview, threads, finance, access) {
   };
 }
 
-async function handleProtected(request, env, path, store) {
+async function handleProtected(request, env, path, store, handlers = {}) {
   const access = await authenticate(request, env, store);
   if (access.error) return access.error;
   const record = access.record;
@@ -910,7 +922,7 @@ async function handleProtected(request, env, path, store) {
     if (!reservationId || text.length < 2) return json({ error: "invalid_request" }, 400);
     const reservation = await store.getStayReservationById(reservationId);
     if (!reservation) return json({ error: "reservation_not_found" }, 404);
-    const assignment = kind === "task" ? operationalTaskAssignment(env, body?.assigneeKey) : null;
+    const assignment = kind === "task" ? operationalTaskAssignment(env, bookingTaskRoutingKey(category)) : null;
     if (kind === "task" && !assignment) return json({ error: "task_assignee_unavailable" }, 409);
     const actorHash = await sha256(`mobile:${record.userId}:${record.membershipId}`);
     const activityId = `bact_${crypto.randomUUID()}`;
@@ -1069,6 +1081,36 @@ async function handleProtected(request, env, path, store) {
     return response || json({ error: "ai_control_failed" }, 502);
   }
 
+  if (path === `${MOBILE_API_PREFIX}/inbox/draft/review` && request.method === "POST") {
+    const denied = requireCapability(publicAccess, "messaging.ai_control", "unified_messaging");
+    if (denied) return denied;
+    let body; try { body = await readJson(request); } catch (response) { return response; }
+    const action = ["approve", "reject", "regenerate"].includes(String(body?.action || "")) ? String(body.action) : "";
+    if (!action) return json({ error: "invalid_review_action" }, 400);
+    if (action === "approve") {
+      const sendDenied = requireCapability(publicAccess, "messaging.send", "unified_messaging");
+      if (sendDenied) return sendDenied;
+    }
+    const threadId = cleanText(body?.threadId, 120);
+    const draftId = cleanText(body?.draftId, 120);
+    if (!threadId || !draftId) return json({ error: "invalid_request" }, 400);
+    const outcome = await reviewMessagingDraft({
+      env, store, threadId, draftId, action, message: cleanText(body?.message, 4000),
+      generateReply: handlers.generateReply, actorLabel: record.displayName
+    });
+    const status = outcome?.ok ? 200 : outcome?.error === "draft_not_found" ? 404
+      : ["operational_route_unavailable", "operational_notification_failed"].includes(outcome?.error) ? 409
+      : outcome?.error === "ai_unavailable" ? 503 : 400;
+    if (outcome?.ok) {
+      await store.mobileRecordAudit({
+        tenantId: record.tenantId, userId: record.userId, membershipId: record.membershipId,
+        action: `ai_draft_${action === "approve" ? "approved" : action === "reject" ? "rejected" : "regenerated"}`,
+        reference: `thread:${threadId}`, metadata: { draftId, activityId: outcome?.operation?.activityId || "" }, createdAt: access.now
+      });
+    }
+    return json(outcome || { error: "draft_review_failed" }, status);
+  }
+
   if (path === `${MOBILE_API_PREFIX}/operations` && request.method === "GET") {
     const denied = requireCapability(publicAccess, "operations.view", "core");
     if (denied) return denied;
@@ -1117,7 +1159,7 @@ async function handleProtected(request, env, path, store) {
     try {
       alert = await createProtectedOperationsAlert({
         env, room, alertType: "maintenance_staff_report", severity,
-        recipientGroup: severity === "critical" ? "urgent_response" : "support_with_owners",
+        recipientGroup: severity === "critical" ? operationalRecipientGroup("urgent") : operationalRecipientGroup("maintenance"),
         summary: `Staff app report — Room ${room} — ${issueType} — ${details}`,
         escalationRequired: severity === "critical"
       });
@@ -1433,14 +1475,14 @@ export async function handleMobileLicenseAdminRequest(request, env, path) {
   return json({ ok: Boolean(outcome?.ok), license: publicLicense(record, { enforced: true }), modules }, outcome?.ok ? 200 : 400);
 }
 
-export async function handleMobilePlatformRequest(request, env, path) {
+export async function handleMobilePlatformRequest(request, env, path, handlers = {}) {
   if (!path.startsWith(MOBILE_API_PREFIX)) return null;
   const store = getStore(env);
   if (!store) return json({ error: "mobile_store_unavailable" }, 503);
   if (path === `${MOBILE_API_PREFIX}/auth/bootstrap`) return bootstrap(request, env, store);
   if (path === `${MOBILE_API_PREFIX}/auth/login`) return login(request, env, store);
   if (path === `${MOBILE_API_PREFIX}/auth/accept-invite`) return acceptInvite(request, env, store);
-  return handleProtected(request, env, path, store);
+  return handleProtected(request, env, path, store, handlers);
 }
 
 export const MOBILE_DEFAULT_MODULES = DEFAULT_MODULES;

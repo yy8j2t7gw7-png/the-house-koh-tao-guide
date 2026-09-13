@@ -1,4 +1,5 @@
 import { normalizeText, sanitizeQuestion } from "./concierge-core.js";
+import { operationalRecipientGroup } from "./operations-routing.js";
 
 const BANGKOK_TIME_ZONE = "Asia/Bangkok";
 const BOOKING_REQUEST_WORDS = /(?:^\s*(?:please\s+)?(?:book|reserve|arrange)\s+|\b(?:please\s+(?:book|reserve|arrange)|can\s+you\s+(?:book|reserve|arrange)|could\s+you\s+(?:book|reserve|arrange)|help\s+me\s+(?:book|reserve|arrange)|i\s+(?:want|need|would\s+like)\s+(?:you\s+)?(?:to\s+)?(?:book|reserve|arrange)|book\s+(?:me|us)|make\s+(?:a\s+)?reservation)\b)/i;
@@ -201,7 +202,7 @@ export function classifyConciergeAlert({ result, question, room, now = new Date(
       ...base,
       alertType: "luggage_storage",
       severity: "attention",
-      recipientGroup: "support_with_owners",
+      recipientGroup: operationalRecipientGroup("guest_support"),
       escalationRequired: false
     };
   }
@@ -211,7 +212,7 @@ export function classifyConciergeAlert({ result, question, room, now = new Date(
       ...base,
       alertType: "stay_support",
       severity: "attention",
-      recipientGroup: "support_with_owners",
+      recipientGroup: operationalRecipientGroup("guest_support"),
       escalationRequired: false
     };
   }
@@ -221,7 +222,7 @@ export function classifyConciergeAlert({ result, question, room, now = new Date(
       ...base,
       alertType: "booking_request",
       severity: "attention",
-      recipientGroup: "booking_with_owners",
+      recipientGroup: operationalRecipientGroup("reservations"),
       escalationRequired: false
     };
   }

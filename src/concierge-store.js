@@ -548,6 +548,7 @@ export class ConciergeStore extends DurableObject {
           body TEXT NOT NULL,
           automated INTEGER NOT NULL DEFAULT 0,
           delivery_status TEXT NOT NULL DEFAULT '',
+          metadata_json TEXT NOT NULL DEFAULT '{}',
           created_at TEXT NOT NULL,
           updated_at TEXT NOT NULL
         );
@@ -786,6 +787,11 @@ export class ConciergeStore extends DurableObject {
         this.ctx.storage.sql.exec("ALTER TABLE income_records ADD COLUMN business_id TEXT NOT NULL DEFAULT 'the-house-koh-tao'");
       } catch (_error) {
         // Fresh databases and upgraded deployments already have finance business scoping.
+      }
+      try {
+        this.ctx.storage.sql.exec("ALTER TABLE messaging_messages ADD COLUMN metadata_json TEXT NOT NULL DEFAULT '{}'");
+      } catch (_error) {
+        // Existing messaging schemas already include review/action metadata.
       }
       try {
         this.ctx.storage.sql.exec("ALTER TABLE expense_records ADD COLUMN created_by_hash TEXT NOT NULL DEFAULT ''");
@@ -3696,8 +3702,8 @@ export class ConciergeStore extends DurableObject {
     if (!threadId || !body) return { inserted: false, error: "invalid_message" };
     this.ctx.storage.sql.exec(
       `INSERT INTO messaging_messages
-       (id, thread_id, provider_message_id, direction, sender, body, automated, delivery_status, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       (id, thread_id, provider_message_id, direction, sender, body, automated, delivery_status, metadata_json, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       id,
       threadId,
       providerMessageId,
@@ -3706,6 +3712,7 @@ export class ConciergeStore extends DurableObject {
       body,
       record.automated ? 1 : 0,
       cleanText(record.deliveryStatus, 30),
+      JSON.stringify(record.metadata && typeof record.metadata === "object" ? record.metadata : {}),
       createdAt,
       createdAt
     );
@@ -3776,10 +3783,10 @@ export class ConciergeStore extends DurableObject {
   async listMessagingMessages(threadId, limitValue = 100) {
     const limit = Math.max(1, Math.min(200, Number(limitValue) || 100));
     return rows(this.ctx.storage.sql.exec(
-      `SELECT id, threadId, providerMessageId, direction, sender, body, automated, deliveryStatus, createdAt, updatedAt
+      `SELECT id, threadId, providerMessageId, direction, sender, body, automated, deliveryStatus, metadataJson, createdAt, updatedAt
        FROM (
          SELECT id, thread_id AS threadId, provider_message_id AS providerMessageId,
-                direction, sender, body, automated, delivery_status AS deliveryStatus,
+                direction, sender, body, automated, delivery_status AS deliveryStatus, metadata_json AS metadataJson,
                 created_at AS createdAt, updated_at AS updatedAt
          FROM messaging_messages WHERE thread_id = ?
          ORDER BY created_at DESC, id DESC LIMIT ?
@@ -3787,7 +3794,72 @@ export class ConciergeStore extends DurableObject {
        ORDER BY createdAt ASC, id ASC`,
       cleanText(threadId, 100),
       limit
-    )).map((item) => ({ ...item, automated: Boolean(item.automated) }));
+    )).map((item) => {
+      let metadata = {};
+      try { metadata = JSON.parse(item.metadataJson || "{}"); } catch (_error) { metadata = {}; }
+      const { metadataJson, ...rest } = item;
+      return { ...rest, metadata, automated: Boolean(item.automated) };
+    });
+  }
+
+  async getMessagingMessage(idValue) {
+    const id = cleanText(idValue, 100);
+    if (!id) return null;
+    const item = rows(this.ctx.storage.sql.exec(
+      `SELECT id, thread_id AS threadId, provider_message_id AS providerMessageId, direction, sender, body, automated,
+              delivery_status AS deliveryStatus, metadata_json AS metadataJson, created_at AS createdAt, updated_at AS updatedAt
+       FROM messaging_messages WHERE id = ? LIMIT 1`,
+      id
+    ))[0] || null;
+    if (!item) return null;
+    let metadata = {};
+    try { metadata = JSON.parse(item.metadataJson || "{}"); } catch (_error) { metadata = {}; }
+    const { metadataJson, ...rest } = item;
+    return { ...rest, metadata, automated: Boolean(item.automated) };
+  }
+
+  async updateMessagingDraft(idValue, patch = {}) {
+    const id = cleanText(idValue, 100);
+    const current = await this.getMessagingMessage(id);
+    if (!current || current.direction !== "draft") return { ok: false, error: "draft_not_found" };
+    const body = Object.prototype.hasOwnProperty.call(patch, "body") ? cleanText(patch.body, 3000) : current.body;
+    const deliveryStatus = Object.prototype.hasOwnProperty.call(patch, "deliveryStatus") ? cleanText(patch.deliveryStatus, 30) : current.deliveryStatus;
+    const metadata = Object.prototype.hasOwnProperty.call(patch, "metadata") && patch.metadata && typeof patch.metadata === "object" ? patch.metadata : current.metadata || {};
+    const now = cleanText(patch.updatedAt, 40) || new Date().toISOString();
+    if (!body) return { ok: false, error: "invalid_message" };
+    this.ctx.storage.sql.exec(
+      "UPDATE messaging_messages SET body = ?, delivery_status = ?, metadata_json = ?, updated_at = ? WHERE id = ?",
+      body, deliveryStatus, JSON.stringify(metadata), now, id
+    );
+    return { ok: true, message: await this.getMessagingMessage(id) };
+  }
+
+  async reconcileMessagingProviderEcho({ threadId, providerMessageId, body, createdAt }) {
+    const thread = cleanText(threadId, 100);
+    const provider = cleanText(providerMessageId, 220);
+    const text = cleanText(body, 3000);
+    if (!thread || !provider || !text) return { reconciled: false };
+    const candidates = rows(this.ctx.storage.sql.exec(
+      `SELECT id, created_at AS createdAt FROM messaging_messages
+       WHERE thread_id = ? AND direction = 'outbound' AND provider_message_id = '' AND body = ?
+       ORDER BY created_at DESC LIMIT 6`,
+      thread, text
+    ));
+    const providerTime = new Date(createdAt || Date.now()).getTime();
+    const match = candidates.find((item) => {
+      const localTime = new Date(item.createdAt || 0).getTime();
+      return Number.isFinite(providerTime) && Number.isFinite(localTime) && Math.abs(providerTime - localTime) <= 15 * 60 * 1000;
+    });
+    if (!match) return { reconciled: false };
+    try {
+      this.ctx.storage.sql.exec(
+        "UPDATE messaging_messages SET provider_message_id = ?, delivery_status = 'synced', updated_at = ? WHERE id = ?",
+        provider, cleanText(createdAt, 40) || new Date().toISOString(), match.id
+      );
+      return { reconciled: true, id: match.id };
+    } catch (_error) {
+      return { reconciled: false };
+    }
   }
 
   async findMessagingThreadByPhone(phone) {

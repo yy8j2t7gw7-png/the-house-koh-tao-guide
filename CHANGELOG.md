@@ -1,5 +1,17 @@
 # Changelog
 
+## v5.11.67 — Unified Concierge review & operational routing
+- Provider/mobile Inbox now uses automatic any-language Concierge understanding and replies in the current guest message language.
+- Structured operational category keeps staff routing semantic and language-independent.
+
+- Unified provider/mobile AI drafts with the main Concierge logic in trusted reservation context.
+- Added review-only operational proposals so drafts do not alert staff before approval.
+- Centralized routing: service/housekeeping/maintenance → Su + owners; reservations → Fah + owners; routine turnover → Su; room-ready completion → owners.
+- Added Reject / Regenerate / Approve workflow API and booking-timeline task creation on approval.
+- Reconciled Beds24 provider echoes with locally sent messages to prevent duplicate outbound entries.
+- Preserved automatic-mode compatibility by executing the same draft approval workflow when auto-send is later enabled.
+
+
 ## v5.11.66 — Mobile communications, command center & Finance compatibility
 
 - Adds protected provider-message, WhatsApp and Call capabilities to mobile booking detail.

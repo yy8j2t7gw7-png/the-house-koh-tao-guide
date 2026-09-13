@@ -5,6 +5,7 @@ import {
 } from "./alert-policy.js";
 import { normalizeBangkokRequestedDate } from "./alert-policy.js";
 import { divingBookingSummary, validDivingGroup } from "./diving-catalog.js";
+import { operationalRoute, operationalRouteCatalog } from "./operations-routing.js";
 
 const DEFAULT_GRAPH_VERSION = "v23.0";
 const DEFAULT_TEMPLATE_LANGUAGE = "en_US";
@@ -230,24 +231,25 @@ function parseRecipients(env) {
   return result;
 }
 
+export function operationalRecipientPreview(env, recipientGroup) {
+  const members = (parseRecipients(env)[String(recipientGroup || "")] || []).map((recipient) => recipient.label);
+  return { recipientGroup: String(recipientGroup || ""), members, available: members.length > 0 };
+}
+
 export function operationalTaskAssignments(env) {
   const recipients = parseRecipients(env);
-  const definitions = [
-    { key: "housekeeping", label: "Housekeeping / support", recipientGroup: "support" },
-    { key: "reservations", label: "Bookings / reservations", recipientGroup: "booking" },
-    { key: "owners", label: "Owners", recipientGroup: "owners" },
-    { key: "support_owners", label: "Support + owners", recipientGroup: "support_with_owners" },
-    { key: "booking_owners", label: "Reservations + owners", recipientGroup: "booking_with_owners" },
-    { key: "urgent", label: "Urgent response", recipientGroup: "urgent_response" }
-  ];
-  return definitions.map((item) => {
-    const members = (recipients[item.recipientGroup] || []).map((recipient) => recipient.label);
-    return { ...item, members, available: members.length > 0 };
-  });
+  return operationalRouteCatalog()
+    .filter((item) => ["housekeeping", "maintenance", "guest_support", "general", "reservations", "owner", "urgent"].includes(item.key))
+    .map((item) => {
+      const members = (recipients[item.recipientGroup] || []).map((recipient) => recipient.label);
+      return { ...item, members, available: members.length > 0 };
+    });
 }
 
 export function operationalTaskAssignment(env, key) {
-  return operationalTaskAssignments(env).find((item) => item.key === String(key || "") && item.available) || null;
+  const route = operationalRoute(key);
+  const preview = operationalRecipientPreview(env, route.recipientGroup);
+  return preview.available ? { ...route, members: preview.members, available: true } : null;
 }
 
 export function houseEmergencyContact(env) {

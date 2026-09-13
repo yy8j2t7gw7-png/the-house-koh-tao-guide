@@ -181,7 +181,9 @@ export default {
     }
 
     if (url.pathname.startsWith("/api/mobile/v1/")) {
-      return handleMobilePlatformRequest(request, env, url.pathname);
+      return handleMobilePlatformRequest(request, env, url.pathname, {
+        generateReply: (context) => generateUnifiedMessageReply(context, env, ctx)
+      });
     }
 
     if (url.pathname.startsWith("/api/concierge/admin/")) {

@@ -7,7 +7,8 @@ import {
   handleConciergeRequest,
   handleEmergencyContactRequest,
   handleFeedbackRequest,
-  housekeepingServiceResult
+  housekeepingServiceResult,
+  generateUnifiedMessageReply
 } from "../src/concierge-api.js";
 import { handlePassportGuestRequest } from "../src/passport-api.js";
 import { notifyPassportUploadedOwners, processRegistrationReminderAlerts } from "../src/registration-alerts.js";
@@ -54,6 +55,7 @@ import { integrationAdminOverview } from "../src/integration-catalog.js";
 import {
   beds24MessageSyncPlan,
   beds24SourceLabel,
+  detectGuestMessageLanguage,
   roomForBeds24Booking,
   unifiedMessagingConfiguration
 } from "../src/unified-messaging.js";
@@ -314,6 +316,9 @@ function createStore() {
     },
     async getStayReservationByCodeHash(codeHash, room) {
       return this.stayReservations.find((item) => item.confirmationCodeHash === codeHash && item.room === room && item.status === "confirmed") || null;
+    },
+    async getStayReservationById(reservationId) {
+      return this.stayReservations.find((item) => item.id === reservationId) || null;
     },
     async createVerifiedStaySession(record) { this.staySessions.push(record); return { ok: true }; },
     async getVerifiedStaySession(tokenHash, now) {
@@ -14668,9 +14673,10 @@ test("v5.11.64 booking operational tasks expose configured assignee teams withou
   };
   const assignments = operationalTaskAssignments(env);
   assert.equal(assignments.find((item) => item.key === "housekeeping")?.available, true);
-  assert.deepEqual(assignments.find((item) => item.key === "housekeeping")?.members, ["Su"]);
+  assert.deepEqual(assignments.find((item) => item.key === "housekeeping")?.members, ["Su", "Owner 1", "Owner 2"]);
   assert.equal(assignments.find((item) => item.key === "reservations")?.available, true);
-  assert.deepEqual(assignments.find((item) => item.key === "owners")?.members, ["Owner 1", "Owner 2"]);
+  assert.deepEqual(assignments.find((item) => item.key === "reservations")?.members, ["Fah", "Owner 1", "Owner 2"]);
+  assert.deepEqual(assignments.find((item) => item.key === "owner")?.members, ["Owner 1", "Owner 2"]);
   assert.doesNotMatch(JSON.stringify(assignments), /640000004|960000001|810000002|820000003/);
 });
 
@@ -14764,3 +14770,212 @@ test("v5.11.66 repairs early Finance schemas so mobile receipt expenses can save
   assert.match(storeSource, /ALTER TABLE income_records ADD COLUMN created_by_hash TEXT NOT NULL DEFAULT ''/);
   assert.match(storeSource, /created_by_hash, created_by_role, created_at/);
 });
+
+
+test("v5.11.67 unified messaging uses language-agnostic automatic Concierge context", async () => {
+  // Legacy detector remains available for guide/UI compatibility, but provider messaging must not depend on it.
+  assert.equal(detectGuestMessageLanguage("Könnte der Müllbeutel im Bad gewechselt werden und noch eine Toilettenpapier Rolle?"), "de");
+  const conciergeSource = await readFile(new URL("../src/concierge-api.js", import.meta.url), "utf8");
+  const messagingSource = await readFile(new URL("../src/unified-messaging.js", import.meta.url), "utf8");
+  assert.match(conciergeSource, /trustedMessagingReviewOnly/);
+  assert.match(conciergeSource, /reviewOnly:\s*true/);
+  assert.match(conciergeSource, /operationProposal/);
+  assert.match(conciergeSource, /requestedLanguage === "auto"/);
+  assert.match(conciergeSource, /same natural language as the guest's current message/);
+  assert.match(conciergeSource, /Understand the request semantically in any language/);
+  assert.match(messagingSource, /privateReplyContact:\s*""/);
+  assert.match(messagingSource, /language:\s*"auto"/);
+});
+
+test("v5.11.67 central operational routing sends service requests to Su plus owners and bookings to Fah plus owners", () => {
+  const env = {
+    WHATSAPP_ALERT_RECIPIENTS: JSON.stringify({
+      support: [{ label: "Su", phone: "+66 64 000 0004" }],
+      booking: [{ label: "Fah", phone: "+66 96 000 0001" }],
+      emergency: [
+        { label: "Owner 1", phone: "+66 81 000 0002" },
+        { label: "Owner 2", phone: "+66 82 000 0003" }
+      ]
+    })
+  };
+  const assignments = operationalTaskAssignments(env);
+  for (const key of ["housekeeping", "maintenance", "guest_support", "general"]) {
+    assert.deepEqual(assignments.find((item) => item.key === key)?.members, ["Su", "Owner 1", "Owner 2"]);
+  }
+  assert.deepEqual(assignments.find((item) => item.key === "reservations")?.members, ["Fah", "Owner 1", "Owner 2"]);
+  assert.deepEqual(assignments.find((item) => item.key === "owner")?.members, ["Owner 1", "Owner 2"]);
+});
+
+test("v5.11.67 mobile AI review exposes approve reject regenerate and server-routed booking tasks", async () => {
+  const [mobileSource, messagingSource, routingSource] = await Promise.all([
+    readFile(new URL("../src/mobile-platform.js", import.meta.url), "utf8"),
+    readFile(new URL("../src/unified-messaging.js", import.meta.url), "utf8"),
+    readFile(new URL("../src/operations-routing.js", import.meta.url), "utf8")
+  ]);
+  assert.match(mobileSource, /\/inbox\/draft\/review/);
+  assert.match(mobileSource, /reviewMessagingDraft/);
+  assert.match(mobileSource, /bookingTaskRoutingKey\(category\)/);
+  assert.doesNotMatch(mobileSource, /operationalTaskAssignment\(env, body\?\.assigneeKey\)/);
+  assert.match(messagingSource, /action === "reject"/);
+  assert.match(messagingSource, /action === "regenerate"/);
+  assert.match(messagingSource, /action !== "approve"/);
+  assert.match(messagingSource, /createReviewedOperationalTask/);
+  assert.match(routingSource, /turnover.*recipientGroup: "support"/s);
+  assert.match(routingSource, /room_ready.*recipientGroup: "owners"/s);
+});
+
+test("v5.11.67 Beds24 provider echoes reconcile local outbound messages instead of duplicating them", async () => {
+  const [messagingSource, storeSource] = await Promise.all([
+    readFile(new URL("../src/unified-messaging.js", import.meta.url), "utf8"),
+    readFile(new URL("../src/concierge-store.js", import.meta.url), "utf8")
+  ]);
+  const calls = messagingSource.match(/reconcileMessagingProviderEcho/g) || [];
+  assert.ok(calls.length >= 2, "provider echo reconciliation should run in webhook and conversation refresh paths");
+  assert.match(storeSource, /reconcileMessagingProviderEcho/);
+  assert.match(storeSource, /provider_message_id = \?/);
+});
+
+
+test("v5.11.67 exact German housekeeping provider message stays on Concierge logic and proposes Su+owners task without pre-alerting", async () => {
+  const { env, store } = createEnvironment({
+    OPENAI_API_KEY: "test-key",
+    UNIFIED_MESSAGING_INTERNAL_TOKEN: "unified_internal_test_token",
+    WHATSAPP_ALERT_RECIPIENTS: JSON.stringify({
+      support: [{ label: "Su", phone: "+66 64 000 0004" }],
+      booking: [{ label: "Fah", phone: "+66 96 000 0001" }],
+      emergency: [
+        { label: "Owner 1", phone: "+66 81 000 0002" },
+        { label: "Owner 2", phone: "+66 82 000 0003" }
+      ]
+    })
+  });
+  store.stayReservations.push({
+    id: "stay_unified_german_001",
+    room: "3",
+    status: "confirmed",
+    provider: "airbnb",
+    guestFirstName: "Silke",
+    checkInDate: "2026-09-12",
+    checkOutDate: "2026-09-16"
+  });
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => new Response(JSON.stringify({
+    output: [{ type: "message", content: [{ type: "output_text", text: JSON.stringify({
+      answer: "Natürlich. Wir bringen gerne Toilettenpapier und kümmern uns um das Badezimmer.",
+      intent_id: "housekeeping_request",
+      category: "room",
+      confidence: 0.96,
+      needs_human: true,
+      handoff: "stay_support",
+      learning_gap: false,
+      learning_reason: "none"
+    }) }] }]
+  }), { status: 200, headers: { "content-type": "application/json" } });
+  try {
+    const result = await generateUnifiedMessageReply({
+      question: "Könnte der Müllbeutel im Bad einmal gewechselt werden und könnte ich noch eine Toilettenpapier Rolle dazubekommen?",
+      reservationId: "stay_unified_german_001",
+      room: "3",
+      language: "de",
+      history: []
+    }, env, undefined, new Date("2026-09-13T05:00:00.000Z"));
+    assert.match(result.answer, /Toilettenpapier/i);
+    assert.doesNotMatch(result.answer, /contact number is not attached/i);
+    assert.equal(result.language, "auto");
+    assert.equal(result.autoSend, false);
+    assert.equal(result.operationProposal?.taskCategory, "Housekeeping");
+    assert.equal(result.operationProposal?.recipientGroup, "support_with_owners");
+    assert.equal(store.alerts.length, 0, "review-only generation must not alert staff before approval");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("v5.11.67 arbitrary-language provider requests use semantic operational_category rather than keyword lists", async () => {
+  const { env, store } = createEnvironment({
+    OPENAI_API_KEY: "test-key",
+    UNIFIED_MESSAGING_INTERNAL_TOKEN: "unified_internal_test_token",
+    WHATSAPP_ALERT_RECIPIENTS: JSON.stringify({
+      support: [{ label: "Su", phone: "+66 64 000 0004" }],
+      booking: [{ label: "Fah", phone: "+66 96 000 0001" }],
+      emergency: [
+        { label: "Owner 1", phone: "+66 81 000 0002" },
+        { label: "Owner 2", phone: "+66 82 000 0003" }
+      ]
+    })
+  });
+  store.stayReservations.push({
+    id: "stay_unified_anylang_001",
+    room: "5",
+    status: "confirmed",
+    provider: "airbnb",
+    guestFirstName: "Guest",
+    checkInDate: "2026-09-13",
+    checkOutDate: "2026-09-16"
+  });
+
+  const originalFetch = globalThis.fetch;
+  const seenInstructions = [];
+  let call = 0;
+  globalThis.fetch = async (_url, options = {}) => {
+    const body = JSON.parse(options.body || "{}");
+    seenInstructions.push(String(body.instructions || ""));
+    call += 1;
+    const result = call === 1
+      ? {
+          answer: "当然可以。我们会安排客房服务处理这个请求。",
+          intent_id: "housekeeping_request",
+          category: "room",
+          confidence: 0.97,
+          needs_human: true,
+          handoff: "stay_support",
+          operational_category: "housekeeping",
+          learning_gap: false,
+          learning_reason: "none"
+        }
+      : {
+          answer: "Я могу помочь с рекомендацией парикмахера, если у нас есть подтверждённая информация.",
+          intent_id: "local_barber_recommendation",
+          category: "concierge",
+          confidence: 0.93,
+          needs_human: false,
+          handoff: "none",
+          operational_category: "none",
+          learning_gap: true,
+          learning_reason: "missing_fact"
+        };
+    return new Response(JSON.stringify({
+      output: [{ type: "message", content: [{ type: "output_text", text: JSON.stringify(result) }] }]
+    }), { status: 200, headers: { "content-type": "application/json" } });
+  };
+  try {
+    const chinese = await generateUnifiedMessageReply({
+      question: "请帮我打扫一下浴室，再给我两条毛巾。",
+      reservationId: "stay_unified_anylang_001",
+      room: "5",
+      language: "en",
+      history: []
+    }, env, undefined, new Date("2026-09-13T05:20:00.000Z"));
+    assert.match(chinese.answer, /客房服务/);
+    assert.equal(chinese.language, "auto");
+    assert.equal(chinese.operationProposal?.taskCategory, "Housekeeping");
+    assert.equal(chinese.operationProposal?.recipientGroup, "support_with_owners");
+    assert.equal(store.alerts.length, 0);
+
+    const russian = await generateUnifiedMessageReply({
+      question: "Где поблизости можно хорошо подстричься?",
+      reservationId: "stay_unified_anylang_001",
+      room: "5",
+      language: "en",
+      history: []
+    }, env, undefined, new Date("2026-09-13T05:21:00.000Z"));
+    assert.match(russian.answer, /парикмахера/i);
+    assert.equal(russian.operationProposal, null);
+    assert.equal(store.alerts.length, 0);
+    assert.ok(seenInstructions.every((text) => /same natural language as the guest's current message/.test(text)));
+    assert.ok(seenInstructions.every((text) => /Understand the request semantically in any language/.test(text)));
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+

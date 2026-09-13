@@ -1,3 +1,4 @@
+import { createProtectedOperationsAlert, dispatchConciergeAlert, operationalRecipientPreview } from "./whatsapp-alerts.js";
 const MAX_MESSAGE_LENGTH = 3000;
 const MAX_THREADS = 80;
 const MAX_THREAD_MESSAGES = 100;
@@ -38,6 +39,22 @@ function cleanText(value, maximum = MAX_MESSAGE_LENGTH) {
 
 function digits(value) {
   return String(value || "").replace(/\D/g, "").slice(0, 20);
+}
+
+export function detectGuestMessageLanguage(value) {
+  const text = String(value || "").trim();
+  const lower = text.toLowerCase();
+  if (!text) return "en";
+  if (/[\u0E00-\u0E7F]/u.test(text)) return "th";
+  if (/[\u4E00-\u9FFF]/u.test(text)) return "zh-CN";
+  if (/[\u0400-\u04FF]/u.test(text)) return "ru";
+  const german = /[äöüß]|\b(?:ich|wir|bitte|danke|dankeschön|koennte|könnte|kann|zimmer|bad|toilette|toilettenpapier|müll|muell|handtuch|reinigen|gereinigt|brauche|bräuchte|haette|hätte|gerne|noch|einmal|werden)\b/i;
+  const french = /[àâçéèêëîïôûùüÿœ]|\b(?:bonjour|merci|pouvez|pourriez|chambre|salle de bain|serviette|papier toilette|nettoyer|nettoyage|svp)\b|s['’]il vous plaît/i;
+  const spanish = /[áéíóúñ¿¡]|\b(?:hola|gracias|puede|podría|habitaci[oó]n|baño|toalla|papel higi[eé]nico|limpiar|limpieza|por favor)\b/i;
+  if (german.test(lower)) return "de";
+  if (french.test(lower)) return "fr";
+  if (spanish.test(lower)) return "es";
+  return "en";
 }
 
 function normalizeConfirmationCode(value) {
@@ -397,8 +414,8 @@ async function maybeGenerateReply({ env, store, thread, inboundText, generateRep
       history,
       reservationId: thread.reservationId,
       room: thread.room,
-      privateReplyContact: thread.guestPhone || "",
-      language: "en"
+      privateReplyContact: "",
+      language: "auto"
     });
     if (!result?.answer) return { generated: false, reason: "empty_ai_reply" };
     return { generated: true, ...result };
@@ -407,10 +424,31 @@ async function maybeGenerateReply({ env, store, thread, inboundText, generateRep
   }
 }
 
-async function recordAiDraft(store, thread, result, reason = "review_required") {
+function draftMetadata(result, reason, env) {
+  const proposal = result?.operationProposal && typeof result.operationProposal === "object"
+    ? { ...result.operationProposal }
+    : null;
+  if (proposal?.recipientGroup) {
+    const preview = operationalRecipientPreview(env, proposal.recipientGroup);
+    proposal.members = preview.members;
+    proposal.available = preview.available;
+  }
+  return {
+    reviewReason: String(reason || "review_required").slice(0, 80),
+    language: String(result?.language || "").slice(0, 12),
+    intentId: String(result?.intentId || "").slice(0, 80),
+    category: String(result?.category || "").slice(0, 80),
+    handoff: String(result?.handoff || "none").slice(0, 80),
+    operation: proposal,
+    decision: "pending"
+  };
+}
+
+async function recordAiDraft(store, thread, result, reason = "review_required", env = {}) {
   const now = new Date().toISOString();
+  const id = `msg_${crypto.randomUUID()}`;
   await store.recordMessagingMessage({
-    id: `msg_${crypto.randomUUID()}`,
+    id,
     threadId: thread.id,
     providerMessageId: "",
     direction: "draft",
@@ -418,6 +456,7 @@ async function recordAiDraft(store, thread, result, reason = "review_required") 
     body: cleanText(result.answer, MAX_MESSAGE_LENGTH),
     automated: true,
     deliveryStatus: "draft",
+    metadata: draftMetadata(result, reason, env),
     createdAt: now
   });
   await store.updateMessagingThreadState(thread.id, {
@@ -426,6 +465,7 @@ async function recordAiDraft(store, thread, result, reason = "review_required") 
     lastError: reason,
     updatedAt: now
   });
+  return { id };
 }
 
 async function sendBeds24Text(env, store, externalReservationId, text) {
@@ -611,6 +651,15 @@ export async function openBeds24ReservationConversation({ env, store, reservatio
   const thread = await upsertThreadForBeds24(store, booking, room, linkedReservation);
   const plan = beds24MessageSyncPlan(messages);
   for (const message of plan.messages) {
+    if (message.direction === "outbound" && typeof store.reconcileMessagingProviderEcho === "function") {
+      const echo = await store.reconcileMessagingProviderEcho({
+        threadId: thread.id,
+        providerMessageId: message.providerMessageId,
+        body: message.body,
+        createdAt: message.createdAt
+      }).catch(() => ({ reconciled: false }));
+      if (echo?.reconciled) continue;
+    }
     await store.recordMessagingMessage({
       id: `msg_${crypto.randomUUID()}`,
       threadId: thread.id,
@@ -670,6 +719,15 @@ export async function handleBeds24MessagingWebhook(request, env, ctx, generateRe
   let replyCandidateInserted = false;
   let insertedCount = 0;
   for (const message of plan.messages) {
+    if (message.direction === "outbound" && typeof store.reconcileMessagingProviderEcho === "function") {
+      const echo = await store.reconcileMessagingProviderEcho({
+        threadId: thread.id,
+        providerMessageId: message.providerMessageId,
+        body: message.body,
+        createdAt: message.createdAt
+      }).catch(() => ({ reconciled: false }));
+      if (echo?.reconciled) continue;
+    }
     const recorded = await store.recordMessagingMessage({
       id: `msg_${crypto.randomUUID()}`,
       threadId: thread.id,
@@ -698,14 +756,14 @@ export async function handleBeds24MessagingWebhook(request, env, ctx, generateRe
       }
       return;
     }
-    if (!result.autoSend || !aiAutoSendEnabled(env)) {
-      await recordAiDraft(store, linkedThread, result, result.autoSend ? "auto_send_disabled" : (result.reason || "review_required"));
-      return;
-    }
-    try {
-      await sendAndRecordReply({ env, store, thread: linkedThread, result, channel: "beds24" });
-    } catch (_error) {
-      await recordAiDraft(store, linkedThread, result, "provider_send_failed");
+    const draft = await recordAiDraft(store, linkedThread, result, result.autoSend ? "auto_send_disabled" : (result.reason || "review_required"), env);
+    if (!result.autoSend || !aiAutoSendEnabled(env)) return;
+    const approved = await reviewMessagingDraft({
+      env, store, threadId: linkedThread.id, draftId: draft.id, action: "approve",
+      message: result.answer, actorLabel: "Taoedge AI", automated: true
+    }).catch(() => ({ ok: false, error: "automatic_reply_failed" }));
+    if (!approved?.ok) {
+      await store.updateMessagingThreadState(linkedThread.id, { needsHuman: true, aiDraft: true, lastError: approved?.error || "automatic_reply_failed", updatedAt: new Date().toISOString() });
     }
   };
   if (ctx?.waitUntil) ctx.waitUntil(task()); else await task();
@@ -759,14 +817,14 @@ export async function handleInboundWhatsAppGuestMessage(message, env, ctx, gener
       if (!thread.reservationId) await store.updateMessagingThreadState(thread.id, { needsHuman: true, lastError: "reservation_unlinked", updatedAt: new Date().toISOString() });
       return;
     }
-    if (!result.autoSend || !aiAutoSendEnabled(env)) {
-      await recordAiDraft(store, thread, result, result.autoSend ? "auto_send_disabled" : (result.reason || "review_required"));
-      return;
-    }
-    try {
-      await sendAndRecordReply({ env, store, thread, result, channel: "whatsapp" });
-    } catch (_error) {
-      await recordAiDraft(store, thread, result, "provider_send_failed");
+    const draft = await recordAiDraft(store, thread, result, result.autoSend ? "auto_send_disabled" : (result.reason || "review_required"), env);
+    if (!result.autoSend || !aiAutoSendEnabled(env)) return;
+    const approved = await reviewMessagingDraft({
+      env, store, threadId: thread.id, draftId: draft.id, action: "approve",
+      message: result.answer, actorLabel: "Taoedge AI", automated: true
+    }).catch(() => ({ ok: false, error: "automatic_reply_failed" }));
+    if (!approved?.ok) {
+      await store.updateMessagingThreadState(thread.id, { needsHuman: true, aiDraft: true, lastError: approved?.error || "automatic_reply_failed", updatedAt: new Date().toISOString() });
     }
   };
   if (ctx?.waitUntil) ctx.waitUntil(task()); else await task();
@@ -782,6 +840,128 @@ export async function handleWhatsAppMessagingStatus(status, env) {
     deliveryStatus: cleanText(status?.status || "unknown", 30),
     updatedAt: new Date().toISOString()
   });
+}
+
+function reviewedDraftPublic(message) {
+  if (!message) return null;
+  return {
+    id: message.id,
+    threadId: message.threadId,
+    body: message.body,
+    deliveryStatus: message.deliveryStatus,
+    metadata: message.metadata || {},
+    createdAt: message.createdAt,
+    updatedAt: message.updatedAt
+  };
+}
+
+async function createReviewedOperationalTask({ env, store, thread, draft, actorLabel, now }) {
+  const operation = draft?.metadata?.operation;
+  if (!operation?.required) return { required: false, activity: null, delivery: { attempted: 0, accepted: 0 } };
+  const preview = operationalRecipientPreview(env, operation.recipientGroup);
+  if (!preview.available) return { required: true, error: "operational_route_unavailable", delivery: { attempted: 0, accepted: 0 } };
+  if (!thread.reservationId || !thread.room) return { required: true, error: "reservation_unlinked", delivery: { attempted: 0, accepted: 0 } };
+  const activityId = `bact_${crypto.randomUUID()}`;
+  const category = cleanText(operation.taskCategory || "Guest support", 60) || "Guest support";
+  const created = typeof store.mobileCreateReservationActivity === "function"
+    ? await store.mobileCreateReservationActivity({
+        id: activityId,
+        reservationId: thread.reservationId,
+        kind: "task",
+        category,
+        body: cleanText(operation.summary || "Guest requested assistance.", 1800),
+        assigneeKey: cleanText(operation.recipientGroup, 80),
+        assigneeLabel: preview.members.join(" + ") || "Operational team",
+        createdByHash: "unified-messaging-ai-review",
+        createdByLabel: cleanText(actorLabel, 100) || "AI review",
+        createdAt: now
+      })
+    : { ok: false, error: "booking_activity_unavailable" };
+  if (!created?.ok) return { required: true, error: created?.error || "booking_activity_create_failed", delivery: { attempted: 0, accepted: 0 } };
+  const alert = await createProtectedOperationsAlert({
+    env,
+    room: thread.room,
+    roomVerified: true,
+    alertType: cleanText(operation.alertType || "booking_task_guest_support", 100),
+    severity: cleanText(operation.severity || "attention", 30),
+    recipientGroup: cleanText(operation.recipientGroup, 80),
+    summary: `${cleanText(operation.summary || "Guest requested assistance.", 1200)} · Booking task ref ${activityId.slice(-8)}`,
+    escalationRequired: false,
+    now: new Date(now)
+  });
+  if (!alert) return { required: true, error: "operational_alert_create_failed", activityId, delivery: { attempted: 0, accepted: 0 } };
+  const delivery = await dispatchConciergeAlert(alert, env).catch(() => ({ attempted: 0, accepted: 0 }));
+  if (typeof store.mobileLinkReservationActivityAlert === "function") {
+    await store.mobileLinkReservationActivityAlert(activityId, alert.id, delivery, now).catch(() => {});
+  }
+  return { required: true, activityId, alertId: alert.id, delivery, members: preview.members };
+}
+
+async function sendReviewedGuestReply({ env, store, thread, text, now, automated = false }) {
+  let providerMessageId = "";
+  if (thread.channel === "beds24") {
+    await sendBeds24Text(env, store, thread.externalReservationId, text);
+  } else if (thread.channel === "whatsapp") {
+    const outcome = await sendWhatsAppGuestText(env, thread.guestPhone, text);
+    providerMessageId = `whatsapp:${outcome.providerMessageId}`;
+  } else {
+    throw new Error("unsupported_channel");
+  }
+  await store.recordMessagingMessage({
+    id: `msg_${crypto.randomUUID()}`,
+    threadId: thread.id,
+    providerMessageId,
+    direction: "outbound",
+    sender: automated ? "ai" : "owner",
+    body: text,
+    automated,
+    deliveryStatus: thread.channel === "beds24" ? "submitted" : "accepted",
+    metadata: { source: automated ? "automatic_ai_reply" : "approved_ai_draft" },
+    createdAt: now
+  });
+}
+
+export async function reviewMessagingDraft({ env, store, threadId, draftId, action, message = "", generateReply, actorLabel = "Team member", automated = false }) {
+  const thread = await store.getMessagingThread(cleanText(threadId, 100));
+  const draft = typeof store.getMessagingMessage === "function" ? await store.getMessagingMessage(cleanText(draftId, 100)) : null;
+  if (!thread || !draft || draft.threadId !== thread.id || draft.direction !== "draft") return { ok: false, error: "draft_not_found" };
+  if (!["draft", "regenerated"].includes(draft.deliveryStatus)) return { ok: false, error: "draft_already_reviewed" };
+  const now = new Date().toISOString();
+  if (action === "reject") {
+    const metadata = { ...(draft.metadata || {}), decision: "rejected", decidedAt: now, decidedBy: cleanText(actorLabel, 100) };
+    await store.updateMessagingDraft(draft.id, { deliveryStatus: "rejected", metadata, updatedAt: now });
+    await store.updateMessagingThreadState(thread.id, { needsHuman: true, aiDraft: false, lastError: "draft_rejected", updatedAt: now });
+    return { ok: true, action: "rejected", draft: reviewedDraftPublic(await store.getMessagingMessage(draft.id)) };
+  }
+  if (action === "regenerate") {
+    if (typeof generateReply !== "function") return { ok: false, error: "ai_unavailable" };
+    const messages = await store.listMessagingMessages(thread.id, 100);
+    const inbound = [...messages].reverse().find((item) => item.direction === "inbound" && new Date(item.createdAt).getTime() <= new Date(draft.createdAt).getTime());
+    if (!inbound?.body) return { ok: false, error: "guest_message_not_found" };
+    const result = await maybeGenerateReply({ env, store, thread, inboundText: inbound.body, generateReply });
+    if (!result.generated || !result.answer) return { ok: false, error: result.reason || "ai_regeneration_failed" };
+    const metadata = { ...draftMetadata(result, result.reason || "review_required", env), decision: "pending", regeneratedAt: now };
+    await store.updateMessagingDraft(draft.id, { body: result.answer, deliveryStatus: "regenerated", metadata, updatedAt: now });
+    await store.updateMessagingThreadState(thread.id, { needsHuman: true, aiDraft: true, lastError: result.reason || "review_required", updatedAt: now });
+    return { ok: true, action: "regenerated", draft: reviewedDraftPublic(await store.getMessagingMessage(draft.id)) };
+  }
+  if (action !== "approve") return { ok: false, error: "invalid_review_action" };
+  const text = cleanText(message || draft.body, MAX_MESSAGE_LENGTH);
+  if (!text) return { ok: false, error: "empty_reply" };
+  const operation = await createReviewedOperationalTask({ env, store, thread, draft, actorLabel, now });
+  if (operation.required && operation.error) return { ok: false, error: operation.error, operation };
+  if (operation.required && Number(operation.delivery?.accepted) <= 0) {
+    return { ok: false, error: "operational_notification_failed", operation };
+  }
+  try {
+    await sendReviewedGuestReply({ env, store, thread, text, now, automated });
+  } catch (error) {
+    return { ok: false, error: error?.message || "provider_send_failed", operation };
+  }
+  const metadata = { ...(draft.metadata || {}), decision: "approved", decidedAt: now, decidedBy: cleanText(actorLabel, 100), edited: text !== draft.body, operationResult: operation };
+  await store.updateMessagingDraft(draft.id, { body: text, deliveryStatus: "approved", metadata, updatedAt: now });
+  await store.updateMessagingThreadState(thread.id, { needsHuman: false, aiDraft: false, lastError: "", updatedAt: now });
+  return { ok: true, action: "approved", operation, draft: reviewedDraftPublic(await store.getMessagingMessage(draft.id)) };
 }
 
 function maskedPhone(value) {

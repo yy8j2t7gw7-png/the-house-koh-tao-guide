@@ -1,3 +1,11 @@
+## 5.11.71
+
+- Adds trusted adjacent-reservation context for provider/mobile Concierge conversations.
+- Resolves today/tomorrow and between-checkout/check-in timing in Asia/Bangkok before applying office/housekeeping weekday rules.
+- Makes informational luggage guidance reservation-chain aware, including same-day room moves.
+- Keeps owner-edited one-off exceptions out of permanent approved knowledge unless explicitly saved through a future knowledge-management action.
+- Preserves review-only draft generation, centralized staff routing, Insights V2, TM30 and Finance export behavior.
+
 # Changelog
 
 ## v5.11.70 — Insights V2, Guest Documents & TM30, Finance reports

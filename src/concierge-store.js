@@ -3726,6 +3726,67 @@ export class ConciergeStore extends DurableObject {
     ))[0] || null;
   }
 
+  async getAdjacentStayReservationsForMessaging(reservationIdValue, guestPhoneValue = "") {
+    const reservationId = cleanText(reservationIdValue, 100);
+    const guestPhone = cleanText(guestPhoneValue, 20);
+    if (!reservationId) return { current: null, previous: null, next: null };
+    const current = await this.getStayReservationById(reservationId);
+    if (!current || current.status !== "confirmed") return { current: null, previous: null, next: null };
+
+    const normalize = (item) => item ? ({
+      id: cleanText(item.id, 100),
+      provider: cleanText(item.provider, 40),
+      room: cleanText(item.room, 4),
+      guestFirstName: cleanText(item.guestFirstName, 40),
+      checkInDate: cleanText(item.checkInDate, 10),
+      checkOutDate: cleanText(item.checkOutDate, 10),
+      status: cleanText(item.status, 30) || "confirmed"
+    }) : null;
+
+    let candidates = [];
+    if (guestPhone) {
+      candidates = rows(this.ctx.storage.sql.exec(
+        `SELECT DISTINCT r.id, r.provider, r.room, r.guest_first_name AS guestFirstName,
+                r.check_in_date AS checkInDate,
+                CASE WHEN o.check_out_date > r.check_out_date THEN o.check_out_date ELSE r.check_out_date END AS checkOutDate,
+                r.status
+         FROM messaging_threads m
+         JOIN stay_reservations r ON r.id = m.reservation_id
+         LEFT JOIN stay_checkout_overrides o ON o.reservation_id = r.id
+         WHERE m.guest_phone = ? AND r.status = 'confirmed' AND r.id <> ?
+           AND (r.check_in_date = ? OR (CASE WHEN o.check_out_date > r.check_out_date THEN o.check_out_date ELSE r.check_out_date END) = ?)
+         ORDER BY r.check_in_date ASC`,
+        guestPhone, reservationId, current.checkOutDate, current.checkInDate
+      ));
+    }
+
+    // Provider + first-name fallback is intentionally restricted to exact adjacent dates.
+    // We only trust it when there is a single matching candidate for that boundary.
+    if (!candidates.length && current.guestFirstName) {
+      candidates = rows(this.ctx.storage.sql.exec(
+        `SELECT r.id, r.provider, r.room, r.guest_first_name AS guestFirstName,
+                r.check_in_date AS checkInDate,
+                CASE WHEN o.check_out_date > r.check_out_date THEN o.check_out_date ELSE r.check_out_date END AS checkOutDate,
+                r.status
+         FROM stay_reservations r
+         LEFT JOIN stay_checkout_overrides o ON o.reservation_id = r.id
+         WHERE r.status = 'confirmed' AND r.id <> ? AND lower(r.provider) = lower(?)
+           AND lower(r.guest_first_name) = lower(?)
+           AND (r.check_in_date = ? OR (CASE WHEN o.check_out_date > r.check_out_date THEN o.check_out_date ELSE r.check_out_date END) = ?)
+         ORDER BY r.check_in_date ASC`,
+        reservationId, current.provider || "", current.guestFirstName, current.checkOutDate, current.checkInDate
+      ));
+    }
+
+    const previousCandidates = candidates.filter((item) => cleanText(item.checkOutDate, 10) === cleanText(current.checkInDate, 10));
+    const nextCandidates = candidates.filter((item) => cleanText(item.checkInDate, 10) === cleanText(current.checkOutDate, 10));
+    return {
+      current: normalize(current),
+      previous: previousCandidates.length === 1 ? normalize(previousCandidates[0]) : null,
+      next: nextCandidates.length === 1 ? normalize(nextCandidates[0]) : null
+    };
+  }
+
   async mobileCreateReservationActivity(record) {
     const id = cleanText(record.id, 100);
     const reservationId = cleanText(record.reservationId, 100);

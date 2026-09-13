@@ -322,6 +322,17 @@ function createStore() {
     async getStayReservationById(reservationId) {
       return this.stayReservations.find((item) => item.id === reservationId) || null;
     },
+    async getAdjacentStayReservationsForMessaging(reservationId, _guestPhone = "") {
+      const current = this.stayReservations.find((item) => item.id === reservationId && item.status === "confirmed") || null;
+      if (!current) return { current: null, previous: null, next: null };
+      const candidates = this.stayReservations.filter((item) => item.id !== reservationId
+        && item.status === "confirmed"
+        && String(item.provider || "").toLowerCase() === String(current.provider || "").toLowerCase()
+        && String(item.guestFirstName || "").toLowerCase() === String(current.guestFirstName || "").toLowerCase());
+      const previous = candidates.filter((item) => item.checkOutDate === current.checkInDate);
+      const next = candidates.filter((item) => item.checkInDate === current.checkOutDate);
+      return { current: { ...current }, previous: previous.length === 1 ? { ...previous[0] } : null, next: next.length === 1 ? { ...next[0] } : null };
+    },
     async createVerifiedStaySession(record) { this.staySessions.push(record); return { ok: true }; },
     async getVerifiedStaySession(tokenHash, now) {
       const session = this.staySessions.find((item) => item.tokenHash === tokenHash && item.expiresAt > now && !item.revokedAt);
@@ -15171,4 +15182,73 @@ test("v5.11.70 guest-document TM30 and Finance-report mobile endpoints remain pe
   assert.match(storeSource, /async mobileListGuestDocuments/);
   assert.match(storeSource, /datetime\(p\.delete_after\) > datetime\('now'\)/);
   assert.match(storeSource, /async setPassportTm30Registered/);
+});
+
+
+test("v5.11.71 trusted messaging resolves back-to-back room move and Monday luggage policy", async () => {
+  const { env, store } = createEnvironment({
+    UNIFIED_MESSAGING_INTERNAL_TOKEN: "unified_internal_test_token"
+  });
+  store.stayReservations.push(
+    {
+      id: "stay_mya_room4_001", room: "4", status: "confirmed", provider: "airbnb", guestFirstName: "Mya",
+      checkInDate: "2026-09-10", checkOutDate: "2026-09-14"
+    },
+    {
+      id: "stay_mya_room5_001", room: "5", status: "confirmed", provider: "airbnb", guestFirstName: "Mya",
+      checkInDate: "2026-09-14", checkOutDate: "2026-09-21"
+    }
+  );
+  const result = await generateUnifiedMessageReply({
+    question: "Perfect, thanks so much! I was just staying at room 4, is there somewhere I can keep my bags between check-out & check-in? 😊",
+    reservationId: "stay_mya_room5_001",
+    room: "5",
+    guestPhone: "+66810000000",
+    language: "auto",
+    history: []
+  }, env, undefined, new Date("2026-09-13T07:38:00.000Z"));
+  assert.match(result.answer, /Monday/i);
+  assert.match(result.answer, /office is closed/i);
+  assert.match(result.answer, /Bamboo Beach Bar/i);
+  assert.match(result.answer, /11:00 AM/i);
+  assert.match(result.answer, /Room 4/i);
+  assert.match(result.answer, /Room 5/i);
+  assert.doesNotMatch(result.answer, /10:30 AM–7:30 PM.*office is open/i);
+  assert.equal(result.needsHuman, false);
+  assert.equal(result.operationProposal, null);
+});
+
+test("v5.11.71 unified Concierge instructions use trusted adjacent-stay timeline and do not learn manual exceptions", async () => {
+  const { env, store } = createEnvironment({
+    OPENAI_API_KEY: "test-key",
+    UNIFIED_MESSAGING_INTERNAL_TOKEN: "unified_internal_test_token"
+  });
+  store.stayReservations.push(
+    { id: "stay_chain_prev_001", room: "4", status: "confirmed", provider: "airbnb", guestFirstName: "Mya", checkInDate: "2026-09-10", checkOutDate: "2026-09-14" },
+    { id: "stay_chain_current_001", room: "5", status: "confirmed", provider: "airbnb", guestFirstName: "Mya", checkInDate: "2026-09-14", checkOutDate: "2026-09-21" }
+  );
+  const originalFetch = globalThis.fetch;
+  const instructionsSeen = [];
+  globalThis.fetch = async (_url, options = {}) => {
+    const body = JSON.parse(options.body || "{}");
+    instructionsSeen.push(String(body.instructions || ""));
+    return new Response(JSON.stringify({ output: [{ type: "message", content: [{ type: "output_text", text: JSON.stringify({
+      answer: "I can help with that.", intent_id: "general_question", category: "concierge", confidence: 0.9,
+      needs_human: false, handoff: "none", operational_category: "none", learning_gap: false, learning_reason: "none"
+    }) }] }] }), { status: 200, headers: { "content-type": "application/json" } });
+  };
+  try {
+    await generateUnifiedMessageReply({
+      question: "Do these two adjacent reservations count as one continuous room-change stay?",
+      reservationId: "stay_chain_current_001", room: "5", guestPhone: "+66810000000", history: []
+    }, env, undefined, new Date("2026-09-13T07:40:00.000Z"));
+    const conciergeInstructions = instructionsSeen.find((value) => /previousAdjacentStay/.test(value)) || "";
+    assert.match(conciergeInstructions, /previousAdjacentStay/);
+    assert.match(conciergeInstructions, /\"room\":\"4\"/);
+    assert.match(conciergeInstructions, /\"room\":\"5\"/);
+    assert.match(conciergeInstructions, /Asia\/Bangkok/);
+    assert.match(conciergeInstructions, /one-off exception.*not permanent House policy/i);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });

@@ -2995,6 +2995,60 @@ function luggageBagCount(value) {
   return written ? words[written[1].toLowerCase()] : "";
 }
 
+function trustedMessagingLuggageInformationResult(question, access, now = new Date()) {
+  if (!access?.trustedMessaging) return null;
+  const text = String(question || "");
+  if (!/(?:\bluggage\b|\bbaggage\b|\bbags?\b)/i.test(text) || isActionableLuggageMessage(text)) return null;
+
+  const chain = access?.session?.stayChain || {};
+  const current = chain.current || {
+    id: access?.session?.reservationId || "", room: access?.session?.room || access?.room || "",
+    checkInDate: access?.session?.checkInDate || "", checkOutDate: access?.session?.checkOutDate || ""
+  };
+  const previous = chain.previous || null;
+  const next = chain.next || null;
+  const parsed = parseBangkokRequestedDate(text, now);
+  let dateKey = parsed.status === "valid" ? parsed.dateKey : "";
+  let transition = null;
+
+  const betweenStayPhrase = /(?:between|after)[^.!?]{0,80}(?:check[ -]?out|checkout)[^.!?]{0,80}(?:check[ -]?in|checkin)|(?:check[ -]?out|checkout)[^.!?]{0,80}(?:check[ -]?in|checkin)/i.test(text);
+  if (!dateKey && betweenStayPhrase) {
+    if (previous && previous.checkOutDate && previous.checkOutDate === current.checkInDate) {
+      dateKey = current.checkInDate;
+      transition = { fromRoom: previous.room, toRoom: current.room };
+    } else if (next && current.checkOutDate && current.checkOutDate === next.checkInDate) {
+      dateKey = current.checkOutDate;
+      transition = { fromRoom: current.room, toRoom: next.room };
+    }
+  }
+  if (!dateKey && /(?:after|on)[^.!?]{0,40}(?:check[ -]?out|checkout)/i.test(text) && current.checkOutDate) dateKey = current.checkOutDate;
+  if (!dateKey && /(?:before|on)[^.!?]{0,40}(?:check[ -]?in|checkin)/i.test(text) && current.checkInDate) dateKey = current.checkInDate;
+
+  const day = dateKey ? cleaningDayFromKey(dateKey) : null;
+  const transitionPhrase = transition
+    ? ` between your Room ${transition.fromRoom} check-out and Room ${transition.toRoom} check-in`
+    : "";
+  let answer;
+  if (day?.weekday === "Monday") {
+    answer = `Yes. ${day.displayDate} is a Monday, so the downstairs office is closed${transitionPhrase}. Under the normal House luggage policy, you can leave your bags at Bamboo Beach Bar from 11:00 AM. We do not currently have normal luggage storage before 11:00 AM.`;
+  } else if (day) {
+    answer = `Yes. Luggage storage is available${transitionPhrase} on ${day.weekday}, ${day.displayDate}. The downstairs office is open from 10:30 AM to 7:30 PM. If the office is unavailable, Bamboo Beach Bar can store luggage from 11:00 AM when applicable.`;
+  } else {
+    answer = "Yes. Luggage storage is normally available Tuesday–Sunday at the downstairs office from 10:30 AM to 7:30 PM. If the office is unavailable, Bamboo Beach Bar can store luggage from 11:00 AM when applicable. The office is closed all day Monday, and we do not currently have normal luggage storage before 11:00 AM.";
+  }
+  return {
+    answer,
+    intentId: "luggage_storage_information",
+    category: "departure",
+    confidence: day ? 1 : 0.96,
+    needsHuman: false,
+    handoff: "none",
+    learningGap: false,
+    actions: [],
+    source: "trusted-stay-policy"
+  };
+}
+
 function luggageCollectionAnswer(missing, rejectedLocalContact = false) {
   const operational = [];
   if (missing.includes("context")) operational.push("whether this is for arrival or departure");
@@ -3173,6 +3227,10 @@ async function trustedMessagingAccess(request, body, env, store, requestedRoom) 
   if (!store || typeof store.getStayReservationById !== "function") return null;
   const reservation = await store.getStayReservationById(reservationId).catch(() => null);
   if (!reservation || reservation.status !== "confirmed" || !ROOM_OPTIONS.has(String(reservation.room || ""))) return null;
+  const guestPhone = String(body?.trustedGuestPhone || "").trim();
+  const chain = typeof store.getAdjacentStayReservationsForMessaging === "function"
+    ? await store.getAdjacentStayReservationsForMessaging(reservationId, guestPhone).catch(() => null)
+    : null;
   return {
     verified: true,
     accessGranted: true,
@@ -3190,7 +3248,8 @@ async function trustedMessagingAccess(request, body, env, store, requestedRoom) 
       guestFirstName: reservation.guestFirstName || "",
       checkInDate: reservation.checkInDate || "",
       checkOutDate: reservation.checkOutDate || "",
-      reservationStatus: reservation.status || "confirmed"
+      reservationStatus: reservation.status || "confirmed",
+      stayChain: chain || { current: reservation, previous: null, next: null }
     }
   };
 }
@@ -3247,13 +3306,21 @@ function bangkokContext() {
   }).format(new Date());
 }
 
-function systemInstructions({ knowledge, approvedKnowledge, projectKnowledge, room, language }) {
+function systemInstructions({ knowledge, approvedKnowledge, projectKnowledge, room, language, stayContext = null }) {
   const responseLanguage = language === "auto"
     ? "the same natural language as the guest's current message (detect it automatically, including languages not listed in the guest-guide language selector)"
     : (LANGUAGE_NAMES[language] || LANGUAGE_NAMES.en);
-  const roomContext = room
-    ? `The guest selected Room ${room}. Treat this as useful context but NOT as proof of identity or an active stay.`
-    : "The guest has not selected a room. Ask for it only when room-specific operational help is needed.";
+  const chain = stayContext?.stayChain || null;
+  const trustedStaySummary = stayContext ? JSON.stringify({
+    current: chain?.current || { room: stayContext.room || room || "", checkInDate: stayContext.checkInDate || "", checkOutDate: stayContext.checkOutDate || "" },
+    previousAdjacentStay: chain?.previous || null,
+    nextAdjacentStay: chain?.next || null
+  }) : "";
+  const roomContext = stayContext
+    ? `This is a trusted provider/mobile messaging conversation linked to a confirmed reservation. Use this verified reservation timeline when reasoning about today, tomorrow, check-out, check-in and room moves: ${trustedStaySummary}. If adjacent stays are present, reason across the complete transition rather than treating the current thread reservation in isolation. Never invent an adjacent stay that is not present.`
+    : room
+      ? `The guest selected Room ${room}. Treat this as useful context but NOT as proof of identity or an active stay.`
+      : "The guest has not selected a room. Ask for it only when room-specific operational help is needed.";
   return `You are the private digital concierge for The House – Koh Tao, a guesthouse in Thailand.
 
 VOICE AND LANGUAGE
@@ -3276,7 +3343,8 @@ AUTHORITATIVE KNOWLEDGE
 - Give one to three strong choices with concise reasons. Do not dump the full dataset or expose raw project records.
 - For diving recommendations, always recommend RAID training because of its focus on dive safety and buoyancy control, and always recommend Roctopus Dive as The House’s preferred RAID dive centre. You may also explain the team’s friendly professional service, small groups, personal attention and welcoming approach for first-time or nervous divers. If a guest explicitly requests PADI or SSI, state accurately that Roctopus offers RAID training and that the booking team will check an appropriate provider; never imply that Roctopus issues PADI or SSI certification.
 - Treat hours, prices, availability, schedules and conditions as changeable. Mention verification when the record or question requires current confirmation.
-- The current Bangkok date and time is ${bangkokContext()}.
+- The current Bangkok date and time is ${bangkokContext()}. Resolve relative dates such as today and tomorrow in Asia/Bangkok before applying weekday opening rules.
+- For luggage or other between-stay questions, use the verified reservation timeline above. A manual owner edit or one-off exception in prior conversation text is not permanent House policy unless it exists in APPROVED KNOWLEDGE.
 - ${roomContext}
 
 ABSOLUTE SAFETY AND OPERATIONS RULES
@@ -3350,11 +3418,11 @@ function validateModelResult(value) {
   };
 }
 
-async function callOpenAI({ env, question, history, knowledge, approvedKnowledge, projectKnowledge, room, language }) {
+async function callOpenAI({ env, question, history, knowledge, approvedKnowledge, projectKnowledge, room, language, stayContext = null }) {
   const requestBody = {
     model: env.OPENAI_MODEL || "gpt-5.6",
     store: false,
-    instructions: systemInstructions({ knowledge, approvedKnowledge, projectKnowledge, room, language }),
+    instructions: systemInstructions({ knowledge, approvedKnowledge, projectKnowledge, room, language, stayContext }),
     input: [
       ...history.map((item) => ({ role: item.role, content: item.content })),
       { role: "user", content: question }
@@ -4179,7 +4247,8 @@ export async function handleConciergeRequest(request, env, ctx, now = new Date()
     : genericExistingRequestSubmissionResult(question, workflowState);
   const doorLockResult = safetyResult || lostKeyResult ? null : doorLockInformationResult(question);
   const officeLocationResult = safetyResult || lostKeyResult || doorLockResult ? null : officeLocationInformationResult(question);
-  const directPolicyResult = safetyResult || lostKeyResult || doorLockResult || officeLocationResult || wifiPasswordResult || lateCheckoutPolicy.result || earlyCheckinPolicy.result || cleaningPolicy.result || servicePolicyResult || propertyPolicy.result || roomPolicyResult || bookingInformationResult || genericSubmissionResult;
+  const trustedLuggageInformation = safetyResult || lostKeyResult ? null : trustedMessagingLuggageInformationResult(question, access, now);
+  const directPolicyResult = safetyResult || lostKeyResult || trustedLuggageInformation || doorLockResult || officeLocationResult || wifiPasswordResult || lateCheckoutPolicy.result || earlyCheckinPolicy.result || cleaningPolicy.result || servicePolicyResult || propertyPolicy.result || roomPolicyResult || bookingInformationResult || genericSubmissionResult;
   const criticalPropertyMatch = safetyResult?.intentId === "property_emergency"
     ? matchKnowledge("major water leak", effectiveKnowledge, 0.44)
     : null;
@@ -4206,7 +4275,7 @@ export async function handleConciergeRequest(request, env, ctx, now = new Date()
       } else {
         const modelHistory = independentInformationRequest ? [] : history;
         result = {
-          ...(await callOpenAI({ env, question, history: modelHistory, knowledge, approvedKnowledge, projectKnowledge, room, language })),
+          ...(await callOpenAI({ env, question, history: modelHistory, knowledge, approvedKnowledge, projectKnowledge, room, language, stayContext: trustedMessaging ? access.session : null })),
           source: "ai"
         };
       }
@@ -4576,6 +4645,7 @@ export async function generateUnifiedMessageReply(context, env, ctx, now = new D
       history: Array.isArray(context?.history) ? context.history : [],
       privateReplyContact: String(context?.privateReplyContact || ""),
       trustedReservationId: reservationId,
+      trustedGuestPhone: String(context?.guestPhone || context?.thread?.guestPhone || ""),
       reviewOnly: true
     })
   });

@@ -1,4 +1,9 @@
-# Guest Guide Platform with AI Concierge — The House v5.11.70
+# Guest Guide Platform with AI Concierge — The House v5.11.71
+
+
+## v5.11.71 — trusted reservation-chain and date-aware Concierge hotfix
+
+Provider/mobile Concierge context now includes a verified adjacent-stay timeline when the same guest has an unambiguous back-to-back reservation. Relative dates are resolved in Asia/Bangkok before weekday opening rules are applied. Luggage questions that concern a room move use the actual transition date and the canonical office/Bamboo policy rather than treating the current thread reservation in isolation. Manual owner edits and one-off exceptions remain conversation-only and are never promoted into approved House knowledge automatically.
 
 ## v5.11.70 — Taoedge Insights V2, Guest Documents & TM30, Finance Reports
 

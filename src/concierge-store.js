@@ -788,6 +788,16 @@ export class ConciergeStore extends DurableObject {
         // Fresh databases and upgraded deployments already have finance business scoping.
       }
       try {
+        this.ctx.storage.sql.exec("ALTER TABLE expense_records ADD COLUMN created_by_hash TEXT NOT NULL DEFAULT ''");
+      } catch (_error) {
+        // Repairs early Finance schemas that predate creator-hash audit attribution.
+      }
+      try {
+        this.ctx.storage.sql.exec("ALTER TABLE income_records ADD COLUMN created_by_hash TEXT NOT NULL DEFAULT ''");
+      } catch (_error) {
+        // Repairs early Finance schemas that predate creator-hash audit attribution.
+      }
+      try {
         this.ctx.storage.sql.exec("ALTER TABLE expense_records ADD COLUMN created_by_role TEXT NOT NULL DEFAULT 'owner'");
       } catch (_error) {
         // Fresh databases and upgraded deployments already have finance creator-role auditing.

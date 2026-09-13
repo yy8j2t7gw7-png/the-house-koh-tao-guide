@@ -1,5 +1,14 @@
 # Changelog
 
+## v5.11.66 — Mobile communications, command center & Finance compatibility
+
+- Adds protected provider-message, WhatsApp and Call capabilities to mobile booking detail.
+- Adds Today / Tomorrow / Next 7 days operational glance data for the Owner App Home command center.
+- Keeps guest telephone numbers hidden from staff and all provider credentials backend-only.
+- Repairs early Finance schemas missing `created_by_hash`, fixing the live mobile receipt `expense_save_failed` compatibility case.
+- Preserves staged Beds24 Finance/channel-manager and Unified Messaging AI auto-send safety flags.
+- Full automated suite: **334 passed / 0 failed**.
+
 ## v5.11.65 — Rich booking detail metadata
 
 - expose nights and guest-count metadata on protected booking detail

@@ -597,6 +597,35 @@ async function getBeds24BookingAndMessages(env, store, bookingId, webhookBooking
   return { booking, messages };
 }
 
+export async function openBeds24ReservationConversation({ env, store, reservation, bookingId }) {
+  if (!messagingEnabled(env)) return { ok: false, error: "messaging_disabled" };
+  const numericBookingId = Number(bookingId || 0);
+  if (!Number.isSafeInteger(numericBookingId) || numericBookingId <= 0) return { ok: false, error: "missing_booking" };
+  const { booking, messages } = await getBeds24BookingAndMessages(env, store, numericBookingId);
+  if (!booking) return { ok: false, error: "beds24_booking_missing" };
+  if (!beds24MessagingChannelSupported(booking)) {
+    return { ok: false, error: "channel_has_no_beds24_message_api", source: beds24SourceLabel(booking) };
+  }
+  const room = reservation?.room || roomForBeds24Booking(booking, env);
+  const linkedReservation = reservation || await resolveLocalReservation(store, booking, room, env);
+  const thread = await upsertThreadForBeds24(store, booking, room, linkedReservation);
+  const plan = beds24MessageSyncPlan(messages);
+  for (const message of plan.messages) {
+    await store.recordMessagingMessage({
+      id: `msg_${crypto.randomUUID()}`,
+      threadId: thread.id,
+      providerMessageId: message.providerMessageId,
+      direction: message.direction,
+      sender: message.sender,
+      body: message.body,
+      automated: false,
+      deliveryStatus: message.direction === "inbound" ? "received" : "synced",
+      createdAt: message.createdAt
+    });
+  }
+  return { ok: true, threadId: thread.id, source: beds24SourceLabel(booking), synced: plan.messages.length };
+}
+
 export async function handleBeds24MessagingWebhook(request, env, ctx, generateReply, options = {}) {
   if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405, { allow: "POST" });
   const onBooking = typeof options?.onBooking === "function" ? options.onBooking : null;

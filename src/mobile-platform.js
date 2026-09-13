@@ -3,7 +3,7 @@ import { expenseConfiguration, handleExpenseAdminRequest } from "./expense-api.j
 import { incomeConfiguration, summarizeFinance } from "./finance-api.js";
 import { beds24FinanceSyncConfiguration, reconcileBeds24FinanceRange } from "./beds24-finance-sync.js";
 import { integrationAdminOverview } from "./integration-catalog.js";
-import { beds24ApiRequest, handleUnifiedMessagingAdminRequest, roomForBeds24Booking, startWhatsAppGuestConversation, unifiedMessagingConfiguration, whatsAppGuestInitiationConfiguration } from "./unified-messaging.js";
+import { beds24ApiRequest, handleUnifiedMessagingAdminRequest, openBeds24ReservationConversation, roomForBeds24Booking, startWhatsAppGuestConversation, unifiedMessagingConfiguration, whatsAppGuestInitiationConfiguration } from "./unified-messaging.js";
 import { handleStayAdminRequest } from "./stay-api.js";
 import { createProtectedOperationsAlert, dispatchConciergeAlert, operationalTaskAssignment, operationalTaskAssignments } from "./whatsapp-alerts.js";
 
@@ -489,6 +489,15 @@ function providerLabel(provider) {
   return labels[value] || (value ? value.charAt(0).toUpperCase() + value.slice(1) : "Other");
 }
 
+function providerSupportsBeds24Messaging(provider) {
+  return ["airbnb", "booking", "booking.com", "expedia", "vrbo"].includes(cleanText(provider, 50).toLowerCase());
+}
+
+function dialPhone(value) {
+  const phone = String(value || "").replace(/[^+\d]/g, "").slice(0, 24);
+  return /^\+?\d{7,20}$/.test(phone) ? phone : "";
+}
+
 function publicReservation(item, role, options = {}) {
   const canSeeBookingFinancials = Boolean(options.canSeeBookingFinancials) && role !== "staff";
   const canSeeProviderReference = role !== "staff";
@@ -748,36 +757,67 @@ async function acceptInvite(request, env, store) {
 function homePayload(operations, overview, threads, finance, access) {
   const today = bangkokDate();
   const tomorrow = bangkokDate(1);
+  const weekEnd = bangkokDate(7);
   const reservations = operations.reservations || [];
+  const statuses = operations.housekeepingStatuses || [];
+  const roomsTotal = Math.max(1, statuses.length || 11);
   const arrivals = reservations.filter((item) => item.checkInDate === today);
   const departures = reservations.filter((item) => item.checkOutDate === today);
   const tomorrowArrivals = reservations.filter((item) => item.checkInDate === tomorrow);
+  const tomorrowDepartures = reservations.filter((item) => item.checkOutDate === tomorrow);
   const occupied = reservations.filter((item) => item.checkInDate <= today && item.checkOutDate > today).length;
-  const statuses = operations.housekeepingStatuses || [];
+  const tomorrowOccupied = reservations.filter((item) => item.checkInDate <= tomorrow && item.checkOutDate > tomorrow).length;
+  const weekReservations = reservations.filter((item) => item.checkOutDate > today && item.checkInDate < weekEnd);
+  const weekArrivals = reservations.filter((item) => item.checkInDate >= today && item.checkInDate < weekEnd);
+  const weekDepartures = reservations.filter((item) => item.checkOutDate >= today && item.checkOutDate < weekEnd);
+  let occupiedRoomNights = 0;
+  for (let day = 0; day < 7; day += 1) {
+    const date = bangkokDate(day);
+    occupiedRoomNights += reservations.filter((item) => item.checkInDate <= date && item.checkOutDate > date).length;
+  }
+  const weekOccupancyPercent = Math.round((occupiedRoomNights / (roomsTotal * 7)) * 100);
   const dirty = statuses.filter((item) => item.status === "dirty").length;
   const ready = statuses.filter((item) => item.status === "ready").length;
   const pendingTasks = (operations.housekeepingTasks || []).filter((item) => ["pending", "received"].includes(item.status));
   const urgentMaintenance = (overview.maintenanceReports || []).filter((item) => item.status !== "resolved" && ["critical", "urgent"].includes(item.severity));
+  const openMaintenance = Number(overview?.totals?.openMaintenanceReports) || 0;
+  const pendingRegistrations = Number(overview?.totals?.pendingRegistrations) || 0;
   const events = [
     ...arrivals.map((item) => ({ id: `arrival:${item.id}`, type: "arrival", room: item.room, title: `Room ${item.room} arrival`, subtitle: reservationGuestDisplayName(item, access?.record?.role) || providerLabel(item.provider), time: "14:00", severity: "normal" })),
     ...departures.map((item) => ({ id: `departure:${item.id}`, type: "departure", room: item.room, title: `Room ${item.room} departure`, subtitle: reservationGuestDisplayName(item, access?.record?.role) || providerLabel(item.provider), time: item.lateCheckoutTime || "11:00", severity: "normal" })),
     ...pendingTasks.slice(0, 8).map((item) => ({ id: `housekeeping:${item.id}`, type: "housekeeping", room: item.room, title: `Room ${item.room} housekeeping`, subtitle: item.priority ? "Priority turnover" : "Turnover", time: item.requestedArrival || "", severity: item.priority ? "urgent" : "normal" })),
     ...urgentMaintenance.slice(0, 6).map((item) => ({ id: `maintenance:${item.id}`, type: "maintenance", room: item.room, title: `Room ${item.room} maintenance`, subtitle: item.issueType || "Issue reported", time: "", severity: item.severity || "urgent" }))
   ];
+  const summary = {
+    arrivals: arrivals.length,
+    departures: departures.length,
+    occupied,
+    roomsTotal,
+    ready,
+    dirty,
+    openMaintenance,
+    pendingRegistrations,
+    unreadMessages: threads.reduce((sum, item) => sum + (Number(item.unreadCount) || 0), 0),
+    needsHuman: threads.filter((item) => item.needsHuman).length,
+    tomorrowArrivals: tomorrowArrivals.length
+  };
   return {
     date: today,
-    summary: {
-      arrivals: arrivals.length,
-      departures: departures.length,
-      occupied,
-      roomsTotal: 11,
-      ready,
-      dirty,
-      openMaintenance: Number(overview?.totals?.openMaintenanceReports) || 0,
-      pendingRegistrations: Number(overview?.totals?.pendingRegistrations) || 0,
-      unreadMessages: threads.reduce((sum, item) => sum + (Number(item.unreadCount) || 0), 0),
-      needsHuman: threads.filter((item) => item.needsHuman).length,
-      tomorrowArrivals: tomorrowArrivals.length
+    summary,
+    glance: {
+      today: {
+        date: today, arrivals: arrivals.length, departures: departures.length, occupied, roomsTotal,
+        occupancyPercent: Math.round((occupied / roomsTotal) * 100), dirty, ready, openMaintenance, pendingRegistrations
+      },
+      tomorrow: {
+        date: tomorrow, arrivals: tomorrowArrivals.length, departures: tomorrowDepartures.length, occupied: tomorrowOccupied, roomsTotal,
+        occupancyPercent: Math.round((tomorrowOccupied / roomsTotal) * 100), turnovers: tomorrowDepartures.length
+      },
+      week: {
+        from: today, to: bangkokDate(6), arrivals: weekArrivals.length, departures: weekDepartures.length,
+        activeReservations: weekReservations.length, roomsTotal, occupancyPercent: weekOccupancyPercent,
+        turnovers: weekDepartures.length, openMaintenance, pendingRegistrations
+      }
     },
     finance: hasPermission(access, "finance.view") ? finance : null,
     events: events.sort((a, b) => String(a.time || "99:99").localeCompare(String(b.time || "99:99"))).slice(0, 24)
@@ -806,7 +846,7 @@ async function handleProtected(request, env, path, store) {
     const [operationsRaw, overview, threads] = await Promise.all([
       store.getStayOperationsOverview(), store.getAdminOverview(), store.listMessagingThreads(80)
     ]);
-    const operations = { ...operationsRaw, reservations: await enrichReservationsWithBeds24GuestContacts(operationsRaw.reservations || [], env, store, bangkokDate(-1), bangkokDate(2)) };
+    const operations = { ...operationsRaw, reservations: await enrichReservationsWithBeds24GuestContacts(operationsRaw.reservations || [], env, store, bangkokDate(-1), bangkokDate(8)) };
     let finance = null;
     if (hasPermission(publicAccess, "finance.view") && hasModule(publicAccess, "finance")) {
       const month = currentMonth();
@@ -840,9 +880,20 @@ async function handleProtected(request, env, path, store) {
     if (!raw) return json({ error: "reservation_not_found" }, 404);
     const enriched = (await enrichReservationsWithBeds24GuestContacts([raw], env, store, raw.checkInDate, raw.checkOutDate))[0] || raw;
     const activity = (await store.mobileListReservationActivity(id, 160)).map(publicReservationActivity);
+    const messagingConfiguration = unifiedMessagingConfiguration(env);
+    const threads = hasPermission(publicAccess, "messaging.view") ? await store.listMessagingThreads(200) : [];
+    const providerThread = threads.find((thread) => thread.channel === "beds24" && (thread.reservationId === id || (enriched.beds24BookingId && String(thread.externalReservationId || "") === String(enriched.beds24BookingId)))) || null;
+    const whatsAppThread = threads.find((thread) => thread.channel === "whatsapp" && thread.reservationId === id) || null;
+    const phone = record.role === "staff" ? "" : dialPhone(enriched.guestPhone);
+    const providerMessagingAvailable = hasPermission(publicAccess, "messaging.view") && hasModule(publicAccess, "unified_messaging") && providerSupportsBeds24Messaging(enriched.provider) && Boolean(enriched.beds24BookingId);
     return json({
       ok: true,
       reservation: publicReservation(enriched, record.role, { canSeeBookingFinancials: hasPermission(publicAccess, "finance.view") }),
+      communications: {
+        provider: { available: providerMessagingAvailable, label: providerLabel(enriched.provider), threadId: providerThread?.id || "" },
+        whatsapp: { available: hasPermission(publicAccess, "messaging.view") && record.role !== "staff" && Boolean(enriched.guestPhone), threadId: whatsAppThread?.id || "", canStart: Boolean(messagingConfiguration?.guestInitiation?.ready) },
+        call: { available: record.role !== "staff" && Boolean(phone), phone }
+      },
       activity,
       taskAssignments: publicTaskAssignments(env)
     });
@@ -960,6 +1011,27 @@ async function handleProtected(request, env, path, store) {
       await store.mobileRecordAudit({ tenantId: record.tenantId, userId: record.userId, membershipId: record.membershipId, action: "message_sent", reference: `thread:${cleanText(body?.threadId, 100)}`, createdAt: access.now });
     }
     return response || json({ error: "send_failed" }, 502);
+  }
+
+  if (path === `${MOBILE_API_PREFIX}/inbox/provider/start` && request.method === "POST") {
+    const denied = requireCapability(publicAccess, "messaging.send", "unified_messaging");
+    if (denied) return denied;
+    let body; try { body = await readJson(request); } catch (response) { return response; }
+    const reservationId = cleanText(body.reservationId, 100);
+    if (!reservationId) return json({ error: "invalid_reservation" }, 400);
+    const reservation = await store.getStayReservationById(reservationId);
+    if (!reservation) return json({ error: "reservation_not_found" }, 404);
+    const enriched = (await enrichReservationsWithBeds24GuestContacts([reservation], env, store, reservation.checkInDate, reservation.checkOutDate))[0] || reservation;
+    if (!providerSupportsBeds24Messaging(enriched.provider) || !enriched.beds24BookingId) return json({ error: "provider_messaging_unavailable" }, 409);
+    let outcome;
+    try {
+      outcome = await openBeds24ReservationConversation({ env, store, reservation: enriched, bookingId: enriched.beds24BookingId });
+    } catch (error) {
+      return json({ error: error?.code || error?.message || "provider_messaging_failed" }, 502);
+    }
+    if (!outcome?.ok) return json({ error: outcome?.error || "provider_messaging_unavailable" }, 409);
+    await store.mobileRecordAudit({ tenantId: record.tenantId, userId: record.userId, membershipId: record.membershipId, action: "provider_thread_opened", reference: `reservation:${reservationId}`, metadata: { threadId: outcome.threadId, source: outcome.source }, createdAt: access.now });
+    return json({ ok: true, threadId: outcome.threadId, source: outcome.source });
   }
 
   if (path === `${MOBILE_API_PREFIX}/inbox/whatsapp/start` && request.method === "POST") {

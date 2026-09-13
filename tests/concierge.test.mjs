@@ -14737,3 +14737,30 @@ test("v5.11.65 mobile booking detail exposes rich provider metadata behind finan
   assert.match(mobileSource, /canSeeBookingFinancials/);
   assert.match(mobileSource, /role !== "staff"/);
 });
+
+test("v5.11.66 mobile booking communications expose provider messaging, WhatsApp and protected call actions", async () => {
+  const mobileSource = await readFile(new URL("../src/mobile-platform.js", import.meta.url), "utf8");
+  for (const contract of [
+    "communications",
+    "providerMessagingAvailable",
+    "/inbox/provider/start",
+    "openBeds24ReservationConversation",
+    "providerSupportsBeds24Messaging",
+    "dialPhone"
+  ]) assert.match(mobileSource, new RegExp(contract.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  assert.match(mobileSource, /record\.role === "staff" \? "" : dialPhone/);
+});
+
+test("v5.11.66 Home exposes Today, Tomorrow and seven-day operational glance data", async () => {
+  const mobileSource = await readFile(new URL("../src/mobile-platform.js", import.meta.url), "utf8");
+  for (const contract of ["glance:", "tomorrow:", "week:", "occupancyPercent", "occupiedRoomNights", "turnovers"]) {
+    assert.match(mobileSource, new RegExp(contract.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  }
+});
+
+test("v5.11.66 repairs early Finance schemas so mobile receipt expenses can save creator audit attribution", async () => {
+  const storeSource = await readFile(new URL("../src/concierge-store.js", import.meta.url), "utf8");
+  assert.match(storeSource, /ALTER TABLE expense_records ADD COLUMN created_by_hash TEXT NOT NULL DEFAULT ''/);
+  assert.match(storeSource, /ALTER TABLE income_records ADD COLUMN created_by_hash TEXT NOT NULL DEFAULT ''/);
+  assert.match(storeSource, /created_by_hash, created_by_role, created_at/);
+});

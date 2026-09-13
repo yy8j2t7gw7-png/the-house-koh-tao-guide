@@ -14979,3 +14979,66 @@ test("v5.11.67 arbitrary-language provider requests use semantic operational_cat
   }
 });
 
+
+test("v5.11.68 role isolation removes legacy Fah/owner overlap from support routing", () => {
+  const env = {
+    WHATSAPP_ALERT_RECIPIENTS: JSON.stringify({
+      // Legacy production-style overlap: support historically contained the
+      // whole operating team instead of only the support specialist.
+      support: [
+        { label: "Su", phone: "+66 64 000 0004" },
+        { label: "Fah", phone: "+66 96 000 0001" },
+        { label: "Owner 1", phone: "+66 81 000 0002" },
+        { label: "Owner 2", phone: "+66 82 000 0003" }
+      ],
+      booking: [
+        { label: "Fah", phone: "+66 96 000 0001" },
+        { label: "Owner 1", phone: "+66 81 000 0002" },
+        { label: "Owner 2", phone: "+66 82 000 0003" }
+      ],
+      emergency: [
+        { label: "Owner 1", phone: "+66 81 000 0002" },
+        { label: "Owner 2", phone: "+66 82 000 0003" }
+      ]
+    })
+  };
+  const assignments = operationalTaskAssignments(env);
+  assert.deepEqual(assignments.find((item) => item.key === "housekeeping")?.members, ["Su", "Owner 1", "Owner 2"]);
+  assert.deepEqual(assignments.find((item) => item.key === "maintenance")?.members, ["Su", "Owner 1", "Owner 2"]);
+  assert.deepEqual(assignments.find((item) => item.key === "guest_support")?.members, ["Su", "Owner 1", "Owner 2"]);
+  assert.deepEqual(assignments.find((item) => item.key === "general")?.members, ["Su", "Owner 1", "Owner 2"]);
+  assert.deepEqual(assignments.find((item) => item.key === "reservations")?.members, ["Fah", "Owner 1", "Owner 2"]);
+});
+
+test("v5.11.68 reservation booking tasks use Fah booking template while service tasks use Su service template", () => {
+  const env = {
+    WHATSAPP_STAFF_ACTIONS_ENABLED: "true",
+    WHATSAPP_SERVICE_ACTION_TEMPLATE_NAME: "house_service_alert_actions_v3",
+    WHATSAPP_BOOKING_ACTION_TEMPLATE_NAME: "house_booking_alert_actions_v2",
+    WHATSAPP_LUGGAGE_ACTION_TEMPLATE_NAME: "house_luggage_alert_actions_v2",
+    WHATSAPP_URGENT_ACTION_TEMPLATE_NAME: "house_urgent_alert_actions_v2",
+    WHATSAPP_LOST_KEY_ACTION_TEMPLATE_NAME: "house_lost_key_alert_actions_v2"
+  };
+  const base = {
+    id: "alert_12345678-1234-4234-9234-123456789012",
+    severity: "attention",
+    room: "3",
+    roomVerified: true,
+    bangkokTime: "13 Sep 2026, 13:00",
+    createdAt: "2026-09-13T06:00:00.000Z"
+  };
+  const booking = buildWhatsAppTemplatePayload({
+    ...base,
+    alertType: "booking_task_reservations",
+    summary: "Guest asks to extend the booking by one night."
+  }, { label: "Fah", phone: "66960000001" }, env);
+  const housekeeping = buildWhatsAppTemplatePayload({
+    ...base,
+    alertType: "booking_task_housekeeping",
+    summary: "Guest asks for bathroom cleaning."
+  }, { label: "Su", phone: "66640000004" }, env);
+  assert.equal(booking.ok, true);
+  assert.equal(booking.name, "house_booking_alert_actions_v2");
+  assert.equal(housekeeping.ok, true);
+  assert.equal(housekeeping.name, "house_service_alert_actions_v3");
+});

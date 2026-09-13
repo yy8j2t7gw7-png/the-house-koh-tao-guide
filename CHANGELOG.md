@@ -1,5 +1,14 @@
 # Changelog
 
+## v5.11.68 — Operational routing hotfix
+- Normalizes legacy overlapping protected recipient groups into authoritative support, booking and owner roles before dispatch.
+- Housekeeping / maintenance / general service now resolve to Su + owners even when Fah remains in the legacy raw support group.
+- Reservation tasks continue to resolve to Fah + owners.
+- `booking_task_reservations` now uses the approved booking template so WhatsApp correctly says Fah, not Su.
+- Routine turnover remains Su-only and room-ready remains owner-only.
+- Backend-only release; Taoedge Owner App v0.1.8 remains current.
+- Full automated suite: **342 passed / 0 failed**.
+
 ## v5.11.67 — Unified Concierge review & operational routing
 - Provider/mobile Inbox now uses automatic any-language Concierge understanding and replies in the current guest message language.
 - Structured operational category keeps staff routing semantic and language-independent.

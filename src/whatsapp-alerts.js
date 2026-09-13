@@ -203,10 +203,10 @@ function parseRecipients(env) {
   } catch (_error) {
     return { support: [], booking: [], urgent: [], emergency: [], escalation: [] };
   }
-  const result = {};
+  const raw = {};
   for (const group of ["support", "booking", "urgent", "emergency", "escalation"]) {
     const seen = new Set();
-    result[group] = (Array.isArray(source[group]) ? source[group] : [])
+    raw[group] = (Array.isArray(source[group]) ? source[group] : [])
       .map((recipient) => ({
         label: cleanLabel(recipient?.label || recipient?.name),
         phone: digits(recipient?.phone)
@@ -214,20 +214,58 @@ function parseRecipients(env) {
       .filter((recipient) => recipient.phone.length >= 8 && recipient.phone.length <= 15 && !seen.has(recipient.phone) && seen.add(recipient.phone))
       .slice(0, MAX_RECIPIENTS_PER_GROUP);
   }
-  const union = (...groups) => {
+
+  const unique = (...lists) => {
     const seen = new Set();
-    return groups.flatMap((group) => result[group] || [])
-      .filter((recipient) => !seen.has(recipient.phone) && seen.add(recipient.phone))
+    return lists.flat()
+      .filter((recipient) => recipient?.phone && !seen.has(recipient.phone) && seen.add(recipient.phone))
       .slice(0, MAX_RECIPIENTS_PER_GROUP);
   };
-  // Existing production secrets remain valid. Owners are represented by the
-  // emergency group, Su by support, and Fah by booking.
-  result.support_with_owners = union("support", "emergency");
-  result.booking_with_owners = union("booking", "emergency");
-  result.lost_key_team = union("urgent", "support", "emergency");
-  result.urgent_response = union("emergency", "booking");
-  result.owners = union("emergency");
-  if (!result.escalation.length) result.escalation = union("emergency");
+  const withoutPhones = (list, excluded) => {
+    const blocked = new Set((excluded || []).map((recipient) => recipient.phone));
+    return (list || []).filter((recipient) => !blocked.has(recipient.phone));
+  };
+
+  // The production recipient secret predates role-isolated routing and some
+  // installations may still have Fah/owners duplicated into the legacy
+  // `support` array. Normalize roles by phone membership at the server boundary
+  // so routing remains correct without requiring an immediate secret rewrite.
+  // `emergency` is the authoritative owner set, while `booking` identifies the
+  // booking team. Support specialists are therefore the remaining support
+  // recipients after owners and booking specialists are removed.
+  const owners = unique(raw.emergency);
+  const bookingSpecialists = withoutPhones(raw.booking, owners);
+  const supportWithoutOwners = withoutPhones(raw.support, owners);
+  let supportSpecialists = withoutPhones(supportWithoutOwners, bookingSpecialists);
+
+  // Safe legacy fallback: if a malformed overlap removed every support member,
+  // prefer an explicitly-labelled Su/support recipient before falling back to
+  // non-owner support entries. This preserves service continuity while still
+  // avoiding owner duplication.
+  if (!supportSpecialists.length && supportWithoutOwners.length) {
+    supportSpecialists = supportWithoutOwners.filter((recipient) => /(?:^|\b)(?:su|support|housekeeping)(?:\b|$)/i.test(recipient.label));
+  }
+  if (!supportSpecialists.length) supportSpecialists = supportWithoutOwners;
+
+  const result = {
+    support: unique(supportSpecialists),
+    booking: unique(bookingSpecialists),
+    urgent: unique(raw.urgent),
+    emergency: owners,
+    escalation: unique(raw.escalation)
+  };
+
+  // Canonical Taoedge routing matrix:
+  // - service/housekeeping/maintenance/general -> Su/support + owners
+  // - booking/reservations -> Fah/booking + owners
+  // - routine turnover -> support only
+  // - room-ready -> owners only
+  result.support_with_owners = unique(result.support, owners);
+  result.booking_with_owners = unique(result.booking, owners);
+  result.lost_key_team = unique(result.support, owners);
+  result.urgent_response = unique(owners, result.booking);
+  result.owners = owners;
+  if (!result.escalation.length) result.escalation = owners;
   return result;
 }
 
@@ -430,7 +468,7 @@ function alertTemplateKind(alert) {
   if (alert.alertType === "housekeeping_turnover") return "housekeeping";
   if (alert.alertType === "verified_spare_key_release" || alert.alertType === "lost_key") return "lostKey";
   if (alert.alertType === "luggage_storage") return "luggage";
-  if (alert.alertType === "booking_request") return "booking";
+  if (alert.alertType === "booking_request" || alert.alertType === "booking_task_reservations") return "booking";
   if (alert.severity === "critical" || alert.severity === "urgent") return "urgent";
   return "service";
 }

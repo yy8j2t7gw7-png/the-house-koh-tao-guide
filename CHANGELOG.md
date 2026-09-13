@@ -1,5 +1,16 @@
 # Changelog
 
+## v5.11.74 — Taoedge Revenue Engine V1
+
+- Add protected `/api/mobile/v1/revenue-engine` recommendations for 7/14/30-day horizons.
+- Combine canonical reservations, property occupancy, remaining inventory, Taoedge first-seen pickup, lead time and surrounding-date demand into deterministic room/date pricing suggestions.
+- Add owner pricing guardrails: reference rate, minimum/maximum, maximum move, weekend rule, rounding increment, optional room reference rates and monthly season multipliers.
+- Keep V1 recommendation-only: no Beds24/OTA rate write-back and no automatic price changes.
+- Add owner-only Accept / Ignore / Override decisions with append-only history and backend audit events.
+- Enforce server-side minimum/maximum guardrails for both recommendations and owner overrides.
+- Preserve daily Finance reconciliation, licensing/device enforcement, Insights V2, temporal Concierge context and all existing operational routing.
+- Full backend suite: **353 passed / 0 failed**.
+
 ## v5.11.73 — Integration-health resilience
 
 - Keep the server-owned connection-health contract available to authenticated `integrations.view` users even if a legacy license snapshot omits the newer Integrations module key.

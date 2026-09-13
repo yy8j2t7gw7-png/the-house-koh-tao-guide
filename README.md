@@ -1,4 +1,12 @@
-# Guest Guide Platform with AI Concierge — The House v5.11.73
+# Guest Guide Platform with AI Concierge — The House v5.11.74
+
+## v5.11.74 — Taoedge Revenue Engine V1
+
+v5.11.74 adds the first deterministic Taoedge Revenue Engine. It is deliberately **recommendation-only**: the backend computes room/date pricing suggestions from canonical forward occupancy, Taoedge first-seen booking pickup, days until arrival, remaining inventory, surrounding-date performance, owner-defined weekend rules and season multipliers, but it never writes rates to Beds24 or an OTA.
+
+Owners configure a reference nightly rate plus hard minimum/maximum guardrails, optional room-specific reference rates, maximum adjustment, rate-rounding increment and monthly season multipliers. Every suggestion explains its contributing factors. Accept, Ignore and Override decisions are stored as an append-only decision history so later releases can measure recommendation quality before any provider write-back is enabled.
+
+Revenue Engine V1 uses the existing protected Analytics entitlement and owner-only mutation boundary. Managers with Analytics access can inspect recommendations, while pricing settings and decisions remain owner-only. `BEDS24_CHANNEL_MANAGER_ENABLED=false` and `UNIFIED_MESSAGING_AI_AUTO_SEND_ENABLED=false` remain unchanged; validated daily Finance reconciliation stays enabled.
 
 ## v5.11.73 — integration-health resilience hotfix
 

@@ -85,6 +85,7 @@ import {
   MOBILE_PERMISSION_MATRIX,
   analyticsRange,
   buildAnalyticsPayload,
+  buildRevenueEnginePayload,
   handleMobileLicenseAdminRequest,
   handleMobilePlatformRequest,
   mobileIntegrationHealth,
@@ -15181,6 +15182,55 @@ test("v5.11.70 Insights V2 exposes 30/60/90 demand, pickup, channel quality and 
   assert.match(payload.finance.efficiency.note, /not ADR or RevPAR/i);
   assert.equal(payload.dataQuality.adrRevparReady, false);
   assert.equal(payload.dataQuality.otaBookingTimestampReady, false);
+});
+
+test("v5.11.74 Revenue Engine V1 produces deterministic recommendation-only pricing within owner guardrails", () => {
+  const today = "2026-09-13";
+  const reservations = [
+    { id: "a", room: "1", checkInDate: "2026-09-13", checkOutDate: "2026-09-16", status: "confirmed", createdAt: "2026-09-13T01:00:00Z" },
+    { id: "b", room: "2", checkInDate: "2026-09-13", checkOutDate: "2026-09-15", status: "confirmed", createdAt: "2026-09-12T01:00:00Z" },
+    { id: "c", room: "3", checkInDate: "2026-09-13", checkOutDate: "2026-09-14", status: "confirmed", createdAt: "2026-09-11T01:00:00Z" },
+    { id: "d", room: "4", checkInDate: "2026-09-13", checkOutDate: "2026-09-14", status: "confirmed", createdAt: "2026-09-10T01:00:00Z" },
+    { id: "e", room: "5", checkInDate: "2026-09-13", checkOutDate: "2026-09-14", status: "confirmed", createdAt: "2026-09-09T01:00:00Z" },
+    { id: "f", room: "6", checkInDate: "2026-09-13", checkOutDate: "2026-09-14", status: "confirmed", createdAt: "2026-09-08T01:00:00Z" },
+    { id: "g", room: "7", checkInDate: "2026-09-13", checkOutDate: "2026-09-14", status: "confirmed", createdAt: "2026-09-07T01:00:00Z" },
+    { id: "h", room: "8", checkInDate: "2026-09-13", checkOutDate: "2026-09-14", status: "confirmed", createdAt: "2026-09-13T02:00:00Z" },
+    { id: "i", room: "9", checkInDate: "2026-09-13", checkOutDate: "2026-09-14", status: "confirmed", createdAt: "2026-09-13T03:00:00Z" }
+  ];
+  const settingsRecord = {
+    currency: "THB", referenceRateMinor: 180000, minimumRateMinor: 120000, maximumRateMinor: 250000,
+    maxAdjustmentPercent: 25, weekendAdjustmentPercent: 0, roundToMinor: 5000,
+    roomReferenceRatesJson: JSON.stringify({ "10": 2000 }), monthMultipliersJson: JSON.stringify({ "9": 1 }), updatedAt: "2026-09-13T00:00:00Z"
+  };
+  const payload = buildRevenueEnginePayload({ today, days: 7, reservations, roomsTotal: 11, settingsRecord, decisions: [], currency: "THB" });
+  assert.equal(payload.ok, true);
+  assert.equal(payload.mode, "recommendation_only");
+  assert.equal(payload.providerWriteEnabled, false);
+  assert.equal(payload.liveRateConnected, false);
+  assert.equal(payload.settings.configured, true);
+  const room10Tonight = payload.recommendations.find((item) => item.room === "10" && item.date === today);
+  assert.ok(room10Tonight);
+  assert.equal(room10Tonight.referenceRate, 2000);
+  assert.ok(room10Tonight.suggestedRate >= 1200 && room10Tonight.suggestedRate <= 2500);
+  assert.ok(room10Tonight.reasons.some((reason) => ["occupancy_high", "occupancy_very_high"].includes(reason.code)));
+  assert.match(payload.dataQuality.note, /does not read competitor prices or write OTA rates/i);
+});
+
+test("v5.11.74 Revenue Engine settings and decisions are owner-controlled, audited and stored without provider write-back", async () => {
+  const [mobileSource, storeSource] = await Promise.all([
+    readFile(new URL("../src/mobile-platform.js", import.meta.url), "utf8"),
+    readFile(new URL("../src/concierge-store.js", import.meta.url), "utf8")
+  ]);
+  assert.match(mobileSource, /MOBILE_API_PREFIX}\/revenue-engine/);
+  assert.match(mobileSource, /mode: "recommendation_only"/);
+  assert.match(mobileSource, /providerWriteEnabled: false/);
+  assert.match(mobileSource, /record\.role !== "owner"/);
+  assert.match(mobileSource, /revenue_settings_updated/);
+  assert.match(mobileSource, /revenue_recommendation_\$\{decision\}/);
+  assert.match(storeSource, /CREATE TABLE IF NOT EXISTS revenue_engine_settings/);
+  assert.match(storeSource, /CREATE TABLE IF NOT EXISTS revenue_engine_decisions/);
+  assert.match(storeSource, /async mobileUpsertRevenueDecision/);
+  assert.doesNotMatch(mobileSource.slice(mobileSource.indexOf('MOBILE_API_PREFIX}/revenue-engine'), mobileSource.indexOf('MOBILE_API_PREFIX}/analytics')), /beds24ApiRequest\([^\n]+POST/);
 });
 
 test("v5.11.70 Finance report CSV includes requested-period summary and transaction detail", () => {

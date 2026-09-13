@@ -735,6 +735,245 @@ export function buildAnalyticsPayload({ range, reservations, roomsTotal, operati
   };
 }
 
+
+const REVENUE_ENGINE_VERSION = "v1.0";
+const REVENUE_HORIZONS = Object.freeze([7, 14, 30]);
+
+function numericObject(value) {
+  const parsed = typeof value === "string" ? safeJson(value, {}) : value;
+  return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+}
+
+function revenueSettingsPublic(record = null, currency = "THB") {
+  const referenceRate = Math.max(0, Number(record?.referenceRateMinor || 0) / 100);
+  const minimumRate = Math.max(0, Number(record?.minimumRateMinor || 0) / 100);
+  const maximumRate = Math.max(0, Number(record?.maximumRateMinor || 0) / 100);
+  const maxAdjustmentPercent = Math.max(5, Math.min(50, Number(record?.maxAdjustmentPercent) || 25));
+  const weekendAdjustmentPercent = Math.max(-20, Math.min(30, Number(record?.weekendAdjustmentPercent) || 0));
+  const roundTo = Math.max(1, Number(record?.roundToMinor || 5000) / 100);
+  const roomRaw = numericObject(record?.roomReferenceRatesJson || record?.roomReferenceRates || {});
+  const roomReferenceRates = {};
+  for (const [room, value] of Object.entries(roomRaw)) {
+    if (!/^(1[01]|[1-9])$/.test(room)) continue;
+    const amount = Number(value);
+    if (Number.isFinite(amount) && amount > 0) roomReferenceRates[room] = Math.round(amount * 100) / 100;
+  }
+  const monthsRaw = numericObject(record?.monthMultipliersJson || record?.monthMultipliers || {});
+  const monthMultipliers = {};
+  for (let month = 1; month <= 12; month += 1) {
+    const value = Number(monthsRaw[String(month)] ?? 1);
+    monthMultipliers[String(month)] = Number.isFinite(value) ? Math.max(0.7, Math.min(1.4, Math.round(value * 100) / 100)) : 1;
+  }
+  return {
+    configured: referenceRate > 0 && minimumRate > 0 && maximumRate >= minimumRate && referenceRate >= minimumRate && referenceRate <= maximumRate,
+    currency: cleanText(record?.currency, 8) || currency || "THB",
+    referenceRate,
+    minimumRate,
+    maximumRate,
+    maxAdjustmentPercent,
+    weekendAdjustmentPercent,
+    roundTo,
+    roomReferenceRates,
+    monthMultipliers,
+    updatedAt: cleanText(record?.updatedAt, 40)
+  };
+}
+
+function revenueDateIsWeekend(dateOnly) {
+  const date = new Date(`${dateOnly}T12:00:00Z`);
+  const day = date.getUTCDay();
+  return day === 5 || day === 6;
+}
+
+function revenueRound(value, step) {
+  const increment = Math.max(1, Number(step) || 1);
+  return Math.round((Number(value) || 0) / increment) * increment;
+}
+
+function revenueOverlapDate(reservation, dateOnly) {
+  return reservation?.status === "confirmed" && reservation.checkInDate <= dateOnly && reservation.checkOutDate > dateOnly;
+}
+
+function revenuePickupForDate(reservations, dateOnly, today, windowDays) {
+  const from = shiftedDateOnly(today, -(windowDays - 1));
+  return (Array.isArray(reservations) ? reservations : []).filter((reservation) => {
+    if (!revenueOverlapDate(reservation, dateOnly)) return false;
+    const firstSeen = bangkokDateFromIso(reservation.createdAt);
+    return firstSeen && firstSeen >= from && firstSeen <= today;
+  }).length;
+}
+
+function revenueOccupancyForDate(reservations, dateOnly, roomsTotal) {
+  const occupiedRooms = new Set((Array.isArray(reservations) ? reservations : [])
+    .filter((reservation) => revenueOverlapDate(reservation, dateOnly))
+    .map((reservation) => String(reservation.room || ""))
+    .filter((room) => /^(1[01]|[1-9])$/.test(room)));
+  return {
+    occupiedRooms,
+    occupied: occupiedRooms.size,
+    remaining: Math.max(0, roomsTotal - occupiedRooms.size),
+    occupancyPercent: percent(occupiedRooms.size, roomsTotal)
+  };
+}
+
+function revenueReason(code, label, impactPercent) {
+  return { code, label: cleanText(label, 180), impactPercent: round1(impactPercent) };
+}
+
+function revenueAdjustmentForDate({ occupancyPercent, surroundingOccupancy, pickup7, daysUntil, isWeekend, monthMultiplier, settings }) {
+  const reasons = [];
+  if (occupancyPercent < 25) reasons.push(revenueReason("occupancy_low", `${occupancyPercent}% property occupancy is soft`, -12));
+  else if (occupancyPercent < 50) reasons.push(revenueReason("occupancy_below_half", `${occupancyPercent}% property occupancy is below half`, -6));
+  else if (occupancyPercent >= 90) reasons.push(revenueReason("occupancy_very_high", `${occupancyPercent}% property occupancy leaves little inventory`, 18));
+  else if (occupancyPercent >= 75) reasons.push(revenueReason("occupancy_high", `${occupancyPercent}% property occupancy supports a firmer rate`, 12));
+  else if (occupancyPercent >= 60) reasons.push(revenueReason("occupancy_healthy", `${occupancyPercent}% property occupancy is healthy`, 6));
+  else reasons.push(revenueReason("occupancy_balanced", `${occupancyPercent}% property occupancy is balanced`, 0));
+
+  if (daysUntil <= 2) {
+    if (occupancyPercent < 50) reasons.push(revenueReason("last_minute_soft", `${daysUntil} day${daysUntil === 1 ? "" : "s"} away with open inventory`, -8));
+    else if (occupancyPercent >= 80) reasons.push(revenueReason("last_minute_tight", `${daysUntil} day${daysUntil === 1 ? "" : "s"} away with tight inventory`, 6));
+  } else if (daysUntil <= 7) {
+    if (occupancyPercent < 40) reasons.push(revenueReason("near_term_soft", `${daysUntil} days away and demand is still light`, -5));
+    else if (occupancyPercent >= 75) reasons.push(revenueReason("near_term_strong", `${daysUntil} days away with strong occupancy`, 4));
+  } else if (daysUntil >= 45 && occupancyPercent < 30) {
+    reasons.push(revenueReason("far_out_soft", `${daysUntil} days away; early demand is still light`, -3));
+  }
+
+  if (pickup7 >= 3) reasons.push(revenueReason("pickup_fast", `${pickup7} bookings overlapping this date were first seen in 7 days`, 8));
+  else if (pickup7 === 2) reasons.push(revenueReason("pickup_positive", "2 recent bookings are building demand", 4));
+  else if (pickup7 === 0 && daysUntil <= 14) reasons.push(revenueReason("pickup_quiet", "No recent pickup overlaps this date", -3));
+
+  const surroundingDelta = round1(occupancyPercent - surroundingOccupancy);
+  if (surroundingDelta >= 15) reasons.push(revenueReason("date_outperforming", `${Math.abs(surroundingDelta)} pts above surrounding-date occupancy`, 4));
+  else if (surroundingDelta <= -15) reasons.push(revenueReason("date_underperforming", `${Math.abs(surroundingDelta)} pts below surrounding-date occupancy`, -4));
+
+  if (isWeekend && settings.weekendAdjustmentPercent) reasons.push(revenueReason("weekend", `Owner weekend rule ${settings.weekendAdjustmentPercent > 0 ? "+" : ""}${settings.weekendAdjustmentPercent}%`, settings.weekendAdjustmentPercent));
+  const seasonalPercent = round1((Number(monthMultiplier || 1) - 1) * 100);
+  if (Math.abs(seasonalPercent) >= 0.5) reasons.push(revenueReason("season", `Owner seasonal multiplier ${Number(monthMultiplier).toFixed(2)}x`, seasonalPercent));
+
+  const raw = reasons.reduce((sum, item) => sum + Number(item.impactPercent || 0), 0);
+  const capped = Math.max(-settings.maxAdjustmentPercent, Math.min(settings.maxAdjustmentPercent, raw));
+  if (round1(capped) !== round1(raw)) reasons.push(revenueReason("guardrail_cap", `Adjustment capped at ${settings.maxAdjustmentPercent}%`, round1(capped - raw)));
+  return { adjustmentPercent: round1(capped), reasons };
+}
+
+export function buildRevenueEnginePayload({ today, days = 14, reservations = [], roomsTotal = 11, settingsRecord = null, decisions = [], currency = "THB" }) {
+  const horizonDays = REVENUE_HORIZONS.includes(Number(days)) ? Number(days) : 14;
+  const start = validDate(today) ? today : bangkokDate();
+  const end = shiftedDateOnly(start, horizonDays - 1);
+  const roomCount = Math.max(1, Math.min(99, Number(roomsTotal) || 11));
+  const settings = revenueSettingsPublic(settingsRecord, currency);
+  const dates = [];
+  const occupancyByDate = new Map();
+  for (let offset = 0; offset < horizonDays; offset += 1) {
+    const date = shiftedDateOnly(start, offset);
+    const stats = revenueOccupancyForDate(reservations, date, roomCount);
+    occupancyByDate.set(date, stats);
+    dates.push(date);
+  }
+  const decisionMap = new Map();
+  for (const item of (Array.isArray(decisions) ? decisions : [])) {
+    const key = `${item.room}:${item.stayDate}`;
+    if (!decisionMap.has(key)) decisionMap.set(key, item);
+  }
+  const recommendations = [];
+  let soldRoomNights = 0;
+  let openRoomNights = 0;
+  for (let offset = 0; offset < dates.length; offset += 1) {
+    const date = dates[offset];
+    const stats = occupancyByDate.get(date);
+    soldRoomNights += stats.occupied;
+    openRoomNights += stats.remaining;
+    const neighbors = dates.filter((_, index) => index !== offset && Math.abs(index - offset) <= 3).map((neighbor) => occupancyByDate.get(neighbor)?.occupancyPercent || 0);
+    const surroundingOccupancy = neighbors.length ? round1(neighbors.reduce((sum, value) => sum + value, 0) / neighbors.length) : stats.occupancyPercent;
+    const pickup7 = revenuePickupForDate(reservations, date, start, 7);
+    const pickup14 = revenuePickupForDate(reservations, date, start, 14);
+    const monthMultiplier = settings.monthMultipliers[String(Number(date.slice(5, 7)))] || 1;
+    const adjustment = revenueAdjustmentForDate({
+      occupancyPercent: stats.occupancyPercent,
+      surroundingOccupancy,
+      pickup7,
+      daysUntil: offset,
+      isWeekend: revenueDateIsWeekend(date),
+      monthMultiplier,
+      settings
+    });
+    for (let roomNumber = 1; roomNumber <= roomCount; roomNumber += 1) {
+      const room = String(roomNumber);
+      if (stats.occupiedRooms.has(room)) continue;
+      const referenceRate = Number(settings.roomReferenceRates[room] || settings.referenceRate || 0);
+      let suggestedRate = 0;
+      if (settings.configured && referenceRate > 0) {
+        suggestedRate = revenueRound(referenceRate * (1 + adjustment.adjustmentPercent / 100), settings.roundTo);
+        suggestedRate = Math.max(settings.minimumRate, Math.min(settings.maximumRate, suggestedRate));
+      }
+      const decision = decisionMap.get(`${room}:${date}`) || null;
+      recommendations.push({
+        key: `${room}:${date}`,
+        room,
+        date,
+        daysUntil: offset,
+        propertyOccupancyPercent: stats.occupancyPercent,
+        surroundingOccupancyPercent: surroundingOccupancy,
+        remainingRooms: stats.remaining,
+        pickup7,
+        pickup14,
+        isWeekend: revenueDateIsWeekend(date),
+        referenceRate,
+        suggestedRate,
+        adjustmentPercent: referenceRate > 0 && suggestedRate > 0 ? round1(((suggestedRate - referenceRate) / referenceRate) * 100) : 0,
+        reasons: adjustment.reasons,
+        actionable: settings.configured && suggestedRate > 0 && Math.abs(suggestedRate - referenceRate) >= Math.max(settings.roundTo, 1),
+        decision: decision ? {
+          status: decision.decision,
+          overrideRate: Number(decision.overrideRateMinor || 0) / 100,
+          decidedAt: decision.decidedAt,
+          engineVersion: decision.engineVersion || "v1"
+        } : null
+      });
+    }
+  }
+  const actionable = recommendations.filter((item) => item.actionable && !item.decision).length;
+  const decisionHistory = (Array.isArray(decisions) ? decisions : []).slice(0, 50).map((item) => ({
+    id: item.id,
+    room: item.room,
+    date: item.stayDate,
+    status: item.decision,
+    referenceRate: Number(item.referenceRateMinor || 0) / 100,
+    suggestedRate: Number(item.suggestedRateMinor || 0) / 100,
+    overrideRate: Number(item.overrideRateMinor || 0) / 100,
+    reasons: safeJson(item.rationaleJson, []),
+    engineVersion: item.engineVersion || "v1",
+    decidedAt: item.decidedAt
+  }));
+  return {
+    ok: true,
+    engineVersion: REVENUE_ENGINE_VERSION,
+    generatedAt: new Date().toISOString(),
+    mode: "recommendation_only",
+    providerWriteEnabled: false,
+    liveRateConnected: false,
+    horizon: { days: horizonDays, from: start, to: end },
+    settings,
+    summary: {
+      roomsTotal: roomCount,
+      soldRoomNights,
+      openRoomNights,
+      occupancyPercent: percent(soldRoomNights, roomCount * horizonDays),
+      actionableRecommendations: actionable,
+      recordedDecisions: decisionHistory.length
+    },
+    recommendations,
+    history: decisionHistory,
+    dataQuality: {
+      pickupSource: "taoedge_first_seen",
+      liveRateSource: "owner_reference_rate",
+      marketDemandConnected: false,
+      note: "Revenue Engine V1 is deterministic and recommendation-only. It uses canonical reservations, Taoedge first-seen pickup and owner pricing guardrails. It does not read competitor prices or write OTA rates."
+    }
+  };
+}
+
 function beds24GuestDisplayName(booking = {}) {
   return cleanText([booking.firstName, booking.lastName].filter(Boolean).join(" "), 100);
 }
@@ -1543,6 +1782,111 @@ async function handleProtected(request, env, path, store, handlers = {}) {
       reference: `passport:${guestDocumentTm30Match[1]}`, createdAt: access.now
     });
     return json({ ok: true, tm30RegisteredAt: outcome.tm30RegisteredAt || "" });
+  }
+
+  if (path === `${MOBILE_API_PREFIX}/revenue-engine` && request.method === "GET") {
+    const denied = requireCapability(publicAccess, "analytics.view", "analytics");
+    if (denied) return denied;
+    const url = new URL(request.url);
+    const requestedDays = Number(url.searchParams.get("days") || 14);
+    const days = REVENUE_HORIZONS.includes(requestedDays) ? requestedDays : 14;
+    const today = bangkokDate();
+    const to = shiftedDateOnly(today, days - 1);
+    const [reservations, statuses, settingsRecord, decisions] = await Promise.all([
+      store.mobileAnalyticsReservations(today, to),
+      store.listRoomHousekeepingStatuses(),
+      store.mobileGetRevenueSettings(record.tenantId, HOUSE_PROPERTY_ID),
+      store.mobileListRevenueDecisions(record.tenantId, HOUSE_PROPERTY_ID, today, to, 500)
+    ]);
+    const roomsTotal = Math.max(11, Array.isArray(statuses) ? statuses.length : 0);
+    return json(buildRevenueEnginePayload({
+      today, days, reservations, roomsTotal, settingsRecord, decisions,
+      currency: record.currency || "THB"
+    }));
+  }
+
+  if (path === `${MOBILE_API_PREFIX}/revenue-engine/settings` && request.method === "POST") {
+    const denied = requireCapability(publicAccess, "analytics.view", "analytics");
+    if (denied) return denied;
+    if (record.role !== "owner") return json({ error: "owner_required" }, 403);
+    let body; try { body = await readJson(request); } catch (response) { return response; }
+    const referenceRate = Number(body.referenceRate);
+    const minimumRate = Number(body.minimumRate);
+    const maximumRate = Number(body.maximumRate);
+    const maxAdjustmentPercent = Number(body.maxAdjustmentPercent ?? 25);
+    const weekendAdjustmentPercent = Number(body.weekendAdjustmentPercent ?? 0);
+    const roundTo = Number(body.roundTo ?? 50);
+    if (![referenceRate, minimumRate, maximumRate, maxAdjustmentPercent, weekendAdjustmentPercent, roundTo].every(Number.isFinite)) return json({ error: "invalid_pricing_settings" }, 400);
+    if (referenceRate <= 0 || minimumRate <= 0 || maximumRate < minimumRate || referenceRate < minimumRate || referenceRate > maximumRate) return json({ error: "invalid_rate_guardrails" }, 400);
+    if (maxAdjustmentPercent < 5 || maxAdjustmentPercent > 50 || weekendAdjustmentPercent < -20 || weekendAdjustmentPercent > 30 || roundTo < 1 || roundTo > 1000) return json({ error: "invalid_pricing_settings" }, 400);
+    const roomReferenceRates = {};
+    if (body.roomReferenceRates && typeof body.roomReferenceRates === "object" && !Array.isArray(body.roomReferenceRates)) {
+      for (const [room, raw] of Object.entries(body.roomReferenceRates)) {
+        if (!/^(1[01]|[1-9])$/.test(room) || raw === "" || raw === null || raw === undefined) continue;
+        const value = Number(raw);
+        if (!Number.isFinite(value) || value < minimumRate || value > maximumRate) return json({ error: "invalid_room_reference_rate", room }, 400);
+        roomReferenceRates[room] = Math.round(value * 100) / 100;
+      }
+    }
+    const monthMultipliers = {};
+    if (body.monthMultipliers && typeof body.monthMultipliers === "object" && !Array.isArray(body.monthMultipliers)) {
+      for (let month = 1; month <= 12; month += 1) {
+        const raw = body.monthMultipliers[String(month)];
+        if (raw === undefined || raw === null || raw === "") continue;
+        const value = Number(raw);
+        if (!Number.isFinite(value) || value < 0.7 || value > 1.4) return json({ error: "invalid_season_multiplier", month }, 400);
+        monthMultipliers[String(month)] = Math.round(value * 100) / 100;
+      }
+    }
+    const now = access.now;
+    const outcome = await store.mobileUpsertRevenueSettings({
+      tenantId: record.tenantId, propertyId: HOUSE_PROPERTY_ID, currency: record.currency || "THB",
+      referenceRateMinor: Math.round(referenceRate * 100), minimumRateMinor: Math.round(minimumRate * 100), maximumRateMinor: Math.round(maximumRate * 100),
+      maxAdjustmentPercent, weekendAdjustmentPercent, roundToMinor: Math.round(roundTo * 100),
+      roomReferenceRates, monthMultipliers, updatedByUserId: record.userId, updatedAt: now
+    });
+    if (!outcome?.ok) return json({ error: outcome?.error || "revenue_settings_failed" }, 400);
+    await store.mobileRecordAudit({ tenantId: record.tenantId, userId: record.userId, membershipId: record.membershipId, action: "revenue_settings_updated", reference: `property:${HOUSE_PROPERTY_ID}`, metadata: { referenceRate, minimumRate, maximumRate, maxAdjustmentPercent, weekendAdjustmentPercent, roundTo }, createdAt: now });
+    const saved = await store.mobileGetRevenueSettings(record.tenantId, HOUSE_PROPERTY_ID);
+    return json({ ok: true, settings: revenueSettingsPublic(saved, record.currency || "THB") });
+  }
+
+  if (path === `${MOBILE_API_PREFIX}/revenue-engine/decision` && request.method === "POST") {
+    const denied = requireCapability(publicAccess, "analytics.view", "analytics");
+    if (denied) return denied;
+    if (record.role !== "owner") return json({ error: "owner_required" }, 403);
+    let body; try { body = await readJson(request); } catch (response) { return response; }
+    const room = cleanText(body.room, 4);
+    const date = cleanText(body.date, 10);
+    const decision = cleanText(body.decision, 24).toLowerCase();
+    if (!/^(1[01]|[1-9])$/.test(room) || !validDate(date) || !["accepted", "ignored", "override"].includes(decision)) return json({ error: "invalid_decision" }, 400);
+    const today = bangkokDate();
+    const end = shiftedDateOnly(today, 29);
+    if (date < today || date > end) return json({ error: "decision_outside_horizon" }, 400);
+    const [reservations, statuses, settingsRecord, decisions] = await Promise.all([
+      store.mobileAnalyticsReservations(today, end), store.listRoomHousekeepingStatuses(),
+      store.mobileGetRevenueSettings(record.tenantId, HOUSE_PROPERTY_ID), store.mobileListRevenueDecisions(record.tenantId, HOUSE_PROPERTY_ID, today, end, 500)
+    ]);
+    const roomsTotal = Math.max(11, Array.isArray(statuses) ? statuses.length : 0);
+    const payload = buildRevenueEnginePayload({ today, days: 30, reservations, roomsTotal, settingsRecord, decisions, currency: record.currency || "THB" });
+    const recommendation = payload.recommendations.find((item) => item.room === room && item.date === date);
+    if (!recommendation) return json({ error: "recommendation_not_available" }, 404);
+    if (!payload.settings.configured || !recommendation.suggestedRate) return json({ error: "revenue_settings_required" }, 409);
+    let overrideRate = 0;
+    if (decision === "override") {
+      overrideRate = Number(body.overrideRate);
+      if (!Number.isFinite(overrideRate) || overrideRate < payload.settings.minimumRate || overrideRate > payload.settings.maximumRate) return json({ error: "override_outside_guardrails" }, 400);
+    }
+    const now = access.now;
+    const outcome = await store.mobileUpsertRevenueDecision({
+      tenantId: record.tenantId, propertyId: HOUSE_PROPERTY_ID, room, stayDate: date, decision,
+      referenceRateMinor: Math.round(recommendation.referenceRate * 100), suggestedRateMinor: Math.round(recommendation.suggestedRate * 100),
+      overrideRateMinor: Math.round(overrideRate * 100), rationale: recommendation.reasons, engineVersion: payload.engineVersion,
+      decidedByUserId: record.userId, decidedAt: now
+    });
+    if (!outcome?.ok) return json({ error: outcome?.error || "revenue_decision_failed" }, 400);
+    await store.mobileRecordAudit({ tenantId: record.tenantId, userId: record.userId, membershipId: record.membershipId, action: `revenue_recommendation_${decision}`, reference: `room:${room}:${date}`, metadata: { suggestedRate: recommendation.suggestedRate, overrideRate, providerWriteEnabled: false }, createdAt: now });
+    return json({ ok: true, decision, room, date, recordedRate: decision === "override" ? overrideRate : recommendation.suggestedRate, appliedToProvider: false, engineVersion: payload.engineVersion });
   }
 
   if (path === `${MOBILE_API_PREFIX}/analytics` && request.method === "GET") {

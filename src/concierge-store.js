@@ -726,6 +726,44 @@ export class ConciergeStore extends DurableObject {
         CREATE INDEX IF NOT EXISTS platform_audit_tenant_created
           ON platform_audit(tenant_id, created_at);
 
+        CREATE TABLE IF NOT EXISTS revenue_engine_settings (
+          tenant_id TEXT NOT NULL,
+          property_id TEXT NOT NULL DEFAULT '',
+          currency TEXT NOT NULL DEFAULT 'THB',
+          reference_rate_minor INTEGER NOT NULL DEFAULT 0,
+          minimum_rate_minor INTEGER NOT NULL DEFAULT 0,
+          maximum_rate_minor INTEGER NOT NULL DEFAULT 0,
+          max_adjustment_percent REAL NOT NULL DEFAULT 25,
+          weekend_adjustment_percent REAL NOT NULL DEFAULT 0,
+          round_to_minor INTEGER NOT NULL DEFAULT 5000,
+          room_reference_rates_json TEXT NOT NULL DEFAULT '{}',
+          month_multipliers_json TEXT NOT NULL DEFAULT '{}',
+          updated_by_user_id TEXT NOT NULL DEFAULT '',
+          updated_at TEXT NOT NULL,
+          PRIMARY KEY (tenant_id, property_id)
+        );
+
+        CREATE TABLE IF NOT EXISTS revenue_engine_decisions (
+          id TEXT PRIMARY KEY,
+          tenant_id TEXT NOT NULL,
+          property_id TEXT NOT NULL DEFAULT '',
+          room TEXT NOT NULL,
+          stay_date TEXT NOT NULL,
+          decision TEXT NOT NULL,
+          reference_rate_minor INTEGER NOT NULL DEFAULT 0,
+          suggested_rate_minor INTEGER NOT NULL DEFAULT 0,
+          override_rate_minor INTEGER NOT NULL DEFAULT 0,
+          rationale_json TEXT NOT NULL DEFAULT '[]',
+          engine_version TEXT NOT NULL DEFAULT 'v1',
+          decided_by_user_id TEXT NOT NULL DEFAULT '',
+          decided_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS revenue_engine_decisions_target
+          ON revenue_engine_decisions(tenant_id, property_id, room, stay_date, decided_at);
+        CREATE INDEX IF NOT EXISTS revenue_engine_decisions_recent
+          ON revenue_engine_decisions(tenant_id, decided_at);
+
         CREATE TABLE IF NOT EXISTS platform_licenses (
           tenant_id TEXT PRIMARY KEY,
           license_id TEXT NOT NULL UNIQUE,
@@ -5050,6 +5088,102 @@ export class ConciergeStore extends DurableObject {
        WHERE a.tenant_id = ? ORDER BY a.created_at DESC LIMIT ?`,
       tenantId, limit
     ));
+  }
+
+  async mobileGetRevenueSettings(tenantIdValue, propertyIdValue = "") {
+    const tenantId = cleanText(tenantIdValue, 100);
+    const propertyId = cleanText(propertyIdValue, 100);
+    if (!tenantId) return null;
+    return rows(this.ctx.storage.sql.exec(
+      `SELECT tenant_id AS tenantId, property_id AS propertyId, currency,
+              reference_rate_minor AS referenceRateMinor, minimum_rate_minor AS minimumRateMinor,
+              maximum_rate_minor AS maximumRateMinor, max_adjustment_percent AS maxAdjustmentPercent,
+              weekend_adjustment_percent AS weekendAdjustmentPercent, round_to_minor AS roundToMinor,
+              room_reference_rates_json AS roomReferenceRatesJson, month_multipliers_json AS monthMultipliersJson,
+              updated_by_user_id AS updatedByUserId, updated_at AS updatedAt
+       FROM revenue_engine_settings WHERE tenant_id = ? AND property_id = ? LIMIT 1`,
+      tenantId, propertyId
+    ))[0] || null;
+  }
+
+  async mobileUpsertRevenueSettings(record = {}) {
+    const tenantId = cleanText(record.tenantId, 100);
+    const propertyId = cleanText(record.propertyId, 100);
+    const now = cleanText(record.updatedAt, 40) || new Date().toISOString();
+    if (!tenantId) return { ok: false, error: "invalid_tenant" };
+    this.ctx.storage.sql.exec(
+      `INSERT INTO revenue_engine_settings
+       (tenant_id, property_id, currency, reference_rate_minor, minimum_rate_minor, maximum_rate_minor,
+        max_adjustment_percent, weekend_adjustment_percent, round_to_minor, room_reference_rates_json,
+        month_multipliers_json, updated_by_user_id, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(tenant_id, property_id) DO UPDATE SET
+         currency = excluded.currency,
+         reference_rate_minor = excluded.reference_rate_minor, minimum_rate_minor = excluded.minimum_rate_minor,
+         maximum_rate_minor = excluded.maximum_rate_minor, max_adjustment_percent = excluded.max_adjustment_percent,
+         weekend_adjustment_percent = excluded.weekend_adjustment_percent, round_to_minor = excluded.round_to_minor,
+         room_reference_rates_json = excluded.room_reference_rates_json,
+         month_multipliers_json = excluded.month_multipliers_json,
+         updated_by_user_id = excluded.updated_by_user_id, updated_at = excluded.updated_at`,
+      tenantId, propertyId, cleanText(record.currency, 8) || "THB",
+      Math.max(0, Math.round(Number(record.referenceRateMinor) || 0)),
+      Math.max(0, Math.round(Number(record.minimumRateMinor) || 0)),
+      Math.max(0, Math.round(Number(record.maximumRateMinor) || 0)),
+      Number(record.maxAdjustmentPercent) || 0, Number(record.weekendAdjustmentPercent) || 0,
+      Math.max(1, Math.round(Number(record.roundToMinor) || 1)),
+      JSON.stringify(record.roomReferenceRates || {}), JSON.stringify(record.monthMultipliers || {}),
+      cleanText(record.updatedByUserId, 100), now
+    );
+    return { ok: true, updatedAt: now };
+  }
+
+  async mobileListRevenueDecisions(tenantIdValue, propertyIdValue = "", fromDate = "", toDate = "", limitValue = 250) {
+    const tenantId = cleanText(tenantIdValue, 100);
+    const propertyId = cleanText(propertyIdValue, 100);
+    const from = cleanText(fromDate, 10);
+    const to = cleanText(toDate, 10);
+    const limit = Math.max(1, Math.min(500, Number(limitValue) || 250));
+    if (!tenantId) return [];
+    const clauses = ["tenant_id = ?", "property_id = ?"];
+    const args = [tenantId, propertyId];
+    if (/^\d{4}-\d{2}-\d{2}$/.test(from)) { clauses.push("stay_date >= ?"); args.push(from); }
+    if (/^\d{4}-\d{2}-\d{2}$/.test(to)) { clauses.push("stay_date <= ?"); args.push(to); }
+    return rows(this.ctx.storage.sql.exec(
+      `SELECT id, tenant_id AS tenantId, property_id AS propertyId, room, stay_date AS stayDate, decision,
+              reference_rate_minor AS referenceRateMinor, suggested_rate_minor AS suggestedRateMinor,
+              override_rate_minor AS overrideRateMinor, rationale_json AS rationaleJson,
+              engine_version AS engineVersion, decided_by_user_id AS decidedByUserId,
+              decided_at AS decidedAt, updated_at AS updatedAt
+       FROM revenue_engine_decisions WHERE ${clauses.join(" AND ")}
+       ORDER BY decided_at DESC LIMIT ?`,
+      ...args, limit
+    ));
+  }
+
+  async mobileUpsertRevenueDecision(record = {}) {
+    const tenantId = cleanText(record.tenantId, 100);
+    const propertyId = cleanText(record.propertyId, 100);
+    const room = cleanText(record.room, 4);
+    const stayDate = cleanText(record.stayDate, 10);
+    const decision = cleanText(record.decision, 24);
+    const now = cleanText(record.decidedAt, 40) || new Date().toISOString();
+    if (!tenantId || !/^(1[01]|[1-9])$/.test(room) || !/^\d{4}-\d{2}-\d{2}$/.test(stayDate) || !["accepted", "ignored", "override"].includes(decision)) {
+      return { ok: false, error: "invalid_decision" };
+    }
+    const id = cleanText(record.id, 100) || `revenue_decision_${crypto.randomUUID()}`;
+    this.ctx.storage.sql.exec(
+      `INSERT INTO revenue_engine_decisions
+       (id, tenant_id, property_id, room, stay_date, decision, reference_rate_minor, suggested_rate_minor,
+        override_rate_minor, rationale_json, engine_version, decided_by_user_id, decided_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      id, tenantId, propertyId, room, stayDate, decision,
+      Math.max(0, Math.round(Number(record.referenceRateMinor) || 0)),
+      Math.max(0, Math.round(Number(record.suggestedRateMinor) || 0)),
+      Math.max(0, Math.round(Number(record.overrideRateMinor) || 0)),
+      JSON.stringify(Array.isArray(record.rationale) ? record.rationale : []),
+      cleanText(record.engineVersion, 20) || "v1", cleanText(record.decidedByUserId, 100), now, now
+    );
+    return { ok: true, id, decidedAt: now };
   }
 
   async mobileUpsertPushDevice(record = {}) {

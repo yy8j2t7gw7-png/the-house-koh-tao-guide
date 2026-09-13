@@ -230,6 +230,26 @@ function parseRecipients(env) {
   return result;
 }
 
+export function operationalTaskAssignments(env) {
+  const recipients = parseRecipients(env);
+  const definitions = [
+    { key: "housekeeping", label: "Housekeeping / support", recipientGroup: "support" },
+    { key: "reservations", label: "Bookings / reservations", recipientGroup: "booking" },
+    { key: "owners", label: "Owners", recipientGroup: "owners" },
+    { key: "support_owners", label: "Support + owners", recipientGroup: "support_with_owners" },
+    { key: "booking_owners", label: "Reservations + owners", recipientGroup: "booking_with_owners" },
+    { key: "urgent", label: "Urgent response", recipientGroup: "urgent_response" }
+  ];
+  return definitions.map((item) => {
+    const members = (recipients[item.recipientGroup] || []).map((recipient) => recipient.label);
+    return { ...item, members, available: members.length > 0 };
+  });
+}
+
+export function operationalTaskAssignment(env, key) {
+  return operationalTaskAssignments(env).find((item) => item.key === String(key || "") && item.available) || null;
+}
+
 export function houseEmergencyContact(env) {
   const owners = parseRecipients(env).emergency || [];
   const target = owners.find((item) => /(?:owner\s*2|west)/i.test(item.label)) || owners[1] || owners[0];
@@ -368,7 +388,13 @@ function requestLabel(alert) {
     passport_received: "Passport received",
     passport_checkin_missing: "Passport check-in reminder",
     passport_checkin_partial: "Passport registration incomplete",
-    passport_tm30_overdue: "TM30 reminder"
+    passport_tm30_overdue: "TM30 reminder",
+    booking_task_housekeeping: "Housekeeping task",
+    booking_task_maintenance: "Maintenance task",
+    booking_task_guest_support: "Guest support task",
+    booking_task_reservations: "Reservations task",
+    booking_task_owner: "Owner task",
+    booking_task_general: "Operational task"
   };
   if (alert.alertType === "stay_support") {
     if (/\blate\s+checkout\b/i.test(summary)) return "Late checkout";

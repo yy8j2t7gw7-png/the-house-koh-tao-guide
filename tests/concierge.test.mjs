@@ -37,6 +37,7 @@ import {
   dispatchConciergeAlert,
   handleWhatsAppWebhook,
   houseEmergencyContact,
+  operationalTaskAssignments,
   processDueAlertEscalations,
   validateWhatsAppTemplateParameters,
   whatsappAlertConfiguration
@@ -14651,4 +14652,73 @@ test("v5.11.63 expected payout UI is clearly provisional on desktop and mobile",
     assert.match(appFinance, /expected\/provisional/);
   }
   if (appModels) assert.match(appModels, /expectedNetIncome/);
+});
+
+
+test("v5.11.64 booking operational tasks expose configured assignee teams without phone numbers", () => {
+  const env = {
+    WHATSAPP_ALERT_RECIPIENTS: JSON.stringify({
+      support: [{ label: "Su", phone: "+66 64 000 0004" }],
+      booking: [{ label: "Fah", phone: "+66 96 000 0001" }],
+      emergency: [
+        { label: "Owner 1", phone: "+66 81 000 0002" },
+        { label: "Owner 2", phone: "+66 82 000 0003" }
+      ]
+    })
+  };
+  const assignments = operationalTaskAssignments(env);
+  assert.equal(assignments.find((item) => item.key === "housekeeping")?.available, true);
+  assert.deepEqual(assignments.find((item) => item.key === "housekeeping")?.members, ["Su"]);
+  assert.equal(assignments.find((item) => item.key === "reservations")?.available, true);
+  assert.deepEqual(assignments.find((item) => item.key === "owners")?.members, ["Owner 1", "Owner 2"]);
+  assert.doesNotMatch(JSON.stringify(assignments), /640000004|960000001|810000002|820000003/);
+});
+
+test("v5.11.64 booking tasks reuse approved staff quick actions for Received and Resolved", () => {
+  const env = {
+    WHATSAPP_STAFF_ACTIONS_ENABLED: "true",
+    WHATSAPP_SERVICE_ACTION_TEMPLATE_NAME: "house_service_alert_actions_v3",
+    WHATSAPP_BOOKING_ACTION_TEMPLATE_NAME: "house_booking_alert_actions_v2",
+    WHATSAPP_LUGGAGE_ACTION_TEMPLATE_NAME: "house_luggage_alert_actions_v2",
+    WHATSAPP_URGENT_ACTION_TEMPLATE_NAME: "house_urgent_alert_actions_v2",
+    WHATSAPP_LOST_KEY_ACTION_TEMPLATE_NAME: "house_lost_key_alert_actions_v2"
+  };
+  const alert = {
+    id: "alert_12345678-1234-4234-9234-123456789012",
+    alertType: "booking_task_housekeeping",
+    severity: "attention",
+    room: "4",
+    roomVerified: true,
+    summary: "Please prepare an extra towel set. · Booking task ref 12345678",
+    bangkokTime: "13 Sep 2026, 10:45",
+    createdAt: "2026-09-13T03:45:00.000Z"
+  };
+  const built = buildWhatsAppTemplatePayload(alert, { label: "Su", phone: "66640000004" }, env);
+  assert.equal(built.ok, true);
+  assert.equal(built.name, "house_service_alert_actions_v3");
+  const buttons = built.payload.template.components.filter((component) => component.type === "button");
+  assert.equal(buttons.length, 2);
+  assert.match(buttons[0].parameters[0].payload, /HOUSE_ALERT\|RECEIVED\|alert_/);
+  assert.match(buttons[1].parameters[0].payload, /HOUSE_ALERT\|RESOLVE\|alert_/);
+});
+
+test("v5.11.64 booking activity persists notes/tasks and mirrors protected alert status", async () => {
+  const storeSource = await readFile(new URL("../src/concierge-store.js", import.meta.url), "utf8");
+  const mobileSource = await readFile(new URL("../src/mobile-platform.js", import.meta.url), "utf8");
+  for (const contract of [
+    "CREATE TABLE IF NOT EXISTS reservation_activity",
+    "mobileCreateReservationActivity",
+    "mobileLinkReservationActivityAlert",
+    "mobileListReservationActivity",
+    "SET status = 'received'",
+    "SET status = 'resolved'"
+  ]) assert.match(storeSource, new RegExp(contract.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  for (const contract of [
+    "/bookings/detail",
+    "/bookings/activity",
+    "/bookings/activity/status",
+    "booking_activity.create",
+    "booking_activity.update",
+    "dispatchConciergeAlert"
+  ]) assert.match(mobileSource, new RegExp(contract.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
 });

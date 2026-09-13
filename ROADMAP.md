@@ -1,5 +1,13 @@
 # Product Roadmap
 
+## Completed in v5.11.64
+
+- Booking calendar drill-down backend contract.
+- Persistent booking notes and actionable staff tasks.
+- Protected team assignment with WhatsApp Received / Resolved status synchronization.
+- Booking activity audit trail without exposing recipient phone numbers or provider credentials.
+
+
 Baseline: v5.11.42
 
 ## Completed

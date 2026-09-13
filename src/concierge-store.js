@@ -405,6 +405,32 @@ export class ConciergeStore extends DurableObject {
         CREATE INDEX IF NOT EXISTS housekeeping_tasks_alert
           ON housekeeping_tasks(alert_id);
 
+        CREATE TABLE IF NOT EXISTS reservation_activity (
+          id TEXT PRIMARY KEY,
+          reservation_id TEXT NOT NULL,
+          kind TEXT NOT NULL,
+          category TEXT NOT NULL DEFAULT '',
+          body TEXT NOT NULL,
+          assignee_key TEXT NOT NULL DEFAULT '',
+          assignee_label TEXT NOT NULL DEFAULT '',
+          alert_id TEXT NOT NULL DEFAULT '',
+          status TEXT NOT NULL DEFAULT 'note',
+          delivery_attempted INTEGER NOT NULL DEFAULT 0,
+          delivery_accepted INTEGER NOT NULL DEFAULT 0,
+          created_by_hash TEXT NOT NULL DEFAULT '',
+          created_by_label TEXT NOT NULL DEFAULT '',
+          received_at TEXT NOT NULL DEFAULT '',
+          received_by_hash TEXT NOT NULL DEFAULT '',
+          resolved_at TEXT NOT NULL DEFAULT '',
+          resolved_by_hash TEXT NOT NULL DEFAULT '',
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS reservation_activity_reservation
+          ON reservation_activity(reservation_id, created_at);
+        CREATE INDEX IF NOT EXISTS reservation_activity_alert
+          ON reservation_activity(alert_id);
+
         CREATE TABLE IF NOT EXISTS verified_stay_sessions (
           id TEXT PRIMARY KEY,
           token_hash TEXT NOT NULL UNIQUE,
@@ -1945,17 +1971,27 @@ export class ConciergeStore extends DurableObject {
   }
 
   async acknowledgeAlert(id, actorHash, nowValue) {
+    const now = cleanText(nowValue, 40) || new Date().toISOString();
+    const alertId = cleanText(id, 100);
+    const actor = cleanText(actorHash, 100);
     this.ctx.storage.sql.exec(
       `UPDATE concierge_alerts
        SET status = 'acknowledged', acknowledged_at = ?, acknowledged_by_hash = ?
        WHERE id = ? AND status = 'open'`,
-      cleanText(nowValue, 40) || new Date().toISOString(),
-      cleanText(actorHash, 100),
-      cleanText(id, 100)
+      now, actor, alertId
     );
     this.ctx.storage.sql.exec(
       "UPDATE maintenance_reports SET status = 'acknowledged' WHERE alert_id = ? AND status = 'open'",
-      cleanText(id, 100)
+      alertId
+    );
+    // Reservation tasks mirror the protected WhatsApp alert state so the booking
+    // activity timeline is the operational source of truth visible in the app.
+    this.ctx.storage.sql.exec(
+      `UPDATE reservation_activity
+       SET status = 'received', received_at = CASE WHEN received_at = '' THEN ? ELSE received_at END,
+           received_by_hash = CASE WHEN received_by_hash = '' THEN ? ELSE received_by_hash END, updated_at = ?
+       WHERE alert_id = ? AND kind = 'task' AND status = 'open'`,
+      now, actor, now, alertId
     );
     return { ok: true };
   }
@@ -1971,21 +2007,26 @@ export class ConciergeStore extends DurableObject {
 
   async resolveAlert(id, actorHash, nowValue) {
     const now = cleanText(nowValue, 40) || new Date().toISOString();
+    const alertId = cleanText(id, 100);
+    const actor = cleanText(actorHash, 100);
     this.ctx.storage.sql.exec(
       `UPDATE concierge_alerts
        SET status = 'resolved', resolved_at = ?, resolved_by_hash = ?
        WHERE id = ? AND status IN ('open', 'acknowledged')`,
-      now,
-      cleanText(actorHash, 100),
-      cleanText(id, 100)
+      now, actor, alertId
     );
     this.ctx.storage.sql.exec(
       `UPDATE maintenance_reports
        SET status = 'resolved', resolved_at = ?, delete_after = ?
        WHERE alert_id = ? AND status IN ('open', 'acknowledged')`,
-      now,
-      now,
-      cleanText(id, 100)
+      now, now, alertId
+    );
+    this.ctx.storage.sql.exec(
+      `UPDATE reservation_activity
+       SET status = 'resolved', resolved_at = CASE WHEN resolved_at = '' THEN ? ELSE resolved_at END,
+           resolved_by_hash = CASE WHEN resolved_by_hash = '' THEN ? ELSE resolved_by_hash END, updated_at = ?
+       WHERE alert_id = ? AND kind = 'task' AND status IN ('open', 'received')`,
+      now, actor, now, alertId
     );
     return { ok: true };
   }
@@ -3481,11 +3522,88 @@ export class ConciergeStore extends DurableObject {
       `SELECT r.id, r.provider, r.listing_id AS listingId, r.room, r.guest_first_name AS guestFirstName,
               r.check_in_date AS checkInDate,
               CASE WHEN o.check_out_date > r.check_out_date THEN o.check_out_date ELSE r.check_out_date END AS checkOutDate,
-              r.status, r.updated_at AS updatedAt
+              r.status, r.updated_at AS updatedAt,
+              COALESCE(q.status, g.status, 'not_started') AS registrationStatus,
+              COALESCE(q.guest_type, '') AS guestType,
+              COALESCE(q.required_passports, 0) AS requiredPassports,
+              COALESCE(q.received_passports, 0) AS receivedPassports,
+              COALESCE(l.checkout_minutes, 0) AS lateCheckoutMinutes,
+              COALESCE(l.checkout_time, '') AS lateCheckoutTime,
+              COALESCE(l.fee_thb, 0) AS lateCheckoutFeeThb,
+              COALESCE(l.approved_at, '') AS lateCheckoutApprovedAt
        FROM stay_reservations r
        LEFT JOIN stay_checkout_overrides o ON o.reservation_id = r.id
+       LEFT JOIN stay_registration_status g ON g.reservation_id = r.id
+       LEFT JOIN stay_registration_requirements q ON q.reservation_id = r.id
+       LEFT JOIN stay_late_checkout_approvals l ON l.reservation_id = r.id
        WHERE r.id = ? LIMIT 1`,
       cleanText(reservationId, 100)
+    ))[0] || null;
+  }
+
+  async mobileCreateReservationActivity(record) {
+    const id = cleanText(record.id, 100);
+    const reservationId = cleanText(record.reservationId, 100);
+    const kind = record.kind === 'task' ? 'task' : 'note';
+    const body = cleanText(record.body, 1800);
+    const now = cleanText(record.createdAt, 40) || new Date().toISOString();
+    if (!id || !reservationId || body.length < 2) return { ok: false, error: 'invalid_request' };
+    const status = kind === 'task' ? 'open' : 'note';
+    this.ctx.storage.sql.exec(
+      `INSERT INTO reservation_activity
+       (id, reservation_id, kind, category, body, assignee_key, assignee_label, alert_id, status,
+        delivery_attempted, delivery_accepted, created_by_hash, created_by_label, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, '', ?, 0, 0, ?, ?, ?, ?)`,
+      id, reservationId, kind, cleanText(record.category, 60), body,
+      cleanText(record.assigneeKey, 60), cleanText(record.assigneeLabel, 120), status,
+      cleanText(record.createdByHash, 100), cleanText(record.createdByLabel, 120), now, now
+    );
+    return { ok: true, id, status };
+  }
+
+  async mobileLinkReservationActivityAlert(activityId, alertId, delivery = {}, nowValue) {
+    const id = cleanText(activityId, 100);
+    const alert = cleanText(alertId, 100);
+    const now = cleanText(nowValue, 40) || new Date().toISOString();
+    if (!id || !alert) return { ok: false, error: 'invalid_request' };
+    this.ctx.storage.sql.exec(
+      `UPDATE reservation_activity
+       SET alert_id = ?, delivery_attempted = ?, delivery_accepted = ?, updated_at = ?
+       WHERE id = ? AND kind = 'task'`,
+      alert, Math.max(0, Number(delivery.attempted) || 0), Math.max(0, Number(delivery.accepted) || 0), now, id
+    );
+    return { ok: true };
+  }
+
+  async mobileListReservationActivity(reservationId, limitValue = 120) {
+    const reservation = cleanText(reservationId, 100);
+    const limit = Math.min(250, Math.max(1, Number(limitValue) || 120));
+    return rows(this.ctx.storage.sql.exec(
+      `SELECT id, reservation_id AS reservationId, kind, category, body,
+              assignee_key AS assigneeKey, assignee_label AS assigneeLabel, alert_id AS alertId, status,
+              delivery_attempted AS deliveryAttempted, delivery_accepted AS deliveryAccepted,
+              created_by_label AS createdByLabel, received_at AS receivedAt, resolved_at AS resolvedAt,
+              created_at AS createdAt, updated_at AS updatedAt
+       FROM reservation_activity
+       WHERE reservation_id = ?
+       ORDER BY created_at DESC LIMIT ?`,
+      reservation, limit
+    )).map((item) => ({
+      ...item,
+      deliveryAttempted: Number(item.deliveryAttempted) || 0,
+      deliveryAccepted: Number(item.deliveryAccepted) || 0
+    }));
+  }
+
+  async mobileGetReservationActivity(activityId) {
+    return rows(this.ctx.storage.sql.exec(
+      `SELECT id, reservation_id AS reservationId, kind, category, body,
+              assignee_key AS assigneeKey, assignee_label AS assigneeLabel, alert_id AS alertId, status,
+              delivery_attempted AS deliveryAttempted, delivery_accepted AS deliveryAccepted,
+              created_by_label AS createdByLabel, received_at AS receivedAt, resolved_at AS resolvedAt,
+              created_at AS createdAt, updated_at AS updatedAt
+       FROM reservation_activity WHERE id = ? LIMIT 1`,
+      cleanText(activityId, 100)
     ))[0] || null;
   }
 

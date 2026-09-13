@@ -5,7 +5,7 @@ import { beds24FinanceSyncConfiguration, reconcileBeds24FinanceRange } from "./b
 import { integrationAdminOverview } from "./integration-catalog.js";
 import { beds24ApiRequest, handleUnifiedMessagingAdminRequest, roomForBeds24Booking, startWhatsAppGuestConversation, unifiedMessagingConfiguration, whatsAppGuestInitiationConfiguration } from "./unified-messaging.js";
 import { handleStayAdminRequest } from "./stay-api.js";
-import { createProtectedOperationsAlert, dispatchConciergeAlert } from "./whatsapp-alerts.js";
+import { createProtectedOperationsAlert, dispatchConciergeAlert, operationalTaskAssignment, operationalTaskAssignments } from "./whatsapp-alerts.js";
 
 const MOBILE_API_PREFIX = "/api/mobile/v1";
 const PASSWORD_ITERATIONS = 100000;
@@ -31,7 +31,7 @@ const DEFAULT_MODULES = [
 
 export const MOBILE_PERMISSION_MATRIX = Object.freeze({
   owner: Object.freeze([
-    "home.view", "bookings.view", "calendar.view",
+    "home.view", "bookings.view", "calendar.view", "booking_activity.create", "booking_activity.update",
     "messaging.view", "messaging.send", "messaging.ai_control",
     "operations.view", "housekeeping.update", "maintenance.view", "maintenance.create", "maintenance.resolve",
     "registration.status", "finance.view", "finance.import", "finance.expense_submit", "analytics.view", "integrations.view",
@@ -39,13 +39,13 @@ export const MOBILE_PERMISSION_MATRIX = Object.freeze({
     "direct_stays.manage", "guest_documents.view"
   ]),
   manager: Object.freeze([
-    "home.view", "bookings.view", "calendar.view",
+    "home.view", "bookings.view", "calendar.view", "booking_activity.create", "booking_activity.update",
     "messaging.view", "messaging.send", "messaging.ai_control",
     "operations.view", "housekeeping.update", "maintenance.view", "maintenance.create", "maintenance.resolve",
     "registration.status", "finance.expense_submit", "analytics.view", "integrations.view", "direct_stays.manage"
   ]),
   staff: Object.freeze([
-    "home.view", "bookings.view", "calendar.view", "operations.view",
+    "home.view", "bookings.view", "calendar.view", "booking_activity.create", "booking_activity.update", "operations.view",
     "housekeeping.update", "maintenance.view", "maintenance.create", "maintenance.resolve", "registration.status"
   ])
 });
@@ -453,6 +453,45 @@ function publicReservation(item, role) {
   };
 }
 
+function publicReservationActivity(item) {
+  return {
+    id: item.id,
+    reservationId: item.reservationId,
+    kind: item.kind === "task" ? "task" : "note",
+    category: item.category || "",
+    body: item.body || "",
+    assigneeKey: item.assigneeKey || "",
+    assigneeLabel: item.assigneeLabel || "",
+    status: item.status || (item.kind === "task" ? "open" : "note"),
+    deliveryAttempted: Number(item.deliveryAttempted) || 0,
+    deliveryAccepted: Number(item.deliveryAccepted) || 0,
+    createdByLabel: item.createdByLabel || "Team member",
+    receivedAt: item.receivedAt || "",
+    resolvedAt: item.resolvedAt || "",
+    createdAt: item.createdAt || "",
+    updatedAt: item.updatedAt || ""
+  };
+}
+
+function publicTaskAssignments(env) {
+  return operationalTaskAssignments(env).map((item) => ({
+    key: item.key,
+    label: item.label,
+    members: item.members,
+    available: Boolean(item.available)
+  }));
+}
+
+function bookingTaskAlertType(category) {
+  const value = cleanText(category, 60).toLowerCase();
+  if (value === "housekeeping") return "booking_task_housekeeping";
+  if (value === "maintenance") return "booking_task_maintenance";
+  if (value === "guest support") return "booking_task_guest_support";
+  if (value === "reservations") return "booking_task_reservations";
+  if (value === "owner") return "booking_task_owner";
+  return "booking_task_general";
+}
+
 function publicThread(thread) {
   return {
     id: thread.id,
@@ -722,6 +761,86 @@ async function handleProtected(request, env, path, store) {
     const enrichedReservations = await enrichReservationsWithBeds24GuestContacts(filteredReservations, env, store, from || bangkokDate(-30), to || bangkokDate(90));
     const reservations = enrichedReservations.map((item) => publicReservation(item, record.role));
     return json({ ok: true, from, to, reservations });
+  }
+
+  if (path === `${MOBILE_API_PREFIX}/bookings/detail` && request.method === "GET") {
+    const denied = requireCapability(publicAccess, "bookings.view", "bookings");
+    if (denied) return denied;
+    const id = cleanText(new URL(request.url).searchParams.get("id"), 100);
+    if (!id) return json({ error: "invalid_request" }, 400);
+    const raw = await store.getStayReservationById(id);
+    if (!raw) return json({ error: "reservation_not_found" }, 404);
+    const enriched = (await enrichReservationsWithBeds24GuestContacts([raw], env, store, raw.checkInDate, raw.checkOutDate))[0] || raw;
+    const activity = (await store.mobileListReservationActivity(id, 160)).map(publicReservationActivity);
+    return json({ ok: true, reservation: publicReservation(enriched, record.role), activity, taskAssignments: publicTaskAssignments(env) });
+  }
+
+  if (path === `${MOBILE_API_PREFIX}/bookings/activity` && request.method === "POST") {
+    const denied = requireCapability(publicAccess, "booking_activity.create", "bookings");
+    if (denied) return denied;
+    let body; try { body = await readJson(request); } catch (response) { return response; }
+    const reservationId = cleanText(body?.reservationId, 100);
+    const kind = body?.kind === "task" ? "task" : "note";
+    const text = cleanText(body?.body, 1800);
+    const category = cleanText(body?.category, 60) || (kind === "task" ? "General" : "Internal note");
+    if (!reservationId || text.length < 2) return json({ error: "invalid_request" }, 400);
+    const reservation = await store.getStayReservationById(reservationId);
+    if (!reservation) return json({ error: "reservation_not_found" }, 404);
+    const assignment = kind === "task" ? operationalTaskAssignment(env, body?.assigneeKey) : null;
+    if (kind === "task" && !assignment) return json({ error: "task_assignee_unavailable" }, 409);
+    const actorHash = await sha256(`mobile:${record.userId}:${record.membershipId}`);
+    const activityId = `bact_${crypto.randomUUID()}`;
+    const created = await store.mobileCreateReservationActivity({
+      id: activityId, reservationId, kind, category, body: text,
+      assigneeKey: assignment?.key || "", assigneeLabel: assignment?.label || "",
+      createdByHash: actorHash, createdByLabel: record.displayName, createdAt: access.now
+    });
+    if (!created?.ok) return json({ error: created?.error || "activity_create_failed" }, 400);
+    let delivery = { attempted: 0, accepted: 0 };
+    if (kind === "task") {
+      const shortRef = activityId.slice(-8);
+      const alert = await createProtectedOperationsAlert({
+        env, room: reservation.room, roomVerified: true,
+        alertType: bookingTaskAlertType(category), severity: "attention",
+        recipientGroup: assignment.recipientGroup,
+        summary: `${text} · Booking task ref ${shortRef}`,
+        escalationRequired: false, now: new Date(access.now)
+      });
+      if (alert) {
+        delivery = await dispatchConciergeAlert(alert, env).catch(() => ({ attempted: 0, accepted: 0 }));
+        await store.mobileLinkReservationActivityAlert(activityId, alert.id, delivery, access.now);
+      }
+    }
+    await store.mobileRecordAudit({
+      tenantId: record.tenantId, userId: record.userId, membershipId: record.membershipId,
+      action: kind === "task" ? "booking_task_created" : "booking_note_created",
+      reference: `reservation:${reservationId}`, metadata: { activityId, category, assigneeKey: assignment?.key || "", deliveryAccepted: Number(delivery.accepted) || 0 }, createdAt: access.now
+    });
+    const activity = await store.mobileGetReservationActivity(activityId);
+    return json({ ok: true, activity: publicReservationActivity(activity), delivery }, 201);
+  }
+
+  if (path === `${MOBILE_API_PREFIX}/bookings/activity/status` && request.method === "POST") {
+    const denied = requireCapability(publicAccess, "booking_activity.update", "bookings");
+    if (denied) return denied;
+    let body; try { body = await readJson(request); } catch (response) { return response; }
+    const id = cleanText(body?.id, 100);
+    const status = body?.status === "resolved" ? "resolved" : body?.status === "received" ? "received" : "";
+    if (!id || !status) return json({ error: "invalid_request" }, 400);
+    const activity = await store.mobileGetReservationActivity(id);
+    if (!activity || activity.kind !== "task") return json({ error: "task_not_found" }, 404);
+    if (activity.status === "resolved") return json({ ok: true, activity: publicReservationActivity(activity) });
+    const actorHash = await sha256(`mobile:${record.userId}:${record.membershipId}`);
+    if (!activity.alertId) return json({ error: "task_alert_missing" }, 409);
+    if (status === "received") await store.acknowledgeAlert(activity.alertId, actorHash, access.now);
+    else await store.resolveAlert(activity.alertId, actorHash, access.now);
+    await store.mobileRecordAudit({
+      tenantId: record.tenantId, userId: record.userId, membershipId: record.membershipId,
+      action: status === "received" ? "booking_task_received" : "booking_task_resolved",
+      reference: `reservation:${activity.reservationId}`, metadata: { activityId: id }, createdAt: access.now
+    });
+    const updated = await store.mobileGetReservationActivity(id);
+    return json({ ok: true, activity: publicReservationActivity(updated) });
   }
 
   if (path === `${MOBILE_API_PREFIX}/calendar` && request.method === "GET") {

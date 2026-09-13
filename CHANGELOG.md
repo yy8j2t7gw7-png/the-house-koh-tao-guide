@@ -1,5 +1,16 @@
 # Changelog
 
+## v5.11.64 — Booking activity & staff task workflow
+
+- Added a persistent `reservation_activity` ledger for internal booking notes and operational tasks.
+- Added protected mobile booking-detail, activity-create and task-status endpoints.
+- Booking tasks can be assigned to configured protected operational recipient groups without exposing telephone numbers to the app.
+- Reused approved WhatsApp staff quick actions: **Received** acknowledges the task and **Resolved** closes it.
+- Alert acknowledgement/resolution now mirrors into the linked booking task so app and WhatsApp share one operational state.
+- Added audit events for note/task creation and app-side task status changes.
+- Preserved v5.11.63 Airbnb expected-payout reconciliation, commercial licensing/device binding and disabled automatic Beds24 Finance/channel-manager/AI auto-send cutovers.
+- Full automated suite: **330 passed / 0 failed**.
+
 ## v5.11.63 — Airbnb expected-payout Finance reconciliation
 
 - Imports Beds24/Airbnb expected payouts as clearly marked provisional Finance income when actual channel-collected payment is still zero.

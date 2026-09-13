@@ -1,9 +1,10 @@
-# Guest Guide Platform with AI Concierge — The House v5.11.71
+# Guest Guide Platform with AI Concierge — The House v5.11.72
 
+## v5.11.72 — truthful integration health + live Finance automation
 
-## v5.11.71 — trusted reservation-chain and date-aware Concierge hotfix
+v5.11.72 replaces the mobile Integrations screen's coarse Prepared/Connected guesses with server-owned capability health. Beds24 provider access, Unified Messaging, scheduled Finance reconciliation, WhatsApp outbound/API readiness, guest-initiation template readiness and the Beds24 Channel Manager are reported independently so a working OTA inbox is no longer confused with full channel-manager control.
 
-Provider/mobile Concierge context now includes a verified adjacent-stay timeline when the same guest has an unambiguous back-to-back reservation. Relative dates are resolved in Asia/Bangkok before weekday opening rules are applied. Luggage questions that concern a room move use the actual transition date and the canonical office/Bamboo policy rather than treating the current thread reservation in isolation. Manual owner edits and one-off exceptions remain conversation-only and are never promoted into approved House knowledge automatically.
+The House's validated Airbnb Finance reconciliation is now promoted from staged/manual mode to daily scheduled reconciliation by setting `BEDS24_FINANCE_SYNC_ENABLED=true`. `BEDS24_CHANNEL_MANAGER_ENABLED=false` and `UNIFIED_MESSAGING_AI_AUTO_SEND_ENABLED=false` remain deliberate safety boundaries. Provider secrets remain server-only.
 
 ## v5.11.70 — Taoedge Insights V2, Guest Documents & TM30, Finance Reports
 

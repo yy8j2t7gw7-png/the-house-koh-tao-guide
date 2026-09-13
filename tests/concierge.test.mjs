@@ -87,6 +87,7 @@ import {
   buildAnalyticsPayload,
   handleMobileLicenseAdminRequest,
   handleMobilePlatformRequest,
+  mobileIntegrationHealth,
   mobilePlatformConfiguration
 } from "../src/mobile-platform.js";
 import knowledge from "../public/data/concierge-knowledge.json" with { type: "json" };
@@ -14078,7 +14079,7 @@ test("v5.11.56 Beds24 channel-manager source contract keeps central protection a
 });
 
 
-test("v5.11.57 Beds24 finance sync is deliberately disabled by default and requires financial access plus all 11 room mappings", async () => {
+test("Beds24 finance configuration defaults fail-closed while the validated House deployment enables scheduled sync", async () => {
   assert.equal(beds24FinanceSyncEnabled({}), false);
   const roomMap = JSON.stringify(Object.fromEntries(Array.from({ length: 11 }, (_, index) => [String(99301 + index), String(index + 1)])));
   const disabled = beds24FinanceSyncConfiguration({ BEDS24_FINANCE_SYNC_ENABLED: "false", BEDS24_REFRESH_TOKEN: "refresh", BEDS24_ROOM_MAP: roomMap });
@@ -14089,7 +14090,7 @@ test("v5.11.57 Beds24 finance sync is deliberately disabled by default and requi
   assert.equal(ready.channel, "Airbnb");
   assert.deepEqual(ready.requiredBeds24Scopes, ["read:bookings", "read:bookings-financial"]);
   const wrangler = await readFile(new URL("../wrangler.jsonc", import.meta.url), "utf8");
-  assert.match(wrangler, /"BEDS24_FINANCE_SYNC_ENABLED": "false"/);
+  assert.match(wrangler, /"BEDS24_FINANCE_SYNC_ENABLED": "true"/);
   assert.doesNotMatch(wrangler, /BEDS24_REFRESH_TOKEN/);
 });
 
@@ -14226,7 +14227,7 @@ test("v5.11.57 provider-managed Beds24 income cannot be manually deleted from Fi
   assert.equal(store.incomeRecords.length, 1);
 });
 
-test("v5.11.57 Finance UI and scheduler expose safe Airbnb payout automation without enabling it", async () => {
+test("Finance UI and scheduler expose Airbnb payout automation with the validated House deployment enabled", async () => {
   const [html, js, indexSource, financeSource, storeSource, wrangler] = await Promise.all([
     readFile(new URL("../public/concierge-admin.html", import.meta.url), "utf8"),
     readFile(new URL("../public/concierge-admin.js", import.meta.url), "utf8"),
@@ -14243,7 +14244,7 @@ test("v5.11.57 Finance UI and scheduler expose safe Airbnb payout automation wit
   assert.match(financeSource, /beds24FinanceSyncConfiguration/);
   assert.match(storeSource, /income_records_provider_external/);
   assert.match(storeSource, /income_provider_updated/);
-  assert.match(wrangler, /"BEDS24_FINANCE_SYNC_ENABLED": "false"/);
+  assert.match(wrangler, /"BEDS24_FINANCE_SYNC_ENABLED": "true"/);
   assert.match(wrangler, /"BEDS24_CHANNEL_MANAGER_ENABLED": "false"/);
   assert.match(wrangler, /"UNIFIED_MESSAGING_AI_AUTO_SEND_ENABLED": "false"/);
 });
@@ -14342,13 +14343,13 @@ test("v5.11.58 Worker routes mobile traffic before normal static handling and ke
   assert.match(wrangler, /"namespace_id": "550004"/);
 });
 
-test("v5.11.58 mobile secrets remain uncommitted and existing production safety flags stay false", async () => {
+test("mobile secrets remain uncommitted while Finance sync is enabled and higher-risk controls stay staged", async () => {
   const wrangler = await readFile(new URL("../wrangler.jsonc", import.meta.url), "utf8");
   for (const secret of ["MOBILE_BOOTSTRAP_TOKEN", "MOBILE_PASSWORD_PEPPER", "MOBILE_SESSION_PEPPER", "MOBILE_INVITE_PEPPER", "BEDS24_REFRESH_TOKEN", "BEDS24_WEBHOOK_TOKEN", "UNIFIED_MESSAGING_INTERNAL_TOKEN"]) {
     assert.doesNotMatch(wrangler, new RegExp(`"${secret}"\\s*:`));
   }
   assert.match(wrangler, /"BEDS24_CHANNEL_MANAGER_ENABLED": "false"/);
-  assert.match(wrangler, /"BEDS24_FINANCE_SYNC_ENABLED": "false"/);
+  assert.match(wrangler, /"BEDS24_FINANCE_SYNC_ENABLED": "true"/);
   assert.match(wrangler, /"UNIFIED_MESSAGING_AI_AUTO_SEND_ENABLED": "false"/);
 });
 
@@ -14491,14 +14492,49 @@ test("v5.11.61 direct WhatsApp guest initiation uses a server-side approved temp
   assert.match(wrangler, /"WHATSAPP_GUEST_INIT_TEMPLATE_NAME": ""/);
 });
 
-test("v5.11.62 preserves validated mobile license/device enforcement while high-impact provider automation stays staged", async () => {
+test("v5.11.72 mobile integration health separates provider access, automation and WhatsApp capabilities", () => {
+  const roomMap = JSON.stringify(Object.fromEntries(Array.from({ length: 11 }, (_, index) => [String(88001 + index), String(index + 1)])));
+  const health = mobileIntegrationHealth({
+    CONCIERGE_STORE: {},
+    RESERVATION_SYNC_TOKEN: "reservation-sync",
+    STAY_TOKEN_PEPPER: "pepper",
+    UNIFIED_MESSAGING_ENABLED: "true",
+    UNIFIED_MESSAGING_AI_REPLY_ENABLED: "true",
+    UNIFIED_MESSAGING_AI_AUTO_SEND_ENABLED: "false",
+    UNIFIED_MESSAGING_INTERNAL_TOKEN: "internal",
+    BEDS24_REFRESH_TOKEN: "refresh",
+    BEDS24_WEBHOOK_TOKEN: "webhook",
+    BEDS24_ROOM_MAP: roomMap,
+    BEDS24_FINANCE_SYNC_ENABLED: "true",
+    BEDS24_CHANNEL_MANAGER_ENABLED: "false",
+    WHATSAPP_ACCESS_TOKEN: "meta",
+    WHATSAPP_PHONE_NUMBER_ID: "123456789",
+    WHATSAPP_WEBHOOK_VERIFY_TOKEN: "verify",
+    META_APP_SECRET: "app-secret",
+    WHATSAPP_GUEST_INIT_TEMPLATE_NAME: "guest_start",
+    WHATSAPP_GUEST_INIT_TEMPLATE_LANGUAGE: "en_US"
+  });
+  assert.equal(health.beds24.status, "connected");
+  assert.equal(health.beds24.otaMessagingReady, true);
+  assert.equal(health.beds24.channelManagerEnabled, false);
+  assert.equal(health.unifiedMessaging.status, "connected");
+  assert.equal(health.unifiedMessaging.aiAutoSendEnabled, false);
+  assert.equal(health.financeAutomation.status, "active");
+  assert.equal(health.financeAutomation.ready, true);
+  assert.equal(health.whatsapp.status, "connected");
+  assert.equal(health.whatsapp.webhookReady, true);
+  assert.equal(health.whatsapp.guestInitiationReady, true);
+  assert.equal(health.channelManager.status, "off");
+});
+
+test("validated mobile enforcement stays active while Finance sync is enabled and channel-manager/AI auto-send stay staged", async () => {
   const wrangler = await readFile(new URL("../wrangler.jsonc", import.meta.url), "utf8");
   assert.match(wrangler, /"MOBILE_APP_ENABLED": "true"/);
   assert.match(wrangler, /"MOBILE_BOOTSTRAP_ENABLED": "false"/);
   assert.match(wrangler, /"MOBILE_LICENSE_ENFORCEMENT_ENABLED": "true"/);
   assert.match(wrangler, /"MOBILE_DEVICE_BINDING_ENABLED": "true"/);
   assert.match(wrangler, /"BEDS24_CHANNEL_MANAGER_ENABLED": "false"/);
-  assert.match(wrangler, /"BEDS24_FINANCE_SYNC_ENABLED": "false"/);
+  assert.match(wrangler, /"BEDS24_FINANCE_SYNC_ENABLED": "true"/);
   assert.match(wrangler, /"UNIFIED_MESSAGING_AI_AUTO_SEND_ENABLED": "false"/);
 });
 

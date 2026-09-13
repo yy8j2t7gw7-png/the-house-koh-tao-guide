@@ -86,6 +86,68 @@ function json(data, status = 200, extraHeaders = {}) {
   });
 }
 
+function enabledFlag(value) {
+  return String(value || "false").toLowerCase() === "true";
+}
+
+export function mobileIntegrationHealth(env = {}) {
+  const integrations = integrationAdminOverview(env);
+  const messaging = unifiedMessagingConfiguration(env);
+  const finance = beds24FinanceSyncConfiguration(env);
+  const guestWhatsApp = whatsAppGuestInitiationConfiguration(env);
+  const channelManagerEnabled = enabledFlag(env.BEDS24_CHANNEL_MANAGER_ENABLED);
+  const airbnbReservation = Array.isArray(integrations?.providers)
+    ? integrations.providers.find((item) => item?.id === "airbnb")
+    : null;
+
+  const beds24Connected = Boolean(messaging.beds24Ready);
+  const unifiedMessagingConnected = Boolean(messaging.enabled && (messaging.beds24Ready || messaging.whatsAppReady));
+  const whatsAppOutboundConnected = Boolean(guestWhatsApp.whatsAppReady);
+
+  return {
+    beds24: {
+      status: beds24Connected ? "connected" : "needs_setup",
+      connected: beds24Connected,
+      roomMapConfigured: Boolean(messaging.roomMapConfigured),
+      otaMessagingReady: Boolean(messaging.otaViaBeds24Ready),
+      channelManagerEnabled
+    },
+    reservationFeed: {
+      status: airbnbReservation?.status || "not_connected",
+      connected: airbnbReservation?.status === "connected",
+      source: "existing_house_airbnb_sync"
+    },
+    unifiedMessaging: {
+      status: unifiedMessagingConnected ? "connected" : (messaging.enabled ? "needs_setup" : "off"),
+      connected: unifiedMessagingConnected,
+      enabled: Boolean(messaging.enabled),
+      aiReplyReady: Boolean(messaging.aiReplyReady),
+      aiAutoSendEnabled: Boolean(messaging.aiAutoSendEnabled)
+    },
+    financeAutomation: {
+      status: finance.ready ? "active" : (finance.enabled ? "needs_setup" : (finance.historicalImportReady ? "prepared" : "needs_setup")),
+      connected: Boolean(finance.ready),
+      enabled: Boolean(finance.enabled),
+      ready: Boolean(finance.ready),
+      historicalImportReady: Boolean(finance.historicalImportReady),
+      channel: finance.channel,
+      schedule: finance.schedule
+    },
+    whatsapp: {
+      status: whatsAppOutboundConnected ? "connected" : "needs_setup",
+      connected: whatsAppOutboundConnected,
+      webhookReady: Boolean(messaging.whatsAppReady),
+      guestInitiationReady: Boolean(guestWhatsApp.ready),
+      guestTemplateConfigured: Boolean(guestWhatsApp.templateConfigured),
+      guestTemplateLanguage: guestWhatsApp.language
+    },
+    channelManager: {
+      status: channelManagerEnabled ? "active" : "off",
+      enabled: channelManagerEnabled
+    }
+  };
+}
+
 function privateMobileFile(object, record, filename) {
   const headers = new Headers({
     "content-type": cleanText(record?.mediaType, 80) || "application/octet-stream",
@@ -1732,6 +1794,8 @@ async function handleProtected(request, env, path, store, handlers = {}) {
     const integrationAllowed = hasPermission(publicAccess, "integrations.view") && hasModule(publicAccess, "integrations");
     const messagingAllowed = hasPermission(publicAccess, "messaging.view") && hasModule(publicAccess, "unified_messaging");
     const financeAllowed = hasPermission(publicAccess, "finance.view") && hasModule(publicAccess, "finance");
+    const connectionHealth = integrationAllowed ? mobileIntegrationHealth(env) : undefined;
+    if (connectionHealth && !financeAllowed) delete connectionHealth.financeAutomation;
     return json({
       ok: true,
       identity: publicIdentity(record, access.properties, access.entitlements, access.modules),
@@ -1739,6 +1803,7 @@ async function handleProtected(request, env, path, store, handlers = {}) {
       integrations: integrationAllowed ? integrationAdminOverview(env) : undefined,
       messaging: messagingAllowed ? unifiedMessagingConfiguration(env) : undefined,
       financeAutomation: financeAllowed ? beds24FinanceSyncConfiguration(env) : undefined,
+      connectionHealth,
       product: {
         workingName: "Taoedge Owner App",
         commercialBrandPending: true,

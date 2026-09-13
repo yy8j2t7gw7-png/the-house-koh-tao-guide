@@ -1,12 +1,13 @@
-## 5.11.71
-
-- Adds trusted adjacent-reservation context for provider/mobile Concierge conversations.
-- Resolves today/tomorrow and between-checkout/check-in timing in Asia/Bangkok before applying office/housekeeping weekday rules.
-- Makes informational luggage guidance reservation-chain aware, including same-day room moves.
-- Keeps owner-edited one-off exceptions out of permanent approved knowledge unless explicitly saved through a future knowledge-management action.
-- Preserves review-only draft generation, centralized staff routing, Insights V2, TM30 and Finance export behavior.
-
 # Changelog
+
+## v5.11.72 — Integration health correction + Finance automation activation
+
+- Add server-owned mobile connection-health status for Beds24, Unified Messaging, Finance automation, WhatsApp and the Beds24 Channel Manager.
+- Separate provider read/messaging connectivity from channel-manager authority so working OTA conversations are no longer shown as merely Prepared.
+- Report WhatsApp outbound/API readiness separately from inbound webhook and approved guest-initiation-template readiness.
+- Enable `BEDS24_FINANCE_SYNC_ENABLED=true` after the House live reconciliation checks were accepted.
+- Keep `BEDS24_CHANNEL_MANAGER_ENABLED=false` and `UNIFIED_MESSAGING_AI_AUTO_SEND_ENABLED=false`.
+- Keep credentials and provider secrets server-side; only capability booleans/status values reach the mobile client.
 
 ## v5.11.70 — Insights V2, Guest Documents & TM30, Finance reports
 

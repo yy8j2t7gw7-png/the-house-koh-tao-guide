@@ -14722,3 +14722,18 @@ test("v5.11.64 booking activity persists notes/tasks and mirrors protected alert
     "dispatchConciergeAlert"
   ]) assert.match(mobileSource, new RegExp(contract.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
 });
+
+test("v5.11.65 mobile booking detail exposes rich provider metadata behind financial permissions", async () => {
+  const mobileSource = await readFile(new URL("../src/mobile-platform.js", import.meta.url), "utf8");
+  for (const contract of [
+    "providerReference",
+    "beds24BookingId",
+    "bookingPrice",
+    "bookingCurrency",
+    "guestCount",
+    "reservationNightCount",
+    'hasPermission(publicAccess, "finance.view")'
+  ]) assert.match(mobileSource, new RegExp(contract.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  assert.match(mobileSource, /canSeeBookingFinancials/);
+  assert.match(mobileSource, /role !== "staff"/);
+});

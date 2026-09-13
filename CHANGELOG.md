@@ -1,5 +1,12 @@
 # Changelog
 
+## v5.11.65 — Rich booking detail metadata
+
+- expose nights and guest-count metadata on protected booking detail
+- expose OTA/provider reference and Beds24 booking ID to non-staff roles
+- expose gross booking value only when `finance.view` is granted
+- preserve v5.11.64 reservation activity and staff task workflow
+
 ## v5.11.64 — Booking activity & staff task workflow
 
 - Added a persistent `reservation_activity` ledger for internal booking notes and operational tasks.

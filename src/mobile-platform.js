@@ -374,6 +374,41 @@ function beds24GuestPhone(booking = {}) {
   return "";
 }
 
+function finiteBookingNumber(...values) {
+  for (const value of values) {
+    if (value === "" || value === null || value === undefined) continue;
+    const number = Number(value);
+    if (Number.isFinite(number)) return number;
+  }
+  return 0;
+}
+
+function optionalBookingNumber(...values) {
+  for (const value of values) {
+    if (value === "" || value === null || value === undefined) continue;
+    const number = Number(value);
+    if (Number.isFinite(number)) return number;
+  }
+  return undefined;
+}
+
+function beds24GuestCounts(booking = {}) {
+  const guests = Array.isArray(booking.guests) ? booking.guests : [];
+  const adults = Math.max(0, Math.round(finiteBookingNumber(booking.numAdult, booking.numAdults, booking.adults, booking.adultCount)));
+  const children = Math.max(0, Math.round(finiteBookingNumber(booking.numChild, booking.numChildren, booking.children, booking.childCount)));
+  let total = adults + children;
+  if (!total) total = Math.max(0, Math.round(finiteBookingNumber(booking.numGuests, booking.guestCount, booking.guestsCount, guests.length)));
+  return { adults, children, total };
+}
+
+function reservationNightCount(checkInDate, checkOutDate) {
+  if (!validDate(checkInDate) || !validDate(checkOutDate)) return 0;
+  const start = Date.parse(`${checkInDate}T00:00:00Z`);
+  const end = Date.parse(`${checkOutDate}T00:00:00Z`);
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return 0;
+  return Math.max(0, Math.round((end - start) / 86_400_000));
+}
+
 function maskedPhone(value) {
   const phone = String(value || "").replace(/\D/g, "");
   return phone.length >= 8 ? `•••• ${phone.slice(-4)}` : "";
@@ -409,13 +444,35 @@ async function enrichReservationsWithBeds24GuestContacts(reservations, env, stor
       const arrival = cleanText(booking?.arrival, 10);
       const departure = cleanText(booking?.departure, 10);
       if (!room || !validDate(arrival) || !validDate(departure)) continue;
+      const guestCounts = beds24GuestCounts(booking);
       contacts.set(reservationWindowKey(room, arrival, departure), {
-        name: beds24GuestDisplayName(booking), phone: beds24GuestPhone(booking), beds24BookingId: String(booking.id || "")
+        name: beds24GuestDisplayName(booking),
+        phone: beds24GuestPhone(booking),
+        beds24BookingId: String(booking.id || ""),
+        providerReference: cleanText(booking.apiReference || booking.reference || booking.channelReference || booking.bookingReference, 120),
+        bookingPrice: optionalBookingNumber(booking.price, booking.totalPrice, booking.bookingPrice),
+        bookingCommission: optionalBookingNumber(booking.commission),
+        bookingCurrency: cleanText(booking.currency || env.EXPENSE_CURRENCY || "THB", 8).toUpperCase(),
+        adults: guestCounts.adults,
+        children: guestCounts.children,
+        guestCount: guestCounts.total
       });
     }
     return source.map((item) => {
       const contact = contacts.get(reservationWindowKey(item.room, item.checkInDate, item.checkOutDate));
-      return contact ? { ...item, ...(contact.name ? { guestDisplayName: contact.name } : {}), ...(contact.phone ? { guestPhone: contact.phone } : {}), beds24BookingId: contact.beds24BookingId } : item;
+      return contact ? {
+        ...item,
+        ...(contact.name ? { guestDisplayName: contact.name } : {}),
+        ...(contact.phone ? { guestPhone: contact.phone } : {}),
+        beds24BookingId: contact.beds24BookingId,
+        providerReference: contact.providerReference,
+        bookingPrice: contact.bookingPrice,
+        bookingCommission: contact.bookingCommission,
+        bookingCurrency: contact.bookingCurrency,
+        adults: contact.adults,
+        children: contact.children,
+        guestCount: contact.guestCount
+      } : item;
     });
   } catch (_error) {
     return source;
@@ -432,7 +489,10 @@ function providerLabel(provider) {
   return labels[value] || (value ? value.charAt(0).toUpperCase() + value.slice(1) : "Other");
 }
 
-function publicReservation(item, role) {
+function publicReservation(item, role, options = {}) {
+  const canSeeBookingFinancials = Boolean(options.canSeeBookingFinancials) && role !== "staff";
+  const canSeeProviderReference = role !== "staff";
+  const hasBookingPrice = item.bookingPrice !== undefined && item.bookingPrice !== null && item.bookingPrice !== "" && Number.isFinite(Number(item.bookingPrice));
   return {
     id: item.id,
     provider: item.provider,
@@ -441,11 +501,19 @@ function publicReservation(item, role) {
     guestName: reservationGuestDisplayName(item, role),
     checkInDate: item.checkInDate,
     checkOutDate: item.checkOutDate,
+    nights: reservationNightCount(item.checkInDate, item.checkOutDate),
     status: item.status,
     registrationStatus: item.registrationStatus || "not_started",
     guestType: role === "staff" ? "" : item.guestType || "",
     requiredPassports: role === "staff" ? undefined : Number(item.requiredPassports) || 0,
     receivedPassports: role === "staff" ? undefined : Number(item.receivedPassports) || 0,
+    adults: Math.max(0, Number(item.adults) || 0),
+    children: Math.max(0, Number(item.children) || 0),
+    guestCount: Math.max(0, Number(item.guestCount) || 0),
+    providerReference: canSeeProviderReference ? cleanText(item.providerReference, 120) : "",
+    beds24BookingId: canSeeProviderReference ? cleanText(item.beds24BookingId, 40) : "",
+    bookingPrice: canSeeBookingFinancials && hasBookingPrice ? Math.max(0, Number(item.bookingPrice)) : undefined,
+    bookingCurrency: canSeeBookingFinancials && hasBookingPrice ? cleanText(item.bookingCurrency || "THB", 8).toUpperCase() : "",
     lateCheckoutTime: item.lateCheckoutTime || "",
     lateCheckoutFeeThb: role === "owner" ? Number(item.lateCheckoutFeeThb) || 0 : undefined,
     whatsAppAvailable: role === "staff" ? false : Boolean(item.guestPhone),
@@ -772,7 +840,12 @@ async function handleProtected(request, env, path, store) {
     if (!raw) return json({ error: "reservation_not_found" }, 404);
     const enriched = (await enrichReservationsWithBeds24GuestContacts([raw], env, store, raw.checkInDate, raw.checkOutDate))[0] || raw;
     const activity = (await store.mobileListReservationActivity(id, 160)).map(publicReservationActivity);
-    return json({ ok: true, reservation: publicReservation(enriched, record.role), activity, taskAssignments: publicTaskAssignments(env) });
+    return json({
+      ok: true,
+      reservation: publicReservation(enriched, record.role, { canSeeBookingFinancials: hasPermission(publicAccess, "finance.view") }),
+      activity,
+      taskAssignments: publicTaskAssignments(env)
+    });
   }
 
   if (path === `${MOBILE_API_PREFIX}/bookings/activity` && request.method === "POST") {

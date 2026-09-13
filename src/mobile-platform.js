@@ -1,6 +1,6 @@
 import { HOUSE_FINANCE_BUSINESS_ID } from "./finance-businesses.js";
 import { expenseConfiguration, handleExpenseAdminRequest } from "./expense-api.js";
-import { incomeConfiguration, summarizeFinance } from "./finance-api.js";
+import { financeReportCsv, incomeConfiguration, summarizeFinance } from "./finance-api.js";
 import { beds24FinanceSyncConfiguration, reconcileBeds24FinanceRange } from "./beds24-finance-sync.js";
 import { integrationAdminOverview } from "./integration-catalog.js";
 import { beds24ApiRequest, handleUnifiedMessagingAdminRequest, openBeds24ReservationConversation, reviewMessagingDraft, roomForBeds24Booking, startWhatsAppGuestConversation, unifiedMessagingConfiguration, whatsAppGuestInitiationConfiguration } from "./unified-messaging.js";
@@ -84,6 +84,20 @@ function json(data, status = 200, extraHeaders = {}) {
       ...extraHeaders
     }
   });
+}
+
+function privateMobileFile(object, record, filename) {
+  const headers = new Headers({
+    "content-type": cleanText(record?.mediaType, 80) || "application/octet-stream",
+    "content-disposition": `attachment; filename="${String(filename || "download.bin").replace(/["\r\n]/g, "")}"`,
+    "cache-control": "no-store, max-age=0",
+    "content-security-policy": "default-src 'none'; sandbox",
+    "cross-origin-resource-policy": "same-origin",
+    "referrer-policy": "no-referrer",
+    "x-content-type-options": "nosniff",
+    "x-frame-options": "DENY"
+  });
+  return new Response(object.body, { status: 200, headers });
 }
 
 function cleanText(value, maximum = 500) {
@@ -371,14 +385,16 @@ function dateSpanDays(from, to) {
 export function analyticsRange(value) {
   const today = bangkokDate();
   const key = ["month", "30d", "90d"].includes(cleanText(value, 12).toLowerCase()) ? cleanText(value, 12).toLowerCase() : "30d";
-  let from = key === "month" ? `${today.slice(0, 7)}-01` : shiftedDateOnly(today, key === "90d" ? -89 : -29);
+  const from = key === "month" ? `${today.slice(0, 7)}-01` : shiftedDateOnly(today, key === "90d" ? -89 : -29);
   const to = today;
   const days = dateSpanDays(from, to);
   const previousTo = shiftedDateOnly(from, -1);
   const previousFrom = shiftedDateOnly(previousTo, -(days - 1));
   const forwardFrom = today;
-  const forwardTo = shiftedDateOnly(today, 29);
-  return { key, from, to, days, previousFrom, previousTo, forwardFrom, forwardTo };
+  const forward30To = shiftedDateOnly(today, 29);
+  const forward60To = shiftedDateOnly(today, 59);
+  const forward90To = shiftedDateOnly(today, 89);
+  return { key, from, to, days, previousFrom, previousTo, forwardFrom, forward30To, forward60To, forward90To, forwardTo: forward30To };
 }
 
 function overlapNights(reservation, from, to) {
@@ -454,7 +470,9 @@ function reservationWindowStats(reservations, from, to, roomsTotal) {
     channels: [...channels.values()].map((item) => ({
       ...item,
       bookingSharePercent: percent(item.bookings, totalBookings),
-      nightSharePercent: percent(item.nights, totalConfirmedNights)
+      nightSharePercent: percent(item.nights, totalConfirmedNights),
+      cancellationRate: percent(item.cancellations, item.bookings),
+      averageStayNights: item.confirmedBookings ? round1(item.nights / item.confirmedBookings) : 0
     })).sort((a, b) => b.nights - a.nights || b.bookings - a.bookings)
   };
 }
@@ -462,13 +480,58 @@ function reservationWindowStats(reservations, from, to, roomsTotal) {
 function analyticsWeeklyBuckets(reservations, from, to, roomsTotal) {
   const output = [];
   let cursor = from;
-  while (cursor <= to && output.length < 6) {
+  while (cursor <= to && output.length < 14) {
     const bucketTo = shiftedDateOnly(cursor, 6) < to ? shiftedDateOnly(cursor, 6) : to;
     const stats = reservationWindowStats(reservations, cursor, bucketTo, roomsTotal);
     output.push({ from: cursor, to: bucketTo, occupancyPercent: stats.occupancyPercent, roomNights: stats.roomNights, arrivals: stats.arrivals, departures: stats.departures });
     cursor = shiftedDateOnly(bucketTo, 1);
   }
   return output;
+}
+
+function bangkokDateFromIso(value) {
+  const date = new Date(String(value || ""));
+  if (!Number.isFinite(date.getTime())) return "";
+  const parts = Object.fromEntries(new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Bangkok", year: "numeric", month: "2-digit", day: "2-digit"
+  }).formatToParts(date).filter((part) => part.type !== "literal").map((part) => [part.type, part.value]));
+  return `${parts.year}-${parts.month}-${parts.day}`;
+}
+
+function analyticsPickup(reservations, today, forwardTo) {
+  const source = (Array.isArray(reservations) ? reservations : []).filter((item) => item.status === "confirmed" && item.checkInDate >= today && item.checkInDate <= forwardTo);
+  const window = (days) => {
+    const from = shiftedDateOnly(today, -(days - 1));
+    const seen = source.filter((item) => {
+      const firstSeen = bangkokDateFromIso(item.createdAt);
+      return firstSeen && firstSeen >= from && firstSeen <= today;
+    });
+    return { days, bookings: seen.length, roomNights: seen.reduce((sum, item) => sum + fullStayNights(item), 0) };
+  };
+  return {
+    firstSeen1d: window(1),
+    firstSeen7d: window(7),
+    firstSeen14d: window(14),
+    note: "Pickup uses the date a reservation was first seen by Taoedge. For historical backfills this may differ from the original OTA booking timestamp."
+  };
+}
+
+function buildOperationalRates(operations) {
+  const maintenanceCreated = Number(operations?.maintenance?.created) || 0;
+  const maintenanceResolved = Number(operations?.maintenance?.resolved) || 0;
+  const turnovers = Number(operations?.housekeeping?.turnovers) || 0;
+  const ready = Number(operations?.housekeeping?.ready) || 0;
+  const requests = Number(operations?.concierge?.requests) || 0;
+  const handoffs = Number(operations?.concierge?.needsHuman) || 0;
+  const positive = Number(operations?.concierge?.feedbackPositive) || 0;
+  const negative = Number(operations?.concierge?.feedbackNegative) || 0;
+  const feedback = positive + negative;
+  return {
+    maintenanceResolutionRate: percent(maintenanceResolved, maintenanceCreated),
+    roomReadyRate: percent(ready, turnovers),
+    handoffRate: percent(handoffs, requests),
+    conciergeHelpfulnessRate: feedback ? percent(positive, feedback) : null
+  };
 }
 
 function buildAnalyticsAttention({ current, previous, forward, operations, finance, rooms }) {
@@ -498,7 +561,10 @@ function buildAnalyticsAttention({ current, previous, forward, operations, finan
 export function buildAnalyticsPayload({ range, reservations, roomsTotal, operations, finance }) {
   const current = reservationWindowStats(reservations, range.from, range.to, roomsTotal);
   const previous = reservationWindowStats(reservations, range.previousFrom, range.previousTo, roomsTotal);
-  const forward = reservationWindowStats(reservations, range.forwardFrom, range.forwardTo, roomsTotal);
+  const forward30 = reservationWindowStats(reservations, range.forwardFrom, range.forward30To || range.forwardTo, roomsTotal);
+  const forward60 = reservationWindowStats(reservations, range.forwardFrom, range.forward60To || shiftedDateOnly(range.forwardFrom, 59), roomsTotal);
+  const forward90 = reservationWindowStats(reservations, range.forwardFrom, range.forward90To || shiftedDateOnly(range.forwardFrom, 89), roomsTotal);
+  const forward = forward30;
   const roomMap = new Map(Array.from({ length: roomsTotal }, (_, index) => [String(index + 1), {
     room: String(index + 1), occupiedNights: 0, occupancyPercent: 0, arrivals: 0, departures: 0, cancellations: 0,
     maintenanceIssues: 0, turnovers: 0, averageTurnaroundMinutes: 0, netIncome: 0, operatingResult: 0
@@ -531,7 +597,11 @@ export function buildAnalyticsPayload({ range, reservations, roomsTotal, operati
       roomMap.get(room).operatingResult += Number(value?.operatingResult) || 0;
     }
   }
-  const rooms = [...roomMap.values()].map((item) => ({ ...item, occupancyPercent: percent(item.occupiedNights, current.days) }));
+  const rooms = [...roomMap.values()].map((item) => ({
+    ...item,
+    occupancyPercent: percent(item.occupiedNights, current.days),
+    netIncomePerOccupiedNight: item.occupiedNights > 0 ? round1(item.netIncome / item.occupiedNights) : 0
+  }));
   const attention = buildAnalyticsAttention({ current, previous, forward, operations, finance, rooms });
   const financePayload = finance ? {
     ...finance,
@@ -539,6 +609,13 @@ export function buildAnalyticsPayload({ range, reservations, roomsTotal, operati
       netIncomePercent: percentChange(finance.totals?.netIncome, finance.comparisonTotals?.netIncome),
       operatingResultPercent: percentChange(finance.totals?.operatingResult, finance.comparisonTotals?.operatingResult),
       expensesPercent: percentChange(finance.totals?.expenses, finance.comparisonTotals?.expenses)
+    },
+    efficiency: {
+      feeRatePercent: percent(finance.totals?.fees, finance.totals?.grossIncome),
+      settledSharePercent: percent(finance.totals?.settledNetIncome, finance.totals?.netIncome),
+      ledgerNetPerOccupiedNight: current.roomNights ? round1((Number(finance.totals?.netIncome) || 0) / current.roomNights) : 0,
+      operatingResultPerAvailableRoomNight: current.availableRoomNights ? round1((Number(finance.totals?.operatingResult) || 0) / current.availableRoomNights) : 0,
+      note: "Ledger efficiency compares Finance entries dated in the selected period with occupied room nights. It is not ADR or RevPAR; those require canonical stay-level revenue attribution."
     }
   } : null;
   return {
@@ -560,16 +637,27 @@ export function buildAnalyticsPayload({ range, reservations, roomsTotal, operati
     },
     forward: {
       from: range.forwardFrom,
-      to: range.forwardTo,
-      occupancyPercent: forward.occupancyPercent,
-      roomNights: forward.roomNights,
-      arrivals: forward.arrivals,
-      departures: forward.departures,
-      weekly: analyticsWeeklyBuckets(reservations, range.forwardFrom, range.forwardTo, roomsTotal)
+      to: range.forward30To || range.forwardTo,
+      occupancyPercent: forward30.occupancyPercent,
+      roomNights: forward30.roomNights,
+      arrivals: forward30.arrivals,
+      departures: forward30.departures,
+      weekly: analyticsWeeklyBuckets(reservations, range.forwardFrom, range.forward30To || range.forwardTo, roomsTotal),
+      horizons: [
+        { days: 30, to: range.forward30To || range.forwardTo, occupancyPercent: forward30.occupancyPercent, roomNights: forward30.roomNights, arrivals: forward30.arrivals },
+        { days: 60, to: range.forward60To || shiftedDateOnly(range.forwardFrom, 59), occupancyPercent: forward60.occupancyPercent, roomNights: forward60.roomNights, arrivals: forward60.arrivals },
+        { days: 90, to: range.forward90To || shiftedDateOnly(range.forwardFrom, 89), occupancyPercent: forward90.occupancyPercent, roomNights: forward90.roomNights, arrivals: forward90.arrivals }
+      ]
     },
+    trend: {
+      current: analyticsWeeklyBuckets(reservations, range.from, range.to, roomsTotal),
+      previous: analyticsWeeklyBuckets(reservations, range.previousFrom, range.previousTo, roomsTotal)
+    },
+    pickup: analyticsPickup(reservations, range.to, range.forward90To || shiftedDateOnly(range.to, 89)),
     channels: current.channels,
     rooms,
     operations,
+    operationalRates: buildOperationalRates(operations),
     finance: financePayload,
     attention,
     dataQuality: {
@@ -577,7 +665,10 @@ export function buildAnalyticsPayload({ range, reservations, roomsTotal, operati
       resolvedMaintenanceHistoryDays: 30,
       conciergeHistoryDays: 30,
       operationsHistoryComplete: range.days <= 30,
-      note: range.days > 30 ? "Resolved maintenance and Concierge interaction/feedback records are retained for about 30 days, so those older operational signals may be incomplete. Reservation and Finance metrics use their own retained source records." : "Operational and Concierge history are within their current 30-day retention windows."
+      adrRevparReady: false,
+      otaBookingTimestampReady: false,
+      note: range.days > 30 ? "Resolved maintenance and Concierge interaction/feedback records are retained for about 30 days, so those older operational signals may be incomplete. Reservation and Finance metrics use their own retained source records." : "Operational and Concierge history are within their current 30-day retention windows.",
+      revenueMetricNote: "Taoedge does not label ledger income per occupied night as ADR or RevPAR. True ADR/RevPAR will activate after stay-level booking revenue is stored canonically across every channel."
     }
   };
 }
@@ -1332,13 +1423,73 @@ async function handleProtected(request, env, path, store, handlers = {}) {
     return json(outcome || { error: "draft_review_failed" }, status);
   }
 
+  if (path === `${MOBILE_API_PREFIX}/guest-documents` && request.method === "GET") {
+    const denied = requireCapability(publicAccess, "guest_documents.view", "guest_registration");
+    if (denied) return denied;
+    if (typeof store.mobileListGuestDocuments !== "function") return json({ error: "guest_documents_unavailable" }, 503);
+    const documents = await store.mobileListGuestDocuments(250);
+    const safe = documents.map((item) => ({
+      id: item.id, room: item.room, documentType: item.documentType === "thai_id" ? "thai_id" : "passport",
+      mediaType: item.mediaType, extension: item.extension, sizeBytes: Number(item.sizeBytes) || 0,
+      uploadedAt: item.uploadedAt, deleteAfter: item.deleteAfter, tm30RegisteredAt: item.tm30RegisteredAt || "",
+      reservationId: item.reservationId || "", guestFirstName: item.guestFirstName || "", provider: item.provider || "",
+      checkInDate: item.checkInDate || "", checkOutDate: item.checkOutDate || "", registrationStatus: item.registrationStatus || "not_started"
+    }));
+    return json({
+      ok: true,
+      documents: safe,
+      summary: {
+        passports: safe.filter((item) => item.documentType === "passport").length,
+        tm30Pending: safe.filter((item) => item.documentType === "passport" && !item.tm30RegisteredAt).length,
+        tm30Registered: safe.filter((item) => item.documentType === "passport" && item.tm30RegisteredAt).length,
+        thaiIds: safe.filter((item) => item.documentType === "thai_id").length
+      }
+    });
+  }
+
+  const guestDocumentFileMatch = path.match(/^\/api\/mobile\/v1\/guest-documents\/(pass_[A-Za-z0-9-]{20,80})\/file$/);
+  if (guestDocumentFileMatch && request.method === "GET") {
+    const denied = requireCapability(publicAccess, "guest_documents.view", "guest_registration");
+    if (denied) return denied;
+    if (!env.PASSPORT_UPLOADS?.get) return json({ error: "guest_documents_unavailable" }, 503);
+    const document = await store.getPassportUpload(guestDocumentFileMatch[1]);
+    if (!document || document.status !== "uploaded" || !document.objectKey) return json({ error: "not_found" }, 404);
+    if (document.deleteAfter && Date.parse(document.deleteAfter) <= Date.now()) return json({ error: "not_found" }, 404);
+    const object = await env.PASSPORT_UPLOADS.get(document.objectKey);
+    if (!object?.body) return json({ error: "not_found" }, 404);
+    const datePart = String(document.uploadedAt || "").slice(0, 10) || "document";
+    const typePart = document.documentType === "thai_id" ? "thai-id" : "passport";
+    const filename = `${typePart}-room-${document.room || "unknown"}-${datePart}.${document.extension || "bin"}`;
+    await store.mobileRecordAudit({
+      tenantId: record.tenantId, userId: record.userId, membershipId: record.membershipId,
+      action: "guest_document_downloaded", reference: `passport:${document.id}`, metadata: { documentType: document.documentType, room: document.room }, createdAt: access.now
+    });
+    return privateMobileFile(object, document, filename);
+  }
+
+  const guestDocumentTm30Match = path.match(/^\/api\/mobile\/v1\/guest-documents\/(pass_[A-Za-z0-9-]{20,80})\/tm30$/);
+  if (guestDocumentTm30Match && request.method === "POST") {
+    const denied = requireCapability(publicAccess, "guest_documents.view", "guest_registration");
+    if (denied) return denied;
+    let body; try { body = await readJson(request); } catch (response) { return response; }
+    if (typeof body?.registered !== "boolean") return json({ error: "invalid_request" }, 400);
+    const outcome = await store.setPassportTm30Registered(guestDocumentTm30Match[1], body.registered, access.now);
+    if (!outcome?.ok) return json({ error: outcome?.error || "tm30_tracking_unavailable" }, outcome?.error === "tm30_not_applicable" ? 409 : 404);
+    await store.mobileRecordAudit({
+      tenantId: record.tenantId, userId: record.userId, membershipId: record.membershipId,
+      action: body.registered ? "tm30_registered" : "tm30_registration_undone",
+      reference: `passport:${guestDocumentTm30Match[1]}`, createdAt: access.now
+    });
+    return json({ ok: true, tm30RegisteredAt: outcome.tm30RegisteredAt || "" });
+  }
+
   if (path === `${MOBILE_API_PREFIX}/analytics` && request.method === "GET") {
     const denied = requireCapability(publicAccess, "analytics.view", "analytics");
     if (denied) return denied;
     const url = new URL(request.url);
     const range = analyticsRange(url.searchParams.get("range"));
     const [reservations, operations, statuses] = await Promise.all([
-      store.mobileAnalyticsReservations(range.previousFrom, range.forwardTo),
+      store.mobileAnalyticsReservations(range.previousFrom, range.forward90To || range.forwardTo),
       store.mobileAnalyticsOperations(range.from, range.to),
       store.listRoomHousekeepingStatuses()
     ]);
@@ -1515,6 +1666,35 @@ async function handleProtected(request, env, path, store, handlers = {}) {
       metadata: { from, to, scanned: result.scanned, created: result.created, updated: result.updated, unchanged: result.unchanged, expected: result.expected, paid: result.paid, reconciled: result.reconciled, refunded: result.refunded, voided: result.voided }, createdAt: access.now
     });
     return json(result);
+  }
+
+  if (path === `${MOBILE_API_PREFIX}/finance/report` && request.method === "GET") {
+    const denied = requireCapability(publicAccess, "finance.view", "finance");
+    if (denied) return denied;
+    const url = new URL(request.url);
+    const from = cleanText(url.searchParams.get("from"), 10);
+    const to = cleanText(url.searchParams.get("to"), 10);
+    const days = dateSpanDays(from, to);
+    if (!validDate(from) || !validDate(to) || to < from || days < 1 || days > 366) return json({ error: "invalid_finance_report_range" }, 400);
+    const [expenses, income] = await Promise.all([
+      store.listExpensesRange(from, to, HOUSE_FINANCE_BUSINESS_ID),
+      store.listIncomeRange(from, to, HOUSE_FINANCE_BUSINESS_ID)
+    ]);
+    const configuration = incomeConfiguration(env, HOUSE_FINANCE_BUSINESS_ID);
+    const csv = financeReportCsv(expenses, income, configuration, from, to);
+    await store.mobileRecordAudit({
+      tenantId: record.tenantId, userId: record.userId, membershipId: record.membershipId,
+      action: "finance_report_downloaded", reference: `finance:${from}:${to}`, metadata: { format: "csv", entries: expenses.length + income.length }, createdAt: access.now
+    });
+    return new Response(csv, {
+      headers: {
+        "content-type": "text/csv; charset=utf-8",
+        "content-disposition": `attachment; filename="taoedge-finance-${from}-to-${to}.csv"`,
+        "cache-control": "no-store",
+        "referrer-policy": "no-referrer",
+        "x-content-type-options": "nosniff"
+      }
+    });
   }
 
   if (path === `${MOBILE_API_PREFIX}/finance` && request.method === "GET") {

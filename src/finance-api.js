@@ -109,6 +109,30 @@ function financeCsv(expenses, income, configuration) {
   return `\uFEFF${rows.map((row) => row.map(csvEscape).join(",")).join("\r\n")}`;
 }
 
+function financeReportCsv(expenses, income, configuration, from, to) {
+  const totals = summarizeFinance(expenses, income, configuration);
+  const digits = configuration.minorUnitDigits;
+  const amount = (value) => Number(value || 0).toFixed(digits);
+  const summaryRows = [
+    ["Taoedge Finance Report"],
+    ["Period", from, to],
+    ["Currency", configuration.currency],
+    ["Gross income", amount(totals.grossIncome)],
+    ["OTA / payment fees", amount(totals.fees)],
+    ["Net income", amount(totals.netIncome)],
+    ["Expected / provisional net income", amount(totals.expectedNetIncome)],
+    ["Settled net income", amount(totals.settledNetIncome)],
+    ["Expenses", amount(totals.expenses)],
+    ["Operating result incl. expected", amount(totals.operatingResult)],
+    ["Settled operating result", amount(totals.settledOperatingResult)],
+    ["Income entries", totals.incomeEntries],
+    ["Expense entries", totals.expenseEntries],
+    []
+  ];
+  const detail = financeCsv(expenses, income, configuration).replace(/^\uFEFF/, "");
+  return `\uFEFF${summaryRows.map((row) => row.map(csvEscape).join(",")).join("\r\n")}\r\n${detail}`;
+}
+
 function summarizeFinance(expenses, income, configuration) {
   const expenseCategoryMinor = {};
   const incomeCategoryMinor = {};
@@ -388,4 +412,4 @@ export async function handleFinanceAdminRequest(request, env, path, store, actor
   });
 }
 
-export { DEFAULT_INCOME_CATEGORIES, incomeConfiguration, summarizeFinance };
+export { DEFAULT_INCOME_CATEGORIES, financeCsv, financeReportCsv, incomeConfiguration, summarizeFinance };

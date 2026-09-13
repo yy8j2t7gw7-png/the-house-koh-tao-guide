@@ -20,7 +20,7 @@ import {
 } from "../src/stay-api.js";
 import { handleMaintenanceAdminRequest, handleMaintenanceGuestRequest } from "../src/maintenance-api.js";
 import { handleExpenseAdminRequest } from "../src/expense-api.js";
-import { handleFinanceAdminRequest, summarizeFinance } from "../src/finance-api.js";
+import { handleFinanceAdminRequest, financeReportCsv, summarizeFinance } from "../src/finance-api.js";
 import { BAMBOO_FINANCE_BUSINESS_ID, HOUSE_FINANCE_BUSINESS_ID } from "../src/finance-businesses.js";
 import {
   learningClusterKey,
@@ -15098,4 +15098,77 @@ test("v5.11.69 analytics endpoint is server-permissioned and uses canonical rese
   assert.match(storeSource, /FROM feedback/);
   assert.match(mobileSource, /comparisonTotals/);
   assert.match(mobileSource, /feedbackPositive/);
+});
+
+
+test("v5.11.70 Insights V2 exposes 30/60/90 demand, pickup, channel quality and ledger efficiency without calling it ADR/RevPAR", () => {
+  const range = analyticsRange("30d");
+  assert.ok(range.forward30To);
+  assert.ok(range.forward60To);
+  assert.ok(range.forward90To);
+  const reservations = [
+    { id: "cur", provider: "airbnb", room: "1", checkInDate: range.from, checkOutDate: range.to, status: "confirmed", createdAt: `${range.to}T02:00:00Z` },
+    { id: "cancel", provider: "airbnb", room: "1", checkInDate: range.from, checkOutDate: range.to, status: "cancelled", createdAt: `${range.to}T02:00:00Z` },
+    { id: "f30", provider: "direct", room: "2", checkInDate: range.forwardFrom, checkOutDate: range.forward30To, status: "confirmed", createdAt: `${range.to}T03:00:00Z` },
+    { id: "f60", provider: "booking.com", room: "3", checkInDate: range.forward30To, checkOutDate: range.forward60To, status: "confirmed", createdAt: `${range.to}T04:00:00Z` },
+    { id: "f90", provider: "airbnb", room: "4", checkInDate: range.forward60To, checkOutDate: range.forward90To, status: "confirmed", createdAt: `${range.to}T05:00:00Z` }
+  ];
+  const operations = {
+    maintenance: { created: 4, resolved: 3, openNow: 1, byRoom: [] },
+    housekeeping: { turnovers: 5, ready: 4, averageTurnaroundMinutes: 55, byRoom: [] },
+    concierge: { requests: 10, needsHuman: 2, learningGaps: 1, feedbackPositive: 7, feedbackNegative: 1, categories: [] },
+    messaging: { inbound: 10, outbound: 9, automatedOutbound: 0 }
+  };
+  const finance = {
+    currency: "THB",
+    totals: { grossIncome: 20000, fees: 2000, netIncome: 18000, expectedNetIncome: 3000, settledNetIncome: 15000, expenses: 5000, operatingResult: 13000, settledOperatingResult: 10000, locations: {} },
+    comparisonTotals: { grossIncome: 15000, fees: 1500, netIncome: 13500, expectedNetIncome: 0, settledNetIncome: 13500, expenses: 4500, operatingResult: 9000, settledOperatingResult: 9000, locations: {} }
+  };
+  const payload = buildAnalyticsPayload({ range, reservations, roomsTotal: 11, operations, finance });
+  assert.deepEqual(payload.forward.horizons.map((item) => item.days), [30, 60, 90]);
+  assert.ok(payload.trend.current.length >= 4);
+  assert.equal(payload.pickup.firstSeen1d.bookings >= 1, true);
+  assert.equal(payload.channels.find((item) => item.key === "airbnb")?.cancellationRate >= 0, true);
+  assert.equal(typeof payload.operationalRates.maintenanceResolutionRate, "number");
+  assert.equal(typeof payload.finance.efficiency.feeRatePercent, "number");
+  assert.match(payload.finance.efficiency.note, /not ADR or RevPAR/i);
+  assert.equal(payload.dataQuality.adrRevparReady, false);
+  assert.equal(payload.dataQuality.otaBookingTimestampReady, false);
+});
+
+test("v5.11.70 Finance report CSV includes requested-period summary and transaction detail", () => {
+  const configuration = { currency: "THB", minorUnitDigits: 2, locationLabel: "Room / area" };
+  const income = [{
+    incomeDate: "2026-09-13", category: "Airbnb", description: "Airbnb payout", grossMinor: 1000000, feesMinor: 100000,
+    netMinor: 900000, reference: "ABC", paymentMethod: "Bank transfer", unit: "Room 1", notes: "", sourceStatus: "paid", sourceSystem: "beds24", createdByRole: "owner"
+  }];
+  const expenses = [{
+    expenseDate: "2026-09-13", category: "Maintenance", description: "AC service", amountMinor: 200000, vendor: "Tech",
+    paymentMethod: "Cash", roomArea: "Room 1", notes: "", hasReceipt: true, createdByRole: "owner"
+  }];
+  const csv = financeReportCsv(expenses, income, configuration, "2026-09-01", "2026-09-30");
+  assert.match(csv, /Taoedge Finance Report/);
+  assert.match(csv, /Period,2026-09-01,2026-09-30/);
+  assert.match(csv, /Gross income,10000\.00/);
+  assert.match(csv, /Expenses,2000\.00/);
+  assert.match(csv, /Airbnb payout/);
+  assert.match(csv, /AC service/);
+});
+
+test("v5.11.70 guest-document TM30 and Finance-report mobile endpoints remain permission gated and audited", async () => {
+  const [mobileSource, storeSource] = await Promise.all([
+    readFile(new URL("../src/mobile-platform.js", import.meta.url), "utf8"),
+    readFile(new URL("../src/concierge-store.js", import.meta.url), "utf8")
+  ]);
+  assert.match(mobileSource, /MOBILE_API_PREFIX}\/guest-documents/);
+  assert.match(mobileSource, /requireCapability\(publicAccess, "guest_documents\.view", "guest_registration"\)/);
+  assert.match(mobileSource, /guest_document_downloaded/);
+  assert.match(mobileSource, /tm30_registered/);
+  assert.match(mobileSource, /tm30_registration_undone/);
+  assert.match(mobileSource, /MOBILE_API_PREFIX}\/finance\/report/);
+  assert.match(mobileSource, /finance_report_downloaded/);
+  assert.match(mobileSource, /financeReportCsv/);
+  assert.match(storeSource, /async mobileListGuestDocuments/);
+  assert.match(storeSource, /datetime\(p\.delete_after\) > datetime\('now'\)/);
+  assert.match(storeSource, /async setPassportTm30Registered/);
 });

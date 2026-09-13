@@ -4314,6 +4314,31 @@ export class ConciergeStore extends DurableObject {
     ))[0] || null;
   }
 
+  async mobileListGuestDocuments(limitValue = 200) {
+    const limit = Math.max(1, Math.min(500, Number(limitValue) || 200));
+    return rows(this.ctx.storage.sql.exec(
+      `SELECT p.id, p.room, p.document_type AS documentType, p.status, p.media_type AS mediaType,
+              p.extension, p.size_bytes AS sizeBytes, p.uploaded_at AS uploadedAt, p.delete_after AS deleteAfter,
+              p.tm30_registered_at AS tm30RegisteredAt,
+              COALESCE(l.reservation_id, '') AS reservationId,
+              COALESCE(r.guest_first_name, '') AS guestFirstName, COALESCE(r.provider, '') AS provider,
+              COALESCE(r.check_in_date, '') AS checkInDate, COALESCE(r.check_out_date, '') AS checkOutDate,
+              COALESCE(q.status, g.status, 'not_started') AS registrationStatus
+       FROM passport_uploads p
+       LEFT JOIN passport_reservation_links l ON l.passport_id = p.id
+       LEFT JOIN stay_reservations r ON r.id = l.reservation_id
+       LEFT JOIN stay_registration_status g ON g.reservation_id = l.reservation_id
+       LEFT JOIN stay_registration_requirements q ON q.reservation_id = l.reservation_id
+       WHERE p.status = 'uploaded'
+         AND p.object_key <> ''
+         AND (p.delete_after = '' OR datetime(p.delete_after) > datetime('now'))
+       ORDER BY CASE WHEN p.document_type = 'passport' AND p.tm30_registered_at = '' THEN 0 ELSE 1 END,
+                COALESCE(r.check_in_date, substr(p.uploaded_at, 1, 10)) DESC, p.uploaded_at DESC
+       LIMIT ?`,
+      limit
+    ));
+  }
+
   async setPassportTm30Registered(id, registered, nowValue) {
     const cleanId = cleanText(id, 100);
     const record = rows(this.ctx.storage.sql.exec(

@@ -1,5 +1,17 @@
 # Changelog
 
+## v5.11.70 — Insights V2, Guest Documents & TM30, Finance reports
+
+- Expand Taoedge Insights with 30/60/90-day forward-demand horizons, weekly occupancy trend, and reservation pickup measured from Taoedge first-seen timestamps.
+- Add per-channel cancellation rate and average stay, room-level ledger net per occupied night, Finance-ledger efficiency, and operational quality rates.
+- Explicitly label ledger ratios as **not ADR / not RevPAR** until canonical stay-level revenue attribution is available.
+- Add owner-protected `/api/mobile/v1/guest-documents` listing for currently retained passports and Thai IDs.
+- Add authenticated private guest-document download, with audit logging and automatic-retention enforcement.
+- Add TM30 registered / undo controls backed by the existing passport TM30 state and audit trail.
+- Add owner Finance CSV reports for any selected month or custom date range up to 366 days, including summary totals and transaction detail.
+- Preserve expected/provisional versus settled OTA payout semantics, v5.11.68 operational routing, v5.11.69 Insights foundations and staged high-impact provider automation.
+- Full backend suite: **347 passed / 0 failed**.
+
 ## v5.11.69 — Taoedge Insights V1
 
 - Add protected `/api/mobile/v1/analytics` with This Month / 30-day / 90-day ranges.

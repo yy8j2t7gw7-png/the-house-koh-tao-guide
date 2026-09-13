@@ -1,11 +1,16 @@
-# Guest Guide Platform with AI Concierge — The House v5.11.69
+# Guest Guide Platform with AI Concierge — The House v5.11.70
+
+## v5.11.70 — Taoedge Insights V2, Guest Documents & TM30, Finance Reports
+
+v5.11.70 expands the server-owned Taoedge Insights contract with 30/60/90-day forward demand, weekly occupancy trends, reservation pickup measured from the date Taoedge first saw each reservation, richer channel cancellation/length-of-stay signals, operational quality rates and clearly labelled Finance-ledger efficiency. It deliberately does **not** call ledger-period ratios ADR or RevPAR until canonical stay-level revenue attribution exists.
+
+The release also adds an owner-protected mobile **Guest Documents & TM30** workspace API. Owners with `guest_documents.view` can list currently retained passport/Thai-ID uploads, securely download the original private file, see TM30 status, mark a passport as TM30 registered, and undo that status. File access and TM30 changes are audited; expired/deleted documents are not exposed.
+
+Finance gains a permission-gated CSV report endpoint for a selected month or any custom period up to 366 days. The report contains period totals plus the underlying income and expense ledger rows, preserving expected/provisional versus settled payout semantics.
 
 ## v5.11.69 — Taoedge Insights V1
 
-v5.11.69 adds the server-owned analytics contract for Taoedge Insights. The mobile analytics endpoint combines canonical reservation history, forward occupancy, channel mix, room performance, housekeeping/maintenance signals, Concierge demand patterns and protected Finance totals. Analytics remains permission/module gated and Finance fields are omitted unless `finance.view` is present. No OTA credentials or guest document data are exposed.
-
-
-v5.11.68 is a narrow backend routing hotfix on v5.11.67. It isolates Su/Fah/owner roles even when the legacy protected recipient secret contains overlapping members, and makes reservation tasks use the Fah booking WhatsApp template instead of the Su service template. Taoedge Owner App v0.1.8 remains current; no client rebuild is required. Existing multilingual Concierge review, security, Finance and staged automation boundaries remain unchanged.
+v5.11.69 added the first server-owned analytics contract for Taoedge Insights: canonical reservation history, forward occupancy, channel mix, room performance, housekeeping/maintenance signals, Concierge demand patterns and protected Finance totals. Analytics remains permission/module gated and Finance fields are omitted unless `finance.view` is present.
 
 The House – Koh Tao guest guide is a production-oriented, mobile-first digital guest guide and concierge platform. It combines property information, curated island guidance, structured place and activity data, and centralized contact and booking routes.
 

@@ -10,6 +10,7 @@ import { beds24ListingsRatesConfiguration, getBeds24ListingsRates, writeBeds24Li
 import { guestLifecycleMessagingConfiguration } from "./lifecycle-messaging.js";
 import { createProtectedOperationsAlert, dispatchConciergeAlert, operationalTaskAssignment, operationalTaskAssignments } from "./whatsapp-alerts.js";
 import { operationalRecipientGroup } from "./operations-routing.js";
+import { reservationSourceCapabilities } from "./reservation-model.js";
 
 const MOBILE_API_PREFIX = "/api/mobile/v1";
 const PASSWORD_ITERATIONS = 100000;
@@ -1162,7 +1163,10 @@ function publicReservation(item, role, options = {}) {
     extensionInterest: item.extensionInterest || "",
     departurePromptSentAt: item.departurePromptSentAt || "",
     whatsAppAvailable: role === "staff" ? false : Boolean(item.guestPhone),
-    guestPhoneMasked: role === "staff" ? "" : maskedPhone(item.guestPhone)
+    whatsAppPhone: role === "staff" ? "" : dialPhone(item.guestPhone),
+    guestPhoneMasked: role === "staff" ? "" : maskedPhone(item.guestPhone),
+    ownerManaged: reservationSourceCapabilities(item.provider).ownerManaged,
+    directStayEditable: item.provider === "direct" && item.status === "confirmed"
   };
 }
 
@@ -1533,6 +1537,9 @@ async function handleProtected(request, env, path, store, handlers = {}) {
     const whatsAppThread = threads.find((thread) => thread.channel === "whatsapp" && thread.reservationId === id) || null;
     const phone = record.role === "staff" ? "" : dialPhone(enriched.guestPhone);
     const providerMessagingAvailable = hasPermission(publicAccess, "messaging.view") && hasModule(publicAccess, "unified_messaging") && providerSupportsBeds24Messaging(enriched.provider) && Boolean(enriched.beds24BookingId);
+    const distributionSync = typeof store.listReservationDistributionEvents === "function"
+      ? await store.listReservationDistributionEvents(id, 80)
+      : [];
     return json({
       ok: true,
       reservation: publicReservation(enriched, record.role, { canSeeBookingFinancials: hasPermission(publicAccess, "finance.view") }),
@@ -1541,6 +1548,7 @@ async function handleProtected(request, env, path, store, handlers = {}) {
         whatsapp: { available: hasPermission(publicAccess, "messaging.view") && record.role !== "staff" && Boolean(enriched.guestPhone), threadId: whatsAppThread?.id || "", canStart: Boolean(messagingConfiguration?.guestInitiation?.ready) },
         call: { available: record.role !== "staff" && Boolean(phone), phone }
       },
+      distributionSync,
       activity,
       taskAssignments: publicTaskAssignments(env)
     });
@@ -1806,7 +1814,7 @@ async function handleProtected(request, env, path, store, handlers = {}) {
     return json({ ok: true, tm30RegisteredAt: outcome.tm30RegisteredAt || "" });
   }
 
-  if (path === `${MOBILE_API_PREFIX}/listings-rates` && request.method === "GET") {
+  if ([`${MOBILE_API_PREFIX}/listings-rates`, `${MOBILE_API_PREFIX}/listings`].includes(path) && request.method === "GET") {
     const denied = requireCapability(publicAccess, "listings_rates.view", "integrations");
     if (denied) return denied;
     const url = new URL(request.url);
@@ -1821,7 +1829,7 @@ async function handleProtected(request, env, path, store, handlers = {}) {
     return json(outcome, outcome.ok ? 200 : (outcome.error === "beds24_listings_rates_not_ready" ? 503 : 400));
   }
 
-  if (path === `${MOBILE_API_PREFIX}/listings-rates/write` && request.method === "POST") {
+  if ([`${MOBILE_API_PREFIX}/listings-rates/write`, `${MOBILE_API_PREFIX}/listings/write`].includes(path) && request.method === "POST") {
     const denied = requireCapability(publicAccess, "listings_rates.manage", "integrations");
     if (denied) return denied;
     let body; try { body = await readJson(request); } catch (response) { return response; }
@@ -2076,6 +2084,36 @@ async function handleProtected(request, env, path, store, handlers = {}) {
     return response || json({ error: "direct_stay_failed" }, 502);
   }
 
+  if (path === `${MOBILE_API_PREFIX}/direct-stays/update` && request.method === "POST") {
+    const denied = requireCapability(publicAccess, "direct_stays.manage", "bookings");
+    if (denied) return denied;
+    let body; try { body = await readJson(request); } catch (response) { return response; }
+    const reservationId = cleanText(body?.reservationId, 100);
+    const internalRequest = new Request("https://internal.taoedge.invalid/api/concierge/admin/direct-stay-update", {
+      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body || {})
+    });
+    const response = await handleStayAdminRequest(internalRequest, env, "/api/concierge/admin/direct-stay-update", store);
+    if (response?.ok) {
+      await store.mobileRecordAudit({ tenantId: record.tenantId, userId: record.userId, membershipId: record.membershipId, action: "direct_stay_updated", reference: `reservation:${reservationId}`, metadata: { room: cleanText(body?.room, 4), checkInDate: cleanText(body?.checkInDate, 10), checkOutDate: cleanText(body?.checkOutDate, 10) }, createdAt: access.now });
+    }
+    return response || json({ error: "direct_stay_update_failed" }, 502);
+  }
+
+  if (path === `${MOBILE_API_PREFIX}/direct-stays/cancel` && request.method === "POST") {
+    const denied = requireCapability(publicAccess, "direct_stays.manage", "bookings");
+    if (denied) return denied;
+    let body; try { body = await readJson(request); } catch (response) { return response; }
+    const reservationId = cleanText(body?.reservationId, 100);
+    const internalRequest = new Request("https://internal.taoedge.invalid/api/concierge/admin/manual-stay-delete", {
+      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ reservationId, confirmed: body?.confirmed === true })
+    });
+    const response = await handleStayAdminRequest(internalRequest, env, "/api/concierge/admin/manual-stay-delete", store);
+    if (response?.ok) {
+      await store.mobileRecordAudit({ tenantId: record.tenantId, userId: record.userId, membershipId: record.membershipId, action: "direct_stay_cancelled", reference: `reservation:${reservationId}`, createdAt: access.now });
+    }
+    return response || json({ error: "direct_stay_cancel_failed" }, 502);
+  }
+
   if (path === `${MOBILE_API_PREFIX}/operations/maintenance/resolve` && request.method === "POST") {
     const denied = requireCapability(publicAccess, "maintenance.resolve", "maintenance");
     if (denied) return denied;
@@ -2232,6 +2270,7 @@ async function handleProtected(request, env, path, store, handlers = {}) {
       messaging: messagingAllowed ? unifiedMessagingConfiguration(env) : undefined,
       financeAutomation: financeAllowed ? beds24FinanceSyncConfiguration(env) : undefined,
       connectionHealth,
+      apiContract: { backendVersion: "5.11.77", mobileApiVersion: "v1", listingsRatesRoute: `${MOBILE_API_PREFIX}/listings-rates`, directStayOperations: true },
       product: {
         workingName: "Taoedge Owner App",
         commercialBrandPending: true,
@@ -2400,12 +2439,13 @@ export async function handleMobileLicenseAdminRequest(request, env, path) {
 
 export async function handleMobilePlatformRequest(request, env, path, handlers = {}) {
   if (!path.startsWith(MOBILE_API_PREFIX)) return null;
+  const normalizedPath = path.length > MOBILE_API_PREFIX.length ? path.replace(/\/+$/, "") : path;
   const store = getStore(env);
   if (!store) return json({ error: "mobile_store_unavailable" }, 503);
-  if (path === `${MOBILE_API_PREFIX}/auth/bootstrap`) return bootstrap(request, env, store);
-  if (path === `${MOBILE_API_PREFIX}/auth/login`) return login(request, env, store);
-  if (path === `${MOBILE_API_PREFIX}/auth/accept-invite`) return acceptInvite(request, env, store);
-  return handleProtected(request, env, path, store, handlers);
+  if (normalizedPath === `${MOBILE_API_PREFIX}/auth/bootstrap`) return bootstrap(request, env, store);
+  if (normalizedPath === `${MOBILE_API_PREFIX}/auth/login`) return login(request, env, store);
+  if (normalizedPath === `${MOBILE_API_PREFIX}/auth/accept-invite`) return acceptInvite(request, env, store);
+  return handleProtected(request, env, normalizedPath, store, handlers);
 }
 
 export const MOBILE_DEFAULT_MODULES = DEFAULT_MODULES;

@@ -1,3 +1,10 @@
+# v5.11.77 — Reservation Operations & OTA Sync Hardening
+
+- Repairs the mobile Listings & Rates route contract and publishes the live backend/API contract to Diagnostics.
+- Adds narrow Direct Stay fast inventory close/reopen with central availability verification while the full Channel Manager remains off.
+- Adds conflict-aware cancellation reopening, protected Direct Stay updates, per-reservation distribution events and minute-level retry processing.
+- Keeps broad Listings & Rates writes fail-closed pending a controlled live write.
+
 # Changelog
 
 ## v5.11.76 — Daily Operating Console

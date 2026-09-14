@@ -15436,14 +15436,20 @@ test("v5.11.76 narrow Listings & Rates bridge reads calendar cells and writes on
     if ((options.method || "GET") === "POST") {
       return new Response(JSON.stringify([{ success: true }]), { status: 200, headers: { "content-type": "application/json" } });
     }
-    return new Response(JSON.stringify({ data: [{ roomId: 83004, calendar: [{ from: "2026-09-20", to: "2026-09-20", price1: 1800, inventory: 1 }] }] }), { status: 200, headers: { "content-type": "application/json" } });
+    return new Response(JSON.stringify({ type: "calendar", pages: { current: 1, total: 1 }, data: [{ roomId: 83004, date: "2026-09-20", price1: 1800, numAvail: 1, minStay: 2 }] }), { status: 200, headers: { "content-type": "application/json" } });
   };
   try {
     const read = await getBeds24ListingsRates(env, store, { from: "2026-09-20", to: "2026-09-20" });
     assert.equal(read.ok, true);
-    assert.deepEqual(read.rows.map(({ room, date, price1, inventory }) => ({ room, date, price1, inventory })), [
-      { room: "4", date: "2026-09-20", price1: 1800, inventory: 1 }
+    assert.deepEqual(read.rows.map(({ room, date, price1, inventory, minStay }) => ({ room, date, price1, inventory, minStay })), [
+      { room: "4", date: "2026-09-20", price1: 1800, inventory: 1, minStay: 2 }
     ]);
+    const get = calls.find((call) => call.method === "GET");
+    assert.ok(get);
+    const getUrl = new URL(get.url);
+    assert.equal(getUrl.searchParams.get("includeNumAvail"), "true");
+    assert.equal(getUrl.searchParams.get("includePrices"), "true");
+    assert.equal(getUrl.searchParams.get("includeMinStay"), "true");
 
     const write = await writeBeds24ListingRateCell(env, store, { room: "4", date: "2026-09-20", price1: 1950, inventory: 1 });
     assert.equal(write.ok, true);
@@ -15452,6 +15458,23 @@ test("v5.11.76 narrow Listings & Rates bridge reads calendar cells and writes on
     assert.match(post.url, /inventory\/rooms\/calendar/);
     const body = JSON.parse(post.body);
     assert.deepEqual(body, [{ roomId: 83004, calendar: [{ from: "2026-09-20", to: "2026-09-20", price1: 1950, inventory: 1 }] }]);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("v5.11.77a Listings & Rates does not coerce missing provider values to zero", async () => {
+  const originalFetch = globalThis.fetch;
+  const roomMap = JSON.stringify(Object.fromEntries(Array.from({ length: 11 }, (_, index) => [String(83101 + index), String(index + 1)])));
+  const store = { async getMessagingProviderState() { return { value: { accessToken: "access" }, expiresAt: new Date(Date.now() + 3_600_000).toISOString() }; } };
+  const env = { BEDS24_REFRESH_TOKEN: "refresh", BEDS24_ROOM_MAP: roomMap };
+  globalThis.fetch = async () => new Response(JSON.stringify({ data: [{ roomId: 83101, date: "2026-09-20" }] }), { status: 200, headers: { "content-type": "application/json" } });
+  try {
+    const read = await getBeds24ListingsRates(env, store, { from: "2026-09-20", to: "2026-09-20" });
+    assert.equal(read.rows.length, 1);
+    assert.equal(read.rows[0].price1, null);
+    assert.equal(read.rows[0].inventory, null);
+    assert.equal(read.rows[0].minStay, null);
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -15553,7 +15576,7 @@ test("v5.11.77 Listings & Rates mobile route contract is explicit, aliased and t
   const source = await readFile(new URL("../src/mobile-platform.js", import.meta.url), "utf8");
   assert.ok(source.includes('[`${MOBILE_API_PREFIX}/listings-rates`, `${MOBILE_API_PREFIX}/listings`].includes(path)'));
   assert.ok(source.includes('path.replace(/\\/+$/, "")'));
-  assert.match(source, /backendVersion: "5\.11\.77"/);
+  assert.match(source, /backendVersion: "5\.11\.77a"/);
   assert.match(source, /listingsRatesRoute: `\$\{MOBILE_API_PREFIX\}\/listings-rates`/);
   assert.match(source, /direct-stays\/update/);
   assert.match(source, /direct-stays\/cancel/);

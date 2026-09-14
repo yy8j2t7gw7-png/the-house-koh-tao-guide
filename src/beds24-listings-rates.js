@@ -59,6 +59,12 @@ function calendarRows(response) {
   return [];
 }
 
+function numericOrNull(value) {
+  if (value === null || value === undefined || value === "") return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
 function normalizeCalendarRows(response, env, from, to) {
   const reverse = new Map(
     HOUSE_ROOMS.map((room) => [String(houseRoomToBeds24RoomId(room, env)), room]).filter(([id]) => id)
@@ -76,15 +82,16 @@ function normalizeCalendarRows(response, env, from, to) {
       if (!start) continue;
       for (let date = start, guard = 0; date && date <= (end || start) && guard < MAX_RANGE_DAYS; date = shiftedDateOnly(date, 1), guard += 1) {
         if (date < from || date > to) continue;
-        const price = item?.price1 ?? item?.p1 ?? item?.dailyPrice1 ?? null;
-        const inventory = item?.inventory ?? item?.i ?? item?.availability ?? null;
+        const price = numericOrNull(item?.price1 ?? item?.p1 ?? item?.dailyPrice1);
+        const inventory = numericOrNull(item?.numAvail ?? item?.inventory ?? item?.i ?? item?.availability);
+        const minStay = numericOrNull(item?.minStay ?? item?.m);
         out.push({
           room,
           providerRoomId,
           date,
-          price1: Number.isFinite(Number(price)) ? Number(price) : null,
-          inventory: Number.isFinite(Number(inventory)) ? Number(inventory) : null,
-          minStay: Number.isFinite(Number(item?.minStay ?? item?.m)) ? Number(item?.minStay ?? item?.m) : null,
+          price1: price,
+          inventory,
+          minStay,
           rawSource: "beds24_calendar"
         });
       }
@@ -108,7 +115,14 @@ export async function getBeds24ListingsRates(env, store, { from, to } = {}) {
   }
   const roomIds = HOUSE_ROOMS.map((room) => Number(houseRoomToBeds24RoomId(room, env))).filter(Number.isFinite);
   const response = await beds24ApiRequest(env, store, "inventory/rooms/calendar", {
-    query: { roomId: roomIds, startDate: start, endDate: end }
+    query: {
+      roomId: roomIds,
+      startDate: start,
+      endDate: end,
+      includeNumAvail: true,
+      includePrices: true,
+      includeMinStay: true
+    }
   });
   return { ok: true, configuration, from: start, to: end, rows: normalizeCalendarRows(response, env, start, end) };
 }

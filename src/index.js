@@ -24,6 +24,7 @@ import {
   reconcileBeds24ChannelManager
 } from "./beds24-channel-manager.js";
 import { processHousekeepingTurnovers } from "./housekeeping-operations.js";
+import { processGuestLifecycleMessaging } from "./lifecycle-messaging.js";
 import { reconcileBeds24Finance } from "./beds24-finance-sync.js";
 import { servePublicLegalPage } from "./public-legal.js";
 import { handleMobileLicenseAdminRequest, handleMobilePlatformRequest } from "./mobile-platform.js";
@@ -269,7 +270,8 @@ export default {
     if (controller.cron === "*/1 * * * *") {
       ctx.waitUntil(Promise.all([
         processDueAlertEscalations(env),
-        processHousekeepingTurnovers(env)
+        processHousekeepingTurnovers(env),
+        processGuestLifecycleMessaging(env)
       ]));
       return;
     }

@@ -3,9 +3,11 @@ import { expenseConfiguration, handleExpenseAdminRequest } from "./expense-api.j
 import { financeReportCsv, incomeConfiguration, summarizeFinance } from "./finance-api.js";
 import { beds24FinanceSyncConfiguration, reconcileBeds24FinanceRange } from "./beds24-finance-sync.js";
 import { integrationAdminOverview } from "./integration-catalog.js";
-import { beds24DirectStaySyncConfiguration } from "./beds24-channel-manager.js";
 import { beds24ApiRequest, handleUnifiedMessagingAdminRequest, openBeds24ReservationConversation, reviewMessagingDraft, roomForBeds24Booking, startWhatsAppGuestConversation, unifiedMessagingConfiguration, whatsAppGuestInitiationConfiguration } from "./unified-messaging.js";
 import { handleStayAdminRequest } from "./stay-api.js";
+import { beds24DirectStayProtectionConfiguration } from "./beds24-channel-manager.js";
+import { beds24ListingsRatesConfiguration, getBeds24ListingsRates, writeBeds24ListingRateCell } from "./beds24-listings-rates.js";
+import { guestLifecycleMessagingConfiguration } from "./lifecycle-messaging.js";
 import { createProtectedOperationsAlert, dispatchConciergeAlert, operationalTaskAssignment, operationalTaskAssignments } from "./whatsapp-alerts.js";
 import { operationalRecipientGroup } from "./operations-routing.js";
 
@@ -38,13 +40,13 @@ export const MOBILE_PERMISSION_MATRIX = Object.freeze({
     "operations.view", "housekeeping.update", "maintenance.view", "maintenance.create", "maintenance.resolve",
     "registration.status", "finance.view", "finance.import", "finance.expense_submit", "analytics.view", "integrations.view",
     "staff.manage", "licenses.view", "licenses.manage", "security.sessions",
-    "direct_stays.manage", "guest_documents.view"
+    "direct_stays.manage", "guest_documents.view", "listings_rates.view", "listings_rates.manage"
   ]),
   manager: Object.freeze([
     "home.view", "bookings.view", "calendar.view", "booking_activity.create", "booking_activity.update",
     "messaging.view", "messaging.send", "messaging.ai_control",
     "operations.view", "housekeeping.update", "maintenance.view", "maintenance.create", "maintenance.resolve",
-    "registration.status", "finance.expense_submit", "analytics.view", "integrations.view", "direct_stays.manage"
+    "registration.status", "finance.expense_submit", "analytics.view", "integrations.view", "direct_stays.manage", "listings_rates.view"
   ]),
   staff: Object.freeze([
     "home.view", "bookings.view", "calendar.view", "booking_activity.create", "booking_activity.update", "operations.view",
@@ -95,9 +97,11 @@ export function mobileIntegrationHealth(env = {}) {
   const integrations = integrationAdminOverview(env);
   const messaging = unifiedMessagingConfiguration(env);
   const finance = beds24FinanceSyncConfiguration(env);
-  const directStayProtection = beds24DirectStaySyncConfiguration(env);
   const guestWhatsApp = whatsAppGuestInitiationConfiguration(env);
   const channelManagerEnabled = enabledFlag(env.BEDS24_CHANNEL_MANAGER_ENABLED);
+  const directStayProtection = beds24DirectStayProtectionConfiguration(env);
+  const listingsRates = beds24ListingsRatesConfiguration(env);
+  const lifecycleMessaging = guestLifecycleMessagingConfiguration(env);
   const airbnbReservation = Array.isArray(integrations?.providers)
     ? integrations.providers.find((item) => item?.id === "airbnb")
     : null;
@@ -135,12 +139,6 @@ export function mobileIntegrationHealth(env = {}) {
       channel: finance.channel,
       schedule: finance.schedule
     },
-    directStayProtection: {
-      status: directStayProtection.ready ? "active" : (directStayProtection.enabled ? "needs_setup" : "off"),
-      enabled: Boolean(directStayProtection.enabled),
-      ready: Boolean(directStayProtection.ready),
-      roomMapConfigured: Boolean(directStayProtection.roomMapComplete)
-    },
     whatsapp: {
       status: whatsAppOutboundConnected ? "connected" : "needs_setup",
       connected: whatsAppOutboundConnected,
@@ -152,6 +150,18 @@ export function mobileIntegrationHealth(env = {}) {
     channelManager: {
       status: channelManagerEnabled ? "active" : "off",
       enabled: channelManagerEnabled
+    },
+    directStayProtection: {
+      status: directStayProtection.ready ? "active" : (directStayProtection.enabled ? "needs_setup" : "off"),
+      ...directStayProtection
+    },
+    listingsRates: {
+      status: listingsRates.writeReady ? "write_ready" : (listingsRates.readable ? "read_only" : "needs_setup"),
+      ...listingsRates
+    },
+    lifecycleMessaging: {
+      status: lifecycleMessaging.enabled ? "active" : "off",
+      ...lifecycleMessaging
     }
   };
 }
@@ -610,7 +620,7 @@ function buildAnalyticsAttention({ current, previous, forward, operations, finan
   if (forward.occupancyPercent < 40) items.push({ id: "forward-demand", tone: "warning", title: "Forward demand is light", detail: `Next 30 days are ${forward.occupancyPercent}% occupied. Keep an eye on pickup before changing rates.`, route: "" });
   else if (forward.occupancyPercent >= 80) items.push({ id: "forward-demand", tone: "success", title: "Forward demand is strong", detail: `Next 30 days are already ${forward.occupancyPercent}% occupied. Remaining inventory deserves a rate review.`, route: "" });
   if (occupancyDelta <= -10) items.push({ id: "occupancy-down", tone: "warning", title: "Occupancy has softened", detail: `${Math.abs(occupancyDelta)} points below the previous comparable period.`, route: "" });
-  if (current.cancellationRate >= 15 && current.bookings >= 4) items.push({ id: "cancellations", tone: "warning", title: "Cancellation rate needs attention", detail: `${current.cancellationRate}% of arrivals booked for this period are cancelled in the reservation history.`, route: "/bookings" });
+  if (current.cancellationRate >= 15 && current.bookings >= 4) items.push({ id: "cancellations", tone: "warning", title: "Cancellation rate needs attention", detail: `${current.cancellationRate}% of arrivals booked for this period are cancelled in the canonical reservation history.`, route: "/bookings" });
   const repeatRoom = [...rooms].sort((a, b) => b.maintenanceIssues - a.maintenanceIssues)[0];
   if (repeatRoom?.maintenanceIssues >= 2) items.push({ id: "repeat-maintenance", tone: "danger", title: `Room ${repeatRoom.room} has repeated maintenance`, detail: `${repeatRoom.maintenanceIssues} maintenance reports in this period.`, route: "/(tabs)/operations?focus=maintenance" });
   if ((operations?.concierge?.learningGaps || 0) > 0) items.push({ id: "knowledge-gaps", tone: "accent", title: "Concierge knowledge can improve", detail: `${operations.concierge.learningGaps} request${operations.concierge.learningGaps === 1 ? "" : "s"} exposed a knowledge gap in this period.`, route: "" });
@@ -685,7 +695,7 @@ export function buildAnalyticsPayload({ range, reservations, roomsTotal, operati
       settledSharePercent: percent(finance.totals?.settledNetIncome, finance.totals?.netIncome),
       ledgerNetPerOccupiedNight: current.roomNights ? round1((Number(finance.totals?.netIncome) || 0) / current.roomNights) : 0,
       operatingResultPerAvailableRoomNight: current.availableRoomNights ? round1((Number(finance.totals?.operatingResult) || 0) / current.availableRoomNights) : 0,
-      note: "This comparison uses Finance entries dated in the selected period and occupied room nights. It is not ADR or RevPAR; those require revenue to be matched to each stay."
+      note: "Ledger efficiency compares Finance entries dated in the selected period with occupied room nights. It is not ADR or RevPAR; those require canonical stay-level revenue attribution."
     }
   } : null;
   return {
@@ -738,7 +748,7 @@ export function buildAnalyticsPayload({ range, reservations, roomsTotal, operati
       adrRevparReady: false,
       otaBookingTimestampReady: false,
       note: range.days > 30 ? "Resolved maintenance and Concierge interaction/feedback records are retained for about 30 days, so those older operational signals may be incomplete. Reservation and Finance metrics use their own retained source records." : "Operational and Concierge history are within their current 30-day retention windows.",
-      revenueMetricNote: "Taoedge keeps income per occupied night separate from ADR and RevPAR. True ADR and RevPAR will appear once booking revenue can be matched reliably to each stay across every channel."
+      revenueMetricNote: "Taoedge does not label ledger income per occupied night as ADR or RevPAR. True ADR/RevPAR will activate after stay-level booking revenue is stored canonically across every channel."
     }
   };
 }
@@ -977,7 +987,7 @@ export function buildRevenueEnginePayload({ today, days = 14, reservations = [],
       pickupSource: "taoedge_first_seen",
       liveRateSource: "owner_reference_rate",
       marketDemandConnected: false,
-      note: "Revenue Engine V1 is recommendation-only. It uses confirmed reservations, when Taoedge received each booking, and your pricing limits. It does not use competitor prices or change live selling rates."
+      note: "Revenue Engine V1 is deterministic and recommendation-only. It uses canonical reservations, Taoedge first-seen pickup and owner pricing guardrails. It does not read competitor prices or write OTA rates."
     }
   };
 }
@@ -1147,6 +1157,10 @@ function publicReservation(item, role, options = {}) {
     bookingCurrency: canSeeBookingFinancials && hasBookingPrice ? cleanText(item.bookingCurrency || "THB", 8).toUpperCase() : "",
     lateCheckoutTime: item.lateCheckoutTime || "",
     lateCheckoutFeeThb: role === "owner" ? Number(item.lateCheckoutFeeThb) || 0 : undefined,
+    plannedDepartureTime: item.plannedDepartureTime || "",
+    plannedDepartureMinutes: Number.isFinite(Number(item.plannedDepartureMinutes)) && Number(item.plannedDepartureMinutes) >= 0 ? Number(item.plannedDepartureMinutes) : undefined,
+    extensionInterest: item.extensionInterest || "",
+    departurePromptSentAt: item.departurePromptSentAt || "",
     whatsAppAvailable: role === "staff" ? false : Boolean(item.guestPhone),
     guestPhoneMasked: role === "staff" ? "" : maskedPhone(item.guestPhone)
   };
@@ -1792,6 +1806,56 @@ async function handleProtected(request, env, path, store, handlers = {}) {
     return json({ ok: true, tm30RegisteredAt: outcome.tm30RegisteredAt || "" });
   }
 
+  if (path === `${MOBILE_API_PREFIX}/listings-rates` && request.method === "GET") {
+    const denied = requireCapability(publicAccess, "listings_rates.view", "integrations");
+    if (denied) return denied;
+    const url = new URL(request.url);
+    const from = validDate(url.searchParams.get("from")) ? url.searchParams.get("from") : bangkokDate();
+    const requestedTo = validDate(url.searchParams.get("to")) ? url.searchParams.get("to") : bangkokDate(13);
+    const outcome = await getBeds24ListingsRates(env, store, { from, to: requestedTo }).catch((error) => ({
+      ok: false,
+      error: cleanText(error?.code || error?.message || "beds24_listings_rates_failed", 120),
+      configuration: beds24ListingsRatesConfiguration(env),
+      rows: []
+    }));
+    return json(outcome, outcome.ok ? 200 : (outcome.error === "beds24_listings_rates_not_ready" ? 503 : 400));
+  }
+
+  if (path === `${MOBILE_API_PREFIX}/listings-rates/write` && request.method === "POST") {
+    const denied = requireCapability(publicAccess, "listings_rates.manage", "integrations");
+    if (denied) return denied;
+    let body; try { body = await readJson(request); } catch (response) { return response; }
+    const outcome = await writeBeds24ListingRateCell(env, store, {
+      room: body.room,
+      date: body.date,
+      price1: body.price1,
+      inventory: body.inventory
+    }).catch((error) => ({
+      ok: false,
+      error: cleanText(error?.code || error?.message || "beds24_calendar_write_failed", 120),
+      configuration: beds24ListingsRatesConfiguration(env)
+    }));
+    if (outcome.ok) {
+      await store.mobileRecordAudit({
+        tenantId: record.tenantId,
+        userId: record.userId,
+        membershipId: record.membershipId,
+        action: "listings_rates_cell_written",
+        reference: `room:${outcome.room}:${outcome.date}`,
+        metadata: {
+          room: outcome.room,
+          providerRoomId: outcome.providerRoomId,
+          date: outcome.date,
+          price1: outcome.price1 ?? null,
+          inventory: outcome.inventory ?? null,
+          fullChannelManagerEnabled: enabledFlag(env.BEDS24_CHANNEL_MANAGER_ENABLED)
+        },
+        createdAt: access.now
+      });
+    }
+    return json(outcome, outcome.ok ? 200 : (outcome.error === "rate_inventory_writes_disabled" ? 409 : 400));
+  }
+
   if (path === `${MOBILE_API_PREFIX}/revenue-engine` && request.method === "GET") {
     const denied = requireCapability(publicAccess, "analytics.view", "analytics");
     if (denied) return denied;
@@ -1930,10 +1994,16 @@ async function handleProtected(request, env, path, store, handlers = {}) {
     const denied = requireCapability(publicAccess, "operations.view", "core");
     if (denied) return denied;
     const [operations, overview] = await Promise.all([store.getStayOperationsOverview(), store.getAdminOverview()]);
+    const departureFrom = bangkokDate(0);
+    const departureTo = bangkokDate(1);
+    const departurePlans = (operations.reservations || [])
+      .filter((item) => item.checkOutDate >= departureFrom && item.checkOutDate <= departureTo)
+      .map((item) => publicReservation(item, record.role));
     return json({
       ok: true,
       housekeepingStatuses: operations.housekeepingStatuses || [],
       housekeepingTasks: operations.housekeepingTasks || [],
+      departurePlans,
       maintenance: (overview.maintenanceReports || []).map((item) => ({
         id: item.id, room: item.room, issueType: item.issueType, severity: item.severity, details: item.details,
         status: item.status, hasPhoto: Boolean(item.hasPhoto), createdAt: item.createdAt, resolvedAt: item.resolvedAt || ""

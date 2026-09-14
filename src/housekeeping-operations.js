@@ -81,7 +81,9 @@ export async function processHousekeepingTurnovers(env, now = new Date()) {
   const store = getStore(env);
   if (!store?.getDueHousekeepingTurnovers || !store?.claimHousekeepingTask) return { due: 0, sent: 0 };
   const clock = bangkokClock(now);
-  if (clock.minutes < (11 * 60)) return { due: 0, sent: 0 };
+  // Planned departure times can release a room before the standard 11:00 checkout.
+  // Never wake housekeeping before 04:00, but otherwise let the store decide whether a turnover is due.
+  if (clock.minutes < (4 * 60)) return { due: 0, sent: 0 };
   const due = await store.getDueHousekeepingTurnovers(clock.dateKey, clock.minutes);
   let sent = 0;
   for (const item of due) {

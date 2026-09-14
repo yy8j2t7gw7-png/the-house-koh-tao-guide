@@ -1,4 +1,6 @@
 import { createProtectedOperationsAlert, dispatchConciergeAlert, operationalRecipientPreview } from "./whatsapp-alerts.js";
+import { pushInboundOtaMessage } from "./mobile-push.js";
+import { captureDepartureIntent } from "./departure-intent.js";
 const MAX_MESSAGE_LENGTH = 3000;
 const MAX_THREADS = 80;
 const MAX_THREAD_MESSAGES = 100;
@@ -468,7 +470,7 @@ async function recordAiDraft(store, thread, result, reason = "review_required", 
   return { id };
 }
 
-async function sendBeds24Text(env, store, externalReservationId, text) {
+export async function sendBeds24GuestText(env, store, externalReservationId, text) {
   const bookingId = Number(externalReservationId);
   if (!Number.isSafeInteger(bookingId) || bookingId <= 0) throw new Error("beds24_invalid_booking");
   const response = await beds24ApiRequest(env, store, "bookings/messages", {
@@ -602,7 +604,7 @@ async function sendAndRecordReply({ env, store, thread, result, channel }) {
   const now = new Date().toISOString();
   let providerMessageId = "";
   if (channel === "beds24") {
-    await sendBeds24Text(env, store, thread.externalReservationId, result.answer);
+    await sendBeds24GuestText(env, store, thread.externalReservationId, result.answer);
   } else if (channel === "whatsapp") {
     const outcome = await sendWhatsAppGuestText(env, thread.guestPhone, result.answer);
     providerMessageId = `whatsapp:${outcome.providerMessageId}`;
@@ -746,6 +748,12 @@ export async function handleBeds24MessagingWebhook(request, env, ctx, generateRe
     return json({ ok: true, synced: insertedCount, ignored: plan.replyCandidate ? "no_new_guest_message" : "latest_message_not_guest", threadId: thread.id });
   }
   const inboundText = plan.replyCandidate.body;
+  const linkedReservationId = reservation?.id || thread.reservationId;
+  const pushTask = pushInboundOtaMessage(env, { ...thread, reservationId: linkedReservationId }, inboundText).catch(() => null);
+  const departureTask = linkedReservationId
+    ? captureDepartureIntent({ env, store, reservationId: linkedReservationId, text: inboundText }).catch(() => null)
+    : Promise.resolve(null);
+  if (ctx?.waitUntil) { ctx.waitUntil(pushTask); ctx.waitUntil(departureTask); } else { await pushTask; await departureTask; }
 
   const task = async () => {
     const linkedThread = { ...thread, reservationId: reservation?.id || thread.reservationId };
@@ -810,6 +818,11 @@ export async function handleInboundWhatsAppGuestMessage(message, env, ctx, gener
     createdAt: now
   });
   if (!recorded?.inserted) return { ok: true, duplicate: true, threadId: thread.id };
+  const pushTask = pushInboundOtaMessage(env, thread, body).catch(() => null);
+  const departureTask = thread.reservationId
+    ? captureDepartureIntent({ env, store, reservationId: thread.reservationId, text: body }).catch(() => null)
+    : Promise.resolve(null);
+  if (ctx?.waitUntil) { ctx.waitUntil(pushTask); ctx.waitUntil(departureTask); } else { await pushTask; await departureTask; }
 
   const task = async () => {
     const result = await maybeGenerateReply({ env, store, thread, inboundText: body, generateReply });
@@ -900,7 +913,7 @@ async function createReviewedOperationalTask({ env, store, thread, draft, actorL
 async function sendReviewedGuestReply({ env, store, thread, text, now, automated = false }) {
   let providerMessageId = "";
   if (thread.channel === "beds24") {
-    await sendBeds24Text(env, store, thread.externalReservationId, text);
+    await sendBeds24GuestText(env, store, thread.externalReservationId, text);
   } else if (thread.channel === "whatsapp") {
     const outcome = await sendWhatsAppGuestText(env, thread.guestPhone, text);
     providerMessageId = `whatsapp:${outcome.providerMessageId}`;
@@ -1021,7 +1034,7 @@ export async function handleUnifiedMessagingAdminRequest(request, env, path, sto
     let providerMessageId = "";
     try {
       if (thread.channel === "beds24") {
-        await sendBeds24Text(env, store, thread.externalReservationId, text);
+        await sendBeds24GuestText(env, store, thread.externalReservationId, text);
       } else if (thread.channel === "whatsapp") {
         const outcome = await sendWhatsAppGuestText(env, thread.guestPhone, text);
         providerMessageId = `whatsapp:${outcome.providerMessageId}`;

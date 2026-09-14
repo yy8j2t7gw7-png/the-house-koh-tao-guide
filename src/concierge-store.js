@@ -565,6 +565,27 @@ export class ConciergeStore extends DurableObject {
           updated_at TEXT NOT NULL
         );
 
+        CREATE TABLE IF NOT EXISTS guest_lifecycle_state (
+          reservation_id TEXT PRIMARY KEY,
+          external_booking_id TEXT NOT NULL DEFAULT '',
+          source_label TEXT NOT NULL DEFAULT '',
+          thread_id TEXT NOT NULL DEFAULT '',
+          communicated_json TEXT NOT NULL DEFAULT '[]',
+          booking_sent_at TEXT NOT NULL DEFAULT '',
+          prearrival_sent_at TEXT NOT NULL DEFAULT '',
+          checkin_sent_at TEXT NOT NULL DEFAULT '',
+          departure_prompt_sent_at TEXT NOT NULL DEFAULT '',
+          checkout_sent_at TEXT NOT NULL DEFAULT '',
+          planned_departure_minutes INTEGER NOT NULL DEFAULT -1,
+          planned_departure_time TEXT NOT NULL DEFAULT '',
+          extension_interest TEXT NOT NULL DEFAULT '',
+          updated_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS guest_lifecycle_state_thread
+          ON guest_lifecycle_state(thread_id, updated_at);
+        CREATE INDEX IF NOT EXISTS guest_lifecycle_state_external
+          ON guest_lifecycle_state(external_booking_id, updated_at);
+
         CREATE TABLE IF NOT EXISTS beds24_reservation_links (
           reservation_id TEXT PRIMARY KEY,
           external_booking_id TEXT NOT NULL UNIQUE,
@@ -2395,7 +2416,7 @@ export class ConciergeStore extends DurableObject {
       `SELECT id, provider, listing_id AS listingId, room, guest_first_name AS guestFirstName,
               check_in_date AS checkInDate,
               CASE WHEN o.check_out_date > r.check_out_date THEN o.check_out_date ELSE r.check_out_date END AS checkOutDate,
-              r.status, r.updated_at AS updatedAt
+              r.status, r.created_at AS createdAt, r.updated_at AS updatedAt
        FROM stay_reservations r
        LEFT JOIN stay_checkout_overrides o ON o.reservation_id = r.id
        WHERE confirmation_code_hash = ? AND room = ? AND status = 'confirmed'
@@ -3260,15 +3281,21 @@ export class ConciergeStore extends DurableObject {
     if (current?.currentTaskId && current.currentTaskId !== task.id) return { ok: false, error: "stale_housekeeping_task" };
     if (task.departingReservationId) {
       const departure = rows(this.ctx.storage.sql.exec(
-        `SELECT CASE WHEN o.check_out_date > r.check_out_date THEN o.check_out_date ELSE r.check_out_date END AS checkOutDate
+        `SELECT CASE WHEN o.check_out_date > r.check_out_date THEN o.check_out_date ELSE r.check_out_date END AS checkOutDate,
+                CASE
+                  WHEN l.checkout_minutes IS NOT NULL THEN l.checkout_minutes
+                  WHEN gl.planned_departure_minutes >= 0 AND gl.planned_departure_minutes < 660 THEN gl.planned_departure_minutes
+                  ELSE 660
+                END AS checkoutMinutes
          FROM stay_reservations r
          LEFT JOIN stay_checkout_overrides o ON o.reservation_id = r.id
+         LEFT JOIN stay_late_checkout_approvals l ON l.reservation_id = r.id
+         LEFT JOIN guest_lifecycle_state gl ON gl.reservation_id = r.id
          WHERE r.id = ? AND r.status = 'confirmed' LIMIT 1`,
         task.departingReservationId
       ))[0] || null;
       if (!departure || departure.checkOutDate !== task.serviceDate) return { ok: false, error: "stale_housekeeping_task" };
-      const approval = await this.getLateCheckoutApproval(task.departingReservationId);
-      const checkoutMinutes = Number(approval?.checkoutMinutes) || 660;
+      const checkoutMinutes = Number.isFinite(Number(departure.checkoutMinutes)) ? Number(departure.checkoutMinutes) : 660;
       const nowDate = new Date(nowValue || Date.now());
       const parts = Object.fromEntries(new Intl.DateTimeFormat("en-GB", {
         timeZone: "Asia/Bangkok", year: "numeric", month: "2-digit", day: "2-digit",
@@ -3297,14 +3324,32 @@ export class ConciergeStore extends DurableObject {
     const departures = rows(this.ctx.storage.sql.exec(
       `SELECT r.id AS departingReservationId, r.room,
               CASE WHEN o.check_out_date > r.check_out_date THEN o.check_out_date ELSE r.check_out_date END AS serviceDate,
-              COALESCE(l.checkout_minutes, 660) AS checkoutMinutes,
-              COALESCE(l.checkout_time, '11:00 AM') AS checkoutTime
+              CASE
+                WHEN gl.planned_departure_minutes >= 0
+                  AND gl.planned_departure_minutes < COALESCE(l.checkout_minutes, 660) THEN gl.planned_departure_minutes
+                WHEN l.checkout_minutes IS NOT NULL THEN l.checkout_minutes
+                ELSE 660
+              END AS checkoutMinutes,
+              CASE
+                WHEN gl.planned_departure_minutes >= 0
+                  AND gl.planned_departure_minutes < COALESCE(l.checkout_minutes, 660)
+                  AND gl.planned_departure_time <> '' THEN gl.planned_departure_time
+                WHEN l.checkout_time IS NOT NULL AND l.checkout_time <> '' THEN l.checkout_time
+                ELSE '11:00 AM'
+              END AS checkoutTime,
+              COALESCE(gl.planned_departure_time, '') AS plannedDepartureTime
        FROM stay_reservations r
        LEFT JOIN stay_checkout_overrides o ON o.reservation_id = r.id
        LEFT JOIN stay_late_checkout_approvals l ON l.reservation_id = r.id
+       LEFT JOIN guest_lifecycle_state gl ON gl.reservation_id = r.id
        WHERE r.status = 'confirmed'
          AND (CASE WHEN o.check_out_date > r.check_out_date THEN o.check_out_date ELSE r.check_out_date END) = ?
-         AND COALESCE(l.checkout_minutes, 660) <= ?
+         AND (CASE
+                WHEN gl.planned_departure_minutes >= 0
+                  AND gl.planned_departure_minutes < COALESCE(l.checkout_minutes, 660) THEN gl.planned_departure_minutes
+                WHEN l.checkout_minutes IS NOT NULL THEN l.checkout_minutes
+                ELSE 660
+              END) <= ?
        ORDER BY CAST(r.room AS INTEGER) ASC`,
       date, Math.floor(minutes)
     ));
@@ -3672,7 +3717,7 @@ export class ConciergeStore extends DurableObject {
     const reservations = rows(this.ctx.storage.sql.exec(
       `SELECT r.id, r.provider, r.room, r.listing_id AS listingId, r.guest_first_name AS guestFirstName, r.check_in_date AS checkInDate,
               CASE WHEN o.check_out_date > r.check_out_date THEN o.check_out_date ELSE r.check_out_date END AS checkOutDate,
-              r.status, r.updated_at AS updatedAt,
+              r.status, r.created_at AS createdAt, r.updated_at AS updatedAt,
               COALESCE(q.status, g.status, 'not_started') AS registrationStatus,
               COALESCE(q.guest_type, '') AS guestType,
               COALESCE(q.required_passports, 0) AS requiredPassports,
@@ -3680,12 +3725,17 @@ export class ConciergeStore extends DurableObject {
               COALESCE(l.checkout_minutes, 0) AS lateCheckoutMinutes,
               COALESCE(l.checkout_time, '') AS lateCheckoutTime,
               COALESCE(l.fee_thb, 0) AS lateCheckoutFeeThb,
-              COALESCE(l.approved_at, '') AS lateCheckoutApprovedAt
+              COALESCE(l.approved_at, '') AS lateCheckoutApprovedAt,
+              COALESCE(gl.planned_departure_time, '') AS plannedDepartureTime,
+              COALESCE(gl.planned_departure_minutes, -1) AS plannedDepartureMinutes,
+              COALESCE(gl.extension_interest, '') AS extensionInterest,
+              COALESCE(gl.departure_prompt_sent_at, '') AS departurePromptSentAt
        FROM stay_reservations r
        LEFT JOIN stay_checkout_overrides o ON o.reservation_id = r.id
        LEFT JOIN stay_registration_status g ON g.reservation_id = r.id
        LEFT JOIN stay_registration_requirements q ON q.reservation_id = r.id
        LEFT JOIN stay_late_checkout_approvals l ON l.reservation_id = r.id
+       LEFT JOIN guest_lifecycle_state gl ON gl.reservation_id = r.id
        WHERE r.status = 'confirmed'
          AND (CASE WHEN o.check_out_date > r.check_out_date THEN o.check_out_date ELSE r.check_out_date END) >= date('now', '-1 day')
        ORDER BY r.check_in_date ASC, r.room ASC LIMIT 250`
@@ -3745,7 +3795,7 @@ export class ConciergeStore extends DurableObject {
       `SELECT r.id, r.provider, r.listing_id AS listingId, r.room, r.guest_first_name AS guestFirstName,
               r.check_in_date AS checkInDate,
               CASE WHEN o.check_out_date > r.check_out_date THEN o.check_out_date ELSE r.check_out_date END AS checkOutDate,
-              r.status, r.updated_at AS updatedAt,
+              r.status, r.created_at AS createdAt, r.updated_at AS updatedAt,
               COALESCE(q.status, g.status, 'not_started') AS registrationStatus,
               COALESCE(q.guest_type, '') AS guestType,
               COALESCE(q.required_passports, 0) AS requiredPassports,
@@ -3753,12 +3803,17 @@ export class ConciergeStore extends DurableObject {
               COALESCE(l.checkout_minutes, 0) AS lateCheckoutMinutes,
               COALESCE(l.checkout_time, '') AS lateCheckoutTime,
               COALESCE(l.fee_thb, 0) AS lateCheckoutFeeThb,
-              COALESCE(l.approved_at, '') AS lateCheckoutApprovedAt
+              COALESCE(l.approved_at, '') AS lateCheckoutApprovedAt,
+              COALESCE(gl.planned_departure_time, '') AS plannedDepartureTime,
+              COALESCE(gl.planned_departure_minutes, -1) AS plannedDepartureMinutes,
+              COALESCE(gl.extension_interest, '') AS extensionInterest,
+              COALESCE(gl.departure_prompt_sent_at, '') AS departurePromptSentAt
        FROM stay_reservations r
        LEFT JOIN stay_checkout_overrides o ON o.reservation_id = r.id
        LEFT JOIN stay_registration_status g ON g.reservation_id = r.id
        LEFT JOIN stay_registration_requirements q ON q.reservation_id = r.id
        LEFT JOIN stay_late_checkout_approvals l ON l.reservation_id = r.id
+       LEFT JOIN guest_lifecycle_state gl ON gl.reservation_id = r.id
        WHERE r.id = ? LIMIT 1`,
       cleanText(reservationId, 100)
     ))[0] || null;
@@ -5184,6 +5239,151 @@ export class ConciergeStore extends DurableObject {
       cleanText(record.engineVersion, 20) || "v1", cleanText(record.decidedByUserId, 100), now, now
     );
     return { ok: true, id, decidedAt: now };
+  }
+
+  async getGuestLifecycleState(reservationIdValue) {
+    const reservationId = cleanText(reservationIdValue, 100);
+    if (!reservationId) return null;
+    const item = rows(this.ctx.storage.sql.exec(
+      `SELECT reservation_id AS reservationId, external_booking_id AS externalBookingId,
+              source_label AS sourceLabel, thread_id AS threadId, communicated_json AS communicatedJson,
+              booking_sent_at AS bookingSentAt, prearrival_sent_at AS prearrivalSentAt,
+              checkin_sent_at AS checkinSentAt, departure_prompt_sent_at AS departurePromptSentAt,
+              checkout_sent_at AS checkoutSentAt, planned_departure_minutes AS plannedDepartureMinutes,
+              planned_departure_time AS plannedDepartureTime, extension_interest AS extensionInterest,
+              updated_at AS updatedAt
+       FROM guest_lifecycle_state WHERE reservation_id = ? LIMIT 1`,
+      reservationId
+    ))[0] || null;
+    if (!item) return null;
+    let communicated = [];
+    try { communicated = JSON.parse(item.communicatedJson || "[]"); } catch (_error) { communicated = []; }
+    const { communicatedJson, ...rest } = item;
+    return {
+      ...rest,
+      communicated: Array.isArray(communicated) ? communicated : [],
+      plannedDepartureMinutes: Number(item.plannedDepartureMinutes)
+    };
+  }
+
+  async upsertGuestLifecycleState(record = {}) {
+    const reservationId = cleanText(record.reservationId, 100);
+    if (!reservationId) return { ok: false, error: "reservation_required" };
+    const now = cleanText(record.updatedAt, 40) || new Date().toISOString();
+    const current = await this.getGuestLifecycleState(reservationId);
+    const communicated = Array.from(new Set([
+      ...(Array.isArray(current?.communicated) ? current.communicated : []),
+      ...(Array.isArray(record.communicated) ? record.communicated.map((x) => cleanText(x, 80)).filter(Boolean) : [])
+    ])).slice(0, 100);
+    const value = (key, fallback = "") => record[key] !== undefined ? cleanText(record[key], 220) : cleanText(current?.[key] || fallback, 220);
+    const plannedMinutes = record.plannedDepartureMinutes !== undefined
+      ? Math.max(-1, Math.min(1439, Number(record.plannedDepartureMinutes)))
+      : Number.isFinite(Number(current?.plannedDepartureMinutes)) ? Number(current.plannedDepartureMinutes) : -1;
+    this.ctx.storage.sql.exec(
+      `INSERT INTO guest_lifecycle_state
+       (reservation_id, external_booking_id, source_label, thread_id, communicated_json,
+        booking_sent_at, prearrival_sent_at, checkin_sent_at, departure_prompt_sent_at, checkout_sent_at,
+        planned_departure_minutes, planned_departure_time, extension_interest, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(reservation_id) DO UPDATE SET
+         external_booking_id = excluded.external_booking_id,
+         source_label = excluded.source_label,
+         thread_id = excluded.thread_id,
+         communicated_json = excluded.communicated_json,
+         booking_sent_at = excluded.booking_sent_at,
+         prearrival_sent_at = excluded.prearrival_sent_at,
+         checkin_sent_at = excluded.checkin_sent_at,
+         departure_prompt_sent_at = excluded.departure_prompt_sent_at,
+         checkout_sent_at = excluded.checkout_sent_at,
+         planned_departure_minutes = excluded.planned_departure_minutes,
+         planned_departure_time = excluded.planned_departure_time,
+         extension_interest = excluded.extension_interest,
+         updated_at = excluded.updated_at`,
+      reservationId,
+      value("externalBookingId"),
+      value("sourceLabel"),
+      value("threadId"),
+      JSON.stringify(communicated),
+      value("bookingSentAt"),
+      value("prearrivalSentAt"),
+      value("checkinSentAt"),
+      value("departurePromptSentAt"),
+      value("checkoutSentAt"),
+      Number.isFinite(plannedMinutes) ? Math.floor(plannedMinutes) : -1,
+      value("plannedDepartureTime"),
+      value("extensionInterest"),
+      now
+    );
+    return { ok: true, state: await this.getGuestLifecycleState(reservationId) };
+  }
+
+  async listGuestLifecycleReservations() {
+    return rows(this.ctx.storage.sql.exec(
+      `SELECT r.id, r.provider, r.room, r.guest_first_name AS guestFirstName,
+              r.check_in_date AS checkInDate,
+              CASE WHEN o.check_out_date > r.check_out_date THEN o.check_out_date ELSE r.check_out_date END AS checkOutDate,
+              r.status, r.created_at AS createdAt, r.updated_at AS updatedAt,
+              COALESCE(q.status, g.status, 'not_started') AS registrationStatus,
+              COALESCE(q.guest_type, '') AS guestType,
+              COALESCE(q.required_passports, 0) AS requiredPassports,
+              COALESCE(q.received_passports, 0) AS receivedPassports,
+              COALESCE(l.checkout_minutes, 0) AS lateCheckoutMinutes,
+              COALESCE(l.checkout_time, '') AS lateCheckoutTime,
+              COALESCE(gl.external_booking_id, '') AS externalBookingId,
+              COALESCE(gl.source_label, '') AS sourceLabel,
+              COALESCE(gl.thread_id, '') AS threadId,
+              COALESCE(gl.booking_sent_at, '') AS bookingSentAt,
+              COALESCE(gl.prearrival_sent_at, '') AS prearrivalSentAt,
+              COALESCE(gl.checkin_sent_at, '') AS checkinSentAt,
+              COALESCE(gl.departure_prompt_sent_at, '') AS departurePromptSentAt,
+              COALESCE(gl.checkout_sent_at, '') AS checkoutSentAt,
+              COALESCE(gl.planned_departure_minutes, -1) AS plannedDepartureMinutes,
+              COALESCE(gl.planned_departure_time, '') AS plannedDepartureTime,
+              COALESCE(gl.extension_interest, '') AS extensionInterest,
+              COALESCE(gl.communicated_json, '[]') AS communicatedJson
+       FROM stay_reservations r
+       LEFT JOIN stay_checkout_overrides o ON o.reservation_id = r.id
+       LEFT JOIN stay_registration_status g ON g.reservation_id = r.id
+       LEFT JOIN stay_registration_requirements q ON q.reservation_id = r.id
+       LEFT JOIN stay_late_checkout_approvals l ON l.reservation_id = r.id
+       LEFT JOIN guest_lifecycle_state gl ON gl.reservation_id = r.id
+       WHERE r.status = 'confirmed'
+         AND (CASE WHEN o.check_out_date > r.check_out_date THEN o.check_out_date ELSE r.check_out_date END) >= date('now', '-1 day')
+         AND r.check_in_date <= date('now', '+370 days')
+       ORDER BY r.check_in_date ASC, CAST(r.room AS INTEGER) ASC
+       LIMIT 500`
+    )).map((item) => {
+      let communicated = [];
+      try { communicated = JSON.parse(item.communicatedJson || "[]"); } catch (_error) { communicated = []; }
+      const { communicatedJson, ...rest } = item;
+      return { ...rest, communicated: Array.isArray(communicated) ? communicated : [] };
+    });
+  }
+
+  async mobileListPushDevices(tenantIdValue = "") {
+    const tenantId = cleanText(tenantIdValue, 100);
+    return rows(this.ctx.storage.sql.exec(
+      `SELECT d.id, d.tenant_id AS tenantId, d.user_id AS userId, d.device_id AS deviceId,
+              d.expo_push_token AS expoPushToken, d.platform, d.app_version AS appVersion,
+              d.enabled, d.created_at AS createdAt, d.updated_at AS updatedAt,
+              COALESCE(m.role, '') AS role
+       FROM platform_push_devices d
+       LEFT JOIN platform_memberships m ON m.tenant_id = d.tenant_id AND m.user_id = d.user_id AND m.status = 'active'
+       WHERE d.enabled = 1 AND (? = '' OR d.tenant_id = ?)
+       ORDER BY d.updated_at DESC LIMIT 250`,
+      tenantId, tenantId
+    )).map((item) => ({ ...item, enabled: Boolean(item.enabled) }));
+  }
+
+  async mobileDisablePushDeviceByToken(expoPushTokenValue, nowValue = "") {
+    const token = cleanText(expoPushTokenValue, 300);
+    if (!token) return { ok: false, error: "token_required" };
+    const now = cleanText(nowValue, 40) || new Date().toISOString();
+    this.ctx.storage.sql.exec(
+      "UPDATE platform_push_devices SET enabled = 0, updated_at = ? WHERE expo_push_token = ?",
+      now, token
+    );
+    return { ok: true };
   }
 
   async mobileUpsertPushDevice(record = {}) {

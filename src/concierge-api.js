@@ -4612,6 +4612,7 @@ const UNIFIED_MESSAGING_REVIEW_PATTERN = /\b(?:cancel|cancellation|refund|charge
 
 function unifiedMessagingAutoSendDecision(question, result) {
   if (!result?.answer) return { autoSend: false, reason: "empty_reply" };
+  if (Number(result.confidence || 0) < 0.96) return { autoSend: false, reason: "confidence_below_threshold" };
   if (result.needsHuman === true) return { autoSend: false, reason: "human_review_required" };
   if (result.handoff && result.handoff !== "none") return { autoSend: false, reason: "handoff_required" };
   if (["emergency", "property-emergency"].includes(result.category)) return { autoSend: false, reason: "emergency_review" };
@@ -4671,7 +4672,8 @@ export async function generateUnifiedMessageReply(context, env, ctx, now = new D
     source: String(result.source || ""),
     actions: Array.isArray(result.actions) ? result.actions : [],
     language: String(result.language || context?.language || "en"),
-    operationProposal: result.operationProposal || null
+    operationProposal: result.operationProposal || null,
+    confidence: Number(result.confidence || 0)
   };
 }
 

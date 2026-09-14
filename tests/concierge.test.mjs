@@ -63,17 +63,24 @@ import {
   beds24AvailabilityAllowsStay,
   beds24ChannelManagerConfiguration,
   beds24ChannelManagerEnabled,
-  beds24DirectStaySyncConfiguration,
-  beds24DirectStaySyncEnabled,
+  beds24DirectStayProtectionConfiguration,
+  beds24DirectStayProtectionEnabled,
   beds24ReservationProvider,
-  cancelBeds24HouseDirectBooking,
   createBeds24HouseDirectBooking,
   houseRoomToBeds24RoomId,
   ingestBeds24ChannelBooking,
-  processBeds24ChannelManagerRetries,
-  reconcileBeds24ChannelManager,
   updateBeds24HouseDirectExtension
 } from "../src/beds24-channel-manager.js";
+import {
+  beds24ListingsRatesConfiguration,
+  beds24RateInventoryWritesEnabled,
+  getBeds24ListingsRates,
+  writeBeds24ListingRateCell
+} from "../src/beds24-listings-rates.js";
+import { guestLifecycleMessagingConfiguration, lifecycleStageForReservation } from "../src/lifecycle-messaging.js";
+import { captureDepartureIntent } from "../src/departure-intent.js";
+import { sendMobilePush } from "../src/mobile-push.js";
+
 import {
   beds24AirbnbIncomeRecord,
   beds24AirbnbPaymentSummary,
@@ -10261,7 +10268,7 @@ test("owner booking alerts expose sanitized alert-bound Meta diagnostics with re
     assert.match(adminScript, /label: "Template", value: latestDiagnostic\.templateName/);
     assert.match(adminScript, /label: "Language", value: latestDiagnostic\.languageCode/);
     assert.match(adminScript, /label: "Attempted", value: item\.attempted \|\| 0/);
-    assert.match(adminScript, /label: "Service", value: "Meta"/);
+    assert.match(adminScript, /label: "Provider", value: "Meta"/);
     assert.match(adminScript, /concierge-admin-diagnostic-grid/);
     assert.match(adminScript, /Provider message/);
   } finally {
@@ -11516,7 +11523,6 @@ async function loadAirbnbSyncContext(overrides = {}) {
   const source = await readFile(new URL("../airbnb-sync/Code.gs", import.meta.url), "utf8");
   const context = vm.createContext({
     console,
-    Date,
     Utilities: { formatDate: appsScriptFormatDate },
     ...overrides
   });
@@ -13794,8 +13800,8 @@ test("v5.11.54 owner admin renders integrations as a read-only connector surface
   assert.match(html, /id="integrationProviders"/);
   assert.match(js, /renderIntegrations\(data\.integrations \|\| \{\}\)/);
   assert.match(js, /How to connect/);
-  assert.match(js, /Official channel information/);
-  assert.match(js, /Connection status:/);
+  assert.match(js, /Official provider information/);
+  assert.match(js, /Connector status:/);
   assert.match(js, /button\.disabled = true/);
   assert.match(css, /\.concierge-admin-integration-guide/);
   assert.match(css, /\.concierge-admin-integration-links/);
@@ -13880,8 +13886,8 @@ test("v5.11.56 House routes and Owner Admin use Beds24 plus direct WhatsApp with
   assert.match(indexSource, /\/api\/messaging\/beds24\/webhook/);
   assert.match(messagingSource, /https:\/\/beds24\.com\/api\/v2/);
   assert.match(messagingSource, /bookings\/messages/);
-  assert.match(adminHtml, /Airbnb and connected booking-channel messages appear here alongside WhatsApp/);
-  assert.match(adminJs, /Booking messages/);
+  assert.match(adminHtml, /OTA messaging via Beds24 \+ direct WhatsApp/);
+  assert.match(adminJs, /OTA via Beds24/);
   assert.doesNotMatch(`${indexSource}\n${messagingSource}\n${adminHtml}\n${adminJs}`, /Smoobu|smoobu|SMOOBU/);
   assert.match(messagingSource, /status: \["confirmed", "new"\]/);
   assert.match(messagingSource, /latest_message_not_guest/);
@@ -13898,7 +13904,7 @@ test("v5.11.56 Beds24 access tokens are cached in the Durable Object while the r
   assert.match(messagingSource, /BEDS24_REFRESH_TOKEN/);
   assert.doesNotMatch(wrangler, /BEDS24_REFRESH_TOKEN/);
   assert.match(wrangler, /"UNIFIED_MESSAGING_AI_REPLY_ENABLED": "true"/);
-  assert.match(wrangler, /"UNIFIED_MESSAGING_AI_AUTO_SEND_ENABLED": "false"/);
+  assert.match(wrangler, /"UNIFIED_MESSAGING_AI_AUTO_SEND_ENABLED": "true"/);
 });
 
 
@@ -14067,7 +14073,7 @@ test("v5.11.56 Beds24 webhook booking ingestion writes the canonical reservation
   assert.equal(captured[0].status, "confirmed");
 });
 
-test("v5.11.56 Beds24 channel-manager source contract keeps central protection and retries while preserving AI auto-send false", async () => {
+test("v5.11.76 keeps Beds24 channel-manager protection staged while guarded AI auto-send is enabled", async () => {
   const [staySource, indexSource, storeSource, wrangler] = await Promise.all([
     readFile(new URL("../src/stay-api.js", import.meta.url), "utf8"),
     readFile(new URL("../src/index.js", import.meta.url), "utf8"),
@@ -14081,381 +14087,10 @@ test("v5.11.56 Beds24 channel-manager source contract keeps central protection a
   assert.match(indexSource, /reconcileBeds24ChannelManager/);
   assert.match(storeSource, /CREATE TABLE IF NOT EXISTS beds24_reservation_links/);
   assert.match(storeSource, /CREATE TABLE IF NOT EXISTS beds24_channel_retries/);
-  assert.match(wrangler, /"UNIFIED_MESSAGING_AI_AUTO_SEND_ENABLED": "false"/);
+  assert.match(wrangler, /"UNIFIED_MESSAGING_AI_AUTO_SEND_ENABLED": "true"/);
   assert.match(wrangler, /"BEDS24_CHANNEL_MANAGER_ENABLED": "false"/);
 });
 
-
-
-test("v5.11.75 direct-stay protection is independently ready while full Channel Manager stays off", async () => {
-  const roomMap = JSON.stringify(Object.fromEntries(Array.from({ length: 11 }, (_, index) => [String(99701 + index), String(index + 1)])));
-  assert.equal(beds24DirectStaySyncEnabled({}), false);
-  assert.equal(beds24DirectStaySyncEnabled({ BEDS24_DIRECT_STAY_SYNC_ENABLED: "true" }), true);
-  const direct = beds24DirectStaySyncConfiguration({
-    BEDS24_CHANNEL_MANAGER_ENABLED: "false",
-    BEDS24_DIRECT_STAY_SYNC_ENABLED: "true",
-    BEDS24_REFRESH_TOKEN: "refresh",
-    BEDS24_ROOM_MAP: roomMap
-  });
-  assert.equal(direct.ready, true);
-  assert.equal(direct.roomMapComplete, true);
-  const full = beds24ChannelManagerConfiguration({
-    BEDS24_CHANNEL_MANAGER_ENABLED: "false",
-    BEDS24_DIRECT_STAY_SYNC_ENABLED: "true",
-    BEDS24_REFRESH_TOKEN: "refresh",
-    BEDS24_WEBHOOK_TOKEN: "webhook",
-    STAY_TOKEN_PEPPER: "pepper",
-    BEDS24_ROOM_MAP: roomMap
-  });
-  assert.equal(full.ready, false);
-  assert.equal(full.centralAvailabilityAuthoritative, false);
-  const wrangler = await readFile(new URL("../wrangler.jsonc", import.meta.url), "utf8");
-  assert.match(wrangler, /"BEDS24_DIRECT_STAY_SYNC_ENABLED": "true"/);
-  assert.match(wrangler, /"BEDS24_CHANNEL_MANAGER_ENABLED": "false"/);
-});
-
-
-test("v5.11.75 desktop/mobile Direct Stay handler protects Beds24 before creating the local stay with full Channel Manager off", async () => {
-  const originalFetch = globalThis.fetch;
-  const order = [];
-  globalThis.fetch = async (url, options = {}) => {
-    if (String(url).includes("inventory/rooms/availability")) {
-      order.push("beds24_availability");
-      return new Response(JSON.stringify({ data: [{ roomId: 99751, availability: { "2026-10-10": true, "2026-10-11": true } }] }), { status: 200 });
-    }
-    order.push("beds24_booking");
-    return new Response(JSON.stringify([{ success: true, new: { id: 777551 } }]), { status: 200 });
-  };
-  try {
-    const map = JSON.stringify(Object.fromEntries(Array.from({ length: 11 }, (_, index) => [String(99751 + index), String(index + 1)])));
-    const localId = "stay_12345678901234567890";
-    const store = {
-      async getMessagingProviderState() { return { value: { accessToken: "access" }, expiresAt: new Date(Date.now() + 3_600_000).toISOString() }; },
-      async findStayOverlap() { return null; },
-      async syncStayReservations() { order.push("local_stay"); return { upserted: 1 }; },
-      async getStayReservationByCodeHash() { return { id: localId }; },
-      async linkBeds24Reservation(record) { order.push("local_link"); assert.equal(record.externalBookingId, "777551"); return { ok: true }; },
-      async cancelOwnerManagedStay() { order.push("unexpected_local_cancel"); return { ok: true }; }
-    };
-    const env = {
-      BEDS24_CHANNEL_MANAGER_ENABLED: "false",
-      BEDS24_DIRECT_STAY_SYNC_ENABLED: "true",
-      BEDS24_REFRESH_TOKEN: "refresh",
-      BEDS24_ROOM_MAP: map,
-      STAY_TOKEN_PEPPER: "pepper"
-    };
-    const response = await handleStayAdminRequest(new Request("https://guide.example/api/concierge/admin/direct-stays", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ room: "1", checkInDate: "2026-10-10", checkOutDate: "2026-10-12" })
-    }), env, "/api/concierge/admin/direct-stays", store);
-    assert.equal(response.status, 200);
-    const body = await response.json();
-    assert.equal(body.ok, true);
-    assert.equal(body.beds24Synchronized, true);
-    assert.deepEqual(order, ["beds24_availability", "beds24_booking", "local_stay", "local_link"]);
-  } finally {
-    globalThis.fetch = originalFetch;
-  }
-});
-
-test("v5.11.75 direct stay create, extension and cancellation write to Beds24 with full Channel Manager off", async () => {
-  const originalFetch = globalThis.fetch;
-  const calls = [];
-  globalThis.fetch = async (url, options = {}) => {
-    calls.push({ url: String(url), method: options.method || "GET", body: options.body || "" });
-    if (String(url).includes("inventory/rooms/availability")) {
-      const target = new URL(String(url));
-      const start = target.searchParams.get("startDate");
-      const end = target.searchParams.get("endDate");
-      const availability = {};
-      for (let current = start; current && current <= end;) {
-        availability[current] = true;
-        const date = new Date(`${current}T12:00:00Z`);
-        date.setUTCDate(date.getUTCDate() + 1);
-        current = date.toISOString().slice(0, 10);
-      }
-      return new Response(JSON.stringify({ data: [{ roomId: 99801, availability }] }), { status: 200 });
-    }
-    const body = String(options.body || "");
-    if (body.includes('"status":"cancelled"')) return new Response(JSON.stringify([{ success: true, modified: { id: 880022 } }]), { status: 200 });
-    if (body.includes('"departure":"2026-10-05"')) return new Response(JSON.stringify([{ success: true, modified: { id: 880022 } }]), { status: 200 });
-    return new Response(JSON.stringify([{ success: true, new: { id: 880022 } }]), { status: 200 });
-  };
-  try {
-    const roomMap = JSON.stringify(Object.fromEntries(Array.from({ length: 11 }, (_, index) => [String(99801 + index), String(index + 1)])));
-    const store = {
-      async getMessagingProviderState() {
-        return { value: { accessToken: "access" }, expiresAt: new Date(Date.now() + 3_600_000).toISOString() };
-      }
-    };
-    const env = {
-      BEDS24_CHANNEL_MANAGER_ENABLED: "false",
-      BEDS24_DIRECT_STAY_SYNC_ENABLED: "true",
-      BEDS24_REFRESH_TOKEN: "refresh",
-      BEDS24_ROOM_MAP: roomMap
-    };
-    const created = await createBeds24HouseDirectBooking(env, store, { room: "1", checkInDate: "2026-10-01", checkOutDate: "2026-10-03" });
-    assert.equal(created.ok, true);
-    assert.equal(created.externalBookingId, "880022");
-    const extended = await updateBeds24HouseDirectExtension(env, store, {
-      externalBookingId: created.externalBookingId,
-      room: "1",
-      currentCheckOutDate: "2026-10-03",
-      checkOutDate: "2026-10-05"
-    });
-    assert.equal(extended.ok, true);
-    const cancelled = await cancelBeds24HouseDirectBooking(env, store, created.externalBookingId);
-    assert.equal(cancelled.ok, true);
-    assert.equal(calls.filter((call) => call.url.includes("inventory/rooms/availability")).length, 2);
-    assert.equal(calls.filter((call) => /\/bookings$/.test(new URL(call.url).pathname)).length, 3);
-    assert.equal(calls.every((call) => call.method === "GET" || call.method === "POST"), true);
-  } finally {
-    globalThis.fetch = originalFetch;
-  }
-});
-
-test("v5.11.75 direct-stay retry processing remains active with full Channel Manager off", async () => {
-  const originalFetch = globalThis.fetch;
-  globalThis.fetch = async (_url, _options = {}) => new Response(JSON.stringify([{ success: true, modified: { id: 991177 } }]), { status: 200 });
-  const completed = [];
-  try {
-    const store = {
-      async listBeds24ChannelRetries() {
-        return [{ id: "retry_demo", operation: "cancel", externalBookingId: "991177", payload: {}, attemptCount: 0 }];
-      },
-      async completeBeds24ChannelRetry(id, success, error) { completed.push({ id, success, error }); },
-      async rescheduleBeds24ChannelRetry() { throw new Error("retry should not reschedule"); },
-      async getMessagingProviderState() {
-        return { value: { accessToken: "access" }, expiresAt: new Date(Date.now() + 3_600_000).toISOString() };
-      }
-    };
-    const env = {
-      BEDS24_CHANNEL_MANAGER_ENABLED: "false",
-      BEDS24_DIRECT_STAY_SYNC_ENABLED: "true",
-      BEDS24_REFRESH_TOKEN: "refresh",
-      CONCIERGE_STORE: { getByName() { return store; } }
-    };
-    const result = await processBeds24ChannelManagerRetries(env);
-    assert.deepEqual(result, { ok: true, processed: 1, completed: 1, failed: 0 });
-    assert.equal(completed.length, 1);
-    assert.equal(completed[0].success, true);
-  } finally {
-    globalThis.fetch = originalFetch;
-  }
-});
-
-test("v5.11.75 full Beds24 reservation authority remains off while House-required capabilities remain independent", async () => {
-  const roomMap = JSON.stringify(Object.fromEntries(Array.from({ length: 11 }, (_, index) => [String(99901 + index), String(index + 1)])));
-  const env = {
-    BEDS24_CHANNEL_MANAGER_ENABLED: "false",
-    BEDS24_DIRECT_STAY_SYNC_ENABLED: "true",
-    BEDS24_FINANCE_SYNC_ENABLED: "true",
-    BEDS24_REFRESH_TOKEN: "refresh",
-    BEDS24_WEBHOOK_TOKEN: "webhook",
-    BEDS24_ROOM_MAP: roomMap,
-    UNIFIED_MESSAGING_ENABLED: "true",
-    UNIFIED_MESSAGING_AI_REPLY_ENABLED: "true",
-    UNIFIED_MESSAGING_AI_AUTO_SEND_ENABLED: "false",
-    UNIFIED_MESSAGING_INTERNAL_TOKEN: "internal",
-    WHATSAPP_ACCESS_TOKEN: "wa",
-    WHATSAPP_PHONE_NUMBER_ID: "123456789",
-    WHATSAPP_WEBHOOK_VERIFY_TOKEN: "verify",
-    META_APP_SECRET: "secret",
-    WHATSAPP_GUEST_INIT_TEMPLATE_NAME: "house_guest_start"
-  };
-  assert.equal(beds24ChannelManagerConfiguration(env).ready, false);
-  assert.equal(beds24DirectStaySyncConfiguration(env).ready, true);
-  assert.equal(beds24FinanceSyncConfiguration(env).ready, true);
-  const messaging = unifiedMessagingConfiguration(env);
-  assert.equal(messaging.enabled, true);
-  assert.equal(messaging.beds24Ready, true);
-  assert.equal(messaging.aiReplyReady, true);
-  assert.equal(messaging.aiAutoSendEnabled, false);
-  const ignoredIngest = await ingestBeds24ChannelBooking({ id: 1 }, env, { async syncBeds24ChannelReservation() { throw new Error("must stay disabled"); } });
-  assert.equal(ignoredIngest.ignored, "channel_manager_disabled");
-  const ignoredReconcile = await reconcileBeds24ChannelManager(env);
-  assert.equal(ignoredReconcile.ignored, "channel_manager_disabled");
-  const health = mobileIntegrationHealth(env);
-  assert.equal(health.channelManager.status, "off");
-  assert.equal(health.directStayProtection.status, "active");
-  assert.equal(health.financeAutomation.status, "active");
-  assert.equal(health.unifiedMessaging.status, "connected");
-  assert.equal(health.whatsapp.status, "connected");
-});
-
-
-test("v5.11.75 Direct Stay fails closed before local creation when Beds24 cannot protect the dates", async () => {
-  const originalFetch = globalThis.fetch;
-  let localWrites = 0;
-  globalThis.fetch = async (url) => {
-    if (String(url).includes("inventory/rooms/availability")) {
-      return new Response(JSON.stringify({ data: [{ roomId: 99951, availability: { "2026-11-01": false, "2026-11-02": false } }] }), { status: 200 });
-    }
-    throw new Error("booking write must not occur when unavailable");
-  };
-  try {
-    const roomMap = JSON.stringify(Object.fromEntries(Array.from({ length: 11 }, (_, index) => [String(99951 + index), String(index + 1)])));
-    const store = {
-      async getMessagingProviderState() { return { value: { accessToken: "access" }, expiresAt: new Date(Date.now() + 3_600_000).toISOString() }; },
-      async findStayOverlap() { return null; },
-      async getStayReservationByCodeHash() { return null; },
-      async linkBeds24Reservation() { return { ok: true }; },
-      async cancelOwnerManagedStay() { return { ok: true }; },
-      async syncStayReservations() { localWrites += 1; return { upserted: 1 }; }
-    };
-    const env = {
-      BEDS24_CHANNEL_MANAGER_ENABLED: "false",
-      BEDS24_DIRECT_STAY_SYNC_ENABLED: "true",
-      BEDS24_REFRESH_TOKEN: "refresh",
-      BEDS24_ROOM_MAP: roomMap,
-      STAY_TOKEN_PEPPER: "pepper"
-    };
-    const response = await handleStayAdminRequest(new Request("https://guide.example/api/concierge/admin/direct-stays", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ room: "1", checkInDate: "2026-11-01", checkOutDate: "2026-11-03" })
-    }), env, "/api/concierge/admin/direct-stays", store);
-    assert.equal(response.status, 409);
-    assert.equal((await response.json()).error, "beds24_room_unavailable");
-    assert.equal(localWrites, 0);
-  } finally {
-    globalThis.fetch = originalFetch;
-  }
-});
-
-test("v5.11.75 Direct Stay cancels the Beds24 block immediately if local creation fails", async () => {
-  const originalFetch = globalThis.fetch;
-  const order = [];
-  globalThis.fetch = async (url, options = {}) => {
-    if (String(url).includes("inventory/rooms/availability")) {
-      order.push("availability");
-      return new Response(JSON.stringify({ data: [{ roomId: 99961, availability: { "2026-11-05": true, "2026-11-06": true } }] }), { status: 200 });
-    }
-    const body = String(options.body || "");
-    if (body.includes('"status":"cancelled"')) {
-      order.push("provider_cancel");
-      return new Response(JSON.stringify([{ success: true, modified: { id: 661122 } }]), { status: 200 });
-    }
-    order.push("provider_create");
-    return new Response(JSON.stringify([{ success: true, new: { id: 661122 } }]), { status: 200 });
-  };
-  try {
-    const roomMap = JSON.stringify(Object.fromEntries(Array.from({ length: 11 }, (_, index) => [String(99961 + index), String(index + 1)])));
-    const store = {
-      async getMessagingProviderState() { return { value: { accessToken: "access" }, expiresAt: new Date(Date.now() + 3_600_000).toISOString() }; },
-      async findStayOverlap() { return null; },
-      async getStayReservationByCodeHash() { return null; },
-      async linkBeds24Reservation() { return { ok: true }; },
-      async cancelOwnerManagedStay() { return { ok: true }; },
-      async syncStayReservations() { order.push("local_create_failed"); return { upserted: 0 }; },
-      async queueBeds24ChannelRetry() { throw new Error("immediate provider cancellation succeeded; no retry expected"); }
-    };
-    const env = {
-      BEDS24_CHANNEL_MANAGER_ENABLED: "false",
-      BEDS24_DIRECT_STAY_SYNC_ENABLED: "true",
-      BEDS24_REFRESH_TOKEN: "refresh",
-      BEDS24_ROOM_MAP: roomMap,
-      STAY_TOKEN_PEPPER: "pepper"
-    };
-    const response = await handleStayAdminRequest(new Request("https://guide.example/api/concierge/admin/direct-stays", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ room: "1", checkInDate: "2026-11-05", checkOutDate: "2026-11-07" })
-    }), env, "/api/concierge/admin/direct-stays", store);
-    assert.equal(response.status, 503);
-    assert.equal((await response.json()).error, "stay_creation_failed");
-    assert.deepEqual(order, ["availability", "provider_create", "local_create_failed", "provider_cancel"]);
-  } finally {
-    globalThis.fetch = originalFetch;
-  }
-});
-
-test("v5.11.75 Direct Stay rolls back both local and Beds24 booking when provider linking fails", async () => {
-  const originalFetch = globalThis.fetch;
-  const order = [];
-  globalThis.fetch = async (url, options = {}) => {
-    if (String(url).includes("inventory/rooms/availability")) {
-      order.push("availability");
-      return new Response(JSON.stringify({ data: [{ roomId: 99971, availability: { "2026-11-10": true, "2026-11-11": true } }] }), { status: 200 });
-    }
-    const body = String(options.body || "");
-    if (body.includes('"status":"cancelled"')) {
-      order.push("provider_cancel");
-      return new Response(JSON.stringify([{ success: true, modified: { id: 771122 } }]), { status: 200 });
-    }
-    order.push("provider_create");
-    return new Response(JSON.stringify([{ success: true, new: { id: 771122 } }]), { status: 200 });
-  };
-  try {
-    const roomMap = JSON.stringify(Object.fromEntries(Array.from({ length: 11 }, (_, index) => [String(99971 + index), String(index + 1)])));
-    const store = {
-      async getMessagingProviderState() { return { value: { accessToken: "access" }, expiresAt: new Date(Date.now() + 3_600_000).toISOString() }; },
-      async findStayOverlap() { return null; },
-      async syncStayReservations() { order.push("local_create"); return { upserted: 1 }; },
-      async getStayReservationByCodeHash() { return { id: "stay_rollback_12345678901234567890" }; },
-      async linkBeds24Reservation() { order.push("link_failed"); return { ok: false, error: "db_failure" }; },
-      async cancelOwnerManagedStay(id) { order.push(`local_cancel:${id}`); return { ok: true }; },
-      async queueBeds24ChannelRetry() { throw new Error("provider cancellation succeeded; no retry expected"); }
-    };
-    const env = {
-      BEDS24_CHANNEL_MANAGER_ENABLED: "false",
-      BEDS24_DIRECT_STAY_SYNC_ENABLED: "true",
-      BEDS24_REFRESH_TOKEN: "refresh",
-      BEDS24_ROOM_MAP: roomMap,
-      STAY_TOKEN_PEPPER: "pepper"
-    };
-    const response = await handleStayAdminRequest(new Request("https://guide.example/api/concierge/admin/direct-stays", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ room: "1", checkInDate: "2026-11-10", checkOutDate: "2026-11-12" })
-    }), env, "/api/concierge/admin/direct-stays", store);
-    assert.equal(response.status, 503);
-    assert.equal((await response.json()).error, "beds24_link_failed");
-    assert.deepEqual(order, ["availability", "provider_create", "local_create", "link_failed", "local_cancel:stay_rollback_12345678901234567890", "provider_cancel"]);
-  } finally {
-    globalThis.fetch = originalFetch;
-  }
-});
-
-test("v5.11.75 Direct Stay extension restores the Beds24 departure if the local extension fails", async () => {
-  const originalFetch = globalThis.fetch;
-  const bookingBodies = [];
-  globalThis.fetch = async (url, options = {}) => {
-    if (String(url).includes("inventory/rooms/availability")) {
-      return new Response(JSON.stringify({ data: [{ roomId: 99981, availability: { "2026-11-22": true, "2026-11-23": true } }] }), { status: 200 });
-    }
-    bookingBodies.push(JSON.parse(String(options.body || "[]"))[0]);
-    return new Response(JSON.stringify([{ success: true, modified: { id: 881144 } }]), { status: 200 });
-  };
-  try {
-    const roomMap = JSON.stringify(Object.fromEntries(Array.from({ length: 11 }, (_, index) => [String(99981 + index), String(index + 1)])));
-    const store = {
-      async getMessagingProviderState() { return { value: { accessToken: "access" }, expiresAt: new Date(Date.now() + 3_600_000).toISOString() }; },
-      async getStayReservationForChannelManager() { return { id: "stay_123456789012345678901234", provider: "direct", room: "1", checkInDate: "2026-11-20", checkOutDate: "2026-11-22", status: "confirmed" }; },
-      async getBeds24ReservationLink() { return { externalBookingId: "881144" }; },
-      async findStayOverlap() { return null; },
-      async extendStayReservation() { return { ok: false, error: "local_extension_failed" }; },
-      async queueBeds24ChannelRetry() { throw new Error("immediate rollback should succeed"); }
-    };
-    const env = {
-      BEDS24_CHANNEL_MANAGER_ENABLED: "false",
-      BEDS24_DIRECT_STAY_SYNC_ENABLED: "true",
-      BEDS24_REFRESH_TOKEN: "refresh",
-      BEDS24_ROOM_MAP: roomMap
-    };
-    const response = await handleStayAdminRequest(new Request("https://guide.example/api/concierge/admin/stay-extension", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ reservationId: "stay_123456789012345678901234", checkOutDate: "2026-11-24" })
-    }), env, "/api/concierge/admin/stay-extension", store);
-    assert.equal(response.status, 400);
-    assert.equal((await response.json()).error, "local_extension_failed");
-    assert.deepEqual(bookingBodies.map((body) => body.departure), ["2026-11-24", "2026-11-22"]);
-  } finally {
-    globalThis.fetch = originalFetch;
-  }
-});
 
 test("Beds24 finance configuration defaults fail-closed while the validated House deployment enables scheduled sync", async () => {
   assert.equal(beds24FinanceSyncEnabled({}), false);
@@ -14624,7 +14259,7 @@ test("Finance UI and scheduler expose Airbnb payout automation with the validate
   assert.match(storeSource, /income_provider_updated/);
   assert.match(wrangler, /"BEDS24_FINANCE_SYNC_ENABLED": "true"/);
   assert.match(wrangler, /"BEDS24_CHANNEL_MANAGER_ENABLED": "false"/);
-  assert.match(wrangler, /"UNIFIED_MESSAGING_AI_AUTO_SEND_ENABLED": "false"/);
+  assert.match(wrangler, /"UNIFIED_MESSAGING_AI_AUTO_SEND_ENABLED": "true"/);
 });
 
 
@@ -14728,7 +14363,7 @@ test("mobile secrets remain uncommitted while Finance sync is enabled and higher
   }
   assert.match(wrangler, /"BEDS24_CHANNEL_MANAGER_ENABLED": "false"/);
   assert.match(wrangler, /"BEDS24_FINANCE_SYNC_ENABLED": "true"/);
-  assert.match(wrangler, /"UNIFIED_MESSAGING_AI_AUTO_SEND_ENABLED": "false"/);
+  assert.match(wrangler, /"UNIFIED_MESSAGING_AI_AUTO_SEND_ENABLED": "true"/);
 });
 
 test("v5.11.59 mobile password hashing stays within the Cloudflare Workers PBKDF2 runtime limit", async () => {
@@ -14905,7 +14540,7 @@ test("v5.11.72 mobile integration health separates provider access, automation a
   assert.equal(health.channelManager.status, "off");
 });
 
-test("validated mobile enforcement stays active while Finance sync is enabled and channel-manager/AI auto-send stay staged", async () => {
+test("v5.11.76 keeps mobile enforcement active while Finance sync and guarded AI auto-send are enabled and full channel manager stays off", async () => {
   const wrangler = await readFile(new URL("../wrangler.jsonc", import.meta.url), "utf8");
   assert.match(wrangler, /"MOBILE_APP_ENABLED": "true"/);
   assert.match(wrangler, /"MOBILE_BOOTSTRAP_ENABLED": "false"/);
@@ -14913,7 +14548,7 @@ test("validated mobile enforcement stays active while Finance sync is enabled an
   assert.match(wrangler, /"MOBILE_DEVICE_BINDING_ENABLED": "true"/);
   assert.match(wrangler, /"BEDS24_CHANNEL_MANAGER_ENABLED": "false"/);
   assert.match(wrangler, /"BEDS24_FINANCE_SYNC_ENABLED": "true"/);
-  assert.match(wrangler, /"UNIFIED_MESSAGING_AI_AUTO_SEND_ENABLED": "false"/);
+  assert.match(wrangler, /"UNIFIED_MESSAGING_AI_AUTO_SEND_ENABLED": "true"/);
 });
 
 
@@ -15590,7 +15225,7 @@ test("v5.11.74 Revenue Engine V1 produces deterministic recommendation-only pric
   assert.equal(room10Tonight.referenceRate, 2000);
   assert.ok(room10Tonight.suggestedRate >= 1200 && room10Tonight.suggestedRate <= 2500);
   assert.ok(room10Tonight.reasons.some((reason) => ["occupancy_high", "occupancy_very_high"].includes(reason.code)));
-  assert.match(payload.dataQuality.note, /does not use competitor prices or change live selling rates/i);
+  assert.match(payload.dataQuality.note, /does not read competitor prices or write OTA rates/i);
 });
 
 test("v5.11.74 Revenue Engine settings and decisions are owner-controlled, audited and stored without provider write-back", async () => {
@@ -15721,4 +15356,190 @@ test("v5.11.73 integration health remains visible to integration-permitted sessi
   assert.match(source, /const integrationPermission = hasPermission\(publicAccess, "integrations\.view"\)/);
   assert.match(source, /const connectionHealth = integrationPermission \? mobileIntegrationHealth\(env\) : undefined/);
   assert.match(source, /const integrationAllowed = integrationPermission && hasModule\(publicAccess, "integrations"\)/);
+});
+
+test("v5.11.76 daily operating console feature flags keep full CM off while lifecycle and direct protection are independently active", async () => {
+  const wrangler = await readFile(new URL("../wrangler.jsonc", import.meta.url), "utf8");
+  assert.match(wrangler, /"BEDS24_CHANNEL_MANAGER_ENABLED": "false"/);
+  assert.match(wrangler, /"BEDS24_DIRECT_STAY_PROTECTION_ENABLED": "true"/);
+  assert.match(wrangler, /"BEDS24_RATE_INVENTORY_WRITES_ENABLED": "false"/);
+  assert.match(wrangler, /"AI_GUEST_LIFECYCLE_ENABLED": "true"/);
+  assert.match(wrangler, /"AI_GUEST_LIFECYCLE_FIRST_MESSAGE_DELAY_MINUTES": "5"/);
+  assert.match(wrangler, /"UNIFIED_MESSAGING_AI_AUTO_SEND_ENABLED": "true"/);
+
+  const lifecycle = guestLifecycleMessagingConfiguration({
+    AI_GUEST_LIFECYCLE_ENABLED: "true",
+    AI_GUEST_LIFECYCLE_FIRST_MESSAGE_DELAY_MINUTES: "5"
+  });
+  assert.equal(lifecycle.enabled, true);
+  assert.equal(lifecycle.firstMessageDelayMinutes, 5);
+  assert.equal(lifecycle.airbnbNativeQuickRepliesExpected, false);
+  assert.equal(lifecycle.cutoverSafety, "first_run_watermark");
+});
+
+test("v5.11.76 direct-stay central protection is independent from the disabled full Beds24 channel manager", () => {
+  const roomMap = JSON.stringify(Object.fromEntries(Array.from({ length: 11 }, (_, index) => [String(81001 + index), String(index + 1)])));
+  const env = {
+    BEDS24_CHANNEL_MANAGER_ENABLED: "false",
+    BEDS24_DIRECT_STAY_PROTECTION_ENABLED: "true",
+    BEDS24_REFRESH_TOKEN: "refresh",
+    STAY_TOKEN_PEPPER: "pepper",
+    BEDS24_ROOM_MAP: roomMap
+  };
+  assert.equal(beds24ChannelManagerEnabled(env), false);
+  assert.equal(beds24DirectStayProtectionEnabled(env), true);
+  const configuration = beds24DirectStayProtectionConfiguration(env);
+  assert.equal(configuration.independentFromChannelManager, true);
+  assert.equal(configuration.roomMapComplete, true);
+  assert.equal(configuration.ready, true);
+});
+
+test("v5.11.76 Listings & Rates reads while writes stay fail-closed until the narrow write flag is explicitly enabled", () => {
+  const roomMap = JSON.stringify(Object.fromEntries(Array.from({ length: 11 }, (_, index) => [String(82001 + index), String(index + 1)])));
+  const base = { BEDS24_CHANNEL_MANAGER_ENABLED: "false", BEDS24_REFRESH_TOKEN: "refresh", BEDS24_ROOM_MAP: roomMap };
+  const readOnly = beds24ListingsRatesConfiguration(base);
+  assert.equal(readOnly.readable, true);
+  assert.equal(readOnly.fullChannelManagerEnabled, false);
+  assert.equal(readOnly.independentFromChannelManager, true);
+  assert.equal(readOnly.writesEnabled, false);
+  assert.equal(readOnly.writeReady, false);
+  assert.deepEqual(readOnly.supportedWrites, ["price1", "inventory"]);
+  assert.equal(readOnly.scope, "explicit_room_date_cells");
+  assert.equal(beds24RateInventoryWritesEnabled(base), false);
+
+  const writable = beds24ListingsRatesConfiguration({ ...base, BEDS24_RATE_INVENTORY_WRITES_ENABLED: "true" });
+  assert.equal(writable.writeReady, true);
+  assert.equal(writable.fullChannelManagerEnabled, false);
+});
+
+test("v5.11.76 narrow Listings & Rates bridge reads calendar cells and writes only one explicit room/date cell", async () => {
+  const originalFetch = globalThis.fetch;
+  const calls = [];
+  const roomMap = JSON.stringify(Object.fromEntries(Array.from({ length: 11 }, (_, index) => [String(83001 + index), String(index + 1)])));
+  const store = {
+    async getMessagingProviderState() {
+      return { value: { accessToken: "access" }, expiresAt: new Date(Date.now() + 3_600_000).toISOString() };
+    }
+  };
+  const env = {
+    BEDS24_CHANNEL_MANAGER_ENABLED: "false",
+    BEDS24_RATE_INVENTORY_WRITES_ENABLED: "true",
+    BEDS24_REFRESH_TOKEN: "refresh",
+    BEDS24_ROOM_MAP: roomMap
+  };
+  globalThis.fetch = async (url, options = {}) => {
+    calls.push({ url: String(url), method: options.method || "GET", body: options.body || "" });
+    if ((options.method || "GET") === "POST") {
+      return new Response(JSON.stringify([{ success: true }]), { status: 200, headers: { "content-type": "application/json" } });
+    }
+    return new Response(JSON.stringify({ data: [{ roomId: 83004, calendar: [{ from: "2026-09-20", to: "2026-09-20", price1: 1800, inventory: 1 }] }] }), { status: 200, headers: { "content-type": "application/json" } });
+  };
+  try {
+    const read = await getBeds24ListingsRates(env, store, { from: "2026-09-20", to: "2026-09-20" });
+    assert.equal(read.ok, true);
+    assert.deepEqual(read.rows.map(({ room, date, price1, inventory }) => ({ room, date, price1, inventory })), [
+      { room: "4", date: "2026-09-20", price1: 1800, inventory: 1 }
+    ]);
+
+    const write = await writeBeds24ListingRateCell(env, store, { room: "4", date: "2026-09-20", price1: 1950, inventory: 1 });
+    assert.equal(write.ok, true);
+    const post = calls.find((call) => call.method === "POST");
+    assert.ok(post);
+    assert.match(post.url, /inventory\/rooms\/calendar/);
+    const body = JSON.parse(post.body);
+    assert.deepEqual(body, [{ roomId: 83004, calendar: [{ from: "2026-09-20", to: "2026-09-20", price1: 1950, inventory: 1 }] }]);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("v5.11.76 booking lifecycle chooses logical +5-minute stages for advance, near-arrival and same-day bookings", () => {
+  const before14 = new Date("2026-09-14T05:00:00.000Z"); // 12:00 Bangkok
+  const after14 = new Date("2026-09-14T08:00:00.000Z"); // 15:00 Bangkok
+  const activation = new Date("2026-09-14T00:00:00.000Z");
+  const base = { bookingSentAt: "", prearrivalSentAt: "", checkinSentAt: "", departurePromptSentAt: "", checkoutSentAt: "", checkOutDate: "2026-09-25" };
+  assert.equal(lifecycleStageForReservation({ ...base, createdAt: "2026-09-14T04:54:00.000Z", checkInDate: "2026-09-20" }, before14, 5, activation), "booking");
+  assert.equal(lifecycleStageForReservation({ ...base, createdAt: "2026-09-14T04:54:00.000Z", checkInDate: "2026-09-16" }, before14, 5, activation), "booking_prearrival");
+  assert.equal(lifecycleStageForReservation({ ...base, createdAt: "2026-09-14T04:54:00.000Z", checkInDate: "2026-09-14" }, before14, 5, activation), "same_day");
+  assert.equal(lifecycleStageForReservation({ ...base, createdAt: "2026-09-14T07:54:00.000Z", checkInDate: "2026-09-14" }, after14, 5, activation), "same_day_late");
+  assert.equal(lifecycleStageForReservation({ ...base, createdAt: "2026-09-13T23:00:00.000Z", checkInDate: "2026-09-20" }, before14, 5, activation), "");
+});
+
+test("v5.11.76 departure assistant captures planned time and extension interest only after the checkout prompt", async () => {
+  const states = new Map([["stay_departure_001", { reservationId: "stay_departure_001", departurePromptSentAt: "2026-09-13T10:00:00.000Z", communicated: [] }]]);
+  const reservation = { id: "stay_departure_001", room: "4", status: "confirmed", guestFirstName: "Nina", checkOutDate: "2026-09-14" };
+  const store = {
+    async getStayReservationById(id) { return id === reservation.id ? reservation : null; },
+    async getGuestLifecycleState(id) { return states.get(id) || null; },
+    async upsertGuestLifecycleState(patch) {
+      const current = states.get(patch.reservationId) || {};
+      states.set(patch.reservationId, { ...current, ...patch, communicated: [...new Set([...(current.communicated || []), ...(patch.communicated || [])])] });
+      return { ok: true };
+    }
+  };
+  const result = await captureDepartureIntent({
+    env: {}, store, reservationId: reservation.id,
+    text: "We will leave around 7:30 am, but if possible we would also like to extend one more night.",
+    now: new Date("2026-09-13T12:00:00.000Z")
+  });
+  assert.equal(result.captured, true);
+  assert.equal(result.plannedDepartureTime, "7:30 AM");
+  assert.equal(result.extensionInterest, "interested");
+  const state = states.get(reservation.id);
+  assert.equal(state.plannedDepartureMinutes, 450);
+  assert.equal(state.plannedDepartureTime, "7:30 AM");
+  assert.equal(state.extensionInterest, "interested");
+  assert.ok(state.communicated.includes("planned_departure_received"));
+  assert.ok(state.communicated.includes("extension_interest_received"));
+});
+
+test("v5.11.76 mobile push targets management correctly and exposes only approved deep-link data", async () => {
+  const originalFetch = globalThis.fetch;
+  const outbound = [];
+  const disabled = [];
+  const store = {
+    async mobileListPushDevices() {
+      return [
+        { role: "owner", expoPushToken: "ExponentPushToken[owner-demo]" },
+        { role: "manager", expoPushToken: "ExpoPushToken[manager-demo]" },
+        { role: "staff", expoPushToken: "ExponentPushToken[staff-demo]" }
+      ];
+    },
+    async mobileDisablePushDeviceByToken(token) { disabled.push(token); }
+  };
+  const env = { CONCIERGE_STORE: { getByName() { return store; } } };
+  globalThis.fetch = async (_url, options = {}) => {
+    outbound.push(JSON.parse(options.body));
+    return new Response(JSON.stringify({ data: [{ status: "ok", id: "ticket1" }, { status: "error", details: { error: "DeviceNotRegistered" } }] }), { status: 200, headers: { "content-type": "application/json" } });
+  };
+  try {
+    const result = await sendMobilePush(env, {
+      audience: "management", title: "New guest message", body: "Airbnb · Nina: Hello",
+      data: { route: "/inbox/thread1", threadId: "thread1", reservationId: "stay1", room: "4", eventType: "guest_message", sourceLabel: "Airbnb", secret: "must-not-leak" }
+    });
+    assert.equal(result.attempted, 2);
+    assert.equal(result.accepted, 1);
+    assert.equal(outbound.length, 1);
+    assert.equal(outbound[0].length, 2);
+    assert.deepEqual(outbound[0].map((item) => item.to), ["ExponentPushToken[owner-demo]", "ExpoPushToken[manager-demo]"]);
+    assert.equal(outbound[0][0].data.secret, undefined);
+    assert.equal(outbound[0][0].data.route, "/inbox/thread1");
+    assert.deepEqual(disabled, ["ExpoPushToken[manager-demo]"]);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("v5.11.76 lifecycle AI protects guest access secrets and housekeeping can advance turnover from a confirmed early departure", async () => {
+  const [lifecycleSource, storeSource] = await Promise.all([
+    readFile(new URL("../src/lifecycle-messaging.js", import.meta.url), "utf8"),
+    readFile(new URL("../src/concierge-store.js", import.meta.url), "utf8")
+  ]);
+  assert.match(lifecycleSource, /sanitizeLifecycleAiText/);
+  assert.match(lifecycleSource, /\[\[CONFIRMATION_CODE\]\]/);
+  assert.match(lifecycleSource, /\[\[GUEST_PAGE_URL\]\]/);
+  assert.match(lifecycleSource, /first_run_watermark/);
+  assert.match(lifecycleSource, /action=skip/);
+  assert.match(storeSource, /gl\.planned_departure_minutes < COALESCE\(l\.checkout_minutes, 660\)/);
+  assert.match(storeSource, /LEFT JOIN guest_lifecycle_state gl ON gl\.reservation_id = r\.id/);
 });

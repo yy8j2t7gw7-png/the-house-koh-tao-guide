@@ -4,6 +4,7 @@ import {
   safeAlertSummary
 } from "./alert-policy.js";
 import { normalizeBangkokRequestedDate } from "./alert-policy.js";
+import { pushOperationalAlert } from "./mobile-push.js";
 import { divingBookingSummary, validDivingGroup } from "./diving-catalog.js";
 import { operationalRoute, operationalRouteCatalog } from "./operations-routing.js";
 
@@ -1021,7 +1022,9 @@ export async function dispatchConciergeAlert(alert, env) {
   if (!alert || (alert.duplicate && !alert.retryableDelivery)) return { attempted: 0, accepted: 0 };
   const store = getStore(env);
   if (!store) return { attempted: 0, accepted: 0 };
-  return sendToGroup(alert, alert.recipientGroup, alert.duplicate ? "retry" : "initial", env, store);
+  const whatsapp = await sendToGroup(alert, alert.recipientGroup, alert.duplicate ? "retry" : "initial", env, store);
+  await pushOperationalAlert(env, alert).catch(() => null);
+  return whatsapp;
 }
 
 export async function retryConciergeBookingAlert({ env, alertId, room, bookingRequest, replyContact }) {

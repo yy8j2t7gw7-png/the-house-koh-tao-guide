@@ -1,18 +1,12 @@
-# Guest Guide Platform with AI Concierge — The House v5.11.75
+# Guest Guide Platform with AI Concierge — The House v5.11.76
 
-## v5.11.75 — production hardening + protected Direct Stay synchronization
+## v5.11.76 — Daily Operating Console
 
-v5.11.75 decouples owner-created Direct Stay inventory protection from full Beds24 Channel Manager authority. With `BEDS24_CHANNEL_MANAGER_ENABLED=false` and `BEDS24_DIRECT_STAY_SYNC_ENABLED=true`, Taoedge now checks Beds24 availability, creates the Beds24 booking/block before local confirmation, synchronizes extensions and cancellations, and fails closed if the dates cannot be protected. Full reservation/channel authority remains deliberately off.
+v5.11.76 makes Taoedge the controlled operating layer for day-to-day boutique-hotel work. It adds AI-owned reservation lifecycle messaging (first message about five minutes after a new booking, logical last-minute/same-day merging, semantic duplicate suppression and a safe Airbnb Quick Reply cutover watermark), planned-departure/extension handling tied to housekeeping, mobile push for OTA/operational events, guarded high-certainty message auto-send and a narrow Beds24 Listings & Rates bridge.
 
-The release also polishes owner/admin connection, messaging and Finance status copy, adds rollback/retry protection around external Direct Stay writes, and preserves daily Finance reconciliation, review-first guest messaging, commercial licensing/device enforcement, Insights V2 and Revenue Engine V1.
+The provider boundary stays deliberately narrow. `BEDS24_CHANNEL_MANAGER_ENABLED=false` remains authoritative; Direct Stay central protection is independent, and rate/inventory writes are implemented behind `BEDS24_RATE_INVENTORY_WRITES_ENABLED=false` until a controlled live Beds24 write is verified. Lifecycle AI receives protected placeholders rather than raw stay confirmation codes or room-page URLs.
 
-## v5.11.74 — Taoedge Revenue Engine V1
-
-v5.11.74 adds the first deterministic Taoedge Revenue Engine. It is deliberately **recommendation-only**: the backend computes room/date pricing suggestions from canonical forward occupancy, Taoedge first-seen booking pickup, days until arrival, remaining inventory, surrounding-date performance, owner-defined weekend rules and season multipliers, but it never writes rates to Beds24 or an OTA.
-
-Owners configure a reference nightly rate plus hard minimum/maximum guardrails, optional room-specific reference rates, maximum adjustment, rate-rounding increment and monthly season multipliers. Every suggestion explains its contributing factors. Accept, Ignore and Override decisions are stored as an append-only decision history so later releases can measure recommendation quality before any provider write-back is enabled.
-
-Revenue Engine V1 uses the existing protected Analytics entitlement and owner-only mutation boundary. Managers with Analytics access can inspect recommendations, while pricing settings and decisions remain owner-only. `BEDS24_CHANNEL_MANAGER_ENABLED=false` and `UNIFIED_MESSAGING_AI_AUTO_SEND_ENABLED=false` remain unchanged; validated daily Finance reconciliation stays enabled.
+The matching mobile client is Taoedge Owner App v0.1.17. See `RELEASE_NOTES_v5.11.76.md`, `DEVELOPMENT_HANDOFF_v5.11.76_DAILY_OPERATING_CONSOLE.md` and `VALIDATION_RESULTS_v5.11.76.md`.
 
 ## v5.11.73 — integration-health resilience hotfix
 

@@ -316,7 +316,7 @@ function listingFromText_(text) {
 
 function datesFromEmail_(text, referenceDate) {
   var source = String(text || "");
-  var reference = referenceDate instanceof Date && !isNaN(referenceDate.getTime()) ? referenceDate : new Date();
+  var reference = referenceDate && typeof referenceDate.getTime === "function" && !isNaN(referenceDate.getTime()) ? referenceDate : new Date();
   var checkIn = source.match(/(?:check[- ]?in|arrival)[^\n\r]{0,80}?(\d{4}-\d{2}-\d{2})/i);
   var checkOut = source.match(/(?:check[- ]?out|departure)[^\n\r]{0,80}?(\d{4}-\d{2}-\d{2})/i);
   var checkInDate = checkIn && HOUSE_SYNC_SETTINGS.datePattern.test(checkIn[1]) ? checkIn[1] : "";
@@ -338,7 +338,7 @@ function datesFromEmail_(text, referenceDate) {
 function englishDateRange_(text, referenceDate) {
   var monthNames = "Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?";
   var source = String(text || "").replace(/\s+/g, " ");
-  var reference = referenceDate instanceof Date && !isNaN(referenceDate.getTime()) ? referenceDate : new Date();
+  var reference = referenceDate && typeof referenceDate.getTime === "function" && !isNaN(referenceDate.getTime()) ? referenceDate : new Date();
   var monthFirst = source.match(new RegExp("(" + monthNames + ")\\s+(\\d{1,2})(?:st|nd|rd|th)?\\s*(?:-|–|—|to)\\s*(?:(" + monthNames + ")\\s+)?(\\d{1,2})(?:st|nd|rd|th)?(?:,)?(?:\\s+(\\d{4}))?", "i"));
   if (monthFirst) {
     var first = monthFirst[5]
@@ -371,7 +371,7 @@ function labeledEnglishDate_(text, labelPattern, referenceDate) {
   var label = source.search(labelPattern);
   if (label < 0) return "";
   var nearby = source.slice(label, label + 180).replace(/\s+/g, " ");
-  var reference = referenceDate instanceof Date && !isNaN(referenceDate.getTime()) ? referenceDate : new Date();
+  var reference = referenceDate && typeof referenceDate.getTime === "function" && !isNaN(referenceDate.getTime()) ? referenceDate : new Date();
   var weekday = "(?:Mon(?:day)?|Tue(?:sday)?|Wed(?:nesday)?|Thu(?:rsday)?|Fri(?:day)?|Sat(?:urday)?|Sun(?:day)?),?\\s+";
   var monthFirst = nearby.match(new RegExp("(?:" + weekday + ")?(" + monthNames + ")\\s+(\\d{1,2})(?:st|nd|rd|th)?(?:,)?(?:\\s+(\\d{4}))?", "i"));
   if (monthFirst) {
@@ -387,7 +387,7 @@ function labeledEnglishDate_(text, labelPattern, referenceDate) {
 }
 
 function inferredYearIsoDate_(monthName, day, referenceDate) {
-  var reference = referenceDate instanceof Date && !isNaN(referenceDate.getTime()) ? referenceDate : new Date();
+  var reference = referenceDate && typeof referenceDate.getTime === "function" && !isNaN(referenceDate.getTime()) ? referenceDate : new Date();
   var referenceYear = Number(Utilities.formatDate(reference, HOUSE_SYNC_SETTINGS.timeZone, "yyyy"));
   var referenceIso = Utilities.formatDate(reference, HOUSE_SYNC_SETTINGS.timeZone, "yyyy-MM-dd");
   var current = isoDate_(referenceYear, monthName, day);

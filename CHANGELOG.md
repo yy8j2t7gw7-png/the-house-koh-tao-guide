@@ -1,15 +1,15 @@
 # Changelog
 
-## 5.11.75 — Production hardening + protected Direct Stay synchronization
+## v5.11.76 — Daily Operating Console
 
-- Decouple Direct Stay Beds24 protection from full Channel Manager authority with `BEDS24_DIRECT_STAY_SYNC_ENABLED`.
-- Protect Direct Stay dates in Beds24 before creating the local stay; fail closed if external protection is unavailable.
-- Add rollback/retry safety for local-create failures, provider-link failures, extension failures and external cancellation failures.
-- Keep full Beds24 Channel Manager off while preserving current House reservation feed, Unified Messaging, Finance automation, WhatsApp and all operational workflows.
-- Expose Direct booking protection independently in mobile connection health.
-- Polish owner/admin connection, messaging and Finance copy to remove unnecessary internal setup vocabulary.
-- Add nine dedicated Direct Stay regression tests.
-- Full suite: 362 passed / 0 failed.
+- Add AI-owned reservation lifecycle messaging with a five-minute post-booking delay, last-minute/same-day merging, semantic duplicate suppression and first-run cutover watermark for retiring Airbnb Scheduled Quick Replies.
+- Protect readable confirmation codes and guest-page URLs from lifecycle model prompts with opaque placeholders and deterministic fallback.
+- Add day-before-checkout departure/extension assistant and feed confirmed earlier departure times into housekeeping turnover eligibility without allowing guest text to extend authorized checkout.
+- Add role-aware Expo push delivery for supported OTA messages and operational events.
+- Enable guarded high-certainty Unified Messaging auto-send while retaining review/handoff for sensitive, emergency or low-confidence cases.
+- Add narrow Beds24 Listings & Rates calendar read/write architecture with explicit one-room/one-date writes and audit logging. Keep `BEDS24_RATE_INVENTORY_WRITES_ENABLED=false` until controlled live validation.
+- Keep full `BEDS24_CHANNEL_MANAGER_ENABLED=false` while independent Direct Stay protection remains enabled.
+- Full backend suite: **361 passed / 0 failed**; backend JS/MJS syntax: **30 / 30**.
 
 ## v5.11.74 — Taoedge Revenue Engine V1
 

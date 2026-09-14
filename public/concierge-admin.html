@@ -71,11 +71,11 @@
         <summary class="concierge-admin-section-head">
           <div>
             <p class="concierge-admin-kicker">Booking sources</p>
-            <h2>Integrations</h2>
+            <h2>Connections</h2>
           </div>
           <span class="concierge-admin-section-summary"><span class="concierge-admin-section-count" data-section-count>0</span><span data-section-state>Collapsed</span><span class="concierge-admin-section-chevron" aria-hidden="true"></span></span>
         </summary>
-        <p>See which reservation sources are active at The House and which additional booking channels can be added to the commercial product. Expand <strong>How to connect</strong> on any optional provider for the property steps, software requirements and official provider information. A provider is never shown as connected unless a real connector is installed and configured.</p>
+        <p>See which booking channels are connected to The House and which additional channels can be added later. Expand <strong>How to connect</strong> for any optional channel to see the property setup steps and official information. A channel is only shown as connected when the connection is genuinely ready.</p>
         <div id="integrationArchitectureStatus" class="concierge-admin-integration-architecture"></div>
         <div id="integrationProviders" class="concierge-admin-integration-grid" aria-label="Booking platform integrations"></div>
       </details>
@@ -88,7 +88,7 @@
           </div>
           <span class="concierge-admin-section-summary"><span class="concierge-admin-section-count" data-section-count>0</span><span data-section-state>Expanded</span><span class="concierge-admin-section-chevron" aria-hidden="true"></span></span>
         </summary>
-        <p>OTA messaging via Beds24 + direct WhatsApp. Messages stay in the guest’s original channel; replies sent here return to the guest on that channel. AI replies can be enabled after the live connectors are tested.</p>
+        <p>Airbnb and connected booking-channel messages appear here alongside WhatsApp. Guests continue to receive replies in the same channel they used. AI-assisted replies remain review-first until you deliberately change that setting.</p>
         <div id="unifiedMessagingStatus" class="concierge-admin-messaging-status" aria-live="polite"></div>
         <div class="concierge-admin-messaging-layout">
           <div>
@@ -124,7 +124,7 @@
         </div>
         <div class="concierge-admin-operations-block">
           <h3>14-day room calendar</h3>
-          <p class="concierge-admin-operations-note">Shows confirmed stays from every provider. Same-day checkout and check-in can appear together in one room.</p>
+          <p class="concierge-admin-operations-note">Shows confirmed stays from every booking source. Same-day checkout and check-in can appear together in one room.</p>
           <div id="operationsCalendar" class="concierge-admin-calendar-wrap" aria-label="14-day room calendar"></div>
         </div>
       </details>
@@ -137,7 +137,7 @@
           </div>
           <span class="concierge-admin-section-summary"><span class="concierge-admin-section-count" data-section-count>0</span><span data-section-state>Expanded</span><span class="concierge-admin-section-chevron" aria-hidden="true"></span></span>
         </summary>
-        <p>The automatic Gmail and Airbnb iCal sync supplies confirmation codes and stay dates. Codes are hashed immediately and never shown here. Use the manual form only when an Airbnb reservation is missing because it has not synchronized.</p>
+        <p>Airbnb reservations normally arrive automatically with their stay dates and confirmation codes. The private codes are protected and never shown here. Use the manual form only when an Airbnb reservation is genuinely missing from Taoedge.</p>
         <form id="manualStayForm" class="concierge-admin-registration-form">
           <div class="concierge-admin-field"><label for="manualStayRoom">Room</label><select id="manualStayRoom" required><option value="">Select room</option><option value="1">Room 1</option><option value="2">Room 2</option><option value="3">Room 3</option><option value="4">Room 4</option><option value="5">Room 5</option><option value="6">Room 6</option><option value="8">Room 8</option><option value="9">Room 9</option><option value="10">Room 10</option><option value="11">Room 11</option></select></div>
           <div class="concierge-admin-field"><label for="manualStayCode">Airbnb confirmation code</label><input id="manualStayCode" type="text" autocomplete="off" required></div>
@@ -147,7 +147,7 @@
         </form>
         <div class="concierge-admin-direct-block">
           <h3>Direct bookings and walk-ins</h3>
-          <p>Create a protected stay when a guest books directly or arrives without an Airbnb reservation. The private House stay code is shown once and is never stored in readable form.</p>
+          <p>Create a protected stay when a guest books directly or arrives without an Airbnb reservation. Taoedge checks Beds24 first and creates the matching booking there so connected sales channels can close those dates. If that protection cannot be confirmed, the stay is not created. The private House stay code is shown once and is never stored in readable form.</p>
           <form id="directStayForm" class="concierge-admin-registration-form concierge-admin-direct-form">
             <div class="concierge-admin-field"><label for="directStayRoom">Room</label><select id="directStayRoom" required><option value="">Select room</option><option value="1">Room 1</option><option value="2">Room 2</option><option value="3">Room 3</option><option value="4">Room 4</option><option value="5">Room 5</option><option value="6">Room 6</option><option value="7">Room 7</option><option value="8">Room 8</option><option value="9">Room 9</option><option value="10">Room 10</option><option value="11">Room 11</option></select></div>
             <div class="concierge-admin-field"><label for="directStayCheckIn">Check-in</label><input id="directStayCheckIn" type="date" required></div>
@@ -187,12 +187,12 @@
         <p>Track income and expenses in one private owner view. Beds24 can import Airbnb expected payouts provisionally during onboarding and reconcile the same records to actual channel-collected payments when settlement arrives. Expected amounts are clearly marked until paid.</p>
         <div class="concierge-admin-operations-block concierge-admin-finance-automation">
           <h3>Airbnb payout automation</h3>
-          <p id="financeAutomationStatus">Beds24 payout sync is disabled until financial access is configured and tested.</p>
+          <p id="financeAutomationStatus">Automatic Airbnb payout matching will appear here when the Beds24 financial connection is ready.</p>
           <div class="concierge-admin-card-actions"><button type="button" class="secondary" id="financeBeds24Sync" hidden>Sync Airbnb payouts now</button></div>
         </div>
         <div class="concierge-admin-operations-block" id="financeHistoricalImportPanel">
           <h3>Import historical Airbnb income</h3>
-          <p>Use this when a property joins mid-month or when earlier Airbnb income needs to be brought into Finance. Beds24 expected payouts are imported as provisional income and the same provider-managed record is updated when the actual payout arrives. The import is duplicate-safe and can be rerun.</p>
+          <p>Use this when a property joins mid-month or when earlier Airbnb income needs to be brought into Finance. Expected payouts are added as provisional income and the same record is updated when the actual payout arrives. The same period can be imported again safely without creating duplicates.</p>
           <div class="concierge-admin-card-actions">
             <button type="button" class="secondary" id="financeImportThisMonth">This month</button>
             <button type="button" class="secondary" id="financeImportPreviousMonth">Previous month</button>

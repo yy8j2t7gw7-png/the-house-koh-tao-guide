@@ -202,7 +202,7 @@
 
     const links = Array.isArray(guide.officialLinks) ? guide.officialLinks.filter((item) => item?.url && item?.label) : [];
     if (links.length) {
-      body.appendChild(element("strong", "concierge-admin-integration-guide-heading", "Official provider information"));
+      body.appendChild(element("strong", "concierge-admin-integration-guide-heading", "Official channel information"));
       const linkRow = element("div", "concierge-admin-integration-links");
       links.forEach((item) => {
         const link = element("a", "secondary", item.label);
@@ -224,10 +224,10 @@
 
     const architectureReady = integrations.canonicalReservationModel === true;
     integrationArchitectureStatus.replaceChildren(
-      element("strong", "", architectureReady ? "Canonical reservation layer ready" : "Integration architecture unavailable"),
+      element("strong", "", architectureReady ? "Reservation foundation ready" : "Booking connections unavailable"),
       element("span", "", architectureReady
-        ? "Every future booking connector can feed the same reservations, calendar, housekeeping and guest-access workflows. The House itself stays on its existing Airbnb + direct/walk-in setup unless you deliberately add another live connector."
-        : "Provider connectors should not be added until the canonical reservation layer is available.")
+        ? "Every future booking channel can feed the same reservations, calendar, housekeeping and guest-access workflows. The House stays on its existing Airbnb and direct-booking setup unless you deliberately add another live connection."
+        : "Additional booking channels should not be connected until the reservation foundation is ready.")
     );
 
     providers.forEach((provider) => {
@@ -235,8 +235,8 @@
       const head = element("div", "concierge-admin-integration-head");
       const title = element("div");
       title.append(
-        element("strong", "", provider.name || provider.id || "Provider"),
-        element("span", "", provider.liveAtHouse ? "The House production" : "Optional product integration")
+        element("strong", "", provider.name || provider.id || "Booking channel"),
+        element("span", "", provider.liveAtHouse ? "The House production" : "Optional booking channel")
       );
       const status = element("span", `concierge-admin-integration-status is-${provider.status || "not_connected"}`, integrationStatusLabel(provider.status));
       head.append(title, status);
@@ -248,7 +248,7 @@
       button.type = "button";
 
       if (provider.connectAction === "managed_existing_sync") {
-        button.textContent = provider.status === "connected" ? "Connected" : "Existing sync needs configuration";
+        button.textContent = provider.status === "connected" ? "Connected" : "Existing connection needs setup";
         button.disabled = true;
       } else if (provider.connectAction === "built_in") {
         button.textContent = "Built in";
@@ -256,8 +256,8 @@
       } else {
         button.textContent = "Connect";
         button.disabled = true;
-        button.title = "A real provider connector must be installed and approved before this connection can be enabled.";
-        const connectorState = element("span", "concierge-admin-integration-connector-state", `Connector status: ${provider.connectorInstalled ? "Installed" : "Not installed"}`);
+        button.title = "This booking channel needs a supported connection before it can be enabled.";
+        const connectorState = element("span", "concierge-admin-integration-connector-state", `Connection status: ${provider.connectorInstalled ? "Ready" : "Not ready"}`);
         actions.append(button, connectorState);
       }
       if (!actions.childNodes.length) actions.append(button);
@@ -280,11 +280,11 @@
     if (!unifiedMessagingStatus) return;
     const pills = [
       [configuration.enabled === true, "Unified inbox", configuration.enabled === true ? "Enabled" : "Disabled"],
-      [configuration.otaViaBeds24Ready === true, "OTA via Beds24", configuration.otaViaBeds24Ready === true ? "Ready" : "Needs setup"],
-      [configuration.roomMapConfigured === true, "Beds24 room map", configuration.roomMapConfigured === true ? "Ready" : "Needs mapping"],
-      [configuration.whatsAppReady === true, "WhatsApp", configuration.whatsAppReady === true ? "Ready" : "Needs Meta configuration"],
-      [configuration.aiReplyReady === true, "AI assistant", configuration.aiReplyReady === true ? "Ready" : configuration.aiReplyEnabled === true ? "Needs internal token" : "Disabled"],
-      [configuration.aiAutoSendEnabled === true, "AI auto-send", configuration.aiAutoSendEnabled === true ? "On" : "Review only"]
+      [configuration.otaViaBeds24Ready === true, "Booking messages", configuration.otaViaBeds24Ready === true ? "Ready" : "Needs setup"],
+      [configuration.roomMapConfigured === true, "Beds24 room matching", configuration.roomMapConfigured === true ? "Ready" : "Needs attention"],
+      [configuration.whatsAppReady === true, "WhatsApp", configuration.whatsAppReady === true ? "Ready" : "Needs setup"],
+      [configuration.aiReplyReady === true, "AI assistant", configuration.aiReplyReady === true ? "Ready" : configuration.aiReplyEnabled === true ? "Needs setup" : "Disabled"],
+      [configuration.aiAutoSendEnabled === true, "AI replies", configuration.aiAutoSendEnabled === true ? "Automatic" : "Review before sending"]
     ];
     unifiedMessagingStatus.replaceChildren(...pills.map(([ready, label, value]) => {
       const pill = element("span", ready ? "is-ready" : "is-waiting");
@@ -299,7 +299,7 @@
     unifiedMessagingThreads.dataset.count = String(threads.length);
     setAdminSectionCount("messaging", threads.length);
     if (!threads.length) {
-      unifiedMessagingThreads.replaceChildren(element("div", "concierge-admin-empty", "No guest conversations yet. OTA messages will appear after Beds24 is connected; WhatsApp guest messages arrive through the existing Meta webhook."));
+      unifiedMessagingThreads.replaceChildren(element("div", "concierge-admin-empty", "No guest conversations yet. Booking-channel messages will appear after Beds24 is connected, and WhatsApp conversations will appear when the WhatsApp connection is ready."));
       return;
     }
     const cards = threads.map((thread) => {
@@ -664,7 +664,7 @@
         const errorCode = latestDiagnostic.errorCode || latestDiagnostic.storedErrorCode;
         diagnostic.appendChild(diagnosticGrid([
           { label: "Channel", value: "WhatsApp" },
-          { label: "Provider", value: "Meta" },
+          { label: "Service", value: "Meta" },
           { label: "Template", value: latestDiagnostic.templateName },
           { label: "Language", value: latestDiagnostic.languageCode },
           { label: "Route", value: item.recipientGroup },
@@ -782,7 +782,7 @@
       cardHead.appendChild(selectLabel);
       card.appendChild(cardHead);
       card.appendChild(diagnosticGrid([
-        { label: "Provider", value: "Meta" },
+        { label: "Service", value: "Meta" },
         { label: "Route", value: parentAlert.recipientGroup || "Not retained" },
         { label: "Template", value: title },
         { label: "Language", value: item.languageCode || "Not retained" },
@@ -1634,13 +1634,13 @@
   function renderFinanceAutomation(automation = {}) {
     if (!financeAutomationStatus || !financeBeds24Sync) return;
     if (automation.ready) {
-      financeAutomationStatus.textContent = "Airbnb Finance sync is active. Beds24 expected payouts are imported provisionally and automatically reconciled to the actual channel-collected payment when it arrives.";
+      financeAutomationStatus.textContent = "Automatic Airbnb Finance matching is active. Expected payouts are shown as provisional income and matched to the actual payout when it arrives.";
       financeBeds24Sync.hidden = false;
     } else {
       financeBeds24Sync.hidden = true;
       financeAutomationStatus.textContent = automation.enabled
-        ? "Airbnb payout sync is enabled but not ready. Check the Beds24 refresh token, financial booking scope and explicit Room 1–11 mapping."
-        : "Airbnb payout sync is safely disabled. Historical backfill can still be used below; automatic OTA payment import stays off until BEDS24_FINANCE_SYNC_ENABLED is deliberately enabled.";
+        ? "Automatic Airbnb payout matching is switched on but not ready. Check the Beds24 financial connection and Room 1–11 matching."
+        : "Automatic Airbnb payout matching is switched off. Historical income can still be imported below.";
     }
 
     const historicalReady = automation.historicalImportReady === true;
@@ -1651,7 +1651,7 @@
     if (financeHistoricalImportStatus) {
       financeHistoricalImportStatus.textContent = historicalReady
         ? "Historical Airbnb import is ready. Expected payouts can be imported before settlement; re-running the same period reconciles them to actual payments instead of creating duplicates."
-        : "Historical import needs the Beds24 refresh token, read:bookings + read:bookings-financial access, and the complete Room 1–11 mapping.";
+        : "Historical import needs the Beds24 financial connection and complete Room 1–11 matching.";
     }
   }
 
@@ -1759,7 +1759,7 @@
     } catch (error) {
       if (financeHistoricalImportStatus) {
         financeHistoricalImportStatus.textContent = error.message === "beds24_finance_sync_not_ready"
-          ? "Historical import is not ready. Check Beds24 financial API access and the complete Room 1–11 mapping."
+          ? "Historical import is not ready. Check the Beds24 financial connection and complete Room 1–11 matching."
           : "Historical Airbnb income could not be imported. No existing Finance records were deleted.";
       }
     } finally {
@@ -1962,9 +1962,14 @@
       directStayForm.reset();
       await loadOverview();
     } catch (error) {
-      window.alert(error.message === "room_date_conflict"
+      const message = error.message === "room_date_conflict"
         ? "This room already has a confirmed stay that overlaps those dates. Delete or correct the existing manually added stay first."
-        : "The direct stay could not be created. Check the room and dates.");
+        : error.message === "beds24_room_unavailable"
+          ? "Beds24 reports that this room is not available for all of those nights. Nothing was created."
+          : error.message === "beds24_direct_stay_sync_not_ready"
+            ? "Direct-booking protection is not ready. Nothing was created, so the room remains safe from an unprotected local booking."
+            : "The direct stay could not be protected in Beds24, so nothing was created. Please check the dates and connection before trying again.";
+      window.alert(message);
     } finally {
       submit.disabled = false;
     }
@@ -2401,13 +2406,13 @@
   financeBeds24Sync?.addEventListener("click", async () => {
     financeBeds24Sync.disabled = true;
     const previous = financeBeds24Sync.textContent;
-    financeBeds24Sync.textContent = "Syncing Airbnb payouts…";
+    financeBeds24Sync.textContent = "Matching Airbnb payouts…";
     try {
       const result = await api("/api/concierge/admin/finance/beds24-sync", { method: "POST", body: "{}" });
       await loadFinance();
-      window.alert(`Beds24 payout sync complete: ${Number(result.created) || 0} created, ${Number(result.updated) || 0} updated, ${Number(result.refunded) || 0} refunded.`);
+      window.alert(`Airbnb payout matching complete: ${Number(result.created) || 0} added, ${Number(result.updated) || 0} updated, ${Number(result.refunded) || 0} refunds.`);
     } catch (_error) {
-      window.alert("Beds24 payout sync could not be completed. Check Beds24 financial access and the finance-sync flag.");
+      window.alert("Airbnb payout matching could not be completed. Check the Beds24 financial connection and try again.");
     } finally {
       financeBeds24Sync.disabled = false;
       financeBeds24Sync.textContent = previous;

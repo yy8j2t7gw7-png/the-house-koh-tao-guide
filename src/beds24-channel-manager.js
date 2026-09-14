@@ -80,6 +80,10 @@ export function beds24ChannelManagerEnabled(env = {}) {
   return String(env.BEDS24_CHANNEL_MANAGER_ENABLED || "false").toLowerCase() === "true";
 }
 
+export function beds24DirectStaySyncEnabled(env = {}) {
+  return String(env.BEDS24_DIRECT_STAY_SYNC_ENABLED || "false").toLowerCase() === "true";
+}
+
 export function houseRoomToBeds24RoomId(room, env = {}) {
   const target = cleanText(room, 4);
   if (!HOUSE_ROOMS.includes(target)) return "";
@@ -104,10 +108,14 @@ export function beds24ReservationProvider(booking = {}) {
   return "beds24";
 }
 
-export function beds24ChannelManagerConfiguration(env = {}) {
+function beds24RoomMapReadiness(env = {}) {
   const reverse = HOUSE_ROOMS.map((room) => [room, houseRoomToBeds24RoomId(room, env)]);
-  const roomMapComplete = reverse.every(([, roomId]) => Boolean(roomId))
+  return reverse.every(([, roomId]) => Boolean(roomId))
     && new Set(reverse.map(([, roomId]) => roomId)).size === HOUSE_ROOMS.length;
+}
+
+export function beds24ChannelManagerConfiguration(env = {}) {
+  const roomMapComplete = beds24RoomMapReadiness(env);
   const credentialsReady = Boolean(env.BEDS24_REFRESH_TOKEN && env.BEDS24_WEBHOOK_TOKEN && env.STAY_TOKEN_PEPPER);
   const enabled = beds24ChannelManagerEnabled(env);
   return {
@@ -118,6 +126,22 @@ export function beds24ChannelManagerConfiguration(env = {}) {
     centralAvailabilityAuthoritative: enabled && credentialsReady && roomMapComplete,
     supportedReservationSources: [...RESERVATION_SOURCES]
   };
+}
+
+export function beds24DirectStaySyncConfiguration(env = {}) {
+  const roomMapComplete = beds24RoomMapReadiness(env);
+  const credentialsReady = Boolean(env.BEDS24_REFRESH_TOKEN);
+  const enabled = beds24DirectStaySyncEnabled(env) || beds24ChannelManagerEnabled(env);
+  return {
+    enabled,
+    credentialsReady,
+    roomMapComplete,
+    ready: enabled && credentialsReady && roomMapComplete
+  };
+}
+
+function beds24DirectStayProtectionEnabled(env = {}) {
+  return beds24ChannelManagerEnabled(env) || beds24DirectStaySyncEnabled(env);
 }
 
 function dateRange(checkInDate, checkOutDate) {
@@ -152,9 +176,11 @@ export function beds24AvailabilityAllowsStay(response, beds24RoomId, checkInDate
 }
 
 export async function checkBeds24CentralAvailability(env, store, room, checkInDate, checkOutDate) {
-  if (!beds24ChannelManagerEnabled(env)) return { ok: true, available: true, ignored: "channel_manager_disabled" };
-  const configuration = beds24ChannelManagerConfiguration(env);
-  if (!configuration.ready) return { ok: false, available: false, error: "beds24_channel_manager_not_ready" };
+  if (!beds24DirectStayProtectionEnabled(env)) return { ok: true, available: true, ignored: "direct_stay_sync_disabled" };
+  const configuration = beds24DirectStaySyncEnabled(env)
+    ? beds24DirectStaySyncConfiguration(env)
+    : beds24ChannelManagerConfiguration(env);
+  if (!configuration.ready) return { ok: false, available: false, error: "beds24_direct_stay_sync_not_ready" };
   const roomId = houseRoomToBeds24RoomId(room, env);
   const start = validDate(checkInDate);
   const checkout = validDate(checkOutDate);
@@ -189,23 +215,32 @@ export async function createBeds24HouseDirectBooking(env, store, { room, checkIn
   return { ok: true, externalBookingId: String(newBeds24BookingId(response)), roomId: availability.roomId };
 }
 
+export async function setBeds24HouseDirectDeparture(env, store, externalBookingId, checkOutDate) {
+  if (!beds24DirectStayProtectionEnabled(env)) return { ok: true, ignored: "direct_stay_sync_disabled" };
+  const bookingId = Number(externalBookingId);
+  const departure = validDate(checkOutDate);
+  if (!Number.isSafeInteger(bookingId) || bookingId <= 0) return { ok: false, error: "beds24_link_required" };
+  if (!departure) return { ok: false, error: "invalid_stay" };
+  const response = await beds24ApiRequest(env, store, "bookings", {
+    method: "POST",
+    body: [{ id: bookingId, departure }]
+  });
+  assertBeds24WriteSucceeded(response, "beds24_extension_update_failed");
+  return { ok: true, externalBookingId: String(bookingId), checkOutDate: departure };
+}
+
 export async function updateBeds24HouseDirectExtension(env, store, { externalBookingId, room, currentCheckOutDate, checkOutDate } = {}) {
-  if (!beds24ChannelManagerEnabled(env)) return { ok: true, ignored: "channel_manager_disabled" };
+  if (!beds24DirectStayProtectionEnabled(env)) return { ok: true, ignored: "direct_stay_sync_disabled" };
   const bookingId = Number(externalBookingId);
   if (!Number.isSafeInteger(bookingId) || bookingId <= 0) return { ok: false, error: "beds24_link_required" };
   const availability = await checkBeds24CentralAvailability(env, store, room, currentCheckOutDate, checkOutDate);
   if (!availability.ok) return availability;
   if (!availability.available) return { ok: false, error: "beds24_room_unavailable", available: false };
-  const response = await beds24ApiRequest(env, store, "bookings", {
-    method: "POST",
-    body: [{ id: bookingId, departure: validDate(checkOutDate) }]
-  });
-  assertBeds24WriteSucceeded(response, "beds24_extension_update_failed");
-  return { ok: true, externalBookingId: String(bookingId), checkOutDate: validDate(checkOutDate) };
+  return setBeds24HouseDirectDeparture(env, store, bookingId, checkOutDate);
 }
 
 export async function cancelBeds24HouseDirectBooking(env, store, externalBookingId) {
-  if (!beds24ChannelManagerEnabled(env)) return { ok: true, ignored: "channel_manager_disabled" };
+  if (!beds24DirectStayProtectionEnabled(env)) return { ok: true, ignored: "direct_stay_sync_disabled" };
   const bookingId = Number(externalBookingId);
   if (!Number.isSafeInteger(bookingId) || bookingId <= 0) return { ok: false, error: "beds24_link_required" };
   const response = await beds24ApiRequest(env, store, "bookings", {
@@ -275,7 +310,7 @@ export async function queueBeds24Retry(store, record = {}) {
 }
 
 export async function processBeds24ChannelManagerRetries(env) {
-  if (!beds24ChannelManagerEnabled(env)) return { ok: true, ignored: "channel_manager_disabled" };
+  if (!beds24DirectStayProtectionEnabled(env)) return { ok: true, ignored: "direct_stay_sync_disabled" };
   const store = env.CONCIERGE_STORE?.getByName?.("the-house-concierge-global");
   if (!store || typeof store.listBeds24ChannelRetries !== "function") return { ok: false, error: "retry_store_unavailable" };
   const now = new Date();

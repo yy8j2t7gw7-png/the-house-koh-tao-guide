@@ -3,6 +3,7 @@ import { expenseConfiguration, handleExpenseAdminRequest } from "./expense-api.j
 import { financeReportCsv, incomeConfiguration, summarizeFinance } from "./finance-api.js";
 import { beds24FinanceSyncConfiguration, reconcileBeds24FinanceRange } from "./beds24-finance-sync.js";
 import { integrationAdminOverview } from "./integration-catalog.js";
+import { beds24DirectStaySyncConfiguration } from "./beds24-channel-manager.js";
 import { beds24ApiRequest, handleUnifiedMessagingAdminRequest, openBeds24ReservationConversation, reviewMessagingDraft, roomForBeds24Booking, startWhatsAppGuestConversation, unifiedMessagingConfiguration, whatsAppGuestInitiationConfiguration } from "./unified-messaging.js";
 import { handleStayAdminRequest } from "./stay-api.js";
 import { createProtectedOperationsAlert, dispatchConciergeAlert, operationalTaskAssignment, operationalTaskAssignments } from "./whatsapp-alerts.js";
@@ -94,6 +95,7 @@ export function mobileIntegrationHealth(env = {}) {
   const integrations = integrationAdminOverview(env);
   const messaging = unifiedMessagingConfiguration(env);
   const finance = beds24FinanceSyncConfiguration(env);
+  const directStayProtection = beds24DirectStaySyncConfiguration(env);
   const guestWhatsApp = whatsAppGuestInitiationConfiguration(env);
   const channelManagerEnabled = enabledFlag(env.BEDS24_CHANNEL_MANAGER_ENABLED);
   const airbnbReservation = Array.isArray(integrations?.providers)
@@ -132,6 +134,12 @@ export function mobileIntegrationHealth(env = {}) {
       historicalImportReady: Boolean(finance.historicalImportReady),
       channel: finance.channel,
       schedule: finance.schedule
+    },
+    directStayProtection: {
+      status: directStayProtection.ready ? "active" : (directStayProtection.enabled ? "needs_setup" : "off"),
+      enabled: Boolean(directStayProtection.enabled),
+      ready: Boolean(directStayProtection.ready),
+      roomMapConfigured: Boolean(directStayProtection.roomMapComplete)
     },
     whatsapp: {
       status: whatsAppOutboundConnected ? "connected" : "needs_setup",
@@ -602,7 +610,7 @@ function buildAnalyticsAttention({ current, previous, forward, operations, finan
   if (forward.occupancyPercent < 40) items.push({ id: "forward-demand", tone: "warning", title: "Forward demand is light", detail: `Next 30 days are ${forward.occupancyPercent}% occupied. Keep an eye on pickup before changing rates.`, route: "" });
   else if (forward.occupancyPercent >= 80) items.push({ id: "forward-demand", tone: "success", title: "Forward demand is strong", detail: `Next 30 days are already ${forward.occupancyPercent}% occupied. Remaining inventory deserves a rate review.`, route: "" });
   if (occupancyDelta <= -10) items.push({ id: "occupancy-down", tone: "warning", title: "Occupancy has softened", detail: `${Math.abs(occupancyDelta)} points below the previous comparable period.`, route: "" });
-  if (current.cancellationRate >= 15 && current.bookings >= 4) items.push({ id: "cancellations", tone: "warning", title: "Cancellation rate needs attention", detail: `${current.cancellationRate}% of arrivals booked for this period are cancelled in the canonical reservation history.`, route: "/bookings" });
+  if (current.cancellationRate >= 15 && current.bookings >= 4) items.push({ id: "cancellations", tone: "warning", title: "Cancellation rate needs attention", detail: `${current.cancellationRate}% of arrivals booked for this period are cancelled in the reservation history.`, route: "/bookings" });
   const repeatRoom = [...rooms].sort((a, b) => b.maintenanceIssues - a.maintenanceIssues)[0];
   if (repeatRoom?.maintenanceIssues >= 2) items.push({ id: "repeat-maintenance", tone: "danger", title: `Room ${repeatRoom.room} has repeated maintenance`, detail: `${repeatRoom.maintenanceIssues} maintenance reports in this period.`, route: "/(tabs)/operations?focus=maintenance" });
   if ((operations?.concierge?.learningGaps || 0) > 0) items.push({ id: "knowledge-gaps", tone: "accent", title: "Concierge knowledge can improve", detail: `${operations.concierge.learningGaps} request${operations.concierge.learningGaps === 1 ? "" : "s"} exposed a knowledge gap in this period.`, route: "" });
@@ -677,7 +685,7 @@ export function buildAnalyticsPayload({ range, reservations, roomsTotal, operati
       settledSharePercent: percent(finance.totals?.settledNetIncome, finance.totals?.netIncome),
       ledgerNetPerOccupiedNight: current.roomNights ? round1((Number(finance.totals?.netIncome) || 0) / current.roomNights) : 0,
       operatingResultPerAvailableRoomNight: current.availableRoomNights ? round1((Number(finance.totals?.operatingResult) || 0) / current.availableRoomNights) : 0,
-      note: "Ledger efficiency compares Finance entries dated in the selected period with occupied room nights. It is not ADR or RevPAR; those require canonical stay-level revenue attribution."
+      note: "This comparison uses Finance entries dated in the selected period and occupied room nights. It is not ADR or RevPAR; those require revenue to be matched to each stay."
     }
   } : null;
   return {
@@ -730,7 +738,7 @@ export function buildAnalyticsPayload({ range, reservations, roomsTotal, operati
       adrRevparReady: false,
       otaBookingTimestampReady: false,
       note: range.days > 30 ? "Resolved maintenance and Concierge interaction/feedback records are retained for about 30 days, so those older operational signals may be incomplete. Reservation and Finance metrics use their own retained source records." : "Operational and Concierge history are within their current 30-day retention windows.",
-      revenueMetricNote: "Taoedge does not label ledger income per occupied night as ADR or RevPAR. True ADR/RevPAR will activate after stay-level booking revenue is stored canonically across every channel."
+      revenueMetricNote: "Taoedge keeps income per occupied night separate from ADR and RevPAR. True ADR and RevPAR will appear once booking revenue can be matched reliably to each stay across every channel."
     }
   };
 }
@@ -969,7 +977,7 @@ export function buildRevenueEnginePayload({ today, days = 14, reservations = [],
       pickupSource: "taoedge_first_seen",
       liveRateSource: "owner_reference_rate",
       marketDemandConnected: false,
-      note: "Revenue Engine V1 is deterministic and recommendation-only. It uses canonical reservations, Taoedge first-seen pickup and owner pricing guardrails. It does not read competitor prices or write OTA rates."
+      note: "Revenue Engine V1 is recommendation-only. It uses confirmed reservations, when Taoedge received each booking, and your pricing limits. It does not use competitor prices or change live selling rates."
     }
   };
 }

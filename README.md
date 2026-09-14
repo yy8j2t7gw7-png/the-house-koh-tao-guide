@@ -1,4 +1,10 @@
-# Guest Guide Platform with AI Concierge — The House v5.11.74
+# Guest Guide Platform with AI Concierge — The House v5.11.75
+
+## v5.11.75 — production hardening + protected Direct Stay synchronization
+
+v5.11.75 decouples owner-created Direct Stay inventory protection from full Beds24 Channel Manager authority. With `BEDS24_CHANNEL_MANAGER_ENABLED=false` and `BEDS24_DIRECT_STAY_SYNC_ENABLED=true`, Taoedge now checks Beds24 availability, creates the Beds24 booking/block before local confirmation, synchronizes extensions and cancellations, and fails closed if the dates cannot be protected. Full reservation/channel authority remains deliberately off.
+
+The release also polishes owner/admin connection, messaging and Finance status copy, adds rollback/retry protection around external Direct Stay writes, and preserves daily Finance reconciliation, review-first guest messaging, commercial licensing/device enforcement, Insights V2 and Revenue Engine V1.
 
 ## v5.11.74 — Taoedge Revenue Engine V1
 

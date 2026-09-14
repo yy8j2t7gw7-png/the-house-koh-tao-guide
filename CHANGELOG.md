@@ -1,5 +1,16 @@
 # Changelog
 
+## 5.11.75 — Production hardening + protected Direct Stay synchronization
+
+- Decouple Direct Stay Beds24 protection from full Channel Manager authority with `BEDS24_DIRECT_STAY_SYNC_ENABLED`.
+- Protect Direct Stay dates in Beds24 before creating the local stay; fail closed if external protection is unavailable.
+- Add rollback/retry safety for local-create failures, provider-link failures, extension failures and external cancellation failures.
+- Keep full Beds24 Channel Manager off while preserving current House reservation feed, Unified Messaging, Finance automation, WhatsApp and all operational workflows.
+- Expose Direct booking protection independently in mobile connection health.
+- Polish owner/admin connection, messaging and Finance copy to remove unnecessary internal setup vocabulary.
+- Add nine dedicated Direct Stay regression tests.
+- Full suite: 362 passed / 0 failed.
+
 ## v5.11.74 — Taoedge Revenue Engine V1
 
 - Add protected `/api/mobile/v1/revenue-engine` recommendations for 7/14/30-day horizons.

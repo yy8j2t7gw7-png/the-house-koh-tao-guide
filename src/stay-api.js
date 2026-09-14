@@ -6,10 +6,13 @@ import {
 import {
   beds24ChannelManagerEnabled,
   beds24DirectStayProtectionEnabled,
+  accelerateBeds24DirectStayClose,
   cancelBeds24HouseDirectBooking,
   createBeds24HouseDirectBooking,
   queueBeds24Retry,
+  reassertBeds24DirectStayOpenIfSafe,
   restoreBeds24HouseDirectDeparture,
+  updateBeds24HouseDirectBooking,
   updateBeds24HouseDirectExtension
 } from "./beds24-channel-manager.js";
 import { reservationSourceCapabilities } from "./reservation-model.js";
@@ -969,8 +972,10 @@ export async function handleStayAdminRequest(request, env, path, store) {
       }
       return json({ error: "stay_creation_failed" }, 503);
     }
+    let localReservation = null;
+    let distributionSync = { status: beds24Booking?.externalBookingId ? "booking_accepted" : "local_only" };
     if (beds24Booking?.externalBookingId && typeof store.getStayReservationByCodeHash === "function" && typeof store.linkBeds24Reservation === "function") {
-      const localReservation = await store.getStayReservationByCodeHash(confirmationCodeHash, room);
+      localReservation = await store.getStayReservationByCodeHash(confirmationCodeHash, room);
       const linked = localReservation?.id ? await store.linkBeds24Reservation({
         reservationId: localReservation.id,
         externalBookingId: beds24Booking.externalBookingId,
@@ -993,14 +998,41 @@ export async function handleStayAdminRequest(request, env, path, store) {
         }
         return json({ error: "beds24_link_failed" }, 503);
       }
+      if (typeof store.recordReservationDistributionEvent === "function") {
+        await store.recordReservationDistributionEvent({
+          reservationId: localReservation.id,
+          externalBookingId: beds24Booking.externalBookingId,
+          room,
+          eventType: "beds24_booking_accepted",
+          status: "accepted",
+          detail: { checkInDate, checkOutDate, requestedAt: beds24Booking.requestedAt || "", acceptedAt: beds24Booking.acceptedAt || "" },
+          createdAt: beds24Booking.acceptedAt || new Date().toISOString()
+        }).catch(() => {});
+      }
+      distributionSync = await accelerateBeds24DirectStayClose(env, store, {
+        reservationId: localReservation.id,
+        externalBookingId: beds24Booking.externalBookingId,
+        room, checkInDate, checkOutDate
+      });
+      if (!distributionSync?.ok || distributionSync?.status === "provider_pending") {
+        await queueBeds24Retry(store, {
+          operation: "inventory_close",
+          reservationId: localReservation.id,
+          externalBookingId: beds24Booking.externalBookingId,
+          payload: { room, checkInDate, checkOutDate },
+          lastError: distributionSync?.error || distributionSync?.status || "inventory_close_pending"
+        }).catch(() => {});
+      }
     }
     return json({
       ok: true,
+      reservationId: localReservation?.id || "",
       room,
       checkInDate,
       checkOutDate,
       confirmationCode,
       beds24Synchronized: Boolean(beds24Booking?.externalBookingId),
+      distributionSync,
       welcomeUrl: `${new URL(request.url).origin}/room/${encodeURIComponent(room)}`
     });
   }
@@ -1013,6 +1045,9 @@ export async function handleStayAdminRequest(request, env, path, store) {
       return json({ error: "invalid_request" }, 400);
     }
     if (typeof store.cancelOwnerManagedStay !== "function") return json({ error: "stay_delete_unavailable" }, 503);
+    const current = typeof store.getStayReservationForChannelManager === "function"
+      ? await store.getStayReservationForChannelManager(reservationId)
+      : null;
     const beds24Link = beds24DirectStayProtectionEnabled(env) && typeof store.getBeds24ReservationLink === "function"
       ? await store.getBeds24ReservationLink(reservationId)
       : null;
@@ -1021,18 +1056,129 @@ export async function handleStayAdminRequest(request, env, path, store) {
       try {
         await cancelBeds24HouseDirectBooking(env, store, beds24Link.externalBookingId);
         result.beds24Cancellation = "synchronized";
+        if (typeof store.recordReservationDistributionEvent === "function") {
+          await store.recordReservationDistributionEvent({ reservationId, externalBookingId: beds24Link.externalBookingId, room: current?.room || result.room, eventType: "beds24_cancellation_accepted", status: "accepted", detail: { checkInDate: current?.checkInDate || "", checkOutDate: current?.checkOutDate || "" }, createdAt: new Date().toISOString() }).catch(() => {});
+        }
+        if (current?.room && current?.checkInDate && current?.checkOutDate) {
+          const reopen = await reassertBeds24DirectStayOpenIfSafe(env, store, {
+            reservationId,
+            externalBookingId: beds24Link.externalBookingId,
+            room: current.room,
+            checkInDate: current.checkInDate,
+            checkOutDate: current.checkOutDate
+          });
+          result.distributionSync = reopen;
+          if (!reopen?.ok || reopen?.status === "provider_pending") {
+            await queueBeds24Retry(store, {
+              operation: "inventory_reopen",
+              reservationId,
+              externalBookingId: beds24Link.externalBookingId,
+              payload: { room: current.room, checkInDate: current.checkInDate, checkOutDate: current.checkOutDate },
+              lastError: reopen?.error || reopen?.status || "inventory_reopen_pending"
+            }).catch(() => {});
+          }
+        }
       } catch (error) {
         await queueBeds24Retry(store, {
           operation: "cancel",
           reservationId,
           externalBookingId: beds24Link.externalBookingId,
+          payload: { room: current?.room || result.room, checkInDate: current?.checkInDate || "", checkOutDate: current?.checkOutDate || "" },
           lastError: error.code || error.message || "beds24_cancellation_failed"
         }).catch(() => {});
         result.beds24Cancellation = "retry_queued";
+        result.distributionSync = { ok: false, status: "retry_queued", error: error.code || error.message || "beds24_cancellation_failed" };
       }
     }
     const status = result.ok ? 200 : result.error === "reservation_not_found" ? 404 : 409;
     return json(result, status);
+  }
+
+  if (path === "/api/concierge/admin/direct-stay-update") {
+    if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405, { allow: "POST" });
+    const body = await readJson(request, 3_000);
+    const reservationId = String(body?.reservationId || "");
+    const room = String(body?.room || "");
+    const checkInDate = validDate(body?.checkInDate);
+    const checkOutDate = validDate(body?.checkOutDate);
+    if (!/^stay_[A-Za-z0-9-]{20,}$/.test(reservationId) || !PROPERTY_ROOMS.has(room) || !checkInDate || !checkOutDate || checkOutDate <= checkInDate) {
+      return json({ error: "invalid_request" }, 400);
+    }
+    if (typeof store.getStayReservationForChannelManager !== "function" || typeof store.updateOwnerManagedStay !== "function") {
+      return json({ error: "direct_stay_update_unavailable" }, 503);
+    }
+    const current = await store.getStayReservationForChannelManager(reservationId);
+    if (!current) return json({ error: "reservation_not_found" }, 404);
+    if (current.provider !== "direct") return json({ error: "direct_stay_required" }, 409);
+    const overlap = typeof store.findStayOverlap === "function" ? await store.findStayOverlap(room, checkInDate, checkOutDate, reservationId) : null;
+    if (overlap) return json({ error: "room_date_conflict", conflict: overlap }, 409);
+
+    const next = { room, checkInDate, checkOutDate };
+    const link = beds24DirectStayProtectionEnabled(env) && typeof store.getBeds24ReservationLink === "function"
+      ? await store.getBeds24ReservationLink(reservationId)
+      : null;
+    let providerUpdated = null;
+    if (beds24DirectStayProtectionEnabled(env)) {
+      if (!link?.externalBookingId) return json({ error: "beds24_link_required" }, 409);
+      try {
+        providerUpdated = await updateBeds24HouseDirectBooking(env, store, { externalBookingId: link.externalBookingId, current, next });
+        if (!providerUpdated?.ok) {
+          const status = providerUpdated?.error === "beds24_room_unavailable" ? 409 : 503;
+          return json({ error: providerUpdated?.error || "beds24_booking_update_failed" }, status);
+        }
+      } catch (error) {
+        return json({ error: error.code || error.message || "beds24_booking_update_failed" }, 502);
+      }
+    }
+
+    const result = await store.updateOwnerManagedStay(reservationId, next, new Date().toISOString());
+    if (!result?.ok) {
+      if (providerUpdated?.ok && link?.externalBookingId) {
+        try {
+          await updateBeds24HouseDirectBooking(env, store, { externalBookingId: link.externalBookingId, current: next, next: current });
+        } catch (error) {
+          await queueBeds24Retry(store, {
+            operation: "restore_booking",
+            reservationId,
+            externalBookingId: link.externalBookingId,
+            payload: { room: current.room, checkInDate: current.checkInDate, checkOutDate: current.checkOutDate },
+            lastError: error.code || error.message || "beds24_booking_rollback_failed"
+          }).catch(() => {});
+        }
+      }
+      return json({ error: result?.error || "direct_stay_update_failed", conflict: result?.conflict }, result?.error === "room_date_conflict" ? 409 : 400);
+    }
+
+    if (providerUpdated?.ok && typeof store.linkBeds24Reservation === "function") {
+      await store.linkBeds24Reservation({
+        reservationId,
+        externalBookingId: link.externalBookingId,
+        externalRoomId: providerUpdated.roomId,
+        sourceLabel: "Direct",
+        updatedAt: new Date().toISOString()
+      }).catch(() => {});
+      const close = await accelerateBeds24DirectStayClose(env, store, { reservationId, externalBookingId: link.externalBookingId, ...next });
+      result.distributionSync = { close };
+      if (!close?.ok || close?.status === "provider_pending") {
+        await queueBeds24Retry(store, { operation: "inventory_close", reservationId, externalBookingId: link.externalBookingId, payload: next, lastError: close?.error || close?.status || "inventory_close_pending" }).catch(() => {});
+      }
+
+      const released = [];
+      if (current.room !== next.room) released.push({ room: current.room, checkInDate: current.checkInDate, checkOutDate: current.checkOutDate });
+      else {
+        if (next.checkInDate > current.checkInDate) released.push({ room: current.room, checkInDate: current.checkInDate, checkOutDate: next.checkInDate });
+        if (next.checkOutDate < current.checkOutDate) released.push({ room: current.room, checkInDate: next.checkOutDate, checkOutDate: current.checkOutDate });
+      }
+      result.distributionSync.released = [];
+      for (const range of released.filter((item) => item.checkOutDate > item.checkInDate)) {
+        const reopen = await reassertBeds24DirectStayOpenIfSafe(env, store, { reservationId, externalBookingId: link.externalBookingId, ...range });
+        result.distributionSync.released.push({ ...range, ...reopen });
+        if (!reopen?.ok || reopen?.status === "provider_pending") {
+          await queueBeds24Retry(store, { operation: "inventory_reopen", reservationId, externalBookingId: link.externalBookingId, payload: range, lastError: reopen?.error || reopen?.status || "inventory_reopen_pending" }).catch(() => {});
+        }
+      }
+    }
+    return json(result);
   }
 
   if (path === "/api/concierge/admin/direct-stay-code") {

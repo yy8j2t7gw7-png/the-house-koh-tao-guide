@@ -9,14 +9,8 @@
     "run_worker_first": true
   },
   "vars": {
-    "OPENAI_MODEL": "gpt-5.6",
-    "OPENAI_REASONING_EFFORT": "medium",
-    "OPENAI_TRANSLATION_MODEL": "gpt-5.6",
     "OPENAI_TRANSLATION_REASONING_EFFORT": "medium",
     "EXPLORE_ENABLED": "false",
-    "PASSPORT_RETENTION_DAYS": "14",
-    "MAINTENANCE_RETENTION_DAYS": "30",
-    "WHATSAPP_GRAPH_API_VERSION": "v23.0",
     "WHATSAPP_SERVICE_TEMPLATE_NAME": "house_service_alert_v3",
     "WHATSAPP_BOOKING_TEMPLATE_NAME": "house_booking_alert_v2",
     "WHATSAPP_LUGGAGE_TEMPLATE_NAME": "house_luggage_alert_v2",
@@ -42,15 +36,13 @@
     "BEDS24_RATE_INVENTORY_WRITES_ENABLED": "false",
     "AI_GUEST_LIFECYCLE_ENABLED": "true",
     "AI_GUEST_LIFECYCLE_FIRST_MESSAGE_DELAY_MINUTES": "5",
-    "PUBLIC_GUIDE_BASE_URL": "https://the-house-koh-tao-guide.7mf56yd45g.workers.dev",
     "BEDS24_FINANCE_SYNC_ENABLED": "true",
     "MOBILE_APP_ENABLED": "true",
     "MOBILE_BOOTSTRAP_ENABLED": "false",
     "MOBILE_SESSION_TTL_DAYS": "30",
     "MOBILE_LICENSE_ENFORCEMENT_ENABLED": "true",
     "MOBILE_DEVICE_BINDING_ENABLED": "true",
-    "WHATSAPP_GUEST_INIT_TEMPLATE_NAME": "",
-    "WHATSAPP_GUEST_INIT_TEMPLATE_LANGUAGE": "en_US"
+    "WHATSAPP_GUEST_INIT_TEMPLATE_NAME": ""
   },
   "r2_buckets": [
     {

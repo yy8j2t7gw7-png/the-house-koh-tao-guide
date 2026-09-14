@@ -29,8 +29,15 @@ function rangeDays(from, to) {
   return Math.floor((end - start) / 86_400_000) + 1;
 }
 
+export function beds24RateInventoryWriteMode(env = {}) {
+  const value = String(env.BEDS24_RATE_INVENTORY_WRITES_ENABLED || "false").trim().toLowerCase();
+  if (["true", "live", "enabled", "1"].includes(value)) return "live";
+  if (["test", "validate", "validation"].includes(value)) return "test";
+  return "off";
+}
+
 export function beds24RateInventoryWritesEnabled(env = {}) {
-  return String(env.BEDS24_RATE_INVENTORY_WRITES_ENABLED || "false").toLowerCase() === "true";
+  return beds24RateInventoryWriteMode(env) === "live";
 }
 
 export function beds24ListingsRatesConfiguration(env = {}) {
@@ -38,11 +45,16 @@ export function beds24ListingsRatesConfiguration(env = {}) {
   const roomMapComplete = roomMap.every((item) => Boolean(item.beds24RoomId))
     && new Set(roomMap.map((item) => item.beds24RoomId)).size === HOUSE_ROOMS.length;
   const credentialsReady = Boolean(env.BEDS24_REFRESH_TOKEN);
-  const writesEnabled = beds24RateInventoryWritesEnabled(env);
+  const writeMode = beds24RateInventoryWriteMode(env);
+  const writesEnabled = writeMode === "live";
+  const testWritesEnabled = writeMode === "test" || writeMode === "live";
   return {
     provider: "beds24",
     readable: credentialsReady && roomMapComplete,
     writesEnabled,
+    writeMode,
+    testWritesEnabled,
+    testWriteReady: credentialsReady && roomMapComplete && testWritesEnabled,
     writeReady: credentialsReady && roomMapComplete && writesEnabled,
     roomMapComplete,
     credentialsReady,
@@ -160,7 +172,7 @@ export async function writeBeds24ListingRateCell(env, store, input = {}) {
 
   const calendar = { from: cell.date, to: cell.date };
   if (cell.hasPrice) calendar.price1 = cell.price1;
-  if (cell.hasInventory) calendar.inventory = cell.inventory;
+  if (cell.hasInventory) calendar.numAvail = cell.inventory;
 
   const response = await beds24ApiRequest(env, store, "inventory/rooms/calendar", {
     method: "POST",
@@ -178,5 +190,45 @@ export async function writeBeds24ListingRateCell(env, store, input = {}) {
     price1: cell.hasPrice ? cell.price1 : undefined,
     inventory: cell.hasInventory ? cell.inventory : undefined,
     configuration
+  };
+}
+
+
+export async function testBeds24ListingWriteCell(env, store, input = {}) {
+  const configuration = beds24ListingsRatesConfiguration(env);
+  if (!configuration.testWriteReady) return { ok: false, error: "rate_inventory_test_writes_disabled", configuration };
+  const room = cleanText(input.room, 4);
+  const date = validDate(input.date);
+  if (!HOUSE_ROOMS.includes(room) || !date) return { ok: false, error: "invalid_cell", configuration };
+  const before = await getBeds24ListingsRates(env, store, { from: date, to: date });
+  if (!before.ok) return { ok: false, error: before.error || "beds24_calendar_read_failed", configuration };
+  const cell = before.rows.find((item) => item.room === room && item.date === date);
+  if (!cell || (cell.price1 === null && cell.inventory === null)) {
+    return { ok: false, error: "provider_cell_has_no_writable_value", configuration };
+  }
+  const roomId = houseRoomToBeds24RoomId(room, env);
+  if (!roomId) return { ok: false, error: "room_mapping_missing", configuration };
+  const calendar = { from: date, to: date };
+  if (cell.price1 !== null) calendar.price1 = cell.price1;
+  if (cell.inventory !== null) calendar.numAvail = cell.inventory;
+  const response = await beds24ApiRequest(env, store, "inventory/rooms/calendar", {
+    method: "POST", body: [{ roomId: Number(roomId), calendar: [calendar] }]
+  });
+  const first = Array.isArray(response) ? response[0] : Array.isArray(response?.data) ? response.data[0] : response;
+  if (first?.success === false || (Array.isArray(first?.errors) && first.errors.length)) {
+    return { ok: false, error: "beds24_calendar_test_write_failed", provider: first, configuration };
+  }
+  const after = await getBeds24ListingsRates(env, store, { from: date, to: date });
+  if (!after.ok) return { ok: false, error: after.error || "beds24_calendar_verify_failed", configuration };
+  const verified = after.rows.find((item) => item.room === room && item.date === date);
+  if (!verified) return { ok: false, error: "provider_cell_missing_after_test_write", configuration };
+  const priceMatches = cell.price1 === null || Number(verified.price1) === Number(cell.price1);
+  const inventoryMatches = cell.inventory === null || Number(verified.inventory) === Number(cell.inventory);
+  if (!priceMatches || !inventoryMatches) {
+    return { ok: false, error: "provider_cell_changed_during_test_write", configuration, before: cell, after: verified };
+  }
+  return {
+    ok: true, mode: "no_op_round_trip", room, providerRoomId: roomId, date,
+    verified: true, before: cell, after: verified, configuration
   };
 }

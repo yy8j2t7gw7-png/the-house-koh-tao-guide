@@ -1,4 +1,10 @@
-# Guest Guide Platform with AI Concierge — The House v5.11.77
+# Guest Guide Platform with AI Concierge — The House v5.11.78
+
+## v5.11.78 — Production Readiness & Guest Communication Hardening
+
+v5.11.78 adds deterministic OTA-passport recognition with owner review alerts, per-device push-category controls, and a controlled no-op Beds24 Listings write-validation mode. External passport messages no longer fall through to the generic concierge introduction and never mark Taoedge secure registration complete automatically. The release preserves the v5.11.77a Listings read fix, Direct Stay synchronization hardening, Cloudflare Free-tier deployment compatibility and the full Channel Manager-off boundary.
+
+The matching mobile client is Taoedge Owner App v0.1.20. See `RELEASE_NOTES_v5.11.78.md`, `DEVELOPMENT_HANDOFF_v5.11.78_PRODUCTION_READINESS_GUEST_COMMUNICATION.md`, `VALIDATION_RESULTS_v5.11.78.md`, `CONTROLLED_LISTINGS_WRITE_TEST_v5.11.78.md` and `PRODUCT_NORTH_STAR_AUTONOMOUS_OPERATIONS.md`.
 
 ## v5.11.77 — Reservation Operations & OTA Sync Hardening
 

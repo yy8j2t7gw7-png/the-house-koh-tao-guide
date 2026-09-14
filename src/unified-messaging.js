@@ -59,6 +59,69 @@ export function detectGuestMessageLanguage(value) {
   return "en";
 }
 
+export function detectExternalPassportSubmission(value) {
+  const text = cleanText(value, 1200);
+  if (!text) return false;
+  const lower = text.toLowerCase();
+  const passport = /\bpassport\b|reisepass|passeport|pasaporte|หนังสือเดินทาง/u.test(lower);
+  if (!passport) return false;
+  const completed = /(?:find|see)\s+(?:it\s+)?attached|\battached\b|\bupload(?:ed|ing)?\b|\bsent\b|\bsending\b|\bhere(?:'s| is)\b|\bphoto\b|\bpicture\b|\bimage\b|\bcopy\b|beigefügt|hochgeladen|gesendet|foto|bild|joint|télévers|envoy|photo|adjunt|subid|enviad|foto|รูป|แนบ|ส่ง|อัปโหลด/u.test(lower);
+  const explicitCompletion = /(?:i|we)\s+(?:have\s+)?(?:attached|uploaded|sent)|(?:here(?:'s| is)|find attached).{0,80}(?:passport|reisepass|passeport|pasaporte)|(?:passport|reisepass|passeport|pasaporte).{0,80}(?:attached|uploaded|sent|photo|picture|image|copy)/iu.test(text);
+  const questionOnly = /\b(?:can|could|should|where|how|may)\s+(?:i|we)\b|\bwhere\s+(?:do|can)\s+(?:i|we)\b|\bhow\s+(?:do|can)\s+(?:i|we)\b|\bdo\s+(?:i|we)\s+need\b/iu.test(text);
+  return Boolean((completed || explicitCompletion) && !(questionOnly && !explicitCompletion));
+}
+
+function externalPassportAcknowledgement(thread = {}, inboundText = "") {
+  const first = guestFirstName(thread.guestName);
+  const source = cleanText(thread.sourceLabel || "OTA", 50) || "OTA";
+  const language = detectGuestMessageLanguage(inboundText);
+  const name = first ? ` ${first}` : "";
+  const messages = {
+    en: `Thank you${name}. I can see that you sent a passport image in the ${source} conversation. I have notified our team to review it. You do not need to send it again unless the team asks you to.`,
+    de: `Vielen Dank${name}. Ich sehe, dass Sie ein Passbild im ${source}-Chat gesendet haben. Ich habe unser Team zur Prüfung informiert. Sie müssen es nicht noch einmal senden, außer unser Team bittet Sie darum.`,
+    fr: `Merci${name}. Je vois que vous avez envoyé une image de votre passeport dans la conversation ${source}. J’ai prévenu notre équipe pour vérification. Vous n’avez pas besoin de la renvoyer sauf si notre équipe vous le demande.`,
+    es: `Gracias${name}. Veo que has enviado una imagen de tu pasaporte en la conversación de ${source}. He avisado a nuestro equipo para que la revise. No necesitas volver a enviarla salvo que el equipo te lo pida.`,
+    th: `ขอบคุณ${first ? ` ${first}` : ""}ครับ/ค่ะ เห็นว่าคุณส่งรูปหนังสือเดินทางมาในแชต ${source} แล้ว เราได้แจ้งทีมงานให้ตรวจสอบแล้ว ไม่จำเป็นต้องส่งซ้ำ เว้นแต่ทีมงานจะขอเพิ่มเติม`
+  };
+  return messages[language] || messages.en;
+}
+
+async function handleExternalPassportSubmission({ env, store, thread, inboundText, channel }) {
+  if (!detectExternalPassportSubmission(inboundText)) return { handled: false };
+  const now = new Date().toISOString();
+  const source = cleanText(thread.sourceLabel || (channel === "whatsapp" ? "WhatsApp" : "OTA"), 50) || "OTA";
+  const guest = cleanText(thread.guestName, 80) || "Guest";
+  let activityId = "";
+  if (thread.reservationId && typeof store.mobileCreateReservationActivity === "function") {
+    activityId = `bact_${crypto.randomUUID()}`;
+    await store.mobileCreateReservationActivity({
+      id: activityId, reservationId: thread.reservationId, kind: "task", category: "Passport received externally",
+      body: `${guest} stated that a passport image was sent in the ${source} conversation. Review the external OTA/WhatsApp thread. This does not complete Taoedge secure registration automatically.`,
+      assigneeKey: "owner", assigneeLabel: "Owners", createdByHash: "system", createdByLabel: "Taoedge", createdAt: now
+    }).catch(() => null);
+  }
+  const alert = await createProtectedOperationsAlert({
+    env, room: thread.room, roomVerified: Boolean(thread.room), alertType: "passport_received_external", severity: "attention",
+    recipientGroup: "owners", summary: `Passport received externally · ${guest}${thread.room ? ` · Room ${thread.room}` : ""} · ${source}. Review the guest conversation; secure Taoedge registration is not marked complete.`,
+    escalationRequired: false, now: new Date(now)
+  }).catch(() => null);
+  const delivery = alert ? await dispatchConciergeAlert(alert, env).catch(() => ({ attempted: 0, accepted: 0 })) : { attempted: 0, accepted: 0 };
+  if (activityId && alert?.id && typeof store.mobileLinkReservationActivityAlert === "function") {
+    await store.mobileLinkReservationActivityAlert(activityId, alert.id, delivery, now).catch(() => null);
+  }
+  const result = {
+    answer: externalPassportAcknowledgement(thread, inboundText), intentId: "passport_received_external", category: "registration",
+    confidence: 1, needsHuman: true, handoff: "owner", source: "external-passport-policy", autoSend: aiAutoSendEnabled(env), reason: "external_passport_review_required"
+  };
+  if (result.autoSend) {
+    await sendAndRecordReply({ env, store, thread, result, channel }).catch(() => null);
+  } else {
+    await recordAiDraft(store, thread, result, "external_passport_review_required", env).catch(() => null);
+  }
+  await store.updateMessagingThreadState(thread.id, { needsHuman: true, aiDraft: !result.autoSend, lastError: "external_passport_review_required", updatedAt: now }).catch(() => null);
+  return { handled: true, activityId, alertId: alert?.id || "", delivery, autoSent: result.autoSend };
+}
+
 function normalizeConfirmationCode(value) {
   const code = String(value || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
   return /^[A-Z0-9]{6,24}$/.test(code) ? code : "";
@@ -749,14 +812,19 @@ export async function handleBeds24MessagingWebhook(request, env, ctx, generateRe
   }
   const inboundText = plan.replyCandidate.body;
   const linkedReservationId = reservation?.id || thread.reservationId;
-  const pushTask = pushInboundOtaMessage(env, { ...thread, reservationId: linkedReservationId }, inboundText).catch(() => null);
+  const linkedThread = { ...thread, reservationId: linkedReservationId };
+  const externalPassport = detectExternalPassportSubmission(inboundText);
+  const pushTask = externalPassport ? Promise.resolve(null) : pushInboundOtaMessage(env, linkedThread, inboundText).catch(() => null);
   const departureTask = linkedReservationId
     ? captureDepartureIntent({ env, store, reservationId: linkedReservationId, text: inboundText }).catch(() => null)
     : Promise.resolve(null);
   if (ctx?.waitUntil) { ctx.waitUntil(pushTask); ctx.waitUntil(departureTask); } else { await pushTask; await departureTask; }
 
   const task = async () => {
-    const linkedThread = { ...thread, reservationId: reservation?.id || thread.reservationId };
+    if (externalPassport) {
+      await handleExternalPassportSubmission({ env, store, thread: linkedThread, inboundText, channel: "beds24" });
+      return;
+    }
     const result = await maybeGenerateReply({ env, store, thread: linkedThread, inboundText, generateReply });
     if (!result.generated) {
       if (result.reason === "reservation_unlinked") {
@@ -818,13 +886,18 @@ export async function handleInboundWhatsAppGuestMessage(message, env, ctx, gener
     createdAt: now
   });
   if (!recorded?.inserted) return { ok: true, duplicate: true, threadId: thread.id };
-  const pushTask = pushInboundOtaMessage(env, thread, body).catch(() => null);
+  const externalPassport = detectExternalPassportSubmission(body);
+  const pushTask = externalPassport ? Promise.resolve(null) : pushInboundOtaMessage(env, thread, body).catch(() => null);
   const departureTask = thread.reservationId
     ? captureDepartureIntent({ env, store, reservationId: thread.reservationId, text: body }).catch(() => null)
     : Promise.resolve(null);
   if (ctx?.waitUntil) { ctx.waitUntil(pushTask); ctx.waitUntil(departureTask); } else { await pushTask; await departureTask; }
 
   const task = async () => {
+    if (externalPassport) {
+      await handleExternalPassportSubmission({ env, store, thread, inboundText: body, channel: "whatsapp" });
+      return;
+    }
     const result = await maybeGenerateReply({ env, store, thread, inboundText: body, generateReply });
     if (!result.generated) {
       if (!thread.reservationId) await store.updateMessagingThreadState(thread.id, { needsHuman: true, lastError: "reservation_unlinked", updatedAt: new Date().toISOString() });

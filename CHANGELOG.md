@@ -1,3 +1,13 @@
+# v5.11.78 — Production Readiness & Guest Communication Hardening
+
+- Recognize guest statements that a passport image was attached/uploaded/sent in OTA or WhatsApp chat before generic AI handling.
+- Create Owner review activity + protected owner operational alert for external passport submissions without marking secure Taoedge registration/TM30 complete.
+- Add per-device push category preferences and server-side filtering for guest messages, operations, housekeeping, maintenance, sync problems and lifecycle failures.
+- Add tri-state Listings write mode (`false` / `test` / `true`) and a protected no-op provider write verification endpoint.
+- Use Beds24 `numAvail` for calendar inventory writes and preserve exact current values during validation.
+- Keep `BEDS24_RATE_INVENTORY_WRITES_ENABLED=false` and `BEDS24_CHANNEL_MANAGER_ENABLED=false` in the release package.
+- Full backend suite: **370 passed / 0 failed**; backend JS syntax: **29 / 29**.
+
 # v5.11.77 — Reservation Operations & OTA Sync Hardening
 
 - Repairs the mobile Listings & Rates route contract and publishes the live backend/API contract to Diagnostics.

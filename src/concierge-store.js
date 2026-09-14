@@ -742,6 +742,7 @@ export class ConciergeStore extends DurableObject {
           expo_push_token TEXT NOT NULL,
           platform TEXT NOT NULL DEFAULT '',
           app_version TEXT NOT NULL DEFAULT '',
+          preferences_json TEXT NOT NULL DEFAULT '{}',
           enabled INTEGER NOT NULL DEFAULT 1,
           created_at TEXT NOT NULL,
           updated_at TEXT NOT NULL
@@ -821,6 +822,11 @@ export class ConciergeStore extends DurableObject {
         this.ctx.storage.sql.exec("ALTER TABLE platform_licenses ADD COLUMN modules_json TEXT NOT NULL DEFAULT '[]'");
       } catch (_error) {
         // Existing schema already has the signed module list.
+      }
+      try {
+        this.ctx.storage.sql.exec("ALTER TABLE platform_push_devices ADD COLUMN preferences_json TEXT NOT NULL DEFAULT '{}'");
+      } catch (_error) {
+        // Existing push-device schemas already include per-device notification preferences.
       }
       try {
         this.ctx.storage.sql.exec("ALTER TABLE stay_reservations ADD COLUMN guest_first_name TEXT NOT NULL DEFAULT ''");
@@ -5470,7 +5476,7 @@ export class ConciergeStore extends DurableObject {
     const tenantId = cleanText(tenantIdValue, 100);
     return rows(this.ctx.storage.sql.exec(
       `SELECT d.id, d.tenant_id AS tenantId, d.user_id AS userId, d.device_id AS deviceId,
-              d.expo_push_token AS expoPushToken, d.platform, d.app_version AS appVersion,
+              d.expo_push_token AS expoPushToken, d.platform, d.app_version AS appVersion, d.preferences_json AS preferencesJson,
               d.enabled, d.created_at AS createdAt, d.updated_at AS updatedAt,
               COALESCE(m.role, '') AS role
        FROM platform_push_devices d
@@ -5478,7 +5484,12 @@ export class ConciergeStore extends DurableObject {
        WHERE d.enabled = 1 AND (? = '' OR d.tenant_id = ?)
        ORDER BY d.updated_at DESC LIMIT 250`,
       tenantId, tenantId
-    )).map((item) => ({ ...item, enabled: Boolean(item.enabled) }));
+    )).map((item) => {
+      let preferences = {};
+      try { preferences = JSON.parse(item.preferencesJson || "{}"); } catch (_error) { preferences = {}; }
+      const { preferencesJson, ...rest } = item;
+      return { ...rest, enabled: Boolean(item.enabled), preferences };
+    });
   }
 
   async mobileDisablePushDeviceByToken(expoPushTokenValue, nowValue = "") {
@@ -5503,15 +5514,46 @@ export class ConciergeStore extends DurableObject {
     const id = existing?.id || cleanText(record.id, 100) || `push_${crypto.randomUUID()}`;
     this.ctx.storage.sql.exec(
       `INSERT INTO platform_push_devices
-       (id, tenant_id, user_id, device_id, expo_push_token, platform, app_version, enabled, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
+       (id, tenant_id, user_id, device_id, expo_push_token, platform, app_version, preferences_json, enabled, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
        ON CONFLICT(user_id, device_id) DO UPDATE SET
          tenant_id = excluded.tenant_id, expo_push_token = excluded.expo_push_token,
-         platform = excluded.platform, app_version = excluded.app_version, enabled = 1, updated_at = excluded.updated_at`,
+         platform = excluded.platform, app_version = excluded.app_version, preferences_json = excluded.preferences_json, enabled = 1, updated_at = excluded.updated_at`,
       id, cleanText(record.tenantId, 100), userId, deviceId, cleanText(record.expoPushToken, 300),
-      cleanText(record.platform, 30), cleanText(record.appVersion, 40), now, now
+      cleanText(record.platform, 30), cleanText(record.appVersion, 40), JSON.stringify(record.preferences || {}), now, now
     );
     return { ok: true, id };
+  }
+
+  async mobileGetPushDevice(userIdValue, deviceIdValue) {
+    const userId = cleanText(userIdValue, 100);
+    const deviceId = cleanText(deviceIdValue, 180);
+    const item = rows(this.ctx.storage.sql.exec(
+      `SELECT id, tenant_id AS tenantId, user_id AS userId, device_id AS deviceId, expo_push_token AS expoPushToken,
+              platform, app_version AS appVersion, preferences_json AS preferencesJson, enabled, created_at AS createdAt, updated_at AS updatedAt
+       FROM platform_push_devices WHERE user_id = ? AND device_id = ? LIMIT 1`,
+      userId, deviceId
+    ))[0] || null;
+    if (!item) return null;
+    let preferences = {};
+    try { preferences = JSON.parse(item.preferencesJson || "{}"); } catch (_error) { preferences = {}; }
+    const { preferencesJson, ...rest } = item;
+    return { ...rest, enabled: Boolean(item.enabled), preferences };
+  }
+
+  async mobileUpdatePushDeviceSettings(record = {}) {
+    const userId = cleanText(record.userId, 100);
+    const deviceId = cleanText(record.deviceId, 180);
+    const now = cleanText(record.updatedAt, 40) || new Date().toISOString();
+    const existing = rows(this.ctx.storage.sql.exec(
+      "SELECT id FROM platform_push_devices WHERE user_id = ? AND device_id = ? LIMIT 1", userId, deviceId
+    ))[0] || null;
+    if (!existing?.id) return { ok: false, error: "push_device_not_registered" };
+    this.ctx.storage.sql.exec(
+      `UPDATE platform_push_devices SET enabled = ?, preferences_json = ?, updated_at = ? WHERE id = ?`,
+      record.enabled === false ? 0 : 1, JSON.stringify(record.preferences || {}), now, existing.id
+    );
+    return { ok: true, id: existing.id };
   }
 
   async mobileListSessions(tenantIdValue) {

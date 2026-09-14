@@ -56,6 +56,7 @@ import {
   beds24MessageSyncPlan,
   beds24SourceLabel,
   detectGuestMessageLanguage,
+  detectExternalPassportSubmission,
   roomForBeds24Booking,
   unifiedMessagingConfiguration
 } from "../src/unified-messaging.js";
@@ -77,8 +78,10 @@ import {
 } from "../src/beds24-channel-manager.js";
 import {
   beds24ListingsRatesConfiguration,
+  beds24RateInventoryWriteMode,
   beds24RateInventoryWritesEnabled,
   getBeds24ListingsRates,
+  testBeds24ListingWriteCell,
   writeBeds24ListingRateCell
 } from "../src/beds24-listings-rates.js";
 import { guestLifecycleMessagingConfiguration, lifecycleStageForReservation } from "../src/lifecycle-messaging.js";
@@ -13848,6 +13851,15 @@ test("v5.11.56 Beds24 message sync keeps conversation order and only selects a g
   assert.equal(hostLatest.replyCandidate, null);
 });
 
+test("v5.11.78 OTA passport declarations are recognized deterministically without confusing upload questions", () => {
+  assert.equal(detectExternalPassportSubmission("Please find attached a picture of my passport."), true);
+  assert.equal(detectExternalPassportSubmission("Hi, I uploaded my passport here in Airbnb chat."), true);
+  assert.equal(detectExternalPassportSubmission("Here is my passport photo, thanks."), true);
+  assert.equal(detectExternalPassportSubmission("Can I upload my passport here?"), false);
+  assert.equal(detectExternalPassportSubmission("Where should I send my passport?"), false);
+  assert.equal(detectExternalPassportSubmission("Thank you, looking forward to staying."), false);
+});
+
 test("v5.11.56 unified messaging configuration requires real Beds24 and Meta credentials", () => {
   const disabled = unifiedMessagingConfiguration({ UNIFIED_MESSAGING_ENABLED: "true" });
   assert.equal(disabled.enabled, true);
@@ -15457,7 +15469,7 @@ test("v5.11.76 narrow Listings & Rates bridge reads calendar cells and writes on
     assert.ok(post);
     assert.match(post.url, /inventory\/rooms\/calendar/);
     const body = JSON.parse(post.body);
-    assert.deepEqual(body, [{ roomId: 83004, calendar: [{ from: "2026-09-20", to: "2026-09-20", price1: 1950, inventory: 1 }] }]);
+    assert.deepEqual(body, [{ roomId: 83004, calendar: [{ from: "2026-09-20", to: "2026-09-20", price1: 1950, numAvail: 1 }] }]);
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -15557,6 +15569,29 @@ test("v5.11.76 mobile push targets management correctly and exposes only approve
   }
 });
 
+test("v5.11.78 mobile push respects per-device notification categories", async () => {
+  const originalFetch = globalThis.fetch;
+  const outbound = [];
+  const store = {
+    async mobileListPushDevices() {
+      return [
+        { role: "owner", expoPushToken: "ExponentPushToken[owner-pref]", preferences: { guestMessages: false } },
+        { role: "manager", expoPushToken: "ExponentPushToken[manager-pref]", preferences: { guestMessages: true } }
+      ];
+    }
+  };
+  const env = { CONCIERGE_STORE: { getByName() { return store; } } };
+  globalThis.fetch = async (_url, options = {}) => {
+    outbound.push(JSON.parse(options.body));
+    return new Response(JSON.stringify({ data: [{ status: "ok", id: "ticket" }] }), { status: 200, headers: { "content-type": "application/json" } });
+  };
+  try {
+    const result = await sendMobilePush(env, { audience: "management", category: "guestMessages", title: "Guest", body: "Hello" });
+    assert.equal(result.attempted, 1);
+    assert.deepEqual(outbound[0].map((item) => item.to), ["ExponentPushToken[manager-pref]"]);
+  } finally { globalThis.fetch = originalFetch; }
+});
+
 test("v5.11.76 lifecycle AI protects guest access secrets and housekeeping can advance turnover from a confirmed early departure", async () => {
   const [lifecycleSource, storeSource] = await Promise.all([
     readFile(new URL("../src/lifecycle-messaging.js", import.meta.url), "utf8"),
@@ -15572,11 +15607,41 @@ test("v5.11.76 lifecycle AI protects guest access secrets and housekeeping can a
 });
 
 
+test("v5.11.78 Listings write flag supports an isolated validation mode without enabling live owner writes", async () => {
+  assert.equal(beds24RateInventoryWriteMode({ BEDS24_RATE_INVENTORY_WRITES_ENABLED: "false" }), "off");
+  assert.equal(beds24RateInventoryWriteMode({ BEDS24_RATE_INVENTORY_WRITES_ENABLED: "test" }), "test");
+  assert.equal(beds24RateInventoryWriteMode({ BEDS24_RATE_INVENTORY_WRITES_ENABLED: "true" }), "live");
+  assert.equal(beds24RateInventoryWritesEnabled({ BEDS24_RATE_INVENTORY_WRITES_ENABLED: "test" }), false);
+
+  const originalFetch = globalThis.fetch;
+  const calls = [];
+  const store = {
+    async getMessagingProviderState() { return { value: { accessToken: "access" }, expiresAt: new Date(Date.now() + 3_600_000).toISOString() }; }
+  };
+  const roomMap = JSON.stringify(Object.fromEntries(Array.from({ length: 11 }, (_, index) => [String(84001 + index), String(index + 1)])));
+  const env = { BEDS24_RATE_INVENTORY_WRITES_ENABLED: "test", BEDS24_REFRESH_TOKEN: "refresh", BEDS24_ROOM_MAP: roomMap };
+  globalThis.fetch = async (url, options = {}) => {
+    calls.push({ url: String(url), method: options.method || "GET", body: options.body || "" });
+    if ((options.method || "GET") === "POST") return new Response(JSON.stringify([{ success: true }]), { status: 200, headers: { "content-type": "application/json" } });
+    return new Response(JSON.stringify({ data: [{ roomId: 84011, calendar: [{ from: "2026-09-30", to: "2026-09-30", price1: 1250, numAvail: 2, minStay: 2 }] }] }), { status: 200, headers: { "content-type": "application/json" } });
+  };
+  try {
+    const result = await testBeds24ListingWriteCell(env, store, { room: "11", date: "2026-09-30" });
+    assert.equal(result.ok, true);
+    assert.equal(result.mode, "no_op_round_trip");
+    assert.equal(result.verified, true);
+    assert.equal(result.configuration.writeReady, false);
+    assert.equal(result.configuration.testWriteReady, true);
+    const post = calls.find((item) => item.method === "POST");
+    assert.deepEqual(JSON.parse(post.body), [{ roomId: 84011, calendar: [{ from: "2026-09-30", to: "2026-09-30", price1: 1250, numAvail: 2 }] }]);
+  } finally { globalThis.fetch = originalFetch; }
+});
+
 test("v5.11.77 Listings & Rates mobile route contract is explicit, aliased and trailing-slash safe", async () => {
   const source = await readFile(new URL("../src/mobile-platform.js", import.meta.url), "utf8");
   assert.ok(source.includes('[`${MOBILE_API_PREFIX}/listings-rates`, `${MOBILE_API_PREFIX}/listings`].includes(path)'));
   assert.ok(source.includes('path.replace(/\\/+$/, "")'));
-  assert.match(source, /backendVersion: "5\.11\.77a"/);
+  assert.match(source, /backendVersion: "5\.11\.78"/);
   assert.match(source, /listingsRatesRoute: `\$\{MOBILE_API_PREFIX\}\/listings-rates`/);
   assert.match(source, /direct-stays\/update/);
   assert.match(source, /direct-stays\/cancel/);

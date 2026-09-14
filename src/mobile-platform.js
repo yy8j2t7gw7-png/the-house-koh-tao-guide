@@ -6,7 +6,7 @@ import { integrationAdminOverview } from "./integration-catalog.js";
 import { beds24ApiRequest, handleUnifiedMessagingAdminRequest, openBeds24ReservationConversation, reviewMessagingDraft, roomForBeds24Booking, startWhatsAppGuestConversation, unifiedMessagingConfiguration, whatsAppGuestInitiationConfiguration } from "./unified-messaging.js";
 import { handleStayAdminRequest } from "./stay-api.js";
 import { beds24DirectStayProtectionConfiguration } from "./beds24-channel-manager.js";
-import { beds24ListingsRatesConfiguration, getBeds24ListingsRates, writeBeds24ListingRateCell } from "./beds24-listings-rates.js";
+import { beds24ListingsRatesConfiguration, getBeds24ListingsRates, testBeds24ListingWriteCell, writeBeds24ListingRateCell } from "./beds24-listings-rates.js";
 import { guestLifecycleMessagingConfiguration } from "./lifecycle-messaging.js";
 import { createProtectedOperationsAlert, dispatchConciergeAlert, operationalTaskAssignment, operationalTaskAssignments } from "./whatsapp-alerts.js";
 import { operationalRecipientGroup } from "./operations-routing.js";
@@ -188,6 +188,20 @@ function cleanText(value, maximum = 500) {
 function normalizeEmail(value) {
   const email = cleanText(value, 240).toLowerCase();
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? email : "";
+}
+
+const DEFAULT_PUSH_PREFERENCES = Object.freeze({
+  guestMessages: true,
+  operations: true,
+  housekeeping: true,
+  maintenance: true,
+  syncProblems: true,
+  lifecycleFailures: true
+});
+
+function normalizePushPreferences(value = {}) {
+  const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+  return Object.fromEntries(Object.entries(DEFAULT_PUSH_PREFERENCES).map(([key, fallback]) => [key, source[key] === undefined ? fallback : source[key] !== false]));
 }
 
 function safeJson(value, fallback) {
@@ -1829,6 +1843,20 @@ async function handleProtected(request, env, path, store, handlers = {}) {
     return json(outcome, outcome.ok ? 200 : (outcome.error === "beds24_listings_rates_not_ready" ? 503 : 400));
   }
 
+  if ([`${MOBILE_API_PREFIX}/listings-rates/test-write`, `${MOBILE_API_PREFIX}/listings/test-write`].includes(path) && request.method === "POST") {
+    const denied = requireCapability(publicAccess, "listings_rates.manage", "channel_manager");
+    if (denied) return denied;
+    let body; try { body = await readJson(request); } catch (response) { return response; }
+    const outcome = await testBeds24ListingWriteCell(env, store, body || {});
+    await store.mobileRecordAudit?.({
+      tenantId: record.tenantId, userId: record.userId, membershipId: record.membershipId,
+      action: outcome?.ok ? "listings_rates_test_write_verified" : "listings_rates_test_write_failed",
+      reference: `room:${cleanText(body?.room, 4)}:${cleanText(body?.date, 10)}`,
+      metadata: { error: outcome?.error || "", writeMode: outcome?.configuration?.writeMode || "off" }, createdAt: access.now
+    }).catch(() => {});
+    return json(outcome, outcome?.ok ? 200 : outcome?.error === "rate_inventory_test_writes_disabled" ? 409 : 400);
+  }
+
   if ([`${MOBILE_API_PREFIX}/listings-rates/write`, `${MOBILE_API_PREFIX}/listings/write`].includes(path) && request.method === "POST") {
     const denied = requireCapability(publicAccess, "listings_rates.manage", "integrations");
     if (denied) return denied;
@@ -2270,7 +2298,7 @@ async function handleProtected(request, env, path, store, handlers = {}) {
       messaging: messagingAllowed ? unifiedMessagingConfiguration(env) : undefined,
       financeAutomation: financeAllowed ? beds24FinanceSyncConfiguration(env) : undefined,
       connectionHealth,
-      apiContract: { backendVersion: "5.11.77a", mobileApiVersion: "v1", listingsRatesRoute: `${MOBILE_API_PREFIX}/listings-rates`, directStayOperations: true },
+      apiContract: { backendVersion: "5.11.78", mobileApiVersion: "v1", listingsRatesRoute: `${MOBILE_API_PREFIX}/listings-rates`, directStayOperations: true },
       product: {
         workingName: "Taoedge Owner App",
         commercialBrandPending: true,
@@ -2364,9 +2392,34 @@ async function handleProtected(request, env, path, store, handlers = {}) {
     if (!deviceId || !/^(?:Exponent|Expo)PushToken\[[^\]]+\]$/.test(expoPushToken)) return json({ error: "invalid_push_token" }, 400);
     const outcome = await store.mobileUpsertPushDevice({
       id: `push_${crypto.randomUUID()}`, tenantId: record.tenantId, userId: record.userId,
-      deviceId, expoPushToken, platform: cleanText(body.platform, 30), appVersion: cleanText(body.appVersion, 40), updatedAt: access.now
+      deviceId, expoPushToken, platform: cleanText(body.platform, 30), appVersion: cleanText(body.appVersion, 40),
+      preferences: normalizePushPreferences(body.preferences), updatedAt: access.now
     });
-    return json(outcome, outcome?.ok ? 200 : 400);
+    return json({ ...outcome, preferences: normalizePushPreferences(body.preferences) }, outcome?.ok ? 200 : 400);
+  }
+
+  if (path === `${MOBILE_API_PREFIX}/push/settings` && request.method === "GET") {
+    const deviceId = cleanText(request.headers.get("x-mobile-device-id"), 180);
+    if (!deviceId) return json({ error: "device_id_required" }, 400);
+    const device = typeof store.mobileGetPushDevice === "function"
+      ? await store.mobileGetPushDevice(record.userId, deviceId)
+      : null;
+    return json({
+      ok: true, registered: Boolean(device?.id), enabled: device ? Boolean(device.enabled) : false,
+      preferences: normalizePushPreferences(device?.preferences || {})
+    });
+  }
+
+  if (path === `${MOBILE_API_PREFIX}/push/settings` && request.method === "POST") {
+    let body; try { body = await readJson(request); } catch (response) { return response; }
+    const deviceId = cleanText(request.headers.get("x-mobile-device-id"), 180);
+    if (!deviceId) return json({ error: "device_id_required" }, 400);
+    const preferences = normalizePushPreferences(body?.preferences);
+    const enabled = body?.enabled !== false;
+    const outcome = typeof store.mobileUpdatePushDeviceSettings === "function"
+      ? await store.mobileUpdatePushDeviceSettings({ userId: record.userId, deviceId, enabled, preferences, updatedAt: access.now })
+      : { ok: false, error: "push_settings_store_unavailable" };
+    return json({ ...outcome, enabled, preferences }, outcome?.ok ? 200 : outcome?.error === "push_device_not_registered" ? 404 : 400);
   }
 
   return json({ error: "not_found" }, 404);

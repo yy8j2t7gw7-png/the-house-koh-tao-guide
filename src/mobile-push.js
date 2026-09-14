@@ -1,6 +1,26 @@
 const EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send";
 const HOUSE_TENANT_ID = "tenant_the_house_koh_tao";
 
+const DEFAULT_PUSH_PREFERENCES = Object.freeze({
+  guestMessages: true, operations: true, housekeeping: true, maintenance: true, syncProblems: true, lifecycleFailures: true
+});
+
+function preferenceEnabled(device, category) {
+  const preferences = device?.preferences && typeof device.preferences === "object" ? device.preferences : {};
+  if (!category || !(category in DEFAULT_PUSH_PREFERENCES)) return true;
+  return preferences[category] === undefined ? DEFAULT_PUSH_PREFERENCES[category] : preferences[category] !== false;
+}
+
+function alertPushCategory(alert = {}) {
+  const value = `${alert.alertType || ""} ${alert.summary || ""}`.toLowerCase();
+  if (/housekeeping|turnover|room ready|cleaning/.test(value)) return "housekeeping";
+  if (/maintenance|broken|repair|water leak|wifi|plumbing|electrical/.test(value)) return "maintenance";
+  if (/sync|distribution|provider|beds24|airbnb.*delay|channel/.test(value)) return "syncProblems";
+  if (/lifecycle|message delivery|automation failed/.test(value)) return "lifecycleFailures";
+  return "operations";
+}
+
+
 function cleanText(value, maximum = 240) {
   return String(value || "").replace(/\u0000/g, "").trim().slice(0, maximum);
 }
@@ -27,8 +47,10 @@ export async function sendMobilePush(env, event = {}) {
   if (!store?.mobileListPushDevices) return { ok: false, attempted: 0, accepted: 0, error: "push_store_unavailable" };
   const devices = await store.mobileListPushDevices(cleanText(event.tenantId, 100) || HOUSE_TENANT_ID);
   const audience = cleanText(event.audience || "operations", 30);
+  const category = cleanText(event.category || "operations", 40);
   const eligible = devices.filter((device) => {
     if (!isExpoToken(device.expoPushToken)) return false;
+    if (!preferenceEnabled(device, category)) return false;
     if (audience === "management") return ["owner", "manager"].includes(device.role);
     return true;
   });
@@ -79,6 +101,7 @@ export async function pushInboundOtaMessage(env, thread, text = "") {
   const suffix = room ? ` · Room ${room}` : "";
   return sendMobilePush(env, {
     audience: "management",
+    category: "guestMessages",
     title: `New guest message${suffix}`,
     body: `${label}: ${cleanText(text, 130)}`,
     data: { route: `/inbox/${thread.id}`, threadId: thread.id, reservationId: thread.reservationId, room, eventType: "guest_message", sourceLabel: source }
@@ -91,6 +114,7 @@ export async function pushOperationalAlert(env, alert) {
   const title = room ? `Room ${room} · ${cleanText(alert.alertType || "Operations", 50)}` : cleanText(alert.alertType || "Operations", 60);
   return sendMobilePush(env, {
     audience: "operations",
+    category: alertPushCategory(alert),
     title,
     body: cleanText(alert.summary || "Operational attention required", 180),
     data: { route: "/operations", reservationId: alert.reservationId, room, eventType: cleanText(alert.alertType, 60), alertId: alert.id }

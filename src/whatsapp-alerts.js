@@ -427,6 +427,7 @@ function requestLabel(alert) {
     verified_spare_key_release: "Verified spare-key request",
     lost_key: "Lost key",
     passport_received: "Passport received",
+    passport_received_external: "Passport received externally",
     passport_checkin_missing: "Passport check-in reminder",
     passport_checkin_partial: "Passport registration incomplete",
     passport_tm30_overdue: "TM30 reminder",

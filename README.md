@@ -1,10 +1,4 @@
-# Guest Guide Platform with AI Concierge — The House v5.11.77
-
-## v5.11.77 — Reservation Operations & OTA Sync Hardening
-
-v5.11.77 repairs the Listings & Rates mobile API contract, adds provider-visible Direct Stay distribution telemetry, immediately reinforces occupied inventory after Beds24 accepts a Direct Stay, safely reopens cancelled/released inventory only after conflict/provider checks, moves Direct Stay retry processing onto the minute cron, and adds protected mobile Direct Stay update/cancel operations. The full Beds24 Channel Manager remains off and broad Listings & Rates writes remain fail-closed.
-
-The matching mobile client is Taoedge Owner App v0.1.19. See `RELEASE_NOTES_v5.11.77.md`, `DEVELOPMENT_HANDOFF_v5.11.77_RESERVATION_OPERATIONS_OTA_SYNC.md`, `VALIDATION_RESULTS_v5.11.77.md` and `PRODUCT_NORTH_STAR_AUTONOMOUS_OPERATIONS.md`.
+# Guest Guide Platform with AI Concierge — The House v5.11.76
 
 ## v5.11.76 — Daily Operating Console
 

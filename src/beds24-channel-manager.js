@@ -87,10 +87,6 @@ export function beds24DirectStayProtectionEnabled(env = {}) {
   return String(configured || "false").toLowerCase() === "true";
 }
 
-export function beds24DirectStayFastInventorySyncEnabled(env = {}) {
-  return String(env.BEDS24_DIRECT_STAY_FAST_INVENTORY_SYNC_ENABLED || "false").toLowerCase() === "true";
-}
-
 export function beds24DirectStayProtectionConfiguration(env = {}) {
   const reverse = HOUSE_ROOMS.map((room) => [room, houseRoomToBeds24RoomId(room, env)]);
   const roomMapComplete = reverse.every(([, roomId]) => Boolean(roomId))
@@ -102,8 +98,7 @@ export function beds24DirectStayProtectionConfiguration(env = {}) {
     credentialsReady,
     roomMapComplete,
     ready: enabled && credentialsReady && roomMapComplete,
-    independentFromChannelManager: true,
-    fastInventorySyncEnabled: beds24DirectStayFastInventorySyncEnabled(env)
+    independentFromChannelManager: true
   };
 }
 
@@ -158,131 +153,6 @@ function dateRange(checkInDate, checkOutDate) {
   return days;
 }
 
-async function recordDistribution(store, record = {}) {
-  if (!store || typeof store.recordReservationDistributionEvent !== "function") return;
-  await store.recordReservationDistributionEvent({
-    id: `dist_${crypto.randomUUID()}`,
-    reservationId: cleanText(record.reservationId, 100),
-    externalBookingId: cleanText(record.externalBookingId, 40),
-    room: cleanText(record.room, 4),
-    eventType: cleanText(record.eventType, 80),
-    status: cleanText(record.status, 40),
-    detail: record.detail && typeof record.detail === "object" ? record.detail : {},
-    createdAt: record.createdAt || new Date().toISOString()
-  }).catch(() => {});
-}
-
-async function writeBeds24InventoryRange(env, store, { room, checkInDate, checkOutDate, inventory } = {}) {
-  const roomId = houseRoomToBeds24RoomId(room, env);
-  const start = validDate(checkInDate);
-  const checkout = validDate(checkOutDate);
-  const end = shiftedDateOnly(checkout, -1);
-  if (!roomId || !start || !checkout || checkout <= start || ![0, 1].includes(Number(inventory))) {
-    return { ok: false, error: "invalid_inventory_range" };
-  }
-  const response = await beds24ApiRequest(env, store, "inventory/rooms/calendar", {
-    method: "POST",
-    body: [{ roomId: Number(roomId), calendar: [{ from: start, to: end, inventory: Number(inventory) }] }]
-  });
-  assertBeds24WriteSucceeded(response, "beds24_inventory_write_failed");
-  return { ok: true, roomId, from: start, to: end, inventory: Number(inventory) };
-}
-
-export async function accelerateBeds24DirectStayClose(env, store, details = {}) {
-  const { reservationId = "", externalBookingId = "", room, checkInDate, checkOutDate } = details;
-  if (!beds24DirectStayFastInventorySyncEnabled(env)) {
-    return { ok: true, status: "booking_only", fastInventorySyncEnabled: false };
-  }
-  await recordDistribution(store, { reservationId, externalBookingId, room, eventType: "inventory_close_requested", status: "pending", detail: { checkInDate, checkOutDate } });
-  try {
-    const write = await writeBeds24InventoryRange(env, store, { room, checkInDate, checkOutDate, inventory: 0 });
-    const verification = await checkBeds24CentralAvailability(env, store, room, checkInDate, checkOutDate);
-    const closed = verification.ok && verification.available === false;
-    await recordDistribution(store, {
-      reservationId, externalBookingId, room,
-      eventType: closed ? "inventory_close_confirmed" : "inventory_close_sent",
-      status: closed ? "confirmed" : "provider_pending",
-      detail: { checkInDate, checkOutDate, providerRoomId: write.roomId }
-    });
-    return { ok: true, status: closed ? "confirmed_closed" : "provider_pending", providerRoomId: write.roomId };
-  } catch (error) {
-    await recordDistribution(store, { reservationId, externalBookingId, room, eventType: "inventory_close_failed", status: "error", detail: { error: cleanText(error?.code || error?.message, 160), checkInDate, checkOutDate } });
-    return { ok: false, status: "error", error: cleanText(error?.code || error?.message || "beds24_inventory_close_failed", 160) };
-  }
-}
-
-export async function reassertBeds24DirectStayOpenIfSafe(env, store, details = {}) {
-  const { reservationId = "", externalBookingId = "", room, checkInDate, checkOutDate } = details;
-  if (!beds24DirectStayFastInventorySyncEnabled(env)) {
-    return { ok: true, status: "booking_only", fastInventorySyncEnabled: false };
-  }
-  const conflict = typeof store?.findStayOverlap === "function"
-    ? await store.findStayOverlap(room, checkInDate, checkOutDate, reservationId)
-    : null;
-  if (conflict) {
-    await recordDistribution(store, { reservationId, externalBookingId, room, eventType: "inventory_reopen_skipped", status: "blocked_by_other_reservation", detail: { conflictId: conflict.id || "", checkInDate, checkOutDate } });
-    return { ok: true, status: "blocked_by_other_reservation", conflict };
-  }
-
-  const providerAvailability = await checkBeds24CentralAvailability(env, store, room, checkInDate, checkOutDate);
-  if (!providerAvailability.ok || providerAvailability.available !== true) {
-    await recordDistribution(store, { reservationId, externalBookingId, room, eventType: "inventory_reopen_waiting", status: "provider_pending", detail: { checkInDate, checkOutDate } });
-    return { ok: true, status: "provider_pending" };
-  }
-
-  try {
-    const write = await writeBeds24InventoryRange(env, store, { room, checkInDate, checkOutDate, inventory: 1 });
-    const verification = await checkBeds24CentralAvailability(env, store, room, checkInDate, checkOutDate);
-    const open = verification.ok && verification.available === true;
-    await recordDistribution(store, {
-      reservationId, externalBookingId, room,
-      eventType: open ? "inventory_reopen_confirmed" : "inventory_reopen_sent",
-      status: open ? "confirmed" : "provider_pending",
-      detail: { checkInDate, checkOutDate, providerRoomId: write.roomId }
-    });
-    return { ok: true, status: open ? "confirmed_open" : "provider_pending", providerRoomId: write.roomId };
-  } catch (error) {
-    await recordDistribution(store, { reservationId, externalBookingId, room, eventType: "inventory_reopen_failed", status: "error", detail: { error: cleanText(error?.code || error?.message, 160), checkInDate, checkOutDate } });
-    return { ok: false, status: "error", error: cleanText(error?.code || error?.message || "beds24_inventory_reopen_failed", 160) };
-  }
-}
-
-function addedAvailabilityRanges(current = {}, next = {}) {
-  const currentRoom = cleanText(current.room, 4);
-  const nextRoom = cleanText(next.room, 4);
-  const currentIn = validDate(current.checkInDate);
-  const currentOut = validDate(current.checkOutDate);
-  const nextIn = validDate(next.checkInDate);
-  const nextOut = validDate(next.checkOutDate);
-  if (!nextRoom || !nextIn || !nextOut || nextOut <= nextIn) return [];
-  if (currentRoom !== nextRoom) return [{ room: nextRoom, checkInDate: nextIn, checkOutDate: nextOut }];
-  const ranges = [];
-  if (nextIn < currentIn) ranges.push({ room: nextRoom, checkInDate: nextIn, checkOutDate: currentIn });
-  if (nextOut > currentOut) ranges.push({ room: nextRoom, checkInDate: currentOut, checkOutDate: nextOut });
-  return ranges.filter((range) => range.checkOutDate > range.checkInDate);
-}
-
-export async function updateBeds24HouseDirectBooking(env, store, { externalBookingId, current = {}, next = {} } = {}) {
-  if (!beds24DirectStayProtectionEnabled(env)) return { ok: true, ignored: "direct_stay_protection_disabled" };
-  const bookingId = Number(externalBookingId);
-  if (!Number.isSafeInteger(bookingId) || bookingId <= 0) return { ok: false, error: "beds24_link_required" };
-  const roomId = houseRoomToBeds24RoomId(next.room, env);
-  const arrival = validDate(next.checkInDate);
-  const departure = validDate(next.checkOutDate);
-  if (!roomId || !arrival || !departure || departure <= arrival) return { ok: false, error: "invalid_stay" };
-  for (const range of addedAvailabilityRanges(current, next)) {
-    const availability = await checkBeds24CentralAvailability(env, store, range.room, range.checkInDate, range.checkOutDate);
-    if (!availability.ok) return availability;
-    if (!availability.available) return { ok: false, error: "beds24_room_unavailable", available: false, range };
-  }
-  const response = await beds24ApiRequest(env, store, "bookings", {
-    method: "POST",
-    body: [{ id: bookingId, roomId: Number(roomId), arrival, departure }]
-  });
-  assertBeds24WriteSucceeded(response, "beds24_booking_update_failed");
-  return { ok: true, externalBookingId: String(bookingId), roomId, room: next.room, checkInDate: arrival, checkOutDate: departure };
-}
-
 export function beds24AvailabilityAllowsStay(response, beds24RoomId, checkInDate, checkOutDate) {
   const nights = dateRange(checkInDate, checkOutDate);
   if (!nights.length) return false;
@@ -325,7 +195,6 @@ export async function checkBeds24CentralAvailability(env, store, room, checkInDa
 }
 
 export async function createBeds24HouseDirectBooking(env, store, { room, checkInDate, checkOutDate } = {}) {
-  const requestedAt = new Date().toISOString();
   const availability = await checkBeds24CentralAvailability(env, store, room, checkInDate, checkOutDate);
   if (!availability.ok) return availability;
   if (!availability.available) return { ok: false, available: false, error: "beds24_room_unavailable", roomId: availability.roomId };
@@ -339,7 +208,7 @@ export async function createBeds24HouseDirectBooking(env, store, { room, checkIn
       referer: "The House Direct"
     }]
   });
-  return { ok: true, externalBookingId: String(newBeds24BookingId(response)), roomId: availability.roomId, requestedAt, acceptedAt: new Date().toISOString() };
+  return { ok: true, externalBookingId: String(newBeds24BookingId(response)), roomId: availability.roomId };
 }
 
 export async function updateBeds24HouseDirectExtension(env, store, { externalBookingId, room, currentCheckOutDate, checkOutDate } = {}) {
@@ -454,58 +323,6 @@ export async function processBeds24ChannelManagerRetries(env) {
     try {
       if (["cancel", "cancel_orphan"].includes(job.operation)) {
         await cancelBeds24HouseDirectBooking(env, store, job.externalBookingId);
-        if (job.operation === "cancel" && job.payload?.room && job.payload?.checkInDate && job.payload?.checkOutDate) {
-          const reopen = await reassertBeds24DirectStayOpenIfSafe(env, store, {
-            reservationId: job.reservationId,
-            externalBookingId: job.externalBookingId,
-            room: job.payload.room,
-            checkInDate: job.payload.checkInDate,
-            checkOutDate: job.payload.checkOutDate
-          });
-          if (!reopen?.ok || reopen?.status === "provider_pending") {
-            const error = new Error(reopen?.error || "inventory_reopen_pending");
-            error.code = reopen?.error || "inventory_reopen_pending";
-            throw error;
-          }
-        }
-      } else if (job.operation === "inventory_close") {
-        const outcome = await accelerateBeds24DirectStayClose(env, store, {
-          reservationId: job.reservationId,
-          externalBookingId: job.externalBookingId,
-          room: job.payload?.room,
-          checkInDate: job.payload?.checkInDate,
-          checkOutDate: job.payload?.checkOutDate
-        });
-        if (!outcome?.ok || outcome?.status === "provider_pending") {
-          const error = new Error(outcome?.error || "inventory_close_pending");
-          error.code = outcome?.error || "inventory_close_pending";
-          throw error;
-        }
-      } else if (job.operation === "inventory_reopen") {
-        const outcome = await reassertBeds24DirectStayOpenIfSafe(env, store, {
-          reservationId: job.reservationId,
-          externalBookingId: job.externalBookingId,
-          room: job.payload?.room,
-          checkInDate: job.payload?.checkInDate,
-          checkOutDate: job.payload?.checkOutDate
-        });
-        if (!outcome?.ok || outcome?.status === "provider_pending") {
-          const error = new Error(outcome?.error || "inventory_reopen_pending");
-          error.code = outcome?.error || "inventory_reopen_pending";
-          throw error;
-        }
-      } else if (job.operation === "restore_booking") {
-        const roomId = houseRoomToBeds24RoomId(job.payload?.room, env);
-        const response = await beds24ApiRequest(env, store, "bookings", {
-          method: "POST",
-          body: [{
-            id: Number(job.externalBookingId),
-            roomId: Number(roomId),
-            arrival: validDate(job.payload?.checkInDate),
-            departure: validDate(job.payload?.checkOutDate)
-          }]
-        });
-        assertBeds24WriteSucceeded(response, "beds24_booking_rollback_failed");
       } else if (job.operation === "update_departure") {
         const response = await beds24ApiRequest(env, store, "bookings", {
           method: "POST",
@@ -520,8 +337,7 @@ export async function processBeds24ChannelManagerRetries(env) {
       await store.completeBeds24ChannelRetry(job.id, true, "", now.toISOString());
       completed += 1;
     } catch (error) {
-      const baseDelay = ["inventory_close", "inventory_reopen", "cancel"].includes(job.operation) ? 2 : 15;
-      const delayMinutes = Math.min(360, baseDelay * (2 ** Math.min(5, Number(job.attemptCount) || 0)));
+      const delayMinutes = Math.min(360, 15 * (2 ** Math.min(4, Number(job.attemptCount) || 0)));
       const nextAttemptAt = new Date(now.getTime() + (delayMinutes * 60_000)).toISOString();
       await store.rescheduleBeds24ChannelRetry(job.id, nextAttemptAt, cleanText(error.code || error.message, 160), now.toISOString());
       failed += 1;

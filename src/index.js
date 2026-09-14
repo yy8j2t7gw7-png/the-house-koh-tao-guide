@@ -271,14 +271,14 @@ export default {
       ctx.waitUntil(Promise.all([
         processDueAlertEscalations(env),
         processHousekeepingTurnovers(env),
-        processGuestLifecycleMessaging(env),
-        processBeds24ChannelManagerRetries(env)
+        processGuestLifecycleMessaging(env)
       ]));
       return;
     }
     if (controller.cron === "0 * * * *") {
       ctx.waitUntil(Promise.all([
-        processRegistrationReminderAlerts(env)
+        processRegistrationReminderAlerts(env),
+        processBeds24ChannelManagerRetries(env)
       ]));
       return;
     }

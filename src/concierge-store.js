@@ -612,21 +612,6 @@ export class ConciergeStore extends DurableObject {
         CREATE INDEX IF NOT EXISTS beds24_channel_retries_due
           ON beds24_channel_retries(status, next_attempt_at, created_at);
 
-        CREATE TABLE IF NOT EXISTS reservation_distribution_events (
-          id TEXT PRIMARY KEY,
-          reservation_id TEXT NOT NULL DEFAULT '',
-          external_booking_id TEXT NOT NULL DEFAULT '',
-          room TEXT NOT NULL DEFAULT '',
-          event_type TEXT NOT NULL,
-          status TEXT NOT NULL DEFAULT '',
-          detail_json TEXT NOT NULL DEFAULT '{}',
-          created_at TEXT NOT NULL
-        );
-        CREATE INDEX IF NOT EXISTS reservation_distribution_events_reservation
-          ON reservation_distribution_events(reservation_id, created_at);
-        CREATE INDEX IF NOT EXISTS reservation_distribution_events_external
-          ON reservation_distribution_events(external_booking_id, created_at);
-
 
         CREATE TABLE IF NOT EXISTS platform_tenants (
           id TEXT PRIMARY KEY,
@@ -2356,43 +2341,6 @@ export class ConciergeStore extends DurableObject {
     ))[0] || null;
   }
 
-  async recordReservationDistributionEvent(record = {}) {
-    const id = cleanText(record.id, 120) || `dist_${crypto.randomUUID()}`;
-    const reservationId = cleanText(record.reservationId, 100);
-    const externalBookingId = cleanText(record.externalBookingId, 40);
-    const room = cleanText(record.room, 4);
-    const eventType = cleanText(record.eventType, 80);
-    const status = cleanText(record.status, 40);
-    const createdAt = cleanText(record.createdAt, 40) || new Date().toISOString();
-    if (!eventType) return { ok: false, error: "event_type_required" };
-    const detailJson = JSON.stringify(record.detail && typeof record.detail === "object" ? record.detail : {}).slice(0, 6000);
-    this.ctx.storage.sql.exec(
-      `INSERT INTO reservation_distribution_events
-       (id, reservation_id, external_booking_id, room, event_type, status, detail_json, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      id, reservationId, externalBookingId, room, eventType, status, detailJson, createdAt
-    );
-    return { ok: true, id };
-  }
-
-  async listReservationDistributionEvents(reservationId, limitValue = 80) {
-    const id = cleanText(reservationId, 100);
-    const limit = Math.max(1, Math.min(200, Number(limitValue) || 80));
-    if (!id) return [];
-    return rows(this.ctx.storage.sql.exec(
-      `SELECT id, reservation_id AS reservationId, external_booking_id AS externalBookingId,
-              room, event_type AS eventType, status, detail_json AS detailJson, created_at AS createdAt
-       FROM reservation_distribution_events
-       WHERE reservation_id = ?
-       ORDER BY created_at DESC, id DESC
-       LIMIT ?`,
-      id, limit
-    )).map((row) => ({
-      ...row,
-      detail: safeJson(row.detailJson, {})
-    }));
-  }
-
   async getStayReservationForChannelManager(reservationId) {
     return rows(this.ctx.storage.sql.exec(
       `SELECT r.id, r.provider, r.room, r.check_in_date AS checkInDate,
@@ -3549,60 +3497,6 @@ export class ConciergeStore extends DurableObject {
       return { ok: false, error: "code_collision" };
     }
     return { ok: true, reservationId: id, room: cleanText(reservation.room, 4), updatedAt: now };
-  }
-
-  async updateOwnerManagedStay(reservationId, patch = {}, nowValue) {
-    const id = cleanText(reservationId, 100);
-    const room = cleanText(patch.room, 4);
-    const checkInDate = cleanText(patch.checkInDate, 10);
-    const checkOutDate = cleanText(patch.checkOutDate, 10);
-    const now = cleanText(nowValue, 40) || new Date().toISOString();
-    if (!id || !/^([1-9]|1[01])$/.test(room) || !/^\d{4}-\d{2}-\d{2}$/.test(checkInDate) || !/^\d{4}-\d{2}-\d{2}$/.test(checkOutDate) || checkOutDate <= checkInDate) {
-      return { ok: false, error: "invalid_request" };
-    }
-    const reservation = rows(this.ctx.storage.sql.exec(
-      `SELECT id, provider, room, check_in_date AS checkInDate,
-              CASE WHEN o.check_out_date > r.check_out_date THEN o.check_out_date ELSE r.check_out_date END AS checkOutDate,
-              status
-       FROM stay_reservations r
-       LEFT JOIN stay_checkout_overrides o ON o.reservation_id = r.id
-       WHERE r.id = ? LIMIT 1`,
-      id
-    ))[0] || null;
-    if (!reservation) return { ok: false, error: "reservation_not_found" };
-    if (!reservationSourceCapabilities(reservation.provider).ownerManaged || reservation.provider !== "direct") return { ok: false, error: "direct_stay_required" };
-    if (reservation.status !== "confirmed") return { ok: false, error: "reservation_not_active" };
-    const overlap = await this.findStayOverlap(room, checkInDate, checkOutDate, id);
-    if (overlap) return { ok: false, error: "room_date_conflict", conflict: overlap };
-
-    this.ctx.storage.sql.exec(
-      `UPDATE stay_reservations
-       SET room = ?, listing_id = ?, check_in_date = ?, check_out_date = ?, updated_at = ?
-       WHERE id = ?`,
-      room, `house-direct-${room}`, checkInDate, checkOutDate, now, id
-    );
-    this.ctx.storage.sql.exec("DELETE FROM stay_checkout_overrides WHERE reservation_id = ?", id);
-    this.ctx.storage.sql.exec("DELETE FROM stay_late_checkout_approvals WHERE reservation_id = ?", id);
-
-    for (const affectedRoom of [...new Set([cleanText(reservation.room, 4), room])].filter(Boolean)) {
-      const roomStatus = await this.getRoomHousekeepingStatus(affectedRoom);
-      if (roomStatus?.status === "ready") {
-        this.ctx.storage.sql.exec(
-          `UPDATE room_housekeeping_status
-           SET status = 'unknown', current_task_id = '', service_date = '', arriving_reservation_id = '',
-               updated_at = ?, updated_by_hash = 'system'
-           WHERE room = ?`,
-          now, affectedRoom
-        );
-      }
-    }
-    await this.recordAdminAudit("direct_stay_updated", `reservation:${id}`, now);
-    return {
-      ok: true,
-      reservationId: id,
-      previous: { room: reservation.room, checkInDate: reservation.checkInDate, checkOutDate: reservation.checkOutDate },
-      room, checkInDate, checkOutDate, updatedAt: now
-    };
   }
 
   async extendStayReservation(reservationId, checkOutDate, nowValue) {

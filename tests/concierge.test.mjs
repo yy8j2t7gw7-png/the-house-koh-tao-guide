@@ -14309,7 +14309,7 @@ test("v5.11.58 expense submission is granular: owners/managers have it, staff re
   assert.equal(new Set(MOBILE_PERMISSION_MATRIX.owner).has("finance.expense_submit"), true);
   assert.equal(new Set(MOBILE_PERMISSION_MATRIX.manager).has("finance.expense_submit"), true);
   assert.equal(new Set(MOBILE_PERMISSION_MATRIX.staff).has("finance.expense_submit"), false);
-  assert.deepEqual(MOBILE_DELEGATABLE_PERMISSIONS.staff, ["finance.expense_submit"]);
+  assert.deepEqual(MOBILE_DELEGATABLE_PERMISSIONS.staff, ["finance.expense_submit", "copilot.use"]);
   assert.equal(new Set(MOBILE_DELEGATABLE_PERMISSIONS.staff).has("finance.view"), false);
   assert.equal(new Set(MOBILE_DELEGATABLE_PERMISSIONS.manager).has("finance.view"), true);
 });
@@ -14886,14 +14886,17 @@ test("v5.11.67 central operational routing sends service requests to Su plus own
 });
 
 test("v5.11.67 mobile AI review exposes approve reject regenerate and server-routed booking tasks", async () => {
-  const [mobileSource, messagingSource, routingSource] = await Promise.all([
+  const [mobileSource, messagingSource, routingSource, actionSource] = await Promise.all([
     readFile(new URL("../src/mobile-platform.js", import.meta.url), "utf8"),
     readFile(new URL("../src/unified-messaging.js", import.meta.url), "utf8"),
-    readFile(new URL("../src/operations-routing.js", import.meta.url), "utf8")
+    readFile(new URL("../src/operations-routing.js", import.meta.url), "utf8"),
+    readFile(new URL("../src/operational-actions.js", import.meta.url), "utf8")
   ]);
   assert.match(mobileSource, /\/inbox\/draft\/review/);
   assert.match(mobileSource, /reviewMessagingDraft/);
-  assert.match(mobileSource, /bookingTaskRoutingKey\(category\)/);
+  assert.match(mobileSource, /createBookingOperationalTask/);
+  assert.match(actionSource, /operationalCategoryRoutingKey/);
+  assert.match(actionSource, /operationalTaskAssignment\(env, operationalCategoryRoutingKey\(normalizedCategory\)\)/);
   assert.doesNotMatch(mobileSource, /operationalTaskAssignment\(env, body\?\.assigneeKey\)/);
   assert.match(messagingSource, /action === "reject"/);
   assert.match(messagingSource, /action === "regenerate"/);
@@ -15642,7 +15645,7 @@ test("v5.11.77 Listings & Rates mobile route contract is explicit, aliased and t
   const source = await readFile(new URL("../src/mobile-platform.js", import.meta.url), "utf8");
   assert.ok(source.includes('[`${MOBILE_API_PREFIX}/listings-rates`, `${MOBILE_API_PREFIX}/listings`].includes(path)'));
   assert.ok(source.includes('path.replace(/\\/+$/, "")'));
-  assert.match(source, /backendVersion: "5\.11\.79"/);
+  assert.match(source, /backendVersion: "5\.11\.80"/);
   assert.match(source, /listingsRatesRoute: `\$\{MOBILE_API_PREFIX\}\/listings-rates`/);
   assert.match(source, /direct-stays\/update/);
   assert.match(source, /direct-stays\/cancel/);

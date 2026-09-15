@@ -8,7 +8,9 @@ import { handleStayAdminRequest } from "./stay-api.js";
 import { beds24DirectStayProtectionConfiguration } from "./beds24-channel-manager.js";
 import { beds24ListingsRatesConfiguration, getBeds24ListingsRates, testBeds24ListingWriteCell, writeBeds24ListingRateCell } from "./beds24-listings-rates.js";
 import { guestLifecycleMessagingConfiguration } from "./lifecycle-messaging.js";
-import { createProtectedOperationsAlert, dispatchConciergeAlert, operationalTaskAssignment, operationalTaskAssignments } from "./whatsapp-alerts.js";
+import { createProtectedOperationsAlert, dispatchConciergeAlert, operationalTaskAssignments } from "./whatsapp-alerts.js";
+import { createBookingOperationalTask } from "./operational-actions.js";
+import { handleOperationsCopilot } from "./operations-copilot.js";
 import { operationalRecipientGroup } from "./operations-routing.js";
 import { reservationSourceCapabilities } from "./reservation-model.js";
 
@@ -36,7 +38,7 @@ const DEFAULT_MODULES = [
 
 export const MOBILE_PERMISSION_MATRIX = Object.freeze({
   owner: Object.freeze([
-    "home.view", "bookings.view", "calendar.view", "booking_activity.create", "booking_activity.update",
+    "home.view", "bookings.view", "calendar.view", "copilot.use", "booking_activity.create", "booking_activity.update",
     "messaging.view", "messaging.send", "messaging.ai_control",
     "operations.view", "housekeeping.update", "maintenance.view", "maintenance.create", "maintenance.resolve",
     "registration.status", "finance.view", "finance.import", "finance.expense_submit", "analytics.view", "integrations.view",
@@ -44,20 +46,20 @@ export const MOBILE_PERMISSION_MATRIX = Object.freeze({
     "direct_stays.manage", "guest_documents.view", "listings_rates.view", "listings_rates.manage"
   ]),
   manager: Object.freeze([
-    "home.view", "bookings.view", "calendar.view", "booking_activity.create", "booking_activity.update",
+    "home.view", "bookings.view", "calendar.view", "copilot.use", "booking_activity.create", "booking_activity.update",
     "messaging.view", "messaging.send", "messaging.ai_control",
     "operations.view", "housekeeping.update", "maintenance.view", "maintenance.create", "maintenance.resolve",
     "registration.status", "finance.expense_submit", "analytics.view", "integrations.view", "direct_stays.manage", "listings_rates.view"
   ]),
   staff: Object.freeze([
-    "home.view", "bookings.view", "calendar.view", "booking_activity.create", "booking_activity.update", "operations.view",
+    "home.view", "bookings.view", "calendar.view", "copilot.use", "booking_activity.create", "booking_activity.update", "operations.view",
     "housekeeping.update", "maintenance.view", "maintenance.create", "maintenance.resolve", "registration.status"
   ])
 });
 
 export const MOBILE_DELEGATABLE_PERMISSIONS = Object.freeze({
-  manager: Object.freeze(["finance.view", "finance.expense_submit"]),
-  staff: Object.freeze(["finance.expense_submit"])
+  manager: Object.freeze(["finance.view", "finance.expense_submit", "copilot.use"]),
+  staff: Object.freeze(["finance.expense_submit", "copilot.use"])
 });
 
 function sanitizePermissionOverrides(roleValue, input = {}) {
@@ -1214,26 +1216,6 @@ function publicTaskAssignments(env) {
 }
 
 
-function bookingTaskRoutingKey(category) {
-  const value = cleanText(category, 60).toLowerCase();
-  if (value === "housekeeping") return "housekeeping";
-  if (value === "maintenance") return "maintenance";
-  if (value === "guest support") return "guest_support";
-  if (value === "reservations") return "reservations";
-  if (value === "owner") return "owner";
-  return "general";
-}
-
-function bookingTaskAlertType(category) {
-  const value = cleanText(category, 60).toLowerCase();
-  if (value === "housekeeping") return "booking_task_housekeeping";
-  if (value === "maintenance") return "booking_task_maintenance";
-  if (value === "guest support") return "booking_task_guest_support";
-  if (value === "reservations") return "booking_task_reservations";
-  if (value === "owner") return "booking_task_owner";
-  return "booking_task_general";
-}
-
 function publicThread(thread) {
   return {
     id: thread.id,
@@ -1505,6 +1487,14 @@ async function handleProtected(request, env, path, store, handlers = {}) {
     return json({ ok: true });
   }
 
+  if (path === `${MOBILE_API_PREFIX}/copilot/chat` && request.method === "POST") {
+    const denied = requireCapability(publicAccess, "copilot.use", "core");
+    if (denied) return denied;
+    const actorHash = await sha256(`mobile:${record.userId}:${record.membershipId}`);
+    const outcome = await handleOperationsCopilot({ request, env, store, access: publicAccess, actorHash });
+    return json(outcome.body, outcome.status);
+  }
+
   if (path === `${MOBILE_API_PREFIX}/home` && request.method === "GET") {
     const denied = requireCapability(publicAccess, "home.view", "core");
     if (denied) return denied;
@@ -1579,38 +1569,31 @@ async function handleProtected(request, env, path, store, handlers = {}) {
     if (!reservationId || text.length < 2) return json({ error: "invalid_request" }, 400);
     const reservation = await store.getStayReservationById(reservationId);
     if (!reservation) return json({ error: "reservation_not_found" }, 404);
-    const assignment = kind === "task" ? operationalTaskAssignment(env, bookingTaskRoutingKey(category)) : null;
-    if (kind === "task" && !assignment) return json({ error: "task_assignee_unavailable" }, 409);
     const actorHash = await sha256(`mobile:${record.userId}:${record.membershipId}`);
+    if (kind === "task") {
+      const outcome = await createBookingOperationalTask({
+        env, store, reservationId, category, text, actorHash, actorLabel: record.displayName, now: access.now
+      });
+      if (!outcome?.ok) return json({ error: outcome?.error || "activity_create_failed" }, outcome?.error === "task_assignee_unavailable" ? 409 : 400);
+      await store.mobileRecordAudit({
+        tenantId: record.tenantId, userId: record.userId, membershipId: record.membershipId,
+        action: "booking_task_created", reference: `reservation:${reservationId}`,
+        metadata: { activityId: outcome.activity?.id || "", category, assigneeKey: outcome.assignment?.key || "", deliveryAccepted: Number(outcome.delivery?.accepted) || 0 }, createdAt: access.now
+      });
+      return json({ ok: true, activity: publicReservationActivity(outcome.activity), delivery: outcome.delivery }, 201);
+    }
     const activityId = `bact_${crypto.randomUUID()}`;
     const created = await store.mobileCreateReservationActivity({
       id: activityId, reservationId, kind, category, body: text,
-      assigneeKey: assignment?.key || "", assigneeLabel: assignment?.label || "",
-      createdByHash: actorHash, createdByLabel: record.displayName, createdAt: access.now
+      assigneeKey: "", assigneeLabel: "", createdByHash: actorHash, createdByLabel: record.displayName, createdAt: access.now
     });
     if (!created?.ok) return json({ error: created?.error || "activity_create_failed" }, 400);
-    let delivery = { attempted: 0, accepted: 0 };
-    if (kind === "task") {
-      const shortRef = activityId.slice(-8);
-      const alert = await createProtectedOperationsAlert({
-        env, room: reservation.room, roomVerified: true,
-        alertType: bookingTaskAlertType(category), severity: "attention",
-        recipientGroup: assignment.recipientGroup,
-        summary: `${text} · Booking task ref ${shortRef}`,
-        escalationRequired: false, now: new Date(access.now)
-      });
-      if (alert) {
-        delivery = await dispatchConciergeAlert(alert, env).catch(() => ({ attempted: 0, accepted: 0 }));
-        await store.mobileLinkReservationActivityAlert(activityId, alert.id, delivery, access.now);
-      }
-    }
     await store.mobileRecordAudit({
       tenantId: record.tenantId, userId: record.userId, membershipId: record.membershipId,
-      action: kind === "task" ? "booking_task_created" : "booking_note_created",
-      reference: `reservation:${reservationId}`, metadata: { activityId, category, assigneeKey: assignment?.key || "", deliveryAccepted: Number(delivery.accepted) || 0 }, createdAt: access.now
+      action: "booking_note_created", reference: `reservation:${reservationId}`, metadata: { activityId, category }, createdAt: access.now
     });
     const activity = await store.mobileGetReservationActivity(activityId);
-    return json({ ok: true, activity: publicReservationActivity(activity), delivery }, 201);
+    return json({ ok: true, activity: publicReservationActivity(activity), delivery: { attempted: 0, accepted: 0 } }, 201);
   }
 
   if (path === `${MOBILE_API_PREFIX}/bookings/activity/status` && request.method === "POST") {
@@ -2299,7 +2282,7 @@ async function handleProtected(request, env, path, store, handlers = {}) {
       messaging: messagingAllowed ? unifiedMessagingConfiguration(env) : undefined,
       financeAutomation: financeAllowed ? beds24FinanceSyncConfiguration(env) : undefined,
       connectionHealth,
-      apiContract: { backendVersion: "5.11.79", mobileApiVersion: "v1", listingsRatesRoute: `${MOBILE_API_PREFIX}/listings-rates`, directStayOperations: true },
+      apiContract: { backendVersion: "5.11.80", mobileApiVersion: "v1", listingsRatesRoute: `${MOBILE_API_PREFIX}/listings-rates`, directStayOperations: true },
       product: {
         workingName: "Taoedge Owner App",
         commercialBrandPending: true,

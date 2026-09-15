@@ -331,3 +331,40 @@ test("v5.11.84 Copilot calendar block and unblock both require confirmation and 
   assert.equal(block?.status, "cancelled");
   assert.equal(blockerStay?.status, "cancelled");
 });
+
+test("v5.11.85 multilingual voice routing can safely prepare a German Direct Stay cancellation", async () => {
+  const harness = testHarness();
+  harness.reservations.push({ id: "stay_direct-voice-de-123456789012", room: "7", provider: "direct", status: "confirmed", checkInDate: "2026-09-16", checkOutDate: "2026-09-17" });
+  const outcome = await handleOperationsCopilot({
+    request: post({
+      message: "Storniere bitte den Direct Stay in Zimmer 7 morgen",
+      voice: true,
+      preferredLanguage: "de-DE",
+      voiceRoutingText: "Cancel the direct stay in room 7 tomorrow"
+    }),
+    env: harness.env, store: harness.store, access: harness.access, actorHash: "actor_hash"
+  });
+  assert.equal(outcome.status, 200);
+  assert.equal(outcome.body.confirmationRequired, true);
+  assert.equal(outcome.body.proposal?.type, "cancel_direct_stay");
+  assert.equal(outcome.body.proposal?.reservationId, "stay_direct-voice-de-123456789012");
+  assert.equal(outcome.body.replyLanguage, "de-DE");
+  assert.equal(harness.reservations.find((item) => item.id === "stay_direct-voice-de-123456789012")?.status, "confirmed", "voice routing must still require confirmation");
+});
+
+test("v5.11.85 multilingual voice routing maps Thai daily-attention speech into the deterministic live summary", async () => {
+  const harness = testHarness();
+  const outcome = await handleOperationsCopilot({
+    request: post({
+      message: "วันนี้มีอะไรที่ผมต้องจัดการบ้าง",
+      voice: true,
+      preferredLanguage: "th-TH",
+      voiceRoutingText: "What needs my attention today?"
+    }),
+    env: harness.env, store: harness.store, access: harness.access, actorHash: "actor_hash"
+  });
+  assert.equal(outcome.status, 200);
+  assert.equal(outcome.body.proposal, null);
+  assert.equal(outcome.body.replyLanguage, "th-TH");
+  assert.ok(outcome.body.attention);
+});

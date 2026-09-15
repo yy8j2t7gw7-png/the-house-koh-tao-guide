@@ -818,6 +818,43 @@ export class ConciergeStore extends DurableObject {
           PRIMARY KEY (tenant_id, property_id)
         );
 
+        CREATE TABLE IF NOT EXISTS staff_profiles (
+          tenant_id TEXT NOT NULL, user_id TEXT NOT NULL, employee_code TEXT NOT NULL DEFAULT '',
+          job_title TEXT NOT NULL DEFAULT '', department TEXT NOT NULL DEFAULT '', home_property_id TEXT NOT NULL DEFAULT '',
+          employment_type TEXT NOT NULL DEFAULT 'full_time', employment_status TEXT NOT NULL DEFAULT 'active',
+          phone TEXT NOT NULL DEFAULT '', preferred_language TEXT NOT NULL DEFAULT 'en', start_date TEXT NOT NULL DEFAULT '', end_date TEXT NOT NULL DEFAULT '',
+          onboarding_completed_at TEXT NOT NULL DEFAULT '', offboarding_completed_at TEXT NOT NULL DEFAULT '',
+          updated_by_user_id TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+          PRIMARY KEY (tenant_id, user_id)
+        );
+        CREATE INDEX IF NOT EXISTS staff_profiles_status ON staff_profiles(tenant_id, employment_status, department, home_property_id);
+
+        CREATE TABLE IF NOT EXISTS staff_onboarding_items (
+          id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL, user_id TEXT NOT NULL, item_key TEXT NOT NULL, label TEXT NOT NULL,
+          status TEXT NOT NULL DEFAULT 'pending', due_at TEXT NOT NULL DEFAULT '', completed_at TEXT NOT NULL DEFAULT '',
+          completed_by_user_id TEXT NOT NULL DEFAULT '', notes TEXT NOT NULL DEFAULT '', updated_at TEXT NOT NULL
+        );
+        CREATE UNIQUE INDEX IF NOT EXISTS staff_onboarding_unique ON staff_onboarding_items(tenant_id, user_id, item_key);
+        CREATE INDEX IF NOT EXISTS staff_onboarding_user ON staff_onboarding_items(tenant_id, user_id, status);
+
+        CREATE TABLE IF NOT EXISTS staff_shifts (
+          id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL, property_id TEXT NOT NULL, user_id TEXT NOT NULL,
+          shift_date TEXT NOT NULL, start_time TEXT NOT NULL, end_time TEXT NOT NULL, department TEXT NOT NULL DEFAULT '', role_label TEXT NOT NULL DEFAULT '',
+          status TEXT NOT NULL DEFAULT 'draft', notes TEXT NOT NULL DEFAULT '', acknowledged_at TEXT NOT NULL DEFAULT '',
+          clock_in_at TEXT NOT NULL DEFAULT '', clock_out_at TEXT NOT NULL DEFAULT '', created_by_user_id TEXT NOT NULL DEFAULT '',
+          created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS staff_shifts_schedule ON staff_shifts(tenant_id, property_id, shift_date, start_time, status);
+        CREATE INDEX IF NOT EXISTS staff_shifts_user ON staff_shifts(tenant_id, user_id, shift_date, status);
+
+        CREATE TABLE IF NOT EXISTS staff_time_off_requests (
+          id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL, property_id TEXT NOT NULL DEFAULT '', user_id TEXT NOT NULL,
+          from_date TEXT NOT NULL, to_date TEXT NOT NULL, request_type TEXT NOT NULL DEFAULT 'time_off', reason TEXT NOT NULL DEFAULT '',
+          status TEXT NOT NULL DEFAULT 'pending', reviewed_by_user_id TEXT NOT NULL DEFAULT '', reviewed_at TEXT NOT NULL DEFAULT '',
+          created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS staff_time_off_range ON staff_time_off_requests(tenant_id, user_id, from_date, to_date, status);
+
         CREATE TABLE IF NOT EXISTS inventory_locations (
           id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL, property_id TEXT NOT NULL, name TEXT NOT NULL,
           department TEXT NOT NULL DEFAULT '', parent_id TEXT NOT NULL DEFAULT '', active INTEGER NOT NULL DEFAULT 1,
@@ -6114,6 +6151,232 @@ export class ConciergeStore extends DurableObject {
       record.enabled === false ? 0 : 1, JSON.stringify(record.preferences || {}), now, existing.id
     );
     return { ok: true, id: existing.id };
+  }
+
+  async mobileListStaffProfiles(tenantIdValue) {
+    const tenantId = cleanText(tenantIdValue, 100);
+    return rows(this.ctx.storage.sql.exec(
+      `SELECT tenant_id AS tenantId, user_id AS userId, employee_code AS employeeCode,
+              job_title AS jobTitle, department, home_property_id AS homePropertyId,
+              employment_type AS employmentType, employment_status AS employmentStatus,
+              phone, preferred_language AS preferredLanguage, start_date AS startDate, end_date AS endDate,
+              onboarding_completed_at AS onboardingCompletedAt, offboarding_completed_at AS offboardingCompletedAt,
+              updated_by_user_id AS updatedByUserId, created_at AS createdAt, updated_at AS updatedAt
+       FROM staff_profiles WHERE tenant_id = ? ORDER BY department ASC, job_title ASC, user_id ASC`, tenantId
+    ));
+  }
+
+  async mobileUpsertStaffProfile(record = {}) {
+    const tenantId = cleanText(record.tenantId, 100);
+    const userId = cleanText(record.userId, 100);
+    const now = cleanText(record.updatedAt, 40) || new Date().toISOString();
+    if (!tenantId || !userId) return { ok: false, error: "invalid_staff_profile" };
+    this.ctx.storage.sql.exec(
+      `INSERT INTO staff_profiles
+       (tenant_id, user_id, employee_code, job_title, department, home_property_id, employment_type, employment_status,
+        phone, preferred_language, start_date, end_date, onboarding_completed_at, offboarding_completed_at,
+        updated_by_user_id, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(tenant_id, user_id) DO UPDATE SET
+         employee_code=excluded.employee_code, job_title=excluded.job_title, department=excluded.department,
+         home_property_id=excluded.home_property_id, employment_type=excluded.employment_type,
+         employment_status=excluded.employment_status, phone=excluded.phone, preferred_language=excluded.preferred_language,
+         start_date=excluded.start_date, end_date=excluded.end_date, onboarding_completed_at=excluded.onboarding_completed_at,
+         offboarding_completed_at=excluded.offboarding_completed_at, updated_by_user_id=excluded.updated_by_user_id,
+         updated_at=excluded.updated_at`,
+      tenantId, userId, cleanText(record.employeeCode, 60), cleanText(record.jobTitle, 120), cleanText(record.department, 100),
+      cleanText(record.homePropertyId, 100), cleanText(record.employmentType, 40) || "full_time",
+      cleanText(record.employmentStatus, 40) || "active", cleanText(record.phone, 80), cleanText(record.preferredLanguage, 24) || "en",
+      cleanText(record.startDate, 10), cleanText(record.endDate, 10), cleanText(record.onboardingCompletedAt, 40),
+      cleanText(record.offboardingCompletedAt, 40), cleanText(record.updatedByUserId, 100), now, now
+    );
+    return { ok: true, userId };
+  }
+
+  async mobileEnsureStaffOnboarding(tenantIdValue, userIdValue, nowValue) {
+    const tenantId = cleanText(tenantIdValue, 100);
+    const userId = cleanText(userIdValue, 100);
+    const now = cleanText(nowValue, 40) || new Date().toISOString();
+    const defaults = [
+      ["account_access", "Account access and permissions"],
+      ["property_orientation", "Property orientation"],
+      ["house_rules_sop", "House rules and operating procedures"],
+      ["emergency_procedures", "Emergency procedures"],
+      ["role_training", "Role-specific training"],
+      ["keys_equipment", "Keys, uniform and equipment issued"],
+      ["schedule_ready", "First schedule confirmed"]
+    ];
+    for (const [key, label] of defaults) {
+      this.ctx.storage.sql.exec(
+        `INSERT OR IGNORE INTO staff_onboarding_items
+         (id, tenant_id, user_id, item_key, label, status, due_at, completed_at, completed_by_user_id, notes, updated_at)
+         VALUES (?, ?, ?, ?, ?, 'pending', '', '', '', '', ?)`,
+        `staff_onboard_${crypto.randomUUID()}`, tenantId, userId, key, label, now
+      );
+    }
+    return { ok: true };
+  }
+
+  async mobileListStaffOnboarding(tenantIdValue, userIdValue) {
+    const tenantId = cleanText(tenantIdValue, 100);
+    const userId = cleanText(userIdValue, 100);
+    return rows(this.ctx.storage.sql.exec(
+      `SELECT id, item_key AS itemKey, label, status, due_at AS dueAt, completed_at AS completedAt,
+              completed_by_user_id AS completedByUserId, notes, updated_at AS updatedAt
+       FROM staff_onboarding_items WHERE tenant_id = ? AND user_id = ? ORDER BY rowid ASC`, tenantId, userId
+    ));
+  }
+
+  async mobileUpdateStaffOnboardingItem(record = {}) {
+    const tenantId = cleanText(record.tenantId, 100);
+    const userId = cleanText(record.userId, 100);
+    const itemKey = cleanText(record.itemKey, 100);
+    const status = cleanText(record.status, 30);
+    const now = cleanText(record.updatedAt, 40) || new Date().toISOString();
+    if (!tenantId || !userId || !itemKey || !["pending", "completed", "not_applicable"].includes(status)) return { ok: false, error: "invalid_onboarding_item" };
+    const existing = rows(this.ctx.storage.sql.exec(
+      `SELECT id FROM staff_onboarding_items WHERE tenant_id = ? AND user_id = ? AND item_key = ? LIMIT 1`, tenantId, userId, itemKey
+    ))[0] || null;
+    if (!existing) return { ok: false, error: "onboarding_item_not_found" };
+    const completedAt = status === "completed" ? now : "";
+    this.ctx.storage.sql.exec(
+      `UPDATE staff_onboarding_items SET status = ?, completed_at = ?, completed_by_user_id = ?, notes = ?, updated_at = ?
+       WHERE tenant_id = ? AND user_id = ? AND item_key = ?`,
+      status, completedAt, status === "completed" ? cleanText(record.completedByUserId, 100) : "", cleanText(record.notes, 400), now,
+      tenantId, userId, itemKey
+    );
+    return { ok: true, itemKey, status };
+  }
+
+  async mobileListStaffShifts(tenantIdValue, fromValue, toValue, userIdValue = "") {
+    const tenantId = cleanText(tenantIdValue, 100);
+    const from = cleanText(fromValue, 10);
+    const to = cleanText(toValue, 10);
+    const userId = cleanText(userIdValue, 100);
+    const clause = userId ? " AND s.user_id = ?" : "";
+    const args = userId ? [tenantId, from, to, userId] : [tenantId, from, to];
+    return rows(this.ctx.storage.sql.exec(
+      `SELECT s.id, s.tenant_id AS tenantId, s.property_id AS propertyId, s.user_id AS userId,
+              u.display_name AS displayName, s.shift_date AS shiftDate, s.start_time AS startTime, s.end_time AS endTime,
+              s.department, s.role_label AS roleLabel, s.status, s.notes, s.acknowledged_at AS acknowledgedAt,
+              s.clock_in_at AS clockInAt, s.clock_out_at AS clockOutAt, s.created_by_user_id AS createdByUserId,
+              s.created_at AS createdAt, s.updated_at AS updatedAt
+       FROM staff_shifts s LEFT JOIN platform_users u ON u.id = s.user_id
+       WHERE s.tenant_id = ? AND s.shift_date >= ? AND s.shift_date <= ?${clause}
+       ORDER BY s.shift_date ASC, s.start_time ASC, u.display_name ASC`, ...args
+    ));
+  }
+
+  async mobileGetStaffShift(tenantIdValue, shiftIdValue) {
+    const tenantId = cleanText(tenantIdValue, 100);
+    const shiftId = cleanText(shiftIdValue, 100);
+    return rows(this.ctx.storage.sql.exec(
+      `SELECT id, tenant_id AS tenantId, property_id AS propertyId, user_id AS userId, shift_date AS shiftDate,
+              start_time AS startTime, end_time AS endTime, department, role_label AS roleLabel, status, notes,
+              acknowledged_at AS acknowledgedAt, clock_in_at AS clockInAt, clock_out_at AS clockOutAt,
+              created_by_user_id AS createdByUserId, created_at AS createdAt, updated_at AS updatedAt
+       FROM staff_shifts WHERE tenant_id = ? AND id = ? LIMIT 1`, tenantId, shiftId
+    ))[0] || null;
+  }
+
+  async mobileCreateStaffShift(record = {}) {
+    const now = cleanText(record.createdAt, 40) || new Date().toISOString();
+    const id = cleanText(record.id, 100) || `shift_${crypto.randomUUID()}`;
+    this.ctx.storage.sql.exec(
+      `INSERT INTO staff_shifts
+       (id, tenant_id, property_id, user_id, shift_date, start_time, end_time, department, role_label, status, notes,
+        acknowledged_at, clock_in_at, clock_out_at, created_by_user_id, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '', '', '', ?, ?, ?)`,
+      id, cleanText(record.tenantId, 100), cleanText(record.propertyId, 100), cleanText(record.userId, 100),
+      cleanText(record.shiftDate, 10), cleanText(record.startTime, 5), cleanText(record.endTime, 5), cleanText(record.department, 100),
+      cleanText(record.roleLabel, 100), cleanText(record.status, 30) || "draft", cleanText(record.notes, 500),
+      cleanText(record.createdByUserId, 100), now, now
+    );
+    return { ok: true, id };
+  }
+
+  async mobileUpdateStaffShift(record = {}) {
+    const tenantId = cleanText(record.tenantId, 100);
+    const id = cleanText(record.id, 100);
+    const now = cleanText(record.updatedAt, 40) || new Date().toISOString();
+    const existing = await this.mobileGetStaffShift(tenantId, id);
+    if (!existing) return { ok: false, error: "shift_not_found" };
+    const next = { ...existing, ...record };
+    this.ctx.storage.sql.exec(
+      `UPDATE staff_shifts SET property_id = ?, user_id = ?, shift_date = ?, start_time = ?, end_time = ?, department = ?,
+       role_label = ?, status = ?, notes = ?, acknowledged_at = ?, clock_in_at = ?, clock_out_at = ?, updated_at = ?
+       WHERE tenant_id = ? AND id = ?`,
+      cleanText(next.propertyId, 100), cleanText(next.userId, 100), cleanText(next.shiftDate, 10), cleanText(next.startTime, 5),
+      cleanText(next.endTime, 5), cleanText(next.department, 100), cleanText(next.roleLabel, 100), cleanText(next.status, 30),
+      cleanText(next.notes, 500), cleanText(next.acknowledgedAt, 40), cleanText(next.clockInAt, 40), cleanText(next.clockOutAt, 40),
+      now, tenantId, id
+    );
+    return { ok: true, id };
+  }
+
+  async mobileCreateStaffTimeOff(record = {}) {
+    const id = cleanText(record.id, 100) || `timeoff_${crypto.randomUUID()}`;
+    const now = cleanText(record.createdAt, 40) || new Date().toISOString();
+    this.ctx.storage.sql.exec(
+      `INSERT INTO staff_time_off_requests
+       (id, tenant_id, property_id, user_id, from_date, to_date, request_type, reason, status, reviewed_by_user_id, reviewed_at, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', '', '', ?, ?)`,
+      id, cleanText(record.tenantId, 100), cleanText(record.propertyId, 100), cleanText(record.userId, 100),
+      cleanText(record.fromDate, 10), cleanText(record.toDate, 10), cleanText(record.requestType, 40) || "time_off",
+      cleanText(record.reason, 500), now, now
+    );
+    return { ok: true, id };
+  }
+
+  async mobileListStaffTimeOff(tenantIdValue, fromValue, toValue, userIdValue = "") {
+    const tenantId = cleanText(tenantIdValue, 100);
+    const from = cleanText(fromValue, 10);
+    const to = cleanText(toValue, 10);
+    const userId = cleanText(userIdValue, 100);
+    const clause = userId ? " AND r.user_id = ?" : "";
+    const args = userId ? [tenantId, to, from, userId] : [tenantId, to, from];
+    return rows(this.ctx.storage.sql.exec(
+      `SELECT r.id, r.property_id AS propertyId, r.user_id AS userId, u.display_name AS displayName,
+              r.from_date AS fromDate, r.to_date AS toDate, r.request_type AS requestType, r.reason, r.status,
+              r.reviewed_by_user_id AS reviewedByUserId, r.reviewed_at AS reviewedAt, r.created_at AS createdAt, r.updated_at AS updatedAt
+       FROM staff_time_off_requests r LEFT JOIN platform_users u ON u.id = r.user_id
+       WHERE r.tenant_id = ? AND r.from_date <= ? AND r.to_date >= ?${clause}
+       ORDER BY CASE r.status WHEN 'pending' THEN 0 ELSE 1 END, r.from_date ASC, r.created_at DESC`, ...args
+    ));
+  }
+
+  async mobileReviewStaffTimeOff(record = {}) {
+    const tenantId = cleanText(record.tenantId, 100);
+    const id = cleanText(record.id, 100);
+    const status = cleanText(record.status, 30);
+    const now = cleanText(record.reviewedAt, 40) || new Date().toISOString();
+    if (!["approved", "rejected", "cancelled"].includes(status)) return { ok: false, error: "invalid_time_off_status" };
+    const existing = rows(this.ctx.storage.sql.exec(
+      `SELECT id, user_id AS userId FROM staff_time_off_requests WHERE tenant_id = ? AND id = ? LIMIT 1`, tenantId, id
+    ))[0] || null;
+    if (!existing) return { ok: false, error: "time_off_not_found" };
+    this.ctx.storage.sql.exec(
+      `UPDATE staff_time_off_requests SET status = ?, reviewed_by_user_id = ?, reviewed_at = ?, updated_at = ?
+       WHERE tenant_id = ? AND id = ?`, status, cleanText(record.reviewedByUserId, 100), now, now, tenantId, id
+    );
+    return { ok: true, id, userId: existing.userId, status };
+  }
+
+  async mobileOffboardStaff(record = {}) {
+    const tenantId = cleanText(record.tenantId, 100);
+    const userId = cleanText(record.userId, 100);
+    const now = cleanText(record.updatedAt, 40) || new Date().toISOString();
+    if (!tenantId || !userId) return { ok: false, error: "invalid_staff_member" };
+    const member = rows(this.ctx.storage.sql.exec(
+      `SELECT id, role, status FROM platform_memberships WHERE tenant_id = ? AND user_id = ? LIMIT 1`, tenantId, userId
+    ))[0] || null;
+    if (!member || member.role === "owner") return { ok: false, error: "member_not_found" };
+    this.ctx.storage.sql.exec(`UPDATE platform_memberships SET status = 'inactive', updated_at = ? WHERE tenant_id = ? AND user_id = ?`, now, tenantId, userId);
+    this.ctx.storage.sql.exec(`UPDATE platform_sessions SET revoked_at = ? WHERE tenant_id = ? AND user_id = ? AND revoked_at = ''`, now, tenantId, userId);
+    this.ctx.storage.sql.exec(`UPDATE staff_profiles SET employment_status = 'inactive', end_date = CASE WHEN end_date = '' THEN substr(?,1,10) ELSE end_date END, offboarding_completed_at = ?, updated_at = ? WHERE tenant_id = ? AND user_id = ?`, now, now, now, tenantId, userId);
+    this.ctx.storage.sql.exec(`UPDATE staff_shifts SET status = 'cancelled', updated_at = ? WHERE tenant_id = ? AND user_id = ? AND shift_date >= substr(?,1,10) AND status IN ('draft','published','acknowledged')`, now, tenantId, userId, now);
+    this.ctx.storage.sql.exec(`UPDATE inventory_shopping_lists SET assigned_user_id = '', assigned_label = '', status = CASE WHEN status='assigned' THEN 'draft' ELSE status END, updated_at = ? WHERE tenant_id = ? AND assigned_user_id = ? AND status NOT IN ('completed','cancelled')`, now, tenantId, userId);
+    return { ok: true, userId };
   }
 
   async mobileListSessions(tenantIdValue) {

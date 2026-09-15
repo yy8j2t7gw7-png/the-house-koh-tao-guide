@@ -11,11 +11,13 @@ import { guestLifecycleMessagingConfiguration } from "./lifecycle-messaging.js";
 import { createProtectedOperationsAlert, dispatchConciergeAlert, operationalTaskAssignments } from "./whatsapp-alerts.js";
 import { createBookingOperationalTask } from "./operational-actions.js";
 import { handleOperationsCopilot } from "./operations-copilot.js";
+import { handleCopilotVoiceTranscription } from "./voice-copilot.js";
 import { operationalRecipientGroup } from "./operations-routing.js";
 import { reservationSourceCapabilities } from "./reservation-model.js";
 import { normalizeStaffLanguage, staffLanguageLabel, translateOperatorText } from "./staff-translation.js";
 import { activateCatalogueItems, addShoppingListLine, assignShoppingList, createAsset, createInventoryItem, createInventoryLocation, createInventoryMovement, createPurchaseOrder, createShoppingList, createSupplier, inventoryOverview, linkShoppingListExpense, receivePurchaseOrder, seedStarterInventory, shoppingListAssignmentMessage, updateInventoryItem, updatePurchaseOrderStatus, updateShoppingListLine, updateShoppingListStatus } from "./inventory-api.js";
 import { sendMobilePush } from "./mobile-push.js";
+import { canSelfUpdateShift, normalizeShift, normalizeStaffProfile, normalizeTimeOff, publicStaffProfile, shiftInputError, shiftsOverlap, timeOffInputError } from "./staff-management.js";
 
 const MOBILE_API_PREFIX = "/api/mobile/v1";
 const PASSWORD_ITERATIONS = 100000;
@@ -46,7 +48,7 @@ export const MOBILE_PERMISSION_MATRIX = Object.freeze({
     "messaging.view", "messaging.send", "messaging.ai_control",
     "operations.view", "housekeeping.update", "maintenance.view", "maintenance.create", "maintenance.resolve",
     "registration.status", "finance.view", "finance.import", "finance.expense_submit", "analytics.view", "integrations.view",
-    "staff.manage", "licenses.view", "licenses.manage", "security.sessions",
+    "staff.manage", "staff.schedule_view", "staff.schedule_manage", "staff.timeoff_manage", "licenses.view", "licenses.manage", "security.sessions",
     "direct_stays.manage", "guest_documents.view", "listings_rates.view", "listings_rates.manage",
     "inventory.view", "inventory.adjust", "inventory.purchase", "inventory.local_purchase", "inventory.manage", "property_settings.manage"
   ]),
@@ -55,17 +57,17 @@ export const MOBILE_PERMISSION_MATRIX = Object.freeze({
     "messaging.view", "messaging.send", "messaging.ai_control",
     "operations.view", "housekeeping.update", "maintenance.view", "maintenance.create", "maintenance.resolve",
     "registration.status", "finance.expense_submit", "analytics.view", "integrations.view", "direct_stays.manage", "listings_rates.view",
-    "inventory.view", "inventory.adjust", "inventory.purchase", "inventory.local_purchase", "property_settings.manage"
+    "inventory.view", "inventory.adjust", "inventory.purchase", "inventory.local_purchase", "property_settings.manage", "staff.schedule_view", "staff.schedule_manage", "staff.timeoff_manage"
   ]),
   staff: Object.freeze([
     "home.view", "bookings.view", "calendar.view", "copilot.use", "booking_activity.create", "booking_activity.update", "operations.view",
-    "housekeeping.update", "maintenance.view", "maintenance.create", "maintenance.resolve", "registration.status"
+    "housekeeping.update", "maintenance.view", "maintenance.create", "maintenance.resolve", "registration.status", "staff.schedule_view"
   ])
 });
 
 export const MOBILE_DELEGATABLE_PERMISSIONS = Object.freeze({
-  manager: Object.freeze(["finance.view", "finance.expense_submit", "copilot.use", "inventory.view", "inventory.adjust", "inventory.purchase", "inventory.manage"]),
-  staff: Object.freeze(["finance.expense_submit", "copilot.use", "inventory.view", "inventory.adjust", "inventory.local_purchase"])
+  manager: Object.freeze(["finance.view", "finance.expense_submit", "copilot.use", "inventory.view", "inventory.adjust", "inventory.purchase", "inventory.manage", "staff.schedule_manage", "staff.timeoff_manage"]),
+  staff: Object.freeze(["finance.expense_submit", "copilot.use", "inventory.view", "inventory.adjust", "inventory.local_purchase", "staff.schedule_view"])
 });
 
 function sanitizePermissionOverrides(roleValue, input = {}) {
@@ -1501,6 +1503,13 @@ async function handleProtected(request, env, path, store, handlers = {}) {
     return json({ ok: true });
   }
 
+  if (path === `${MOBILE_API_PREFIX}/copilot/voice/transcribe` && request.method === "POST") {
+    const denied = requireCapability(publicAccess, "copilot.use", "core");
+    if (denied) return denied;
+    const outcome = await handleCopilotVoiceTranscription({ request, env, store, access: publicAccess });
+    return json(outcome.body, outcome.status);
+  }
+
   if (path === `${MOBILE_API_PREFIX}/copilot/chat` && request.method === "POST") {
     const denied = requireCapability(publicAccess, "copilot.use", "core");
     if (denied) return denied;
@@ -2592,7 +2601,7 @@ async function handleProtected(request, env, path, store, handlers = {}) {
       messaging: messagingAllowed ? unifiedMessagingConfiguration(env) : undefined,
       financeAutomation: financeAllowed ? beds24FinanceSyncConfiguration(env) : undefined,
       connectionHealth,
-      apiContract: { backendVersion: "5.11.84", mobileApiVersion: "v1", listingsRatesRoute: `${MOBILE_API_PREFIX}/listings-rates`, directStayOperations: true, inventoryShoppingLists: true, copilotOperationalActions: true },
+      apiContract: { backendVersion: "5.11.85", mobileApiVersion: "v1", listingsRatesRoute: `${MOBILE_API_PREFIX}/listings-rates`, directStayOperations: true, inventoryShoppingLists: true, copilotOperationalActions: true },
       product: {
         workingName: "Taoedge Owner App",
         commercialBrandPending: true,
@@ -2652,6 +2661,186 @@ async function handleProtected(request, env, path, store, handlers = {}) {
       metadata: { role: target.role, permissionOverrides }, createdAt: access.now
     });
     return json({ ok: true, userId, role: target.role, permissionOverrides });
+  }
+
+  if (path === `${MOBILE_API_PREFIX}/staff/overview` && request.method === "GET") {
+    const denied = requireCapability(publicAccess, "staff.schedule_view", "staff_access");
+    if (denied) return denied;
+    const canManagePeople = hasPermission(publicAccess, "staff.manage");
+    const canManageSchedule = hasPermission(publicAccess, "staff.schedule_manage");
+    const canManageTimeOff = hasPermission(publicAccess, "staff.timeoff_manage");
+    const users = await store.mobileListTenantUsers(record.tenantId);
+    const profiles = typeof store.mobileListStaffProfiles === "function" ? await store.mobileListStaffProfiles(record.tenantId) : [];
+    const profileMap = new Map(profiles.map((item) => [item.userId, item]));
+    const visibleUsers = canManagePeople || canManageSchedule || canManageTimeOff ? users : users.filter((item) => item.userId === record.userId);
+    return json({
+      ok: true,
+      currentUserId: record.userId,
+      canManagePeople,
+      canManageSchedule,
+      canManageTimeOff,
+      properties: access.properties.filter((item) => item.active).map((item) => ({ id: item.id, name: item.displayName || item.name || item.id })),
+      staff: visibleUsers.map((item) => publicStaffProfile(item, profileMap.get(item.userId) || {}))
+    });
+  }
+
+  if (path === `${MOBILE_API_PREFIX}/staff/profile` && request.method === "POST") {
+    const denied = requireCapability(publicAccess, "staff.manage", "staff_access");
+    if (denied) return denied;
+    let body; try { body = await readJson(request); } catch (response) { return response; }
+    const userId = cleanText(body.userId, 100);
+    const users = await store.mobileListTenantUsers(record.tenantId);
+    const target = users.find((item) => item.userId === userId);
+    if (!target || target.role === "owner") return json({ error: "member_not_found" }, 404);
+    const profile = normalizeStaffProfile(body);
+    const propertyIds = new Set(access.properties.filter((item) => item.active).map((item) => item.id));
+    if (profile.homePropertyId && !propertyIds.has(profile.homePropertyId)) return json({ error: "property_not_allowed" }, 403);
+    await store.mobileUpsertStaffProfile({ tenantId: record.tenantId, userId, ...profile, updatedByUserId: record.userId, updatedAt: access.now });
+    if (profile.employmentStatus === "onboarding") await store.mobileEnsureStaffOnboarding(record.tenantId, userId, access.now);
+    await store.mobileRecordAudit({ tenantId: record.tenantId, userId: record.userId, membershipId: record.membershipId, action: "staff_profile_updated", reference: `user:${userId}`, metadata: { department: profile.department, jobTitle: profile.jobTitle, employmentStatus: profile.employmentStatus, homePropertyId: profile.homePropertyId }, createdAt: access.now });
+    return json({ ok: true, userId, profile });
+  }
+
+  if (path === `${MOBILE_API_PREFIX}/staff/onboarding` && request.method === "GET") {
+    const denied = requireCapability(publicAccess, "staff.schedule_view", "staff_access");
+    if (denied) return denied;
+    const requested = cleanText(url.searchParams.get("userId"), 100) || record.userId;
+    if (requested !== record.userId && !hasPermission(publicAccess, "staff.manage")) return json({ error: "forbidden" }, 403);
+    await store.mobileEnsureStaffOnboarding(record.tenantId, requested, access.now);
+    const items = await store.mobileListStaffOnboarding(record.tenantId, requested);
+    return json({ ok: true, userId: requested, items });
+  }
+
+  if (path === `${MOBILE_API_PREFIX}/staff/onboarding` && request.method === "POST") {
+    const denied = requireCapability(publicAccess, "staff.manage", "staff_access");
+    if (denied) return denied;
+    let body; try { body = await readJson(request); } catch (response) { return response; }
+    const userId = cleanText(body.userId, 100);
+    const itemKey = cleanText(body.itemKey, 100);
+    await store.mobileEnsureStaffOnboarding(record.tenantId, userId, access.now);
+    const outcome = await store.mobileUpdateStaffOnboardingItem({ tenantId: record.tenantId, userId, itemKey, status: body.status, notes: body.notes, completedByUserId: record.userId, updatedAt: access.now });
+    if (!outcome?.ok) return json({ error: outcome?.error || "onboarding_update_failed" }, 400);
+    const items = await store.mobileListStaffOnboarding(record.tenantId, userId);
+    const outstanding = items.filter((item) => item.status === "pending").length;
+    if (!outstanding) {
+      const profiles = await store.mobileListStaffProfiles(record.tenantId);
+      const current = profiles.find((item) => item.userId === userId) || {};
+      await store.mobileUpsertStaffProfile({ tenantId: record.tenantId, userId, ...current, employmentStatus: current.employmentStatus === "inactive" ? "inactive" : "active", onboardingCompletedAt: access.now, updatedByUserId: record.userId, updatedAt: access.now });
+    }
+    await store.mobileRecordAudit({ tenantId: record.tenantId, userId: record.userId, membershipId: record.membershipId, action: "staff_onboarding_updated", reference: `user:${userId}`, metadata: { itemKey, status: body.status, outstanding }, createdAt: access.now });
+    return json({ ok: true, userId, items, outstanding });
+  }
+
+  if (path === `${MOBILE_API_PREFIX}/staff/schedule` && request.method === "GET") {
+    const denied = requireCapability(publicAccess, "staff.schedule_view", "staff_access");
+    if (denied) return denied;
+    const from = validDate(url.searchParams.get("from")) ? url.searchParams.get("from") : bangkokDate();
+    const to = validDate(url.searchParams.get("to")) ? url.searchParams.get("to") : shiftedDateOnly(from, 13);
+    if (to < from || dateSpanDays(from, to) > 62) return json({ error: "invalid_schedule_range" }, 400);
+    const canManage = hasPermission(publicAccess, "staff.schedule_manage");
+    const shifts = await store.mobileListStaffShifts(record.tenantId, from, to, canManage ? "" : record.userId);
+    return json({ ok: true, from, to, canManage, shifts });
+  }
+
+  if (path === `${MOBILE_API_PREFIX}/staff/schedule` && request.method === "POST") {
+    const denied = requireCapability(publicAccess, "staff.schedule_manage", "staff_access");
+    if (denied) return denied;
+    let body; try { body = await readJson(request); } catch (response) { return response; }
+    const shift = normalizeShift(body);
+    const error = shiftInputError(shift);
+    if (error) return json({ error }, 400);
+    const users = await store.mobileListTenantUsers(record.tenantId);
+    const target = users.find((item) => item.userId === shift.userId && item.membershipStatus === "active");
+    if (!target || target.role === "owner") return json({ error: "staff_not_available" }, 404);
+    const propertyIds = new Set(access.properties.filter((item) => item.active).map((item) => item.id));
+    if (!propertyIds.has(shift.propertyId)) return json({ error: "property_not_allowed" }, 403);
+    const existing = await store.mobileListStaffShifts(record.tenantId, shift.shiftDate, shift.shiftDate, shift.userId);
+    if (existing.some((item) => item.status !== "cancelled" && shiftsOverlap(shift, item))) return json({ error: "shift_conflict" }, 409);
+    const status = shift.status === "published" ? "published" : "draft";
+    const outcome = await store.mobileCreateStaffShift({ tenantId: record.tenantId, ...shift, status, createdByUserId: record.userId, createdAt: access.now });
+    await store.mobileRecordAudit({ tenantId: record.tenantId, userId: record.userId, membershipId: record.membershipId, action: "staff_shift_created", reference: `shift:${outcome.id}`, metadata: { targetUserId: shift.userId, propertyId: shift.propertyId, shiftDate: shift.shiftDate, startTime: shift.startTime, endTime: shift.endTime, status }, createdAt: access.now });
+    let notification = null;
+    if (status === "published") notification = await sendMobilePush(env, { targetUserId: shift.userId, category: "operations", title: "New staff shift", body: `${shift.shiftDate} · ${shift.startTime}–${shift.endTime}${shift.department ? ` · ${shift.department}` : ""}`, data: { route: "/staff", eventType: "staff_shift" } });
+    return json({ ok: true, id: outcome.id, status, notification }, 201);
+  }
+
+  if (path === `${MOBILE_API_PREFIX}/staff/schedule/status` && request.method === "POST") {
+    const denied = requireCapability(publicAccess, "staff.schedule_view", "staff_access");
+    if (denied) return denied;
+    let body; try { body = await readJson(request); } catch (response) { return response; }
+    const id = cleanText(body.id, 100);
+    const action = cleanText(body.action, 40);
+    const shift = await store.mobileGetStaffShift(record.tenantId, id);
+    if (!shift) return json({ error: "shift_not_found" }, 404);
+    const manager = hasPermission(publicAccess, "staff.schedule_manage");
+    if (!manager && !canSelfUpdateShift(action, shift, record.userId)) return json({ error: "forbidden" }, 403);
+    const patch = { tenantId: record.tenantId, id, updatedAt: access.now };
+    if (action === "publish" && manager) patch.status = "published";
+    else if (action === "cancel" && manager) patch.status = "cancelled";
+    else if (action === "complete" && manager) patch.status = "completed";
+    else if (action === "acknowledge" && shift.userId === record.userId) { patch.status = shift.status === "published" ? "acknowledged" : shift.status; patch.acknowledgedAt = access.now; }
+    else if (action === "clock_in" && shift.userId === record.userId) patch.clockInAt = access.now;
+    else if (action === "clock_out" && shift.userId === record.userId) patch.clockOutAt = access.now;
+    else return json({ error: "invalid_shift_action" }, 400);
+    const outcome = await store.mobileUpdateStaffShift(patch);
+    if (!outcome?.ok) return json({ error: outcome?.error || "shift_update_failed" }, 400);
+    await store.mobileRecordAudit({ tenantId: record.tenantId, userId: record.userId, membershipId: record.membershipId, action: `staff_shift_${action}`, reference: `shift:${id}`, metadata: { targetUserId: shift.userId }, createdAt: access.now });
+    if (action === "publish") await sendMobilePush(env, { targetUserId: shift.userId, category: "operations", title: "Staff shift published", body: `${shift.shiftDate} · ${shift.startTime}–${shift.endTime}`, data: { route: "/staff", eventType: "staff_shift" } });
+    return json({ ok: true, id, action });
+  }
+
+  if (path === `${MOBILE_API_PREFIX}/staff/time-off` && request.method === "GET") {
+    const denied = requireCapability(publicAccess, "staff.schedule_view", "staff_access");
+    if (denied) return denied;
+    const from = validDate(url.searchParams.get("from")) ? url.searchParams.get("from") : bangkokDate();
+    const to = validDate(url.searchParams.get("to")) ? url.searchParams.get("to") : shiftedDateOnly(from, 90);
+    const manager = hasPermission(publicAccess, "staff.timeoff_manage");
+    const requests = await store.mobileListStaffTimeOff(record.tenantId, from, to, manager ? "" : record.userId);
+    return json({ ok: true, from, to, canManage: manager, requests });
+  }
+
+  if (path === `${MOBILE_API_PREFIX}/staff/time-off` && request.method === "POST") {
+    const denied = requireCapability(publicAccess, "staff.schedule_view", "staff_access");
+    if (denied) return denied;
+    let body; try { body = await readJson(request); } catch (response) { return response; }
+    const timeOff = normalizeTimeOff(body);
+    const error = timeOffInputError(timeOff);
+    if (error) return json({ error }, 400);
+    const propertyIds = new Set(access.properties.filter((item) => item.active).map((item) => item.id));
+    if (timeOff.propertyId && !propertyIds.has(timeOff.propertyId)) return json({ error: "property_not_allowed" }, 403);
+    const outcome = await store.mobileCreateStaffTimeOff({ tenantId: record.tenantId, userId: record.userId, ...timeOff, createdAt: access.now });
+    await store.mobileRecordAudit({ tenantId: record.tenantId, userId: record.userId, membershipId: record.membershipId, action: "staff_time_off_requested", reference: `timeoff:${outcome.id}`, metadata: { fromDate: timeOff.fromDate, toDate: timeOff.toDate, requestType: timeOff.requestType }, createdAt: access.now });
+    await sendMobilePush(env, { audience: "management", category: "operations", title: "Staff time-off request", body: `${record.displayName || "Team member"} · ${timeOff.fromDate} → ${timeOff.toDate}`, data: { route: "/staff", eventType: "staff_time_off" } });
+    return json({ ok: true, id: outcome.id }, 201);
+  }
+
+  if (path === `${MOBILE_API_PREFIX}/staff/time-off/review` && request.method === "POST") {
+    const denied = requireCapability(publicAccess, "staff.timeoff_manage", "staff_access");
+    if (denied) return denied;
+    let body; try { body = await readJson(request); } catch (response) { return response; }
+    const id = cleanText(body.id, 100);
+    const status = ["approved", "rejected"].includes(body.status) ? body.status : "";
+    if (!id || !status) return json({ error: "invalid_time_off_review" }, 400);
+    const outcome = await store.mobileReviewStaffTimeOff({ tenantId: record.tenantId, id, status, reviewedByUserId: record.userId, reviewedAt: access.now });
+    if (!outcome?.ok) return json({ error: outcome?.error || "time_off_review_failed" }, 400);
+    await store.mobileRecordAudit({ tenantId: record.tenantId, userId: record.userId, membershipId: record.membershipId, action: `staff_time_off_${status}`, reference: `timeoff:${id}`, metadata: { targetUserId: outcome.userId }, createdAt: access.now });
+    await sendMobilePush(env, { targetUserId: outcome.userId, category: "operations", title: status === "approved" ? "Time off approved" : "Time off request not approved", body: status === "approved" ? "Your time-off request has been approved." : "Your time-off request was reviewed. Open Staff & schedule for details.", data: { route: "/staff", eventType: "staff_time_off" } });
+    return json({ ok: true, id, status });
+  }
+
+  if (path === `${MOBILE_API_PREFIX}/staff/offboard` && request.method === "POST") {
+    const denied = requireCapability(publicAccess, "staff.manage", "staff_access");
+    if (denied) return denied;
+    let body; try { body = await readJson(request); } catch (response) { return response; }
+    const userId = cleanText(body.userId, 100);
+    if (!userId || userId === record.userId) return json({ error: "invalid_staff_member" }, 400);
+    const users = await store.mobileListTenantUsers(record.tenantId);
+    const target = users.find((item) => item.userId === userId);
+    if (!target || target.role === "owner") return json({ error: "member_not_found" }, 404);
+    const outcome = await store.mobileOffboardStaff({ tenantId: record.tenantId, userId, updatedAt: access.now });
+    if (!outcome?.ok) return json({ error: outcome?.error || "staff_offboard_failed" }, 400);
+    await store.mobileRecordAudit({ tenantId: record.tenantId, userId: record.userId, membershipId: record.membershipId, action: "staff_offboarded", reference: `user:${userId}`, metadata: { displayName: target.displayName }, createdAt: access.now });
+    return json({ ok: true, userId, cancelledFutureShifts: true, sessionsRevoked: true, shoppingListsUnassigned: true });
   }
 
   if (path === `${MOBILE_API_PREFIX}/security/sessions` && request.method === "GET") {

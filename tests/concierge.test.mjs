@@ -14311,7 +14311,7 @@ test("v5.11.58 expense submission is granular: owners/managers have it, staff re
   assert.equal(new Set(MOBILE_PERMISSION_MATRIX.owner).has("finance.expense_submit"), true);
   assert.equal(new Set(MOBILE_PERMISSION_MATRIX.manager).has("finance.expense_submit"), true);
   assert.equal(new Set(MOBILE_PERMISSION_MATRIX.staff).has("finance.expense_submit"), false);
-  assert.deepEqual(MOBILE_DELEGATABLE_PERMISSIONS.staff, ["finance.expense_submit", "copilot.use", "inventory.view", "inventory.adjust", "inventory.local_purchase"]);
+  assert.deepEqual(MOBILE_DELEGATABLE_PERMISSIONS.staff, ["finance.expense_submit", "copilot.use", "inventory.view", "inventory.adjust", "inventory.local_purchase", "staff.schedule_view"]);
   assert.equal(new Set(MOBILE_DELEGATABLE_PERMISSIONS.staff).has("finance.view"), false);
   assert.equal(new Set(MOBILE_DELEGATABLE_PERMISSIONS.manager).has("finance.view"), true);
 });
@@ -15647,7 +15647,7 @@ test("v5.11.77 Listings & Rates mobile route contract is explicit, aliased and t
   const source = await readFile(new URL("../src/mobile-platform.js", import.meta.url), "utf8");
   assert.ok(source.includes('[`${MOBILE_API_PREFIX}/listings-rates`, `${MOBILE_API_PREFIX}/listings`].includes(path)'));
   assert.ok(source.includes('path.replace(/\\/+$/, "")'));
-  assert.match(source, /backendVersion: "5\.11\.84"/);
+  assert.match(source, /backendVersion: "5\.11\.85"/);
   assert.match(source, /listingsRatesRoute: `\$\{MOBILE_API_PREFIX\}\/listings-rates`/);
   assert.match(source, /direct-stays\/update/);
   assert.match(source, /direct-stays\/cancel/);

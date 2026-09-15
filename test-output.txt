@@ -1,0 +1,2516 @@
+
+> the-house-koh-tao-guide@5.11.85 test
+> node --test tests/*.test.mjs
+
+TAP version 13
+# Subtest: critical guest requests stay deterministic and room-aware
+ok 1 - critical guest requests stay deterministic and room-aware
+  ---
+  duration_ms: 122.206601
+  type: 'test'
+  ...
+# Subtest: every clear lost-key and lockout phrase enters the same protected path before generic routing
+ok 2 - every clear lost-key and lockout phrase enters the same protected path before generic routing
+  ---
+  duration_ms: 96.38387
+  type: 'test'
+  ...
+# Subtest: a repeated lost-key synonym while fee acceptance is pending preserves the protected path without an alert
+ok 3 - a repeated lost-key synonym while fee acceptance is pending preserves the protected path without an alert
+  ---
+  duration_ms: 13.370858
+  type: 'test'
+  ...
+# Subtest: generic human requests are AI-first, then expose routine contacts only after persistence during open hours
+ok 4 - generic human requests are AI-first, then expose routine contacts only after persistence during open hours
+  ---
+  duration_ms: 28.568939
+  type: 'test'
+  ...
+# Subtest: inactive historical topics cannot contaminate the production generic-human phrase
+ok 5 - inactive historical topics cannot contaminate the production generic-human phrase
+  ---
+  duration_ms: 13.065984
+  type: 'test'
+  ...
+# Subtest: only explicit lost-key workflow state may influence a generic human request
+ok 6 - only explicit lost-key workflow state may influence a generic human request
+  ---
+  duration_ms: 9.888598
+  type: 'test'
+  ...
+# Subtest: the exact production generic-human phrase bypasses stale LLM context before interpretation
+ok 7 - the exact production generic-human phrase bypasses stale LLM context before interpretation
+  ---
+  duration_ms: 1.755635
+  type: 'test'
+  ...
+# Subtest: a current topic-specific lost-key human request keeps 24-hour self-service but obeys contact hours
+ok 8 - a current topic-specific lost-key human request keeps 24-hour self-service but obeys contact hours
+  ---
+  duration_ms: 13.288037
+  type: 'test'
+  ...
+# Subtest: an unverified lost-key request sends no alert and exposes no spare-key path
+ok 9 - an unverified lost-key request sends no alert and exposes no spare-key path
+  ---
+  duration_ms: 3.218631
+  type: 'test'
+  ...
+# Subtest: a verified daytime lost-key request asks for this request’s fee acceptance before 24-hour self-service release
+ok 10 - a verified daytime lost-key request asks for this request’s fee acceptance before 24-hour self-service release
+  ---
+  duration_ms: 18.182486
+  type: 'test'
+  ...
+# Subtest: nighttime lost-key release matches the same passport-independent, request-bound 24-hour flow
+ok 11 - nighttime lost-key release matches the same passport-independent, request-bound 24-hour flow
+  ---
+  duration_ms: 21.721341
+  type: 'test'
+  ...
+# Subtest: lost-key authorization is fresh, session-and-room bound, one-use and reset only after confirmed rotation
+ok 12 - lost-key authorization is fresh, session-and-room bound, one-use and reset only after confirmed rotation
+  ---
+  duration_ms: 29.781117
+  type: 'test'
+  ...
+# Subtest: protected owner reset distinguishes controlled tests from physical rotation without reviving historical requests
+ok 13 - protected owner reset distinguishes controlled tests from physical rotation without reviving historical requests
+  ---
+  duration_ms: 14.904972
+  type: 'test'
+  ...
+# Subtest: admin can delete one key-box reset activity entry without changing rotation state or lost-key history
+ok 14 - admin can delete one key-box reset activity entry without changing rotation state or lost-key history
+  ---
+  duration_ms: 3.083449
+  type: 'test'
+  ...
+# Subtest: medical emergencies offer Koh Tao Rescue first and 1669 second
+ok 15 - medical emergencies offer Koh Tao Rescue first and 1669 second
+  ---
+  duration_ms: 15.930316
+  type: 'test'
+  ...
+# Subtest: public concierge protects private knowledge and never sends medical alerts without confirmation
+ok 16 - public concierge protects private knowledge and never sends medical alerts without confirmation
+  ---
+  duration_ms: 3.806374
+  type: 'test'
+  ...
+# Subtest: activity booking uses guest-service wording and starts the structured Concierge flow
+ok 17 - activity booking uses guest-service wording and starts the structured Concierge flow
+  ---
+  duration_ms: 21.322155
+  type: 'test'
+  ...
+# Subtest: luggage storage guidance states every available window without promising early-morning storage
+ok 18 - luggage storage guidance states every available window without promising early-morning storage
+  ---
+  duration_ms: 17.303182
+  type: 'test'
+  ...
+# Subtest: an actionable luggage request routes to Su and owners with the dedicated production template
+ok 19 - an actionable luggage request routes to Su and owners with the dedicated production template
+  ---
+  duration_ms: 18.758456
+  type: 'test'
+  ...
+# Subtest: a vague actionable luggage request collects every required field before creating an alert
+ok 20 - a vague actionable luggage request collects every required field before creating an alert
+  ---
+  duration_ms: 6.843865
+  type: 'test'
+  ...
+# Subtest: each required luggage field independently blocks submission when missing
+ok 21 - each required luggage field independently blocks submission when missing
+  ---
+  duration_ms: 28.002959
+  type: 'test'
+  ...
+# Subtest: a local-format luggage contact is rejected until a country code is supplied
+ok 22 - a local-format luggage contact is rejected until a country code is supplied
+  ---
+  duration_ms: 13.010315
+  type: 'test'
+  ...
+# Subtest: a corrected international contact completes the same explicit pending luggage request exactly once
+ok 23 - a corrected international contact completes the same explicit pending luggage request exactly once
+  ---
+  duration_ms: 32.390203
+  type: 'test'
+  ...
+# Subtest: the exact arrival-tomorrow luggage correction preserves date and actually submits
+ok 24 - the exact arrival-tomorrow luggage correction preserves date and actually submits
+  ---
+  duration_ms: 32.368429
+  type: 'test'
+  ...
+# Subtest: a complete luggage request with an international contact submits without redundant questions
+ok 25 - a complete luggage request with an international contact submits without redundant questions
+  ---
+  duration_ms: 9.336101
+  type: 'test'
+  ...
+# Subtest: a protected contact retained for the active luggage workflow is not requested again
+ok 26 - a protected contact retained for the active luggage workflow is not requested again
+  ---
+  duration_ms: 26.088612
+  type: 'test'
+  ...
+# Subtest: luggage contact data stays out of normal interaction, alert and delivery storage
+ok 27 - luggage contact data stays out of normal interaction, alert and delivery storage
+  ---
+  duration_ms: 13.155272
+  type: 'test'
+  ...
+# Subtest: a second luggage request starts clean and cannot submit until its own fields are complete
+ok 28 - a second luggage request starts clean and cannot submit until its own fields are complete
+  ---
+  duration_ms: 22.402025
+  type: 'test'
+  ...
+# Subtest: the alert-creation boundary rejects every incomplete luggage submission
+ok 29 - the alert-creation boundary rejects every incomplete luggage submission
+  ---
+  duration_ms: 1.602955
+  type: 'test'
+  ...
+# Subtest: island resource guidance accurately explains water and electricity conservation
+ok 30 - island resource guidance accurately explains water and electricity conservation
+  ---
+  duration_ms: 7.55603
+  type: 'test'
+  ...
+# Subtest: The House recommendations answer Roctopus and Bamboo directly
+ok 31 - The House recommendations answer Roctopus and Bamboo directly
+  ---
+  duration_ms: 12.340761
+  type: 'test'
+  ...
+# Subtest: Bamboo website follow-ups return official social buttons without an Explore route
+ok 32 - Bamboo website follow-ups return official social buttons without an Explore route
+  ---
+  duration_ms: 3.050932
+  type: 'test'
+  ...
+# Subtest: retrieval connects the AI to approved activity, bar and island records
+ok 33 - retrieval connects the AI to approved activity, bar and island records
+  ---
+  duration_ms: 41.975474
+  type: 'test'
+  ...
+# Subtest: Explore-disabled Concierge retrieval ranks approved beaches, dining, cafés and Bamboo intelligently
+ok 34 - Explore-disabled Concierge retrieval ranks approved beaches, dining, cafés and Bamboo intelligently
+  ---
+  duration_ms: 97.960296
+  type: 'test'
+  ...
+# Subtest: House beach proximity answers are exact, concise and operationally inert
+ok 35 - House beach proximity answers are exact, concise and operationally inert
+  ---
+  duration_ms: 12.296422
+  type: 'test'
+  ...
+# Subtest: a local-information detour answers directly and preserves a pending cleaning workflow for resumption
+ok 36 - a local-information detour answers directly and preserves a pending cleaning workflow for resumption
+  ---
+  duration_ms: 20.755356
+  type: 'test'
+  ...
+# Subtest: a dinner detour ignores stale booking transcript context while retaining the pending booking
+ok 37 - a dinner detour ignores stale booking transcript context while retaining the pending booking
+  ---
+  duration_ms: 5149.114511
+  type: 'test'
+  ...
+# Subtest: snorkeling recommendations stay informational and use approved local records
+ok 38 - snorkeling recommendations stay informational and use approved local records
+  ---
+  duration_ms: 54.821428
+  type: 'test'
+  ...
+# Subtest: production snorkeling phrasings bypass the welcome collision and never depend on model compliance
+ok 39 - production snorkeling phrasings bypass the welcome collision and never depend on model compliance
+  ---
+  duration_ms: 70.192688
+  type: 'test'
+  ...
+# Subtest: concierge loading state uses animated dots without visible status wording
+ok 40 - concierge loading state uses animated dots without visible status wording
+  ---
+  duration_ms: 2.279402
+  type: 'test'
+  ...
+# Subtest: retrieved approved records are included in GPT-5.6 model context
+ok 41 - retrieved approved records are included in GPT-5.6 model context
+  ---
+  duration_ms: 44.103809
+  type: 'test'
+  ...
+# Subtest: technical Roctopus model wording is replaced with the approved guest answer
+ok 42 - technical Roctopus model wording is replaced with the approved guest answer
+  ---
+  duration_ms: 25.192663
+  type: 'test'
+  ...
+# Subtest: required passport registration is a room-aware concierge action
+ok 43 - required passport registration is a room-aware concierge action
+  ---
+  duration_ms: 8.254157
+  type: 'test'
+  ...
+# Subtest: Thai nationals are exempt from the TM30 passport upload flow
+ok 44 - Thai nationals are exempt from the TM30 passport upload flow
+  ---
+  duration_ms: 6.275248
+  type: 'test'
+  ...
+# Subtest: main and room welcome pages make required registration prominent
+ok 45 - main and room welcome pages make required registration prominent
+  ---
+  duration_ms: 2.176576
+  type: 'test'
+  ...
+# Subtest: Concierge stay access stays verified while registration remains an independent UI status
+ok 46 - Concierge stay access stays verified while registration remains an independent UI status
+  ---
+  duration_ms: 4.515743
+  type: 'test'
+  ...
+# Subtest: Concierge room header, menu and registration reminder refresh from one authoritative stay status
+ok 47 - Concierge room header, menu and registration reminder refresh from one authoritative stay status
+  ---
+  duration_ms: 1.833353
+  type: 'test'
+  ...
+# Subtest: concierge initializes safely and keeps public support buttons concierge-first
+ok 48 - concierge initializes safely and keeps public support buttons concierge-first
+  ---
+  duration_ms: 1.046221
+  type: 'test'
+  ...
+# Subtest: browser action rendering and click handling independently hard-gate both routine contacts by Bangkok service hours
+ok 49 - browser action rendering and click handling independently hard-gate both routine contacts by Bangkok service hours
+  ---
+  duration_ms: 1.11608
+  type: 'test'
+  ...
+# Subtest: browser protected workflows keep supplied contacts out of ordinary session history
+ok 50 - browser protected workflows keep supplied contacts out of ordinary session history
+  ---
+  duration_ms: 1.159061
+  type: 'test'
+  ...
+# Subtest: protected workflows never fall back to the device-only answer engine
+ok 51 - protected workflows never fall back to the device-only answer engine
+  ---
+  duration_ms: 1.615057
+  type: 'test'
+  ...
+# Subtest: browser concierge permits only one in-flight question and one rendered answer path
+ok 52 - browser concierge permits only one in-flight question and one rendered answer path
+  ---
+  duration_ms: 7.943821
+  type: 'test'
+  ...
+# Subtest: rendered Concierge spare-key CTA opens the protected fee flow
+ok 53 - rendered Concierge spare-key CTA opens the protected fee flow
+  ---
+  duration_ms: 3.286318
+  type: 'test'
+  ...
+# Subtest: owner dashboard major sections are independently collapsible, persistent and urgent-safe
+ok 54 - owner dashboard major sections are independently collapsible, persistent and urgent-safe
+  ---
+  duration_ms: 3.324806
+  type: 'test'
+  ...
+# Subtest: guest localization supports seven languages and keeps the owner dashboard English
+ok 55 - guest localization supports seven languages and keeps the owner dashboard English
+  ---
+  duration_ms: 2.784792
+  type: 'test'
+  ...
+# Subtest: critical emergency and registration wording is reviewed in every guest language
+ok 56 - critical emergency and registration wording is reviewed in every guest language
+  ---
+  duration_ms: 9.697296
+  type: 'test'
+  ...
+# Subtest: Thai-national exemption is bilingual without duplicating fixed Thai copy in Thai mode
+ok 57 - Thai-national exemption is bilingual without duplicating fixed Thai copy in Thai mode
+  ---
+  duration_ms: 2.717271
+  type: 'test'
+  ...
+# Subtest: every guest HTML page loads the shared localization runtime
+ok 58 - every guest HTML page loads the shared localization runtime
+  ---
+  duration_ms: 13.121563
+  type: 'test'
+  ...
+# Subtest: privacy, data protection and terms are reachable from every public HTML page
+ok 59 - privacy, data protection and terms are reachable from every public HTML page
+  ---
+  duration_ms: 13.106149
+  type: 'test'
+  ...
+# Subtest: every guest-facing page exposes a discreet token-free admin footer link
+ok 60 - every guest-facing page exposes a discreet token-free admin footer link
+  ---
+  duration_ms: 15.838513
+  type: 'test'
+  ...
+# Subtest: guest emergency page keeps Rescue first and 1669 second with distinct actions
+ok 61 - guest emergency page keeps Rescue first and 1669 second with distinct actions
+  ---
+  duration_ms: 0.77021
+  type: 'test'
+  ...
+# Subtest: Explore stays in source but is disabled in the live guest release
+ok 62 - Explore stays in source but is disabled in the live guest release
+  ---
+  duration_ms: 1.109353
+  type: 'test'
+  ...
+# Subtest: translation endpoint accepts approved page text and rejects arbitrary guest text
+ok 63 - translation endpoint accepts approved page text and rejects arbitrary guest text
+  ---
+  duration_ms: 8.073974
+  type: 'test'
+  ...
+# Subtest: one dynamic room phrase cannot block the rest of a translated page batch
+ok 64 - one dynamic room phrase cannot block the rest of a translated page batch
+  ---
+  duration_ms: 2.993499
+  type: 'test'
+  ...
+# Subtest: large page translation batches split and recover instead of leaving lower sections in English
+ok 65 - large page translation batches split and recover instead of leaving lower sections in English
+  ---
+  duration_ms: 3.858837
+  type: 'test'
+  ...
+# Subtest: one failing translation is isolated and explicitly marked for browser retry
+ok 66 - one failing translation is isolated and explicitly marked for browser retry
+  ---
+  duration_ms: 1.695808
+  type: 'test'
+  ...
+# Subtest: every static text and accessibility label on live operational pages is translation-approved
+ok 67 - every static text and accessibility label on live operational pages is translation-approved
+  ---
+  duration_ms: 60.663424
+  type: 'test'
+  ...
+# Subtest: alert policy uses Bangkok after-hours and routes only actionable requests
+ok 68 - alert policy uses Bangkok after-hours and routes only actionable requests
+  ---
+  duration_ms: 1.907928
+  type: 'test'
+  ...
+# Subtest: critical concierge requests require explicit confirmation before sending WhatsApp
+ok 69 - critical concierge requests require explicit confirmation before sending WhatsApp
+  ---
+  duration_ms: 7.158227
+  type: 'test'
+  ...
+# Subtest: critical property messages override every stale ordinary contact workflow
+ok 70 - critical property messages override every stale ordinary contact workflow
+  ---
+  duration_ms: 16.771082
+  type: 'test'
+  ...
+# Subtest: vague urgent wording collects a meaningful incident before offering or sending an alert
+ok 71 - vague urgent wording collects a meaningful incident before offering or sending an alert
+  ---
+  duration_ms: 13.564302
+  type: 'test'
+  ...
+# Subtest: every generic urgent phrase asks what happened without exposing the send action
+ok 72 - every generic urgent phrase asks what happened without exposing the send action
+  ---
+  duration_ms: 26.639173
+  type: 'test'
+  ...
+# Subtest: vague urgent clarification can resolve into medical, routine service or ordinary support
+ok 73 - vague urgent clarification can resolve into medical, routine service or ordinary support
+  ---
+  duration_ms: 22.215589
+  type: 'test'
+  ...
+# Subtest: urgent clarification interrupts pending luggage and never submits stale luggage state
+ok 74 - urgent clarification interrupts pending luggage and never submits stale luggage state
+  ---
+  duration_ms: 18.679825
+  type: 'test'
+  ...
+# Subtest: the urgent confirmation boundary rejects a vague incident summary
+ok 75 - the urgent confirmation boundary rejects a vague incident summary
+  ---
+  duration_ms: 0.758607
+  type: 'test'
+  ...
+# Subtest: an interrupted contact workflow cannot be submitted by a later phone number
+ok 76 - an interrupted contact workflow cannot be submitted by a later phone number
+  ---
+  duration_ms: 8.180361
+  type: 'test'
+  ...
+# Subtest: a contact collected for one workflow cannot satisfy a different later workflow
+ok 77 - a contact collected for one workflow cannot satisfy a different later workflow
+  ---
+  duration_ms: 7.155347
+  type: 'test'
+  ...
+# Subtest: unacknowledged critical alerts escalate and authorized WhatsApp replies can resolve them
+ok 78 - unacknowledged critical alerts escalate and authorized WhatsApp replies can resolve them
+  ---
+  duration_ms: 5.490419
+  type: 'test'
+  ...
+# Subtest: model responses use structured output and deterministic handoff actions
+ok 79 - model responses use structured output and deterministic handoff actions
+  ---
+  duration_ms: 45.084991
+  type: 'test'
+  ...
+# Subtest: final server action policy removes model-derived routine Contact Us and Call Us actions after hours
+ok 80 - final server action policy removes model-derived routine Contact Us and Call Us actions after hours
+  ---
+  duration_ms: 53.318423
+  type: 'test'
+  ...
+# Subtest: guest answers never disclose private commercial arrangements
+ok 81 - guest answers never disclose private commercial arrangements
+  ---
+  duration_ms: 33.371533
+  type: 'test'
+  ...
+# Subtest: unknown questions become learning gaps when the API key is absent
+ok 82 - unknown questions become learning gaps when the API key is absent
+  ---
+  duration_ms: 11.656845
+  type: 'test'
+  ...
+# Subtest: low-confidence fallback matches cannot become false emergencies
+ok 83 - low-confidence fallback matches cannot become false emergencies
+  ---
+  duration_ms: 24.226165
+  type: 'test'
+  ...
+# Subtest: figurative, slang and ambiguous safety language cannot create operational alerts
+ok 84 - figurative, slang and ambiguous safety language cannot create operational alerts
+  ---
+  duration_ms: 26.977824
+  type: 'test'
+  ...
+# Subtest: medical safety guidance never sends a House alert before explicit confirmation
+ok 85 - medical safety guidance never sends a House alert before explicit confirmation
+  ---
+  duration_ms: 20.101128
+  type: 'test'
+  ...
+# Subtest: confirmed medical alerts are sent once while cancel remains a no-send client action
+ok 86 - confirmed medical alerts are sent once while cancel remains a no-send client action
+  ---
+  duration_ms: 9.939951
+  type: 'test'
+  ...
+# whatsapp_template_delivery_failed {"id":"diagnostic_6243d6a0-1ee5-4b11-a022-c1956674aa05","deliveryId":"delivery_491612dd-671a-462d-8fba-fb2c701c8ea0","alertId":"alert_677bd3a1-ca6c-44f1-a6b3-8213e68303ec","stage":"initial","templateName":"house_service_alert_v3","languageCode":"en","componentSchema":"body(5)[1:text,2:text,3:text,4:text,5:text]","httpStatus":0,"errorCode":"missing_configuration","errorSubcode":"","errorType":"","errorMessage":"","errorDetails":"","traceId":"","failureKind":"configuration","createdAt":"2026-09-15T16:15:14.364Z"}
+# Subtest: critical property sentences require confirmation while routine towels remain actionable
+ok 87 - critical property sentences require confirmation while routine towels remain actionable
+  ---
+  duration_ms: 22.684953
+  type: 'test'
+  ...
+# Subtest: Bangkok housekeeping boundaries switch exactly at 10:30 and 19:30
+ok 88 - Bangkok housekeeping boundaries switch exactly at 10:30 and 19:30
+  ---
+  duration_ms: 0.989246
+  type: 'test'
+  ...
+# Subtest: routine housekeeping supplies always create one Su-and-owner service alert
+ok 89 - routine housekeeping supplies always create one Su-and-owner service alert
+  ---
+  duration_ms: 124.766056
+  type: 'test'
+  ...
+# Subtest: supply questions stay informational while a verified missing-towel statement alerts immediately
+ok 90 - supply questions stay informational while a verified missing-towel statement alerts immediately
+  ---
+  duration_ms: 18.956194
+  type: 'test'
+  ...
+# Subtest: room cleaning collects a preferred time and submits the same request without contact
+ok 91 - room cleaning collects a preferred time and submits the same request without contact
+  ---
+  duration_ms: 18.506267
+  type: 'test'
+  ...
+# Subtest: a past same-day cleaning time stays pending and one valid correction submits
+ok 92 - a past same-day cleaning time stays pending and one valid correction submits
+  ---
+  duration_ms: 23.936946
+  type: 'test'
+  ...
+# Subtest: cleaning preferences use Bangkok date, current time and operating-day boundaries
+ok 93 - cleaning preferences use Bangkok date, current time and operating-day boundaries
+  ---
+  duration_ms: 61.133405
+  type: 'test'
+  ...
+# Subtest: cleaning with a supplied preference does not ask twice
+ok 94 - cleaning with a supplied preference does not ask twice
+  ---
+  duration_ms: 25.031102
+  type: 'test'
+  ...
+# Subtest: Monday and Sunday-after-hours cleaning use the real next housekeeping day
+ok 95 - Monday and Sunday-after-hours cleaning use the real next housekeeping day
+  ---
+  duration_ms: 13.465112
+  type: 'test'
+  ...
+# Subtest: Monday and Sunday-evening cleaning preferences still alert once without Call Us
+ok 96 - Monday and Sunday-evening cleaning preferences still alert once without Call Us
+  ---
+  duration_ms: 21.712486
+  type: 'test'
+  ...
+# Subtest: routine housekeeping overrides an older contact-collection workflow without asking for a phone number
+ok 97 - routine housekeeping overrides an older contact-collection workflow without asking for a phone number
+  ---
+  duration_ms: 11.789042
+  type: 'test'
+  ...
+# Subtest: after-hours housekeeping records the request once and sets next-morning expectations
+ok 98 - after-hours housekeeping records the request once and sets next-morning expectations
+  ---
+  duration_ms: 0.455189
+  type: 'test'
+  ...
+# Subtest: natural routine room and property reports create one protected Su-and-owner service alert
+ok 99 - natural routine room and property reports create one protected Su-and-owner service alert
+  ---
+  duration_ms: 88.022508
+  type: 'test'
+  ...
+# Subtest: routine pest names, plurals and likely typos send the existing protected service alert with current Meta actions
+ok 100 - routine pest names, plurals and likely typos send the existing protected service alert with current Meta actions
+  ---
+  duration_ms: 748.977035
+  type: 'test'
+  ...
+# Subtest: expanded pest recognition leaves informational and ambiguous non-pest server wording operationally inert
+ok 101 - expanded pest recognition leaves informational and ambiguous non-pest server wording operationally inert
+  ---
+  duration_ms: 115.842715
+  type: 'test'
+  ...
+# Subtest: the production cockroach sequence stays in the pest workflow on Monday and does not drift into urgent or housekeeping routing
+ok 102 - the production cockroach sequence stays in the pest workflow on Monday and does not drift into urgent or housekeeping routing
+  ---
+  duration_ms: 15.029237
+  type: 'test'
+  ...
+# Subtest: browser protected routing mirrors the pest matcher without turning informational or ambiguous non-pest wording into pest reports
+ok 103 - browser protected routing mirrors the pest matcher without turning informational or ambiguous non-pest wording into pest reports
+  ---
+  duration_ms: 2.450181
+  type: 'test'
+  ...
+# Subtest: an added detail for the same ongoing property issue continues naturally without a duplicate alert
+ok 104 - an added detail for the same ongoing property issue continues naturally without a duplicate alert
+  ---
+  duration_ms: 12.716337
+  type: 'test'
+  ...
+# Subtest: property categories keep clean issue buffers across transitions, duplicate reloads and later same-category reports
+ok 105 - property categories keep clean issue buffers across transitions, duplicate reloads and later same-category reports
+  ---
+  duration_ms: 37.001384
+  type: 'test'
+  ...
+# whatsapp_template_delivery_failed {"id":"diagnostic_5e8c4e44-891a-4c64-b293-87da38ae22ce","deliveryId":"delivery_28d43562-2b09-40d9-8eb0-591c647790dd","alertId":"alert_ed07221e-6935-405f-8710-af333c6d3e43","stage":"initial","templateName":"house_service_alert_v3","languageCode":"en","componentSchema":"body(5)[1:text,2:text,3:text,4:text,5:text]","httpStatus":0,"errorCode":"missing_configuration","errorSubcode":"","errorType":"","errorMessage":"","errorDetails":"","traceId":"","failureKind":"configuration","createdAt":"2026-09-15T16:15:15.725Z"}
+# Subtest: one concise odor clarification submits the same property workflow and obvious odors do not over-clarify
+ok 106 - one concise odor clarification submits the same property workflow and obvious odors do not over-clarify
+  ---
+  duration_ms: 17.907832
+  type: 'test'
+  ...
+# Subtest: Wi-Fi password stays visible from approved knowledge and bypasses numeric-contact redaction
+ok 107 - Wi-Fi password stays visible from approved knowledge and bypasses numeric-contact redaction
+  ---
+  duration_ms: 8.97745
+  type: 'test'
+  ...
+# Subtest: property informational controls remain informational and dirty rooms keep the structured cleaning collector
+ok 108 - property informational controls remain informational and dirty rooms keep the structured cleaning collector
+  ---
+  duration_ms: 56.479147
+  type: 'test'
+  ...
+# Subtest: dangerous property phrases enter the urgent confirmation workflow without sending automatically
+ok 109 - dangerous property phrases enter the urgent confirmation workflow without sending automatically
+  ---
+  duration_ms: 26.362807
+  type: 'test'
+  ...
+# Subtest: fire guidance prioritizes evacuation, Rescue and safe extinguisher use before any House alert
+ok 110 - fire guidance prioritizes evacuation, Rescue and safe extinguisher use before any House alert
+  ---
+  duration_ms: 4.967872
+  type: 'test'
+  ...
+# Subtest: figurative language and cancelled alerts use natural guest wording
+ok 111 - figurative language and cancelled alerts use natural guest wording
+  ---
+  duration_ms: 13.345212
+  type: 'test'
+  ...
+# Subtest: find my room returns the dynamic location and a direct Your Room action
+ok 112 - find my room returns the dynamic location and a direct Your Room action
+  ---
+  duration_ms: 3.943506
+  type: 'test'
+  ...
+# Subtest: diving recommendations stay informational while booking starts clean structured collection
+ok 113 - diving recommendations stay informational while booking starts clean structured collection
+  ---
+  duration_ms: 18.212625
+  type: 'test'
+  ...
+# Subtest: diving collection enforces conditional course details and international contact
+ok 114 - diving collection enforces conditional course details and international contact
+  ---
+  duration_ms: 37.205213
+  type: 'test'
+  ...
+# Subtest: a complete diving request creates one protected Fah-and-owner alert and remains unconfirmed pending payment
+ok 115 - a complete diving request creates one protected Fah-and-owner alert and remains unconfirmed pending payment
+  ---
+  duration_ms: 15.937448
+  type: 'test'
+  ...
+# Subtest: agency-specific beginner and continuing courses pass the structured diving gate
+ok 116 - agency-specific beginner and continuing courses pass the structured diving gate
+  ---
+  duration_ms: 69.310293
+  type: 'test'
+  ...
+# Subtest: the bundled v5.11.37 catalog preserves current PADI, SSI and RAID pathways
+ok 117 - the bundled v5.11.37 catalog preserves current PADI, SSI and RAID pathways
+  ---
+  duration_ms: 1.030588
+  type: 'test'
+  ...
+# Subtest: single-diver Fun, beginner, continuing and professional paths collect only relevant fields
+ok 118 - single-diver Fun, beginner, continuing and professional paths collect only relevant fields
+  ---
+  duration_ms: 232.088411
+  type: 'test'
+  ...
+# Subtest: mixed diving groups allocate every diver once and produce one contact-last owner alert
+ok 119 - mixed diving groups allocate every diver once and produce one contact-last owner alert
+  ---
+  duration_ms: 107.449147
+  type: 'test'
+  ...
+# Subtest: split-group allocation rejects zero and over-allocation before completing a four-diver request
+ok 120 - split-group allocation rejects zero and over-allocation before completing a four-diver request
+  ---
+  duration_ms: 72.382532
+  type: 'test'
+  ...
+# Subtest: a completed diving request cannot supply stale fields to a new booking
+ok 121 - a completed diving request cannot supply stale fields to a new booking
+  ---
+  duration_ms: 18.24237
+  type: 'test'
+  ...
+# Subtest: the final alert boundary rejects incomplete structured diving submissions
+ok 122 - the final alert boundary rejects incomplete structured diving submissions
+  ---
+  duration_ms: 1.983906
+  type: 'test'
+  ...
+# Subtest: supported activity and transport information stays separate from booking intent
+ok 123 - supported activity and transport information stays separate from booking intent
+  ---
+  duration_ms: 67.779201
+  type: 'test'
+  ...
+# Subtest: natural fishing and snorkeling requests enter the protected structured workflow immediately
+ok 124 - natural fishing and snorkeling requests enter the protected structured workflow immediately
+  ---
+  duration_ms: 97.904567
+  type: 'test'
+  ...
+# Subtest: every supported booking category enters one-question progressive collection from natural intent
+ok 125 - every supported booking category enters one-question progressive collection from natural intent
+  ---
+  duration_ms: 51.341552
+  type: 'test'
+  ...
+# Subtest: fishing buttons and typed choices update the same preserved progressive state and contact is collected last
+ok 126 - fishing buttons and typed choices update the same preserved progressive state and contact is collected last
+  ---
+  duration_ms: 35.983278
+  type: 'test'
+  ...
+# Subtest: diving asks only relevant conditional fields and preserves each answer through submission
+ok 127 - diving asks only relevant conditional fields and preserves each answer through submission
+  ---
+  duration_ms: 65.029326
+  type: 'test'
+  ...
+# Subtest: Open Water completes after a rejected local contact is replaced by a valid international contact
+ok 128 - Open Water completes after a rejected local contact is replaced by a valid international contact
+  ---
+  duration_ms: 42.958711
+  type: 'test'
+  ...
+# Subtest: failed Open Water protected delivery retries the same alert and succeeds only after provider acceptance
+ok 129 - failed Open Water protected delivery retries the same alert and succeeds only after provider acceptance
+  ---
+  duration_ms: 46.310023
+  type: 'test'
+  ...
+# Subtest: every natural explicit retry phrase reuses one failed alert before generic or model routing
+ok 130 - every natural explicit retry phrase reuses one failed alert before generic or model routing
+  ---
+  duration_ms: 94.124243
+  type: 'test'
+  ...
+# Subtest: generic try-again wording is not hijacked when no failed booking exists
+ok 131 - generic try-again wording is not hijacked when no failed booking exists
+  ---
+  duration_ms: 6.590169
+  type: 'test'
+  ...
+# Subtest: a reload preserves safe failed-booking fields, recollects only contact and retries the same alert once
+ok 132 - a reload preserves safe failed-booking fields, recollects only contact and retries the same alert once
+  ---
+  duration_ms: 29.589015
+  type: 'test'
+  ...
+# Subtest: failed booking state releases unrelated intents and an isolated explicit retry ignores stale history
+ok 133 - failed booking state releases unrelated intents and an isolated explicit retry ignores stale history
+  ---
+  duration_ms: 84.334603
+  type: 'test'
+  ...
+# Subtest: booking retry snapshots are bound to the verified stay, room and protected browser session
+ok 134 - booking retry snapshots are bound to the verified stay, room and protected browser session
+  ---
+  duration_ms: 36.650609
+  type: 'test'
+  ...
+# Subtest: generic retry asks one concise question when two failed booking categories are ambiguous
+ok 135 - generic retry asks one concise question when two failed booking categories are ambiguous
+  ---
+  duration_ms: 43.06609
+  type: 'test'
+  ...
+# Subtest: active bookings acknowledge side questions, preserve one authoritative state and never promise an alternative provider
+ok 136 - active bookings acknowledge side questions, preserve one authoritative state and never promise an alternative provider
+  ---
+  duration_ms: 78.54855
+  type: 'test'
+  ...
+# Subtest: shared booking dates accept European formats and explain past or unparseable input
+ok 137 - shared booking dates accept European formats and explain past or unparseable input
+  ---
+  duration_ms: 205.335485
+  type: 'test'
+  ...
+# Subtest: diving certification accepts useful sanitized free text and explains unusable answers
+ok 138 - diving certification accepts useful sanitized free text and explains unusable answers
+  ---
+  duration_ms: 76.688848
+  type: 'test'
+  ...
+# Subtest: non-diving booking side notes are acknowledged without filling or resetting the requested field
+ok 139 - non-diving booking side notes are acknowledged without filling or resetting the requested field
+  ---
+  duration_ms: 45.063524
+  type: 'test'
+  ...
+# Subtest: taxi-boat direction buttons preserve the supplied route, time, date and passengers
+ok 140 - taxi-boat direction buttons preserve the supplied route, time, date and passengers
+  ---
+  duration_ms: 25.608106
+  type: 'test'
+  ...
+# Subtest: fishing, snorkeling and transport bookings submit one protected Fah-and-owner alert
+ok 141 - fishing, snorkeling and transport bookings submit one protected Fah-and-owner alert
+  ---
+  duration_ms: 70.654158
+  type: 'test'
+  ...
+# Subtest: every supported non-diving booking rejects a local contact without losing fields
+ok 142 - every supported non-diving booking rejects a local contact without losing fields
+  ---
+  duration_ms: 64.962019
+  type: 'test'
+  ...
+# Subtest: corrected international contact completes the same taxi request once and a new request starts clean
+ok 143 - corrected international contact completes the same taxi request once and a new request starts clean
+  ---
+  duration_ms: 22.774117
+  type: 'test'
+  ...
+# Subtest: booking UI never exposes Fah personal WhatsApp and service hours are guest-visible
+ok 144 - booking UI never exposes Fah personal WhatsApp and service hours are guest-visible
+  ---
+  duration_ms: 2.486587
+  type: 'test'
+  ...
+# Subtest: all House map actions retain the single real-device-verified universal Maps URL
+ok 145 - all House map actions retain the single real-device-verified universal Maps URL
+  ---
+  duration_ms: 1.567375
+  type: 'test'
+  ...
+# Subtest: owner-approved knowledge becomes active without a new deployment
+ok 146 - owner-approved knowledge becomes active without a new deployment
+  ---
+  duration_ms: 5.776342
+  type: 'test'
+  ...
+# Subtest: passport details typed into chat are discarded before answering or learning
+ok 147 - passport details typed into chat are discarded before answering or learning
+  ---
+  duration_ms: 4.980066
+  type: 'test'
+  ...
+# Subtest: feedback and admin APIs require valid records and authorization
+ok 148 - feedback and admin APIs require valid records and authorization
+  ---
+  duration_ms: 8.898515
+  type: 'test'
+  ...
+# Subtest: matching, learning clusters and privacy redaction remain stable
+ok 149 - matching, learning clusters and privacy redaction remain stable
+  ---
+  duration_ms: 3.494897
+  type: 'test'
+  ...
+# Subtest: one-time passport links keep documents outside the concierge and close after upload
+ok 150 - one-time passport links keep documents outside the concierge and close after upload
+  ---
+  duration_ms: 4.873288
+  type: 'test'
+  ...
+# Subtest: Thai-only stays require one secure Thai ID image before full guest access opens
+ok 151 - Thai-only stays require one secure Thai ID image before full guest access opens
+  ---
+  duration_ms: 3.997996
+  type: 'test'
+  ...
+# Subtest: Owner Admin can mark foreign passports TM30 registered but never Thai ID evidence
+ok 152 - Owner Admin can mark foreign passports TM30 registered but never Thai ID evidence
+  ---
+  duration_ms: 1.910319
+  type: 'test'
+  ...
+# Subtest: registration and Owner Admin UI expose Thai ID verification and TM30 processing controls only in the registration module
+ok 153 - registration and Owner Admin UI expose Thai ID verification and TM30 processing controls only in the registration module
+  ---
+  duration_ms: 1.968637
+  type: 'test'
+  ...
+# Subtest: Airbnb reservation sync fixes each listing to its verified room and hashes confirmation codes
+ok 154 - Airbnb reservation sync fixes each listing to its verified room and hashes confirmation codes
+  ---
+  duration_ms: 1.073765
+  type: 'test'
+  ...
+# Subtest: verified Airbnb stay keeps pending passport links protected until explicit guest-type reset
+ok 155 - verified Airbnb stay keeps pending passport links protected until explicit guest-type reset
+  ---
+  duration_ms: 11.901345
+  type: 'test'
+  ...
+# Subtest: Thai-only pending selection can be reset and changed to foreign before Thai ID evidence is uploaded
+ok 156 - Thai-only pending selection can be reset and changed to foreign before Thai ID evidence is uploaded
+  ---
+  duration_ms: 7.229774
+  type: 'test'
+  ...
+# whatsapp_template_delivery_failed {"id":"diagnostic_c42f16e8-ba52-45a0-a111-a8befa435441","deliveryId":"delivery_387c0814-e808-472c-8dcd-d65dd0a50d86","alertId":"alert_ffca72c5-0284-4aca-8a6b-f0b0ec227a83","stage":"initial","templateName":"house_registration_admin_alert_v1","languageCode":"en","componentSchema":"body(1)[1:text];button(1)[1:payload]","httpStatus":0,"errorCode":"missing_configuration","errorSubcode":"","errorType":"","errorMessage":"","errorDetails":"","traceId":"","failureKind":"configuration","createdAt":"2026-09-15T16:15:17.776Z"}
+# Subtest: guest type self-service reset is blocked after registration evidence has been uploaded
+ok 157 - guest type self-service reset is blocked after registration evidence has been uploaded
+  ---
+  duration_ms: 8.288134
+  type: 'test'
+  ...
+# whatsapp_template_delivery_failed {"id":"diagnostic_618d27b8-9ee6-4f04-8475-5dff11c1590d","deliveryId":"delivery_0e96207f-3b78-4e4b-8809-7069a05f07e0","alertId":"alert_d69031b7-a2a0-4b13-bc41-7cd1fb5507ab","stage":"initial","templateName":"house_registration_admin_alert_v1","languageCode":"en","componentSchema":"body(1)[1:text];button(1)[1:payload]","httpStatus":0,"errorCode":"missing_configuration","errorSubcode":"","errorType":"","errorMessage":"","errorDetails":"","traceId":"","failureKind":"configuration","createdAt":"2026-09-15T16:15:17.785Z"}
+# whatsapp_template_delivery_failed {"id":"diagnostic_72878833-5127-49a6-9cbd-49e65d330552","deliveryId":"delivery_50d4b5cb-305a-42f2-96d3-d1532cdb6c0e","alertId":"alert_57f0a437-022b-431f-9e63-b739ec1f6927","stage":"initial","templateName":"house_registration_admin_alert_v1","languageCode":"en","componentSchema":"body(1)[1:text];button(1)[1:payload]","httpStatus":0,"errorCode":"missing_configuration","errorSubcode":"","errorType":"","errorMessage":"","errorDetails":"","traceId":"","failureKind":"configuration","createdAt":"2026-09-15T16:15:17.788Z"}
+# Subtest: private guide stays locked until every declared non-Thai overnight guest passport is submitted
+ok 158 - private guide stays locked until every declared non-Thai overnight guest passport is submitted
+  ---
+  duration_ms: 11.909834
+  type: 'test'
+  ...
+# Subtest: guest in-person passport choice is disabled while authenticated admin can use the in-person exception
+ok 159 - guest in-person passport choice is disabled while authenticated admin can use the in-person exception
+  ---
+  duration_ms: 5.932532
+  type: 'test'
+  ...
+# Subtest: admin can start in-person registration before the guest makes any nationality or guest-count declaration
+ok 160 - admin can start in-person registration before the guest makes any nationality or guest-count declaration
+  ---
+  duration_ms: 2.897212
+  type: 'test'
+  ...
+# Subtest: admin can reset a pending in-person registration with zero received passports back to not started
+ok 161 - admin can reset a pending in-person registration with zero received passports back to not started
+  ---
+  duration_ms: 4.11648
+  type: 'test'
+  ...
+# Subtest: admin registration reset is blocked after passport evidence exists or in-person registration is complete
+ok 162 - admin registration reset is blocked after passport evidence exists or in-person registration is complete
+  ---
+  duration_ms: 2.38111
+  type: 'test'
+  ...
+# Subtest: admin UI keeps the in-person exception available before a guest declares a non-Thai count
+ok 163 - admin UI keeps the in-person exception available before a guest declares a non-Thai count
+  ---
+  duration_ms: 2.497284
+  type: 'test'
+  ...
+# Subtest: Worker routing keeps the room guide, photos and private knowledge behind completed registration
+ok 164 - Worker routing keeps the room guide, photos and private knowledge behind completed registration
+  ---
+  duration_ms: 1.258087
+  type: 'test'
+  ...
+# Subtest: public legal routes load without guest or admin authorization and keep security headers
+ok 165 - public legal routes load without guest or admin authorization and keep security headers
+  ---
+  duration_ms: 3.630233
+  type: 'test'
+  ...
+# (node:47990) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: public legal documents expose no operational credentials or protected secret names
+ok 166 - public legal documents expose no operational credentials or protected secret names
+  ---
+  duration_ms: 1.629346
+  type: 'test'
+  ...
+# Subtest: Durable Object SQLite schema initializes every operational table used by admin and scheduled jobs
+ok 167 - Durable Object SQLite schema initializes every operational table used by admin and scheduled jobs
+  ---
+  duration_ms: 38.611133
+  type: 'test'
+  ...
+# Subtest: a verified session stops granting access when a synchronized reservation checkout is shortened
+ok 168 - a verified session stops granting access when a synchronized reservation checkout is shortened
+  ---
+  duration_ms: 5.422564
+  type: 'test'
+  ...
+# Subtest: direct and walk-in stays receive a one-time House code and active stays can be extended
+ok 169 - direct and walk-in stays receive a one-time House code and active stays can be extended
+  ---
+  duration_ms: 3.2084
+  type: 'test'
+  ...
+# Subtest: owner can replace a forgotten direct-stay code without storing plaintext or disturbing an existing verified session
+ok 170 - owner can replace a forgotten direct-stay code without storing plaintext or disturbing an existing verified session
+  ---
+  duration_ms: 6.972194
+  type: 'test'
+  ...
+# Subtest: direct-stay code replacement is owner-routed and refuses Airbnb reservations
+ok 171 - direct-stay code replacement is owner-routed and refuses Airbnb reservations
+  ---
+  duration_ms: 1.597354
+  type: 'test'
+  ...
+# Subtest: owner operations separates active and upcoming stays and labels manual recovery clearly
+ok 172 - owner operations separates active and upcoming stays and labels manual recovery clearly
+  ---
+  duration_ms: 2.367174
+  type: 'test'
+  ...
+# Subtest: Calendar & Operations dashboard combines room, reservation, housekeeping and stay-timing context and reuses the existing housekeeping write workflow
+ok 173 - Calendar & Operations dashboard combines room, reservation, housekeeping and stay-timing context and reuses the existing housekeeping write workflow
+  ---
+  duration_ms: 2.515808
+  type: 'test'
+  ...
+# whatsapp_template_delivery_failed {"id":"diagnostic_c3dd2f8c-d60c-4fe6-aaa5-0207a3442387","deliveryId":"delivery_9c444711-e2ec-40d8-aa8a-61ab4d7886f6","alertId":"alert_3ed226ff-0d8b-4587-8ce5-dd0083a39443","stage":"initial","templateName":"house_urgent_alert_v2","languageCode":"en","componentSchema":"body(5)[1:text,2:text,3:text,4:text,5:text]","httpStatus":0,"errorCode":"missing_configuration","errorSubcode":"","errorType":"","errorMessage":"","errorDetails":"","traceId":"","failureKind":"configuration","createdAt":"2026-09-15T16:15:17.886Z"}
+# whatsapp_template_delivery_failed {"id":"diagnostic_45a4f8e5-f2f2-4f8c-8df5-66aad04d1330","deliveryId":"delivery_d910f647-40aa-41e6-a221-e73d84502741","alertId":"alert_bb001951-e6e9-4b2a-9987-eed220eb33da","stage":"initial","templateName":"house_service_alert_v3","languageCode":"en","componentSchema":"body(5)[1:text,2:text,3:text,4:text,5:text]","httpStatus":0,"errorCode":"missing_configuration","errorSubcode":"","errorType":"","errorMessage":"","errorDetails":"","traceId":"","failureKind":"configuration","createdAt":"2026-09-15T16:15:17.894Z"}
+# Subtest: verified guests can report routine and critical room problems with protected routing
+ok 174 - verified guests can report routine and critical room problems with protected routing
+  ---
+  duration_ms: 23.008666
+  type: 'test'
+  ...
+# Subtest: owners resolve then remove maintenance reports with private-photo cleanup and stable counts
+ok 175 - owners resolve then remove maintenance reports with private-photo cleanup and stable counts
+  ---
+  duration_ms: 6.647623
+  type: 'test'
+  ...
+# Subtest: diagnostic dismissal changes visibility only and clearing remains limited to resolved alerts
+ok 176 - diagnostic dismissal changes visibility only and clearing remains limited to resolved alerts
+  ---
+  duration_ms: 8.692536
+  type: 'test'
+  ...
+# Subtest: v5.11.55 owner admin can select one, several or all WhatsApp diagnostics for bulk removal from view
+ok 177 - v5.11.55 owner admin can select one, several or all WhatsApp diagnostics for bulk removal from view
+  ---
+  duration_ms: 4.155944
+  type: 'test'
+  ...
+# Subtest: 24-hour spare-key release uses the verified session, confirms the current fee and never alerts the code
+ok 178 - 24-hour spare-key release uses the verified session, confirms the current fee and never alerts the code
+  ---
+  duration_ms: 15.235846
+  type: 'test'
+  ...
+# whatsapp_template_delivery_failed {"id":"diagnostic_7afb85ce-4269-4c94-b8a4-fb63d7caa02c","deliveryId":"delivery_021cd582-a8ae-4cc3-8f83-70f9a227b034","alertId":"alert_de88d4d1-5488-4206-8cfd-c89b68c9831e","stage":"initial","templateName":"house_lost_key_alert_v3","languageCode":"en","componentSchema":"body(3)[1:text,2:text,3:text]","httpStatus":500,"errorCode":"131000","errorSubcode":"","errorType":"","errorMessage":"","errorDetails":"","traceId":"","failureKind":"meta_service","createdAt":"2026-09-15T16:15:17.942Z"}
+# whatsapp_template_delivery_failed {"id":"diagnostic_adbfce1c-0d40-4b76-bfa1-efdf1dc5c9a0","deliveryId":"delivery_a18a2293-f32e-4438-b27b-729b53782d23","alertId":"alert_de88d4d1-5488-4206-8cfd-c89b68c9831e","stage":"initial","templateName":"house_lost_key_alert_v3","languageCode":"en","componentSchema":"body(3)[1:text,2:text,3:text]","httpStatus":500,"errorCode":"131000","errorSubcode":"","errorType":"","errorMessage":"","errorDetails":"","traceId":"","failureKind":"meta_service","createdAt":"2026-09-15T16:15:17.943Z"}
+# whatsapp_template_delivery_failed {"id":"diagnostic_109332d3-b4c6-464a-b9ce-5400b6fdca40","deliveryId":"delivery_a8fc76fc-96e8-4a25-bed5-0daa72ef113e","alertId":"alert_de88d4d1-5488-4206-8cfd-c89b68c9831e","stage":"initial","templateName":"house_lost_key_alert_v3","languageCode":"en","componentSchema":"body(3)[1:text,2:text,3:text]","httpStatus":500,"errorCode":"131000","errorSubcode":"","errorType":"","errorMessage":"","errorDetails":"","traceId":"","failureKind":"meta_service","createdAt":"2026-09-15T16:15:17.943Z"}
+# Subtest: spare-key release automatically notifies the team and fails safely when WhatsApp submission fails
+ok 179 - spare-key release automatically notifies the team and fails safely when WhatsApp submission fails
+  ---
+  duration_ms: 11.625741
+  type: 'test'
+  ...
+# Subtest: every guest page uses the same top navigation
+ok 180 - every guest page uses the same top navigation
+  ---
+  duration_ms: 19.769808
+  type: 'test'
+  ...
+# Subtest: secure guest access uses the shared header and links discreetly to owner login
+ok 181 - secure guest access uses the shared header and links discreetly to owner login
+  ---
+  duration_ms: 2.019775
+  type: 'test'
+  ...
+# Subtest: Bangkok booking dates normalize without inventing a missing time
+ok 182 - Bangkok booking dates normalize without inventing a missing time
+  ---
+  duration_ms: 1.115827
+  type: 'test'
+  ...
+# Subtest: House emergency support resolves Owner 2 or West instead of Su
+ok 183 - House emergency support resolves Owner 2 or West instead of Su
+  ---
+  duration_ms: 1.645033
+  type: 'test'
+  ...
+# Subtest: booking contact is required, kept out of stored records and included only in delivery
+ok 184 - booking contact is required, kept out of stored records and included only in delivery
+  ---
+  duration_ms: 21.22792
+  type: 'test'
+  ...
+# Subtest: WhatsApp acknowledgement notifies other assigned recipients once without exposing phones
+ok 185 - WhatsApp acknowledgement notifies other assigned recipients once without exposing phones
+  ---
+  duration_ms: 2.90152
+  type: 'test'
+  ...
+# Subtest: all active Meta templates use their exact approved body schemas
+ok 186 - all active Meta templates use their exact approved body schemas
+  ---
+  duration_ms: 0.745989
+  type: 'test'
+  ...
+# Subtest: Meta BODY serialization removes invalid whitespace without changing booking parameter order or privacy
+ok 187 - Meta BODY serialization removes invalid whitespace without changing booking parameter order or privacy
+  ---
+  duration_ms: 0.364395
+  type: 'test'
+  ...
+# Subtest: the centralized Meta text sanitizer protects service, status and future action-template BODY values
+ok 188 - the centralized Meta text sanitizer protects service, status and future action-template BODY values
+  ---
+  duration_ms: 0.607352
+  type: 'test'
+  ...
+# Subtest: release configuration keeps the five reviewed staff templates and adds the housekeeping quick-action template
+ok 189 - release configuration keeps the five reviewed staff templates and adds the housekeeping quick-action template
+  ---
+  duration_ms: 1.531132
+  type: 'test'
+  ...
+# Subtest: staff quick-action templates fail closed and bind both actions to the exact alert
+ok 190 - staff quick-action templates fail closed and bind both actions to the exact alert
+  ---
+  duration_ms: 1.063729
+  type: 'test'
+  ...
+# Subtest: template validation supports deliberate v1 rollback and rejects unknown or malformed schemas
+ok 191 - template validation supports deliberate v1 rollback and rejects unknown or malformed schemas
+  ---
+  duration_ms: 0.24317
+  type: 'test'
+  ...
+# Subtest: every deliberate v1 rollback template keeps its approved English US translation
+ok 192 - every deliberate v1 rollback template keeps its approved English US translation
+  ---
+  duration_ms: 0.666953
+  type: 'test'
+  ...
+# Subtest: production 132001 regression sends service v3 as generic English with exactly five BODY parameters
+ok 193 - production 132001 regression sends service v3 as generic English with exactly five BODY parameters
+  ---
+  duration_ms: 0.349092
+  type: 'test'
+  ...
+# Subtest: all active templates expose their exact value-free production request shape
+ok 194 - all active templates expose their exact value-free production request shape
+  ---
+  duration_ms: 1.071208
+  type: 'test'
+  ...
+# Subtest: sanitized Meta diagnostics retain the real provider failure without parameter or recipient data
+ok 195 - sanitized Meta diagnostics retain the real provider failure without parameter or recipient data
+  ---
+  duration_ms: 5.279962
+  type: 'test'
+  ...
+# Subtest: owner booking alerts expose sanitized alert-bound Meta diagnostics with real attempt counts
+ok 196 - owner booking alerts expose sanitized alert-bound Meta diagnostics with real attempt counts
+  ---
+  duration_ms: 25.841077
+  type: 'test'
+  ...
+# whatsapp_template_delivery_failed {"id":"diagnostic_7ff6fd10-1261-4ea0-aabc-657cb349f5ae","deliveryId":"delivery_5a568e2c-c1ca-47ef-909d-b98b4751b022","alertId":"alert_delivery_reference","stage":"initial","templateName":"house_service_alert_v3","languageCode":"en","componentSchema":"body(5)[1:text,2:text,3:text,4:text,5:text]","httpStatus":400,"errorCode":"131008","errorSubcode":"","errorType":"","errorMessage":"","errorDetails":"","traceId":"","failureKind":"template_parameters","createdAt":"2026-09-15T16:15:18.032Z"}
+# whatsapp_template_delivery_failed {"id":"diagnostic_e4210607-bfa5-4edc-bd97-d64f1210fea4","deliveryId":"delivery_2e6579eb-76cc-483c-b05d-33f7c5eac082","alertId":"alert_delivery_reference","stage":"initial","templateName":"house_service_alert_v3","languageCode":"en","componentSchema":"body(5)[1:text,2:text,3:text,4:text,5:text]","httpStatus":400,"errorCode":"131008","errorSubcode":"","errorType":"","errorMessage":"","errorDetails":"","traceId":"","failureKind":"template_parameters","createdAt":"2026-09-15T16:15:18.033Z"}
+# whatsapp_template_delivery_failed {"id":"diagnostic_0d728507-b831-42b1-99c9-7af9db86db5b","deliveryId":"delivery_5a9e36a7-fc8e-435c-8f14-329514481055","alertId":"alert_delivery_reference","stage":"initial","templateName":"house_service_alert_v3","languageCode":"en","componentSchema":"body(5)[1:text,2:text,3:text,4:text,5:text]","httpStatus":400,"errorCode":"131008","errorSubcode":"","errorType":"","errorMessage":"","errorDetails":"","traceId":"","failureKind":"template_parameters","createdAt":"2026-09-15T16:15:18.033Z"}
+# whatsapp_template_delivery_failed {"id":"diagnostic_b0666c7f-cef5-4d1e-bc55-91acd54cf2d6","deliveryId":"delivery_93c02b98-728a-4b06-bf95-20f4c20506f6","alertId":"alert_delivery_reference","stage":"initial","templateName":"house_service_alert_v3","languageCode":"en","componentSchema":"body(5)[1:text,2:text,3:text,4:text,5:text]","httpStatus":500,"errorCode":"2","errorSubcode":"","errorType":"","errorMessage":"","errorDetails":"","traceId":"","failureKind":"meta_service","createdAt":"2026-09-15T16:15:18.034Z"}
+# whatsapp_template_delivery_failed {"id":"diagnostic_7a008630-b63a-4abf-bcfb-333f0bb73d59","deliveryId":"delivery_a63348b8-a707-4cb7-bc0c-0e2dbf67fca4","alertId":"alert_delivery_reference","stage":"initial","templateName":"house_service_alert_v3","languageCode":"en","componentSchema":"body(5)[1:text,2:text,3:text,4:text,5:text]","httpStatus":500,"errorCode":"2","errorSubcode":"","errorType":"","errorMessage":"","errorDetails":"","traceId":"","failureKind":"meta_service","createdAt":"2026-09-15T16:15:18.034Z"}
+# whatsapp_template_delivery_failed {"id":"diagnostic_94740111-f907-47ae-9d7d-5ebcd5c5aed0","deliveryId":"delivery_3653adfd-2089-4ca6-9f71-0b6e6913b1bb","alertId":"alert_delivery_reference","stage":"initial","templateName":"house_service_alert_v3","languageCode":"en","componentSchema":"body(5)[1:text,2:text,3:text,4:text,5:text]","httpStatus":0,"errorCode":"network_error","errorSubcode":"","errorType":"TypeError","errorMessage":"simulated network timeout","errorDetails":"","traceId":"","failureKind":"network","createdAt":"2026-09-15T16:15:18.035Z"}
+# whatsapp_template_delivery_failed {"id":"diagnostic_3d15e5ca-e0c9-42de-8a37-11e58ec21a4d","deliveryId":"delivery_6ee631ff-cc4a-4e4a-a516-45142cb84548","alertId":"alert_delivery_reference","stage":"initial","templateName":"house_service_alert_v3","languageCode":"en","componentSchema":"body(5)[1:text,2:text,3:text,4:text,5:text]","httpStatus":0,"errorCode":"network_error","errorSubcode":"","errorType":"TypeError","errorMessage":"simulated network timeout","errorDetails":"","traceId":"","failureKind":"network","createdAt":"2026-09-15T16:15:18.035Z"}
+# whatsapp_template_delivery_failed {"id":"diagnostic_55398f41-f28c-4bb6-9c5e-f3ca3337eda2","deliveryId":"delivery_e7225661-b675-4ebe-bb67-cb0fa91ff844","alertId":"alert_delivery_reference","stage":"initial","templateName":"wrong_template_name","languageCode":"","componentSchema":"none","httpStatus":0,"errorCode":"unmapped_template","errorSubcode":"","errorType":"","errorMessage":"","errorDetails":"","traceId":"","failureKind":"local_template_schema","createdAt":"2026-09-15T16:15:18.035Z"}
+# whatsapp_template_delivery_failed {"id":"diagnostic_cae3eced-a538-459b-a702-a5946f23b3e6","deliveryId":"delivery_75ec5352-0272-466a-86e1-11de588533c8","alertId":"alert_delivery_reference","stage":"initial","templateName":"wrong_template_name","languageCode":"","componentSchema":"none","httpStatus":0,"errorCode":"unmapped_template","errorSubcode":"","errorType":"","errorMessage":"","errorDetails":"","traceId":"","failureKind":"local_template_schema","createdAt":"2026-09-15T16:15:18.036Z"}
+# Subtest: Meta rejection and network failures stay sanitized while partial delivery is truthful
+ok 197 - Meta rejection and network failures stay sanitized while partial delivery is truthful
+  ---
+  duration_ms: 5.037287
+  type: 'test'
+  ...
+# whatsapp_template_delivery_failed {"id":"diagnostic_a8b63346-f1d8-4d26-9206-3ce8910d3598","deliveryId":"delivery_674e0072-b38a-49fe-8d6a-2f65eaa1d8f3","alertId":"alert_6d1679fa-2679-497d-863b-285be48d944b","stage":"initial","templateName":"house_service_alert_v3","languageCode":"en","componentSchema":"body(5)[1:text,2:text,3:text,4:text,5:text]","httpStatus":400,"errorCode":"131008","errorSubcode":"","errorType":"","errorMessage":"","errorDetails":"","traceId":"","failureKind":"template_parameters","createdAt":"2026-09-15T16:15:18.043Z"}
+# Subtest: failed service-v3 delivery never produces a misleading guest success
+ok 198 - failed service-v3 delivery never produces a misleading guest success
+  ---
+  duration_ms: 8.276691
+  type: 'test'
+  ...
+# Subtest: ACK and RESOLVE propagate status once to other assigned recipients only
+ok 199 - ACK and RESOLVE propagate status once to other assigned recipients only
+  ---
+  duration_ms: 4.7725
+  type: 'test'
+  ...
+# Subtest: Received and Resolve quick replies are authorized, idempotent and actor-excluding
+ok 200 - Received and Resolve quick replies are authorized, idempotent and actor-excluding
+  ---
+  duration_ms: 5.180782
+  type: 'test'
+  ...
+# Subtest: unauthorized or invalid WhatsApp status commands cannot change alerts or send updates
+ok 201 - unauthorized or invalid WhatsApp status commands cannot change alerts or send updates
+  ---
+  duration_ms: 2.801729
+  type: 'test'
+  ...
+# Subtest: strong human and housekeeper contact requests expose The House team only during service hours
+ok 202 - strong human and housekeeper contact requests expose The House team only during service hours
+  ---
+  duration_ms: 20.829404
+  type: 'test'
+  ...
+# Subtest: fire cancellation cannot contaminate a later housekeeper-contact turn while genuine smoke continuation stays safety-first
+ok 203 - fire cancellation cannot contaminate a later housekeeper-contact turn while genuine smoke continuation stays safety-first
+  ---
+  duration_ms: 13.809579
+  type: 'test'
+  ...
+# Subtest: property emergencies expose private-role House emergency calling without naming the responder
+ok 204 - property emergencies expose private-role House emergency calling without naming the responder
+  ---
+  duration_ms: 11.665158
+  type: 'test'
+  ...
+# Subtest: natural stained-bed-sheet wording enters cleaning collection and now submits exactly one service alert
+ok 205 - natural stained-bed-sheet wording enters cleaning collection and now submits exactly one service alert
+  ---
+  duration_ms: 85.863031
+  type: 'test'
+  ...
+# Subtest: cleanup wording plus bare hour completes one automatic service alert without promising a website-chat reply
+ok 206 - cleanup wording plus bare hour completes one automatic service alert without promising a website-chat reply
+  ---
+  duration_ms: 32.297623
+  type: 'test'
+  ...
+# Subtest: generic send-request wording cannot create a context-free service alert
+ok 207 - generic send-request wording cannot create a context-free service alert
+  ---
+  duration_ms: 5.737817
+  type: 'test'
+  ...
+# Subtest: context-free send-request wording is also blocked when only an unrelated monitoring workflow is stale
+ok 208 - context-free send-request wording is also blocked when only an unrelated monitoring workflow is stale
+  ---
+  duration_ms: 5.815023
+  type: 'test'
+  ...
+# Subtest: bare 3 in an active cleaning collector means 3:00 PM and submits the structured request once
+ok 209 - bare 3 in an active cleaning collector means 3:00 PM and submits the structured request once
+  ---
+  duration_ms: 10.003553
+  type: 'test'
+  ...
+# whatsapp_template_delivery_failed {"id":"diagnostic_f1637dba-f62b-4cec-bc6c-2eb7157230e4","deliveryId":"delivery_650f69a9-9165-42a4-9542-91385d442f98","alertId":"alert_d68d4570-02d8-4c17-b693-c6f5533f3f77","stage":"initial","templateName":"house_service_alert_v3","languageCode":"en","componentSchema":"body(5)[1:text,2:text,3:text,4:text,5:text]","httpStatus":500,"errorCode":"2","errorSubcode":"","errorType":"","errorMessage":"simulated Meta failure","errorDetails":"","traceId":"","failureKind":"meta_service","createdAt":"2026-09-15T16:15:18.254Z"}
+# whatsapp_template_delivery_failed {"id":"diagnostic_f734a846-efd8-4fa7-abf1-e8eca871c8ca","deliveryId":"delivery_4eb78db4-cfa4-445a-ae83-a58ab41de4a6","alertId":"alert_d68d4570-02d8-4c17-b693-c6f5533f3f77","stage":"initial","templateName":"house_service_alert_v3","languageCode":"en","componentSchema":"body(5)[1:text,2:text,3:text,4:text,5:text]","httpStatus":500,"errorCode":"2","errorSubcode":"","errorType":"","errorMessage":"simulated Meta failure","errorDetails":"","traceId":"","failureKind":"meta_service","createdAt":"2026-09-15T16:15:18.255Z"}
+# whatsapp_template_delivery_failed {"id":"diagnostic_0049551f-ca0c-4a24-b26e-3818bf2640f5","deliveryId":"delivery_059b4186-ff99-4786-871f-d08166c5870f","alertId":"alert_d68d4570-02d8-4c17-b693-c6f5533f3f77","stage":"initial","templateName":"house_service_alert_v3","languageCode":"en","componentSchema":"body(5)[1:text,2:text,3:text,4:text,5:text]","httpStatus":500,"errorCode":"2","errorSubcode":"","errorType":"","errorMessage":"simulated Meta failure","errorDetails":"","traceId":"","failureKind":"meta_service","createdAt":"2026-09-15T16:15:18.255Z"}
+# Subtest: failed cleaning delivery stays truthful, keeps the collector recoverable and never creates a duplicate alert on retry
+ok 210 - failed cleaning delivery stays truthful, keeps the collector recoverable and never creates a duplicate alert on retry
+  ---
+  duration_ms: 25.308225
+  type: 'test'
+  ...
+# Subtest: verified shorthand acknowledgement ignores stale hidden cleaning transcript
+ok 211 - verified shorthand acknowledgement ignores stale hidden cleaning transcript
+  ---
+  duration_ms: 4.204862
+  type: 'test'
+  ...
+# Subtest: browser starts a visible fresh conversation on reload and uses access-aware initial copy
+ok 212 - browser starts a visible fresh conversation on reload and uses access-aware initial copy
+  ---
+  duration_ms: 2.645034
+  type: 'test'
+  ...
+# Subtest: diving learning and standalone named-provider turns preserve French Kiss Divers preference without promising availability
+ok 213 - diving learning and standalone named-provider turns preserve French Kiss Divers preference without promising availability
+  ---
+  duration_ms: 50.954954
+  type: 'test'
+  ...
+# Subtest: desktop Concierge expands the conversation while mobile keeps its polished sheet layout
+ok 214 - desktop Concierge expands the conversation while mobile keeps its polished sheet layout
+  ---
+  duration_ms: 1.806701
+  type: 'test'
+  ...
+# Subtest: v5.11.28 shared visual system constrains width, hero height, motion and overflow
+ok 215 - v5.11.28 shared visual system constrains width, hero height, motion and overflow
+  ---
+  duration_ms: 1.826714
+  type: 'test'
+  ...
+# Subtest: v5.11.28 guest visual contracts keep registration and lost-key consent scan-friendly
+ok 216 - v5.11.28 guest visual contracts keep registration and lost-key consent scan-friendly
+  ---
+  duration_ms: 1.742451
+  type: 'test'
+  ...
+# Subtest: v5.11.28 landing and room hierarchy use safe imagery, exact guidance and accurate actions
+ok 217 - v5.11.28 landing and room hierarchy use safe imagery, exact guidance and accurate actions
+  ---
+  duration_ms: 15.672066
+  type: 'test'
+  ...
+# Subtest: v5.11.31 header, mobile spacing, wording and CTA corrections remain intact
+ok 218 - v5.11.31 header, mobile spacing, wording and CTA corrections remain intact
+  ---
+  duration_ms: 6.680734
+  type: 'test'
+  ...
+# Subtest: v5.11.33 mobile AI Concierge is a stable identifiable pill with no scroll or collision movement
+ok 219 - v5.11.33 mobile AI Concierge is a stable identifiable pill with no scroll or collision movement
+  ---
+  duration_ms: 2.374416
+  type: 'test'
+  ...
+# Subtest: v5.11.33 launcher is removed from the open chat surface and restored on close
+ok 220 - v5.11.33 launcher is removed from the open chat surface and restored on close
+  ---
+  duration_ms: 2.504072
+  type: 'test'
+  ...
+# Subtest: v5.11.34 moves only the mobile Room 11 crop downward while preserving desktop
+ok 221 - v5.11.34 moves only the mobile Room 11 crop downward while preserving desktop
+  ---
+  duration_ms: 5.621819
+  type: 'test'
+  ...
+# Subtest: v5.11.28 owner operations styles distinguish lifecycle, diagnostics and narrow tables
+ok 222 - v5.11.28 owner operations styles distinguish lifecycle, diagnostics and narrow tables
+  ---
+  duration_ms: 4.308685
+  type: 'test'
+  ...
+# Subtest: explicit human request with a cannot-help reason reaches routine House contact during open hours
+ok 223 - explicit human request with a cannot-help reason reaches routine House contact during open hours
+  ---
+  duration_ms: 3.435867
+  type: 'test'
+  ...
+# Subtest: broad human-contact phrasing stays deterministic across natural variants
+ok 224 - broad human-contact phrasing stays deterministic across natural variants
+  ---
+  duration_ms: 31.758721
+  type: 'test'
+  ...
+# Subtest: stay-extension phrasing always enters the dedicated booking collector
+ok 225 - stay-extension phrasing always enters the dedicated booking collector
+  ---
+  duration_ms: 256.396156
+  type: 'test'
+  ...
+# Subtest: stay extension collects nights then private contact and sends one Fah-and-owner booking alert
+ok 226 - stay extension collects nights then private contact and sends one Fah-and-owner booking alert
+  ---
+  duration_ms: 30.253332
+  type: 'test'
+  ...
+# Subtest: v5.11.45 Airbnb parser accepts broader HM codes, either House/Room order and yearless dates
+ok 227 - v5.11.45 Airbnb parser accepts broader HM codes, either House/Room order and yearless dates
+  ---
+  duration_ms: 4.928096
+  type: 'test'
+  ...
+# Subtest: v5.11.45 Airbnb Gmail scan does not depend on literal confirmation wording
+ok 228 - v5.11.45 Airbnb Gmail scan does not depend on literal confirmation wording
+  ---
+  duration_ms: 2.650574
+  type: 'test'
+  ...
+# Subtest: v5.11.45 Airbnb email fast path posts only trustworthy room-bound partial syncs
+ok 229 - v5.11.45 Airbnb email fast path posts only trustworthy room-bound partial syncs
+  ---
+  duration_ms: 1.580097
+  type: 'test'
+  ...
+# Subtest: v5.11.45 Airbnb idle five-minute runs skip calendars while hourly safety net reconciles all active rooms
+ok 230 - v5.11.45 Airbnb idle five-minute runs skip calendars while hourly safety net reconciles all active rooms
+  ---
+  duration_ms: 4.876108
+  type: 'test'
+  ...
+# Subtest: v5.11.45 Airbnb trigger installer is five-minute and preserves one handler
+ok 231 - v5.11.45 Airbnb trigger installer is five-minute and preserves one handler
+  ---
+  duration_ms: 1.563921
+  type: 'test'
+  ...
+# Subtest: v5.11.45 approved Meta action templates use the exact new BODY orders and old mappings fail closed
+ok 232 - v5.11.45 approved Meta action templates use the exact new BODY orders and old mappings fail closed
+  ---
+  duration_ms: 1.339202
+  type: 'test'
+  ...
+# Subtest: Owner Admin routes Room 7 direct-stay creation through the real admin router
+ok 233 - Owner Admin routes Room 7 direct-stay creation through the real admin router
+  ---
+  duration_ms: 0.957715
+  type: 'test'
+  ...
+# Subtest: Room 7 is guide-enabled for direct testing while remaining excluded from Airbnb synchronization
+ok 234 - Room 7 is guide-enabled for direct testing while remaining excluded from Airbnb synchronization
+  ---
+  duration_ms: 5.264528
+  type: 'test'
+  ...
+# Subtest: verified registration-pending guests receive arrival directions but not the full room guide
+ok 235 - verified registration-pending guests receive arrival directions but not the full room guide
+  ---
+  duration_ms: 5.147642
+  type: 'test'
+  ...
+# Subtest: registration-pending concierge allows find-my-room and reminds about passport registration
+ok 236 - registration-pending concierge allows find-my-room and reminds about passport registration
+  ---
+  duration_ms: 5.066377
+  type: 'test'
+  ...
+# Subtest: registration-pending guests cannot create service, cleaning, luggage or booking alerts
+ok 237 - registration-pending guests cannot create service, cleaning, luggage or booking alerts
+  ---
+  duration_ms: 6.308715
+  type: 'test'
+  ...
+# Subtest: pending-access UI exposes only registration, find-room and emergency quick actions
+ok 238 - pending-access UI exposes only registration, find-room and emergency quick actions
+  ---
+  duration_ms: 1.327589
+  type: 'test'
+  ...
+# Subtest: expense receipt analysis creates an owner-review draft without storing the receipt
+ok 239 - expense receipt analysis creates an owner-review draft without storing the receipt
+  ---
+  duration_ms: 8.031512
+  type: 'test'
+  ...
+# Subtest: owner expense save stores private receipt, reports monthly totals, warns duplicates and exports CSV
+ok 240 - owner expense save stores private receipt, reports monthly totals, warns duplicates and exports CSV
+  ---
+  duration_ms: 5.067675
+  type: 'test'
+  ...
+# Subtest: v5.11.51 owner can edit staff- or owner-entered expenses while the original receipt and audit history stay intact
+ok 241 - v5.11.51 owner can edit staff- or owner-entered expenses while the original receipt and audit history stay intact
+  ---
+  duration_ms: 3.949238
+  type: 'test'
+  ...
+# Subtest: owner can privately download and delete an expense receipt without exposing it publicly
+ok 242 - owner can privately download and delete an expense receipt without exposing it publicly
+  ---
+  duration_ms: 0.980663
+  type: 'test'
+  ...
+# Subtest: expense admin module is isolated, mobile-friendly and routes only through owner admin
+ok 243 - expense admin module is isolated, mobile-friendly and routes only through owner admin
+  ---
+  duration_ms: 13.542802
+  type: 'test'
+  ...
+# Subtest: Owner Admin router exposes expense management only after admin authorization
+ok 244 - Owner Admin router exposes expense management only after admin authorization
+  ---
+  duration_ms: 1.448815
+  type: 'test'
+  ...
+# Subtest: expense module keeps property currency, timezone and categories configurable for white-label deployments
+ok 245 - expense module keeps property currency, timezone and categories configurable for white-label deployments
+  ---
+  duration_ms: 4.582938
+  type: 'test'
+  ...
+# Subtest: owner income entry calculates net, warns duplicates and combines with expenses in the finance overview
+ok 246 - owner income entry calculates net, warns duplicates and combines with expenses in the finance overview
+  ---
+  duration_ms: 5.437732
+  type: 'test'
+  ...
+# Subtest: finance admin UI and routes stay owner-only and keep income separate from guest operations
+ok 247 - finance admin UI and routes stay owner-only and keep income separate from guest operations
+  ---
+  duration_ms: 4.219483
+  type: 'test'
+  ...
+# Subtest: finance module keeps income sources, property currency and timezone configurable for white-label deployments
+ok 248 - finance module keeps income sources, property currency and timezone configurable for white-label deployments
+  ---
+  duration_ms: 1.992286
+  type: 'test'
+  ...
+# Subtest: Bamboo finance is isolated from The House across expenses, income, duplicate checks and totals
+ok 249 - Bamboo finance is isolated from The House across expenses, income, duplicate checks and totals
+  ---
+  duration_ms: 4.151077
+  type: 'test'
+  ...
+# Subtest: Bamboo receipt storage and combined CSV stay business-scoped
+ok 250 - Bamboo receipt storage and combined CSV stay business-scoped
+  ---
+  duration_ms: 2.094566
+  type: 'test'
+  ...
+# Subtest: Bamboo has a dedicated owner-only finance dashboard using the shared engine
+ok 251 - Bamboo has a dedicated owner-only finance dashboard using the shared engine
+  ---
+  duration_ms: 1.701058
+  type: 'test'
+  ...
+# Subtest: Admin dashboard landing page lets owner choose The House or Bamboo before authentication
+ok 252 - Admin dashboard landing page lets owner choose The House or Bamboo before authentication
+  ---
+  duration_ms: 1.309033
+  type: 'test'
+  ...
+# Subtest: invalid finance business ids fail closed instead of falling into The House
+ok 253 - invalid finance business ids fail closed instead of falling into The House
+  ---
+  duration_ms: 0.46535
+  type: 'test'
+  ...
+# Subtest: Bamboo owner and staff credentials are separate, business-scoped and enforced server-side
+ok 254 - Bamboo owner and staff credentials are separate, business-scoped and enforced server-side
+  ---
+  duration_ms: 6.026652
+  type: 'test'
+  ...
+# Subtest: Bamboo finance secrets fail closed when owner and staff credentials are accidentally duplicated
+ok 255 - Bamboo finance secrets fail closed when owner and staff credentials are accidentally duplicated
+  ---
+  duration_ms: 0.229345
+  type: 'test'
+  ...
+# Subtest: Bamboo staff page is entry-only while owner page keeps reports, history and print/export controls
+ok 256 - Bamboo staff page is entry-only while owner page keeps reports, history and print/export controls
+  ---
+  duration_ms: 2.901272
+  type: 'test'
+  ...
+# Subtest: QR code is Bamboo-specific while The House payment-method contract remains unchanged
+ok 257 - QR code is Bamboo-specific while The House payment-method contract remains unchanged
+  ---
+  duration_ms: 0.931687
+  type: 'test'
+  ...
+# Subtest: registration reminder template matches the approved one-variable body and Received button
+ok 258 - registration reminder template matches the approved one-variable body and Received button
+  ---
+  duration_ms: 0.415448
+  type: 'test'
+  ...
+# Subtest: passport received action template uses two approved variables while reminders use one variable plus Received
+ok 259 - passport received action template uses two approved variables while reminders use one variable plus Received
+  ---
+  duration_ms: 0.241428
+  type: 'test'
+  ...
+# Subtest: successful linked passport upload queues one privacy-safe owner alert only after registration progress is saved
+ok 260 - successful linked passport upload queues one privacy-safe owner alert only after registration progress is saved
+  ---
+  duration_ms: 24.001869
+  type: 'test'
+  ...
+# Subtest: 20:00 check-in reminder distinguishes zero and partial passport progress while TM30 reminder sends once
+ok 261 - 20:00 check-in reminder distinguishes zero and partial passport progress while TM30 reminder sends once
+  ---
+  duration_ms: 4.266713
+  type: 'test'
+  ...
+# Subtest: hourly registration reminder cron is present while existing escalation and cleanup crons remain
+ok 262 - hourly registration reminder cron is present while existing escalation and cleanup crons remain
+  ---
+  duration_ms: 0.885986
+  type: 'test'
+  ...
+# Subtest: late checkout up to 2 PM requires the 200 THB fee acceptance, then auto-confirms and notifies the team even with a same-day arrival
+ok 263 - late checkout up to 2 PM requires the 200 THB fee acceptance, then auto-confirms and notifies the team even with a same-day arrival
+  ---
+  duration_ms: 17.045651
+  type: 'test'
+  ...
+# whatsapp_template_delivery_failed {"id":"diagnostic_137544d3-3777-4846-9853-b86cb5e58040","deliveryId":"delivery_64719f5c-f49d-48f4-bd82-ce56daaed3fe","alertId":"alert_9962fd33-e6e0-47d5-aa4f-f07b57927333","stage":"initial","templateName":"house_service_alert_v3","languageCode":"en","componentSchema":"body(5)[1:text,2:text,3:text,4:text,5:text]","httpStatus":0,"errorCode":"missing_configuration","errorSubcode":"","errorType":"","errorMessage":"","errorDetails":"","traceId":"","failureKind":"configuration","createdAt":"2026-09-15T16:15:18.875Z"}
+# Subtest: late checkout over 2 PM is refused and failed delivery never records an approval
+ok 264 - late checkout over 2 PM is refused and failed delivery never records an approval
+  ---
+  duration_ms: 25.427733
+  type: 'test'
+  ...
+# Subtest: early check-in with a same-day departure prioritizes housekeeping and uses the new Received / Room ready template
+ok 265 - early check-in with a same-day departure prioritizes housekeeping and uses the new Received / Room ready template
+  ---
+  duration_ms: 16.958651
+  type: 'test'
+  ...
+# Subtest: an incoming guest is politely asked to check in after 3 PM when the previous stay has an approved late checkout
+ok 266 - an incoming guest is politely asked to check in after 3 PM when the previous stay has an approved late checkout
+  ---
+  duration_ms: 5.08721
+  type: 'test'
+  ...
+# Subtest: ready vacant rooms allow early check-in at any time while walk-ins and extensions still block stale ready status
+ok 267 - ready vacant rooms allow early check-in at any time while walk-ins and extensions still block stale ready status
+  ---
+  duration_ms: 15.655839
+  type: 'test'
+  ...
+# Subtest: v5.11.54 owner Ready is explicit after stale task context is cleared and guest wording avoids internal status language
+ok 268 - v5.11.54 owner Ready is explicit after stale task context is cleared and guest wording avoids internal status language
+  ---
+  duration_ms: 14.352129
+  type: 'test'
+  ...
+# Subtest: door locking and office location use short deterministic hotel-concierge answers
+ok 269 - door locking and office location use short deterministic hotel-concierge answers
+  ---
+  duration_ms: 9.613756
+  type: 'test'
+  ...
+# Subtest: direct stay creation blocks true room overlaps but allows same-day checkout-to-check-in turnover
+ok 270 - direct stay creation blocks true room overlaps but allows same-day checkout-to-check-in turnover
+  ---
+  duration_ms: 1.494594
+  type: 'test'
+  ...
+# Subtest: owner can delete a direct stay and revoke its guest access while Airbnb stays remain protected
+ok 271 - owner can delete a direct stay and revoke its guest access while Airbnb stays remain protected
+  ---
+  duration_ms: 2.786358
+  type: 'test'
+  ...
+# Subtest: Owner Admin exposes delete only for owner-managed stays and keeps the Room 7 overlap warning
+ok 272 - Owner Admin exposes delete only for owner-managed stays and keeps the Room 7 overlap warning
+  ---
+  duration_ms: 1.742795
+  type: 'test'
+  ...
+# Subtest: manual stay correction with the same confirmation code does not conflict with itself
+ok 273 - manual stay correction with the same confirmation code does not conflict with itself
+  ---
+  duration_ms: 1.567779
+  type: 'test'
+  ...
+# Subtest: owner stay extension refuses to extend through a later confirmed arrival
+ok 274 - owner stay extension refuses to extend through a later confirmed arrival
+  ---
+  duration_ms: 0.389994
+  type: 'test'
+  ...
+# Subtest: v5.11.50 keeps a requested cleaning time separate when the guest later reports maintenance
+ok 275 - v5.11.50 keeps a requested cleaning time separate when the guest later reports maintenance
+  ---
+  duration_ms: 32.314073
+  type: 'test'
+  ...
+# Subtest: v5.11.50 housekeeping Received stays with Su while Room ready notifies owners through the existing status template
+ok 276 - v5.11.50 housekeeping Received stays with Su while Room ready notifies owners through the existing status template
+  ---
+  duration_ms: 14.220852
+  type: 'test'
+  ...
+# Subtest: v5.11.52 canonical reservation model preserves current House behavior while normalizing source shape
+ok 277 - v5.11.52 canonical reservation model preserves current House behavior while normalizing source shape
+  ---
+  duration_ms: 0.452219
+  type: 'test'
+  ...
+# Subtest: v5.11.52 reservation sync normalization is provider-agnostic without enabling any new live booking channel
+ok 278 - v5.11.52 reservation sync normalization is provider-agnostic without enabling any new live booking channel
+  ---
+  duration_ms: 0.174978
+  type: 'test'
+  ...
+# Subtest: v5.11.54 integrations dashboard exposes major channels with honest connector requirements and official guidance
+ok 279 - v5.11.54 integrations dashboard exposes major channels with honest connector requirements and official guidance
+  ---
+  duration_ms: 0.374477
+  type: 'test'
+  ...
+# Subtest: v5.11.54 integrations dashboard never claims Airbnb is connected when House sync credentials are incomplete
+ok 280 - v5.11.54 integrations dashboard never claims Airbnb is connected when House sync credentials are incomplete
+  ---
+  duration_ms: 0.079267
+  type: 'test'
+  ...
+# Subtest: v5.11.54 owner admin renders integrations as a read-only connector surface with actionable connection guidance
+ok 281 - v5.11.54 owner admin renders integrations as a read-only connector surface with actionable connection guidance
+  ---
+  duration_ms: 2.01823
+  type: 'test'
+  ...
+# Subtest: v5.11.56 Beds24 room mapping is explicit and never guesses a House room from provider ids
+ok 282 - v5.11.56 Beds24 room mapping is explicit and never guesses a House room from provider ids
+  ---
+  duration_ms: 0.324971
+  type: 'test'
+  ...
+# Subtest: v5.11.56 Beds24 source labels preserve the guest's original OTA channel
+ok 283 - v5.11.56 Beds24 source labels preserve the guest's original OTA channel
+  ---
+  duration_ms: 0.135322
+  type: 'test'
+  ...
+# Subtest: v5.11.56 Beds24 message sync keeps conversation order and only selects a guest reply when the guest is latest
+ok 284 - v5.11.56 Beds24 message sync keeps conversation order and only selects a guest reply when the guest is latest
+  ---
+  duration_ms: 0.440569
+  type: 'test'
+  ...
+# Subtest: v5.11.78 OTA passport declarations are recognized deterministically without confusing upload questions
+ok 285 - v5.11.78 OTA passport declarations are recognized deterministically without confusing upload questions
+  ---
+  duration_ms: 1.746007
+  type: 'test'
+  ...
+# Subtest: v5.11.56 unified messaging configuration requires real Beds24 and Meta credentials
+ok 286 - v5.11.56 unified messaging configuration requires real Beds24 and Meta credentials
+  ---
+  duration_ms: 0.228776
+  type: 'test'
+  ...
+# Subtest: v5.11.56 House routes and Owner Admin use Beds24 plus direct WhatsApp without retaining Smoobu code
+ok 287 - v5.11.56 House routes and Owner Admin use Beds24 plus direct WhatsApp without retaining Smoobu code
+  ---
+  duration_ms: 3.062257
+  type: 'test'
+  ...
+# Subtest: v5.11.56 Beds24 access tokens are cached in the Durable Object while the refresh token remains a secret
+ok 288 - v5.11.56 Beds24 access tokens are cached in the Durable Object while the refresh token remains a secret
+  ---
+  duration_ms: 1.749555
+  type: 'test'
+  ...
+# Subtest: v5.11.56 unified inbox loads the most recent message window while returning it chronologically
+ok 289 - v5.11.56 unified inbox loads the most recent message window while returning it chronologically
+  ---
+  duration_ms: 1.00498
+  type: 'test'
+  ...
+# Subtest: v5.11.56 Beds24 channel manager remains deliberately disabled by default
+ok 290 - v5.11.56 Beds24 channel manager remains deliberately disabled by default
+  ---
+  duration_ms: 0.651467
+  type: 'test'
+  ...
+# Subtest: v5.11.56 Beds24 channel manager requires an explicit one-to-one Room 1-11 map
+ok 291 - v5.11.56 Beds24 channel manager requires an explicit one-to-one Room 1-11 map
+  ---
+  duration_ms: 0.511983
+  type: 'test'
+  ...
+# Subtest: v5.11.56 Beds24 reservation ingestion preserves every supported OTA source independently of messaging support
+ok 292 - v5.11.56 Beds24 reservation ingestion preserves every supported OTA source independently of messaging support
+  ---
+  duration_ms: 0.154938
+  type: 'test'
+  ...
+# Subtest: v5.11.56 Beds24 availability protection requires every booked night to be centrally available
+ok 293 - v5.11.56 Beds24 availability protection requires every booked night to be centrally available
+  ---
+  duration_ms: 0.304797
+  type: 'test'
+  ...
+# Subtest: v5.11.56 Beds24 channel manager readiness needs the flag, credentials and all 11 mapped rooms
+ok 294 - v5.11.56 Beds24 channel manager readiness needs the flag, credentials and all 11 mapped rooms
+  ---
+  duration_ms: 0.724096
+  type: 'test'
+  ...
+# Subtest: v5.11.56 Direct booking checks Beds24 central availability before creating the Beds24 booking
+ok 295 - v5.11.56 Direct booking checks Beds24 central availability before creating the Beds24 booking
+  ---
+  duration_ms: 2.137331
+  type: 'test'
+  ...
+# Subtest: v5.11.56 Direct extension checks only the added nights and updates Beds24 before local extension can proceed
+ok 296 - v5.11.56 Direct extension checks only the added nights and updates Beds24 before local extension can proceed
+  ---
+  duration_ms: 1.266182
+  type: 'test'
+  ...
+# Subtest: v5.11.56 Beds24 webhook booking ingestion writes the canonical reservation with explicit room and provider source
+ok 297 - v5.11.56 Beds24 webhook booking ingestion writes the canonical reservation with explicit room and provider source
+  ---
+  duration_ms: 2.497113
+  type: 'test'
+  ...
+# Subtest: v5.11.76 keeps Beds24 channel-manager protection staged while guarded AI auto-send is enabled
+ok 298 - v5.11.76 keeps Beds24 channel-manager protection staged while guarded AI auto-send is enabled
+  ---
+  duration_ms: 1.517152
+  type: 'test'
+  ...
+# Subtest: Beds24 finance configuration defaults fail-closed while the validated House deployment enables scheduled sync
+ok 299 - Beds24 finance configuration defaults fail-closed while the validated House deployment enables scheduled sync
+  ---
+  duration_ms: 0.942447
+  type: 'test'
+  ...
+# Subtest: v5.11.57 Airbnb finance parser uses channel-collect payments and refunds while ignoring unrelated manual payments
+ok 300 - v5.11.57 Airbnb finance parser uses channel-collect payments and refunds while ignoring unrelated manual payments
+  ---
+  duration_ms: 1.059881
+  type: 'test'
+  ...
+# Subtest: v5.11.57 Airbnb finance record stores actual payout as net and preserves booking gross, commission, room and provider identity
+ok 301 - v5.11.57 Airbnb finance record stores actual payout as net and preserves booking gross, commission, room and provider identity
+  ---
+  duration_ms: 1.026161
+  type: 'test'
+  ...
+# Subtest: v5.11.63 Airbnb finance creates a clearly provisional expected payout before settlement
+ok 302 - v5.11.63 Airbnb finance creates a clearly provisional expected payout before settlement
+  ---
+  duration_ms: 0.285918
+  type: 'test'
+  ...
+# Subtest: v5.11.57 Beds24 finance reconciliation upserts one provider-managed income row and updates it instead of duplicating it
+ok 303 - v5.11.57 Beds24 finance reconciliation upserts one provider-managed income row and updates it instead of duplicating it
+  ---
+  duration_ms: 3.650452
+  type: 'test'
+  ...
+# Subtest: v5.11.57 provider-managed Beds24 income cannot be manually deleted from Finance
+ok 304 - v5.11.57 provider-managed Beds24 income cannot be manually deleted from Finance
+  ---
+  duration_ms: 0.672364
+  type: 'test'
+  ...
+# Subtest: Finance UI and scheduler expose Airbnb payout automation with the validated House deployment enabled
+ok 305 - Finance UI and scheduler expose Airbnb payout automation with the validated House deployment enabled
+  ---
+  duration_ms: 2.313102
+  type: 'test'
+  ...
+# Subtest: v5.11.58 mobile platform defaults fail-closed while the deployed v5.11.61 app flag stays enabled
+ok 306 - v5.11.58 mobile platform defaults fail-closed while the deployed v5.11.61 app flag stays enabled
+  ---
+  duration_ms: 0.679463
+  type: 'test'
+  ...
+# Subtest: v5.11.58 staff permissions are operationally useful but exclude owner-sensitive surfaces
+ok 307 - v5.11.58 staff permissions are operationally useful but exclude owner-sensitive surfaces
+  ---
+  duration_ms: 0.152512
+  type: 'test'
+  ...
+# Subtest: v5.11.58 expense submission is granular: owners/managers have it, staff require an explicit grant
+not ok 308 - v5.11.58 expense submission is granular: owners/managers have it, staff require an explicit grant
+  ---
+  duration_ms: 1.102915
+  type: 'test'
+  location: '/mnt/data/taoedge_v0129_work/backend/tests/concierge.test.mjs:14310:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly deep-equal:
+    + actual - expected
+    
+      [
+        'finance.expense_submit',
+        'copilot.use',
+        'inventory.view',
+        'inventory.adjust',
+        'inventory.local_purchase',
+    +   'staff.schedule_view'
+      ]
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+    0: 'finance.expense_submit'
+    1: 'copilot.use'
+    2: 'inventory.view'
+    3: 'inventory.adjust'
+    4: 'inventory.local_purchase'
+  actual:
+    0: 'finance.expense_submit'
+    1: 'copilot.use'
+    2: 'inventory.view'
+    3: 'inventory.adjust'
+    4: 'inventory.local_purchase'
+    5: 'staff.schedule_view'
+  operator: 'deepStrictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///mnt/data/taoedge_v0129_work/backend/tests/concierge.test.mjs:14314:10)
+    Test.runInAsyncScope (node:async_hooks:214:14)
+    Test.run (node:internal/test_runner/test:1047:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:744:18)
+    Test.postRun (node:internal/test_runner/test:1173:19)
+    Test.run (node:internal/test_runner/test:1101:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: v5.11.58 mobile expense routes reuse the existing receipt/AI Finance pipeline without exposing Finance reports
+ok 309 - v5.11.58 mobile expense routes reuse the existing receipt/AI Finance pipeline without exposing Finance reports
+  ---
+  duration_ms: 3.004766
+  type: 'test'
+  ...
+# Subtest: v5.11.58 tenant entitlements are modular and cover the House commercial feature set
+ok 310 - v5.11.58 tenant entitlements are modular and cover the House commercial feature set
+  ---
+  duration_ms: 0.159472
+  type: 'test'
+  ...
+# Subtest: v5.11.58 mobile endpoints fail closed while the production mobile feature flag is disabled
+ok 311 - v5.11.58 mobile endpoints fail closed while the production mobile feature flag is disabled
+  ---
+  duration_ms: 4.949626
+  type: 'test'
+  ...
+# Subtest: v5.11.58 mobile tenant tables and hashed credential/session storage exist in the Durable Object
+ok 312 - v5.11.58 mobile tenant tables and hashed credential/session storage exist in the Durable Object
+  ---
+  duration_ms: 1.277837
+  type: 'test'
+  ...
+# Subtest: v5.11.58 mobile API reuses protected House messaging and Direct-stay operations instead of exposing provider credentials
+ok 313 - v5.11.58 mobile API reuses protected House messaging and Direct-stay operations instead of exposing provider credentials
+  ---
+  duration_ms: 1.408482
+  type: 'test'
+  ...
+# Subtest: v5.11.58 Worker routes mobile traffic before normal static handling and keeps authentication rate limited
+ok 314 - v5.11.58 Worker routes mobile traffic before normal static handling and keeps authentication rate limited
+  ---
+  duration_ms: 0.92164
+  type: 'test'
+  ...
+# Subtest: mobile secrets remain uncommitted while Finance sync is enabled and higher-risk controls stay staged
+ok 315 - mobile secrets remain uncommitted while Finance sync is enabled and higher-risk controls stay staged
+  ---
+  duration_ms: 0.98723
+  type: 'test'
+  ...
+# Subtest: v5.11.59 mobile password hashing stays within the Cloudflare Workers PBKDF2 runtime limit
+ok 316 - v5.11.59 mobile password hashing stays within the Cloudflare Workers PBKDF2 runtime limit
+  ---
+  duration_ms: 1.73771
+  type: 'test'
+  ...
+# Subtest: v5.11.60 mobile owner views enrich reservation names from Beds24 personal booking data without exposing provider credentials
+ok 317 - v5.11.60 mobile owner views enrich reservation names from Beds24 personal booking data without exposing provider credentials
+  ---
+  duration_ms: 1.22786
+  type: 'test'
+  ...
+# Subtest: v5.11.61 historical Airbnb Finance backfill uses payment-observed dates and remains idempotent across onboarding reruns
+ok 318 - v5.11.61 historical Airbnb Finance backfill uses payment-observed dates and remains idempotent across onboarding reruns
+  ---
+  duration_ms: 2.392887
+  type: 'test'
+  ...
+# Subtest: v5.11.61 OTA Finance adapter catalog is provider-neutral while only Airbnb is activated for production ingestion
+ok 319 - v5.11.61 OTA Finance adapter catalog is provider-neutral while only Airbnb is activated for production ingestion
+  ---
+  duration_ms: 0.298973
+  type: 'test'
+  ...
+# Subtest: v5.11.61 commercial protection keeps licensing secrets server-side and gates protected routes by both permission and module entitlement
+ok 320 - v5.11.61 commercial protection keeps licensing secrets server-side and gates protected routes by both permission and module entitlement
+  ---
+  duration_ms: 2.516506
+  type: 'test'
+  ...
+# Subtest: v5.11.61 licensing admin endpoint is separately authenticated and never exposed under the mobile client API
+ok 321 - v5.11.61 licensing admin endpoint is separately authenticated and never exposed under the mobile client API
+  ---
+  duration_ms: 0.648693
+  type: 'test'
+  ...
+# Subtest: v5.11.61 direct WhatsApp guest initiation uses a server-side approved template and keeps Meta credentials out of the app
+ok 322 - v5.11.61 direct WhatsApp guest initiation uses a server-side approved template and keeps Meta credentials out of the app
+  ---
+  duration_ms: 1.635855
+  type: 'test'
+  ...
+# Subtest: v5.11.72 mobile integration health separates provider access, automation and WhatsApp capabilities
+ok 323 - v5.11.72 mobile integration health separates provider access, automation and WhatsApp capabilities
+  ---
+  duration_ms: 1.030142
+  type: 'test'
+  ...
+# Subtest: v5.11.76 keeps mobile enforcement active while Finance sync and guarded AI auto-send are enabled and full channel manager stays off
+ok 324 - v5.11.76 keeps mobile enforcement active while Finance sync and guarded AI auto-send are enabled and full channel manager stays off
+  ---
+  duration_ms: 0.737053
+  type: 'test'
+  ...
+# Subtest: v5.11.62 desktop owner Finance exposes the same historical Airbnb onboarding ranges as mobile
+ok 325 - v5.11.62 desktop owner Finance exposes the same historical Airbnb onboarding ranges as mobile
+  ---
+  duration_ms: 1.669423
+  type: 'test'
+  ...
+# Subtest: v5.11.62 desktop historical Airbnb import is owner-only, works while daily sync is disabled, and remains idempotent
+ok 326 - v5.11.62 desktop historical Airbnb import is owner-only, works while daily sync is disabled, and remains idempotent
+  ---
+  duration_ms: 2.568972
+  type: 'test'
+  ...
+# Subtest: v5.11.63 historical Airbnb onboarding imports expected payout then reconciles the same row to actual payment
+ok 327 - v5.11.63 historical Airbnb onboarding imports expected payout then reconciles the same row to actual payment
+  ---
+  duration_ms: 1.837203
+  type: 'test'
+  ...
+# Subtest: v5.11.63 Finance summary separates provisional expected income from settled income while keeping forecast total
+ok 328 - v5.11.63 Finance summary separates provisional expected income from settled income while keeping forecast total
+  ---
+  duration_ms: 0.328388
+  type: 'test'
+  ...
+# Subtest: v5.11.63 expected payout UI is clearly provisional on desktop and mobile
+ok 329 - v5.11.63 expected payout UI is clearly provisional on desktop and mobile
+  ---
+  duration_ms: 1.854834
+  type: 'test'
+  ...
+# Subtest: v5.11.64 booking operational tasks expose configured assignee teams without phone numbers
+ok 330 - v5.11.64 booking operational tasks expose configured assignee teams without phone numbers
+  ---
+  duration_ms: 0.615371
+  type: 'test'
+  ...
+# Subtest: v5.11.64 booking tasks reuse approved staff quick actions for Received and Resolved
+ok 331 - v5.11.64 booking tasks reuse approved staff quick actions for Received and Resolved
+  ---
+  duration_ms: 0.205705
+  type: 'test'
+  ...
+# Subtest: v5.11.64 booking activity persists notes/tasks and mirrors protected alert status
+ok 332 - v5.11.64 booking activity persists notes/tasks and mirrors protected alert status
+  ---
+  duration_ms: 2.817145
+  type: 'test'
+  ...
+# Subtest: v5.11.65 mobile booking detail exposes rich provider metadata behind financial permissions
+ok 333 - v5.11.65 mobile booking detail exposes rich provider metadata behind financial permissions
+  ---
+  duration_ms: 2.463683
+  type: 'test'
+  ...
+# Subtest: v5.11.66 mobile booking communications expose provider messaging, WhatsApp and protected call actions
+ok 334 - v5.11.66 mobile booking communications expose provider messaging, WhatsApp and protected call actions
+  ---
+  duration_ms: 2.073109
+  type: 'test'
+  ...
+# Subtest: v5.11.66 Home exposes Today, Tomorrow and seven-day operational glance data
+ok 335 - v5.11.66 Home exposes Today, Tomorrow and seven-day operational glance data
+  ---
+  duration_ms: 2.327811
+  type: 'test'
+  ...
+# Subtest: v5.11.66 repairs early Finance schemas so mobile receipt expenses can save creator audit attribution
+ok 336 - v5.11.66 repairs early Finance schemas so mobile receipt expenses can save creator audit attribution
+  ---
+  duration_ms: 1.500739
+  type: 'test'
+  ...
+# Subtest: v5.11.67 unified messaging uses language-agnostic automatic Concierge context
+ok 337 - v5.11.67 unified messaging uses language-agnostic automatic Concierge context
+  ---
+  duration_ms: 3.751361
+  type: 'test'
+  ...
+# Subtest: v5.11.67 central operational routing sends service requests to Su plus owners and bookings to Fah plus owners
+ok 338 - v5.11.67 central operational routing sends service requests to Su plus owners and bookings to Fah plus owners
+  ---
+  duration_ms: 0.370891
+  type: 'test'
+  ...
+# Subtest: v5.11.67 mobile AI review exposes approve reject regenerate and server-routed booking tasks
+ok 339 - v5.11.67 mobile AI review exposes approve reject regenerate and server-routed booking tasks
+  ---
+  duration_ms: 2.140215
+  type: 'test'
+  ...
+# Subtest: v5.11.67 Beds24 provider echoes reconcile local outbound messages instead of duplicating them
+ok 340 - v5.11.67 Beds24 provider echoes reconcile local outbound messages instead of duplicating them
+  ---
+  duration_ms: 1.338554
+  type: 'test'
+  ...
+# Subtest: v5.11.67 exact German housekeeping provider message stays on Concierge logic and proposes Su+owners task without pre-alerting
+ok 341 - v5.11.67 exact German housekeeping provider message stays on Concierge logic and proposes Su+owners task without pre-alerting
+  ---
+  duration_ms: 61.753037
+  type: 'test'
+  ...
+# Subtest: v5.11.67 arbitrary-language provider requests use semantic operational_category rather than keyword lists
+ok 342 - v5.11.67 arbitrary-language provider requests use semantic operational_category rather than keyword lists
+  ---
+  duration_ms: 77.844121
+  type: 'test'
+  ...
+# Subtest: v5.11.68 role isolation removes legacy Fah/owner overlap from support routing
+ok 343 - v5.11.68 role isolation removes legacy Fah/owner overlap from support routing
+  ---
+  duration_ms: 0.548066
+  type: 'test'
+  ...
+# Subtest: v5.11.68 reservation booking tasks use Fah booking template while service tasks use Su service template
+ok 344 - v5.11.68 reservation booking tasks use Fah booking template while service tasks use Su service template
+  ---
+  duration_ms: 0.502441
+  type: 'test'
+  ...
+# Subtest: v5.11.69 analytics range and payload separate historic, forward, operations and Finance signals
+ok 345 - v5.11.69 analytics range and payload separate historic, forward, operations and Finance signals
+  ---
+  duration_ms: 3.628052
+  type: 'test'
+  ...
+# Subtest: v5.11.69 analytics endpoint is server-permissioned and uses canonical reservations, operations and Finance range data
+ok 346 - v5.11.69 analytics endpoint is server-permissioned and uses canonical reservations, operations and Finance range data
+  ---
+  duration_ms: 2.527394
+  type: 'test'
+  ...
+# Subtest: v5.11.70 Insights V2 exposes 30/60/90 demand, pickup, channel quality and ledger efficiency without calling it ADR/RevPAR
+ok 347 - v5.11.70 Insights V2 exposes 30/60/90 demand, pickup, channel quality and ledger efficiency without calling it ADR/RevPAR
+  ---
+  duration_ms: 2.609412
+  type: 'test'
+  ...
+# Subtest: v5.11.74 Revenue Engine V1 produces deterministic recommendation-only pricing within owner guardrails
+ok 348 - v5.11.74 Revenue Engine V1 produces deterministic recommendation-only pricing within owner guardrails
+  ---
+  duration_ms: 4.627762
+  type: 'test'
+  ...
+# Subtest: v5.11.74 Revenue Engine settings and decisions are owner-controlled, audited and stored without provider write-back
+ok 349 - v5.11.74 Revenue Engine settings and decisions are owner-controlled, audited and stored without provider write-back
+  ---
+  duration_ms: 2.349778
+  type: 'test'
+  ...
+# Subtest: v5.11.70 Finance report CSV includes requested-period summary and transaction detail
+ok 350 - v5.11.70 Finance report CSV includes requested-period summary and transaction detail
+  ---
+  duration_ms: 0.746075
+  type: 'test'
+  ...
+# Subtest: v5.11.70 guest-document TM30 and Finance-report mobile endpoints remain permission gated and audited
+ok 351 - v5.11.70 guest-document TM30 and Finance-report mobile endpoints remain permission gated and audited
+  ---
+  duration_ms: 2.013626
+  type: 'test'
+  ...
+# Subtest: v5.11.71 trusted messaging resolves back-to-back room move and Monday luggage policy
+ok 352 - v5.11.71 trusted messaging resolves back-to-back room move and Monday luggage policy
+  ---
+  duration_ms: 13.611716
+  type: 'test'
+  ...
+# Subtest: v5.11.71 unified Concierge instructions use trusted adjacent-stay timeline and do not learn manual exceptions
+ok 353 - v5.11.71 unified Concierge instructions use trusted adjacent-stay timeline and do not learn manual exceptions
+  ---
+  duration_ms: 64.674869
+  type: 'test'
+  ...
+# Subtest: v5.11.73 integration health remains visible to integration-permitted sessions when a legacy license snapshot omits the module
+ok 354 - v5.11.73 integration health remains visible to integration-permitted sessions when a legacy license snapshot omits the module
+  ---
+  duration_ms: 1.571788
+  type: 'test'
+  ...
+# Subtest: v5.11.76 daily operating console feature flags keep full CM off while lifecycle and direct protection are independently active
+ok 355 - v5.11.76 daily operating console feature flags keep full CM off while lifecycle and direct protection are independently active
+  ---
+  duration_ms: 0.661622
+  type: 'test'
+  ...
+# Subtest: v5.11.76 direct-stay central protection is independent from the disabled full Beds24 channel manager
+ok 356 - v5.11.76 direct-stay central protection is independent from the disabled full Beds24 channel manager
+  ---
+  duration_ms: 0.411472
+  type: 'test'
+  ...
+# Subtest: v5.11.76 Listings & Rates reads while writes stay fail-closed until the narrow write flag is explicitly enabled
+ok 357 - v5.11.76 Listings & Rates reads while writes stay fail-closed until the narrow write flag is explicitly enabled
+  ---
+  duration_ms: 0.52806
+  type: 'test'
+  ...
+# Subtest: v5.11.76 narrow Listings & Rates bridge reads calendar cells and writes only one explicit room/date cell
+ok 358 - v5.11.76 narrow Listings & Rates bridge reads calendar cells and writes only one explicit room/date cell
+  ---
+  duration_ms: 2.840865
+  type: 'test'
+  ...
+# Subtest: v5.11.77a Listings & Rates does not coerce missing provider values to zero
+ok 359 - v5.11.77a Listings & Rates does not coerce missing provider values to zero
+  ---
+  duration_ms: 0.886092
+  type: 'test'
+  ...
+# Subtest: v5.11.76 booking lifecycle chooses logical +5-minute stages for advance, near-arrival and same-day bookings
+ok 360 - v5.11.76 booking lifecycle chooses logical +5-minute stages for advance, near-arrival and same-day bookings
+  ---
+  duration_ms: 1.080419
+  type: 'test'
+  ...
+# Subtest: v5.11.76 departure assistant captures planned time and extension interest only after the checkout prompt
+ok 361 - v5.11.76 departure assistant captures planned time and extension interest only after the checkout prompt
+  ---
+  duration_ms: 2.707561
+  type: 'test'
+  ...
+# Subtest: v5.11.76 mobile push targets management correctly and exposes only approved deep-link data
+ok 362 - v5.11.76 mobile push targets management correctly and exposes only approved deep-link data
+  ---
+  duration_ms: 1.233803
+  type: 'test'
+  ...
+# Subtest: v5.11.78 mobile push respects per-device notification categories
+ok 363 - v5.11.78 mobile push respects per-device notification categories
+  ---
+  duration_ms: 0.405474
+  type: 'test'
+  ...
+# Subtest: v5.11.76 lifecycle AI protects guest access secrets and housekeeping can advance turnover from a confirmed early departure
+ok 364 - v5.11.76 lifecycle AI protects guest access secrets and housekeeping can advance turnover from a confirmed early departure
+  ---
+  duration_ms: 3.325746
+  type: 'test'
+  ...
+# Subtest: v5.11.78 Listings write flag supports an isolated validation mode without enabling live owner writes
+ok 365 - v5.11.78 Listings write flag supports an isolated validation mode without enabling live owner writes
+  ---
+  duration_ms: 1.995414
+  type: 'test'
+  ...
+# Subtest: v5.11.77 Listings & Rates mobile route contract is explicit, aliased and trailing-slash safe
+ok 366 - v5.11.77 Listings & Rates mobile route contract is explicit, aliased and trailing-slash safe
+  ---
+  duration_ms: 1.818579
+  type: 'test'
+  ...
+# Subtest: v5.11.77 Direct Stay fast inventory close remains independent from the full Channel Manager
+ok 367 - v5.11.77 Direct Stay fast inventory close remains independent from the full Channel Manager
+  ---
+  duration_ms: 1.418846
+  type: 'test'
+  ...
+# Subtest: v5.11.77 cancellation reopening never overwrites another local reservation
+ok 368 - v5.11.77 cancellation reopening never overwrites another local reservation
+  ---
+  duration_ms: 0.40655
+  type: 'test'
+  ...
+# Subtest: v5.11.77 Direct Stay edits check newly-added provider availability before updating Beds24
+ok 369 - v5.11.77 Direct Stay edits check newly-added provider availability before updating Beds24
+  ---
+  duration_ms: 1.089026
+  type: 'test'
+  ...
+# Subtest: v5.11.77 direct synchronization retries run on the minute while full Channel Manager stays off
+ok 370 - v5.11.77 direct synchronization retries run on the minute while full Channel Manager stays off
+  ---
+  duration_ms: 1.773488
+  type: 'test'
+  ...
+# Subtest: v5.11.79 authorized Wi-Fi password stays visible and informational provider messages create no operation
+ok 371 - v5.11.79 authorized Wi-Fi password stays visible and informational provider messages create no operation
+  ---
+  duration_ms: 7.097683
+  type: 'test'
+  ...
+# Subtest: v5.11.79 genuine Wi-Fi fault remains actionable maintenance while password question does not
+ok 372 - v5.11.79 genuine Wi-Fi fault remains actionable maintenance while password question does not
+  ---
+  duration_ms: 10.812849
+  type: 'test'
+  ...
+# Subtest: v5.11.79 approve-no-send records positive review with zero guest or operational side effects
+ok 373 - v5.11.79 approve-no-send records positive review with zero guest or operational side effects
+  ---
+  duration_ms: 2.278511
+  type: 'test'
+  ...
+# Subtest: v5.11.79 operational side effect requires an explicit independent owner decision
+ok 374 - v5.11.79 operational side effect requires an explicit independent owner decision
+  ---
+  duration_ms: 0.238547
+  type: 'test'
+  ...
+# Subtest: v5.11.84 trusted guest messaging applies hospitality and customer-satisfaction quality gate
+ok 375 - v5.11.84 trusted guest messaging applies hospitality and customer-satisfaction quality gate
+  ---
+  duration_ms: 53.011017
+  type: 'test'
+  ...
+# Subtest: v5.11.84 automatic guest replies wait at least five minutes and re-check before sending
+ok 376 - v5.11.84 automatic guest replies wait at least five minutes and re-check before sending
+  ---
+  duration_ms: 1.573149
+  type: 'test'
+  ...
+# Subtest: v5.11.84 pending automatic reply is superseded by a newer guest message
+ok 377 - v5.11.84 pending automatic reply is superseded by a newer guest message
+  ---
+  duration_ms: 0.279981
+  type: 'test'
+  ...
+# Subtest: v5.11.83 purchase orders always start as draft and use the guarded status transition path
+ok 378 - v5.11.83 purchase orders always start as draft and use the guarded status transition path
+  ---
+  duration_ms: 3.779703
+  type: 'test'
+  ...
+# Subtest: v5.11.83 asset register preserves next service date for preventive maintenance
+ok 379 - v5.11.83 asset register preserves next service date for preventive maintenance
+  ---
+  duration_ms: 0.559936
+  type: 'test'
+  ...
+# Subtest: v5.11.83 staff translation keeps property working language configurable and supports guest-language resync
+ok 380 - v5.11.83 staff translation keeps property working language configurable and supports guest-language resync
+  ---
+  duration_ms: 1.143859
+  type: 'test'
+  ...
+# Subtest: v5.11.84 starter catalogue stays optional and only explicitly selected items become active stock
+ok 381 - v5.11.84 starter catalogue stays optional and only explicitly selected items become active stock
+  ---
+  duration_ms: 2.031219
+  type: 'test'
+  ...
+# Subtest: v5.11.84 formal purchase orders cannot exist without a real active supplier
+ok 382 - v5.11.84 formal purchase orders cannot exist without a real active supplier
+  ---
+  duration_ms: 1.566154
+  type: 'test'
+  ...
+# Subtest: v5.11.84 local shopping lists support item-level property/room context and only authorized purchasers
+ok 383 - v5.11.84 local shopping lists support item-level property/room context and only authorized purchasers
+  ---
+  duration_ms: 1.34623
+  type: 'test'
+  ...
+# Subtest: v5.11.84 receipt-required shopping list cannot complete until Finance is linked and then posts purchased stock once
+ok 384 - v5.11.84 receipt-required shopping list cannot complete until Finance is linked and then posts purchased stock once
+  ---
+  duration_ms: 0.717988
+  type: 'test'
+  ...
+# Subtest: Operations Copilot registry retrieves practical hotel workflows
+ok 385 - Operations Copilot registry retrieves practical hotel workflows
+  ---
+  duration_ms: 1.663375
+  type: 'test'
+  ...
+# Subtest: Operations Copilot proposes a room task before executing anything
+ok 386 - Operations Copilot proposes a room task before executing anything
+  ---
+  duration_ms: 57.996044
+  type: 'test'
+  ...
+# whatsapp_template_delivery_failed {"id":"diagnostic_c338b7c1-533d-47ac-8a34-c8ede6e057ea","deliveryId":"delivery_e3e3e615-2793-475d-8863-792c51d74a92","alertId":"alert_d4b0f3f7-b80b-4d05-a582-d22abc47900d","stage":"initial","templateName":"house_service_alert_v3","languageCode":"en","componentSchema":"body(5)[1:text,2:text,3:text,4:text,5:text]","httpStatus":0,"errorCode":"missing_configuration","errorSubcode":"","errorType":"","errorMessage":"","errorDetails":"","traceId":"","failureKind":"configuration","createdAt":"2026-09-15T16:15:07.633Z"}
+# Subtest: Operations Copilot executes the exact signed proposal only after confirmation
+ok 387 - Operations Copilot executes the exact signed proposal only after confirmation
+  ---
+  duration_ms: 17.95878
+  type: 'test'
+  ...
+# Subtest: Operations Copilot answers the daily attention question deterministically
+ok 388 - Operations Copilot answers the daily attention question deterministically
+  ---
+  duration_ms: 1.679954
+  type: 'test'
+  ...
+# Subtest: Operations Copilot understands an ordinary room work instruction without the word task
+ok 389 - Operations Copilot understands an ordinary room work instruction without the word task
+  ---
+  duration_ms: 2.769274
+  type: 'test'
+  ...
+# Subtest: Operations Copilot may use validated booking screen context when the instruction is clearly contextual
+ok 390 - Operations Copilot may use validated booking screen context when the instruction is clearly contextual
+  ---
+  duration_ms: 2.287884
+  type: 'test'
+  ...
+# Subtest: Operations Copilot refuses an unknown room instead of guessing
+ok 391 - Operations Copilot refuses an unknown room instead of guessing
+  ---
+  duration_ms: 1.34188
+  type: 'test'
+  ...
+# Subtest: Operations Copilot signed proposal cannot be changed during confirmation
+ok 392 - Operations Copilot signed proposal cannot be changed during confirmation
+  ---
+  duration_ms: 3.52793
+  type: 'test'
+  ...
+# Subtest: Operations Copilot daily attention stays available when one live source has an unexpected production shape
+ok 393 - Operations Copilot daily attention stays available when one live source has an unexpected production shape
+  ---
+  duration_ms: 1.740428
+  type: 'test'
+  ...
+# Subtest: Operations Copilot creates a property-wide Inventory proposal for a restock instruction without inventing a booking
+ok 394 - Operations Copilot creates a property-wide Inventory proposal for a restock instruction without inventing a booking
+  ---
+  duration_ms: 6.54011
+  type: 'test'
+  ...
+# Subtest: Operations Copilot inventory summary uses live role-filtered stock data
+ok 395 - Operations Copilot inventory summary uses live role-filtered stock data
+  ---
+  duration_ms: 1.21518
+  type: 'test'
+  ...
+# Subtest: v5.11.84 Copilot can safely identify and cancel only a Direct Stay after confirmation
+ok 396 - v5.11.84 Copilot can safely identify and cancel only a Direct Stay after confirmation
+  ---
+  duration_ms: 6.035591
+  type: 'test'
+  ...
+# Subtest: v5.11.84 Copilot proposes Direct Stay creation and calendar blocks without mutating before confirmation
+ok 397 - v5.11.84 Copilot proposes Direct Stay creation and calendar blocks without mutating before confirmation
+  ---
+  duration_ms: 3.473502
+  type: 'test'
+  ...
+# Subtest: v5.11.84 Copilot Direct Stay creation returns the canonical local reservation id without provider protection
+ok 398 - v5.11.84 Copilot Direct Stay creation returns the canonical local reservation id without provider protection
+  ---
+  duration_ms: 3.642905
+  type: 'test'
+  ...
+# Subtest: v5.11.84 Copilot calendar block and unblock both require confirmation and preserve canonical availability state
+ok 399 - v5.11.84 Copilot calendar block and unblock both require confirmation and preserve canonical availability state
+  ---
+  duration_ms: 5.689258
+  type: 'test'
+  ...
+# Subtest: v5.11.85 multilingual voice routing can safely prepare a German Direct Stay cancellation
+ok 400 - v5.11.85 multilingual voice routing can safely prepare a German Direct Stay cancellation
+  ---
+  duration_ms: 1.590407
+  type: 'test'
+  ...
+# Subtest: v5.11.85 multilingual voice routing maps Thai daily-attention speech into the deterministic live summary
+ok 401 - v5.11.85 multilingual voice routing maps Thai daily-attention speech into the deterministic live summary
+  ---
+  duration_ms: 1.046422
+  type: 'test'
+  ...
+# Subtest: v5.11.85 staff profile normalizes hospitality employment fields without sensitive HR data
+ok 402 - v5.11.85 staff profile normalizes hospitality employment fields without sensitive HR data
+  ---
+  duration_ms: 1.197715
+  type: 'test'
+  ...
+# Subtest: v5.11.85 shift validation blocks overlapping shifts for the same staff/date
+ok 403 - v5.11.85 shift validation blocks overlapping shifts for the same staff/date
+  ---
+  duration_ms: 0.609078
+  type: 'test'
+  ...
+# Subtest: v5.11.85 time-off request validates an ordered date range
+ok 404 - v5.11.85 time-off request validates an ordered date range
+  ---
+  duration_ms: 0.325184
+  type: 'test'
+  ...
+# Subtest: v5.11.85 voice language fallback recognizes Thai without requiring an external model
+ok 405 - v5.11.85 voice language fallback recognizes Thai without requiring an external model
+  ---
+  duration_ms: 1.264099
+  type: 'test'
+  ...
+# Subtest: v5.11.85 voice language fallback recognizes German operational speech
+ok 406 - v5.11.85 voice language fallback recognizes German operational speech
+  ---
+  duration_ms: 0.404605
+  type: 'test'
+  ...
+1..406
+# tests 406
+# suites 0
+# pass 405
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 11966.836221

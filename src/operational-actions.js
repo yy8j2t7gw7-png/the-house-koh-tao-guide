@@ -54,6 +54,44 @@ function taskSummary(text, timing = "") {
   return when ? `${base} · Timing: ${when}` : base;
 }
 
+function bangkokDateParts(value = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Bangkok", year: "numeric", month: "2-digit", day: "2-digit"
+  }).formatToParts(value);
+  return Object.fromEntries(parts.map((part) => [part.type, part.value]));
+}
+
+function addBangkokDays(dateValue, days) {
+  const parts = bangkokDateParts(dateValue);
+  const anchor = new Date(`${parts.year}-${parts.month}-${parts.day}T12:00:00+07:00`);
+  anchor.setUTCDate(anchor.getUTCDate() + days);
+  const next = bangkokDateParts(anchor);
+  return `${next.year}-${next.month}-${next.day}`;
+}
+
+export function operationalDueAt(timing, nowValue = new Date().toISOString()) {
+  const raw = cleanText(timing, 180);
+  if (!raw) return "";
+  const source = raw.toLowerCase().replace(/\./g, "").replace(/\s+/g, " ").trim();
+  const now = new Date(nowValue);
+  const dayOffset = /\btomorrow\b/.test(source) ? 1 : /\btoday\b/.test(source) ? 0 : null;
+  if (dayOffset === null) return "";
+  const timeMatch = source.match(/\b(?:at\s*)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\b/);
+  if (!timeMatch) return "";
+  let hour = Number(timeMatch[1]);
+  const minute = Number(timeMatch[2] || 0);
+  const meridiem = timeMatch[3] || "";
+  if (minute > 59 || hour > 23) return "";
+  if (meridiem) {
+    if (hour < 1 || hour > 12) return "";
+    if (meridiem === "pm" && hour !== 12) hour += 12;
+    if (meridiem === "am" && hour === 12) hour = 0;
+  }
+  const date = addBangkokDays(now, dayOffset);
+  const iso = new Date(`${date}T${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}:00+07:00`);
+  return Number.isFinite(iso.getTime()) ? iso.toISOString() : "";
+}
+
 export async function createBookingOperationalTask({
   env,
   store,
@@ -63,6 +101,7 @@ export async function createBookingOperationalTask({
   timing = "",
   actorHash,
   actorLabel,
+  source = "booking_form",
   now = new Date().toISOString()
 }) {
   const id = cleanText(reservationId, 120);
@@ -101,13 +140,29 @@ export async function createBookingOperationalTask({
     now: new Date(now)
   });
   if (!alert) return { ok: false, error: "operational_alert_create_failed", activityId };
+  const taskId = `otask_${crypto.randomUUID()}`;
+  const taskCreated = typeof store.mobileCreateOperationalTask === "function"
+    ? await store.mobileCreateOperationalTask({
+        id: taskId, reservationId: id, room: reservation.room, category: normalizedCategory,
+        body: description, timing: cleanText(timing, 180), dueAt: operationalDueAt(timing, now),
+        assigneeKey: assignment.key, assigneeLabel: assignment.label, alertId: alert.id,
+        source: cleanText(source, 60) || "booking_form", sourceActivityId: activityId,
+        createdByHash: cleanText(actorHash, 120), createdByLabel: cleanText(actorLabel, 120) || "Team member",
+        createdAt: now
+      })
+    : { ok: true, id: taskId };
+  if (!taskCreated?.ok) return { ok: false, error: taskCreated?.error || "operational_task_store_failed", activityId, alertId: alert.id };
   const delivery = await dispatchConciergeAlert(alert, env).catch(() => ({ attempted: 0, accepted: 0 }));
   await store.mobileLinkReservationActivityAlert(activityId, alert.id, delivery, now);
+  if (typeof store.mobileUpdateOperationalTaskDelivery === "function") await store.mobileUpdateOperationalTaskDelivery(taskId, delivery, now);
   const activity = await store.mobileGetReservationActivity(activityId);
+  const task = typeof store.mobileGetOperationalTask === "function" ? await store.mobileGetOperationalTask(taskId) : null;
   return {
     ok: true,
     scope: "booking",
     reservation,
+    task,
+    taskId,
     activity,
     alertId: alert.id,
     delivery,
@@ -122,6 +177,9 @@ export async function createRoomOperationalTask({
   category,
   text,
   timing = "",
+  actorHash = "",
+  actorLabel = "Team member",
+  source = "copilot",
   now = new Date().toISOString()
 }) {
   const roomValue = cleanText(room, 24);
@@ -142,11 +200,27 @@ export async function createRoomOperationalTask({
     now: new Date(now)
   });
   if (!alert) return { ok: false, error: "operational_alert_create_failed" };
+  const taskId = `otask_${crypto.randomUUID()}`;
+  const taskCreated = typeof store.mobileCreateOperationalTask === "function"
+    ? await store.mobileCreateOperationalTask({
+        id: taskId, reservationId: "", room: roomValue, category: normalizedCategory,
+        body: description, timing: cleanText(timing, 180), dueAt: operationalDueAt(timing, now),
+        assigneeKey: assignment.key, assigneeLabel: assignment.label, alertId: alert.id,
+        source: cleanText(source, 60) || "copilot", sourceActivityId: "",
+        createdByHash: cleanText(actorHash, 120), createdByLabel: cleanText(actorLabel, 120) || "Team member",
+        createdAt: now
+      })
+    : { ok: true, id: taskId };
+  if (!taskCreated?.ok) return { ok: false, error: taskCreated?.error || "operational_task_store_failed", alertId: alert.id };
   const delivery = await dispatchConciergeAlert(alert, env).catch(() => ({ attempted: 0, accepted: 0 }));
+  if (typeof store.mobileUpdateOperationalTaskDelivery === "function") await store.mobileUpdateOperationalTaskDelivery(taskId, delivery, now);
+  const task = typeof store.mobileGetOperationalTask === "function" ? await store.mobileGetOperationalTask(taskId) : null;
   return {
     ok: true,
     scope: "room",
     room: roomValue,
+    task,
+    taskId,
     alertId: alert.id,
     delivery,
     assignment: { key: assignment.key, label: assignment.label, members: assignment.members || [] }

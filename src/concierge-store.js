@@ -431,6 +431,52 @@ export class ConciergeStore extends DurableObject {
         CREATE INDEX IF NOT EXISTS reservation_activity_alert
           ON reservation_activity(alert_id);
 
+        CREATE TABLE IF NOT EXISTS operational_tasks (
+          id TEXT PRIMARY KEY,
+          reservation_id TEXT NOT NULL DEFAULT '',
+          room TEXT NOT NULL DEFAULT '',
+          category TEXT NOT NULL DEFAULT 'General',
+          body TEXT NOT NULL,
+          timing TEXT NOT NULL DEFAULT '',
+          due_at TEXT NOT NULL DEFAULT '',
+          assignee_key TEXT NOT NULL DEFAULT '',
+          assignee_label TEXT NOT NULL DEFAULT '',
+          alert_id TEXT NOT NULL DEFAULT '',
+          source TEXT NOT NULL DEFAULT 'manual',
+          source_activity_id TEXT NOT NULL DEFAULT '',
+          status TEXT NOT NULL DEFAULT 'open',
+          delivery_attempted INTEGER NOT NULL DEFAULT 0,
+          delivery_accepted INTEGER NOT NULL DEFAULT 0,
+          created_by_hash TEXT NOT NULL DEFAULT '',
+          created_by_label TEXT NOT NULL DEFAULT '',
+          received_at TEXT NOT NULL DEFAULT '',
+          received_by_hash TEXT NOT NULL DEFAULT '',
+          resolved_at TEXT NOT NULL DEFAULT '',
+          resolved_by_hash TEXT NOT NULL DEFAULT '',
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS operational_tasks_status_due
+          ON operational_tasks(status, due_at, created_at);
+        CREATE INDEX IF NOT EXISTS operational_tasks_room
+          ON operational_tasks(room, status, created_at);
+        CREATE INDEX IF NOT EXISTS operational_tasks_reservation
+          ON operational_tasks(reservation_id, status, created_at);
+        CREATE UNIQUE INDEX IF NOT EXISTS operational_tasks_alert
+          ON operational_tasks(alert_id) WHERE alert_id <> '';
+
+        INSERT OR IGNORE INTO operational_tasks
+          (id, reservation_id, room, category, body, timing, due_at, assignee_key, assignee_label,
+           alert_id, source, source_activity_id, status, delivery_attempted, delivery_accepted,
+           created_by_hash, created_by_label, received_at, resolved_at, created_at, updated_at)
+        SELECT 'otask_' || ra.id, ra.reservation_id, COALESCE(r.room, ''), ra.category, ra.body, '', '',
+               ra.assignee_key, ra.assignee_label, ra.alert_id, 'booking_legacy', ra.id, ra.status,
+               ra.delivery_attempted, ra.delivery_accepted, '', ra.created_by_label, ra.received_at,
+               ra.resolved_at, ra.created_at, ra.updated_at
+        FROM reservation_activity ra
+        LEFT JOIN stay_reservations r ON r.id = ra.reservation_id
+        WHERE ra.kind = 'task' AND COALESCE(r.room, '') <> '';
+
         CREATE TABLE IF NOT EXISTS verified_stay_sessions (
           id TEXT PRIMARY KEY,
           token_hash TEXT NOT NULL UNIQUE,
@@ -2089,6 +2135,13 @@ export class ConciergeStore extends DurableObject {
        WHERE alert_id = ? AND kind = 'task' AND status = 'open'`,
       now, actor, now, alertId
     );
+    this.ctx.storage.sql.exec(
+      `UPDATE operational_tasks
+       SET status = 'received', received_at = CASE WHEN received_at = '' THEN ? ELSE received_at END,
+           received_by_hash = CASE WHEN received_by_hash = '' THEN ? ELSE received_by_hash END, updated_at = ?
+       WHERE alert_id = ? AND status = 'open'`,
+      now, actor, now, alertId
+    );
     return { ok: true };
   }
 
@@ -2122,6 +2175,13 @@ export class ConciergeStore extends DurableObject {
        SET status = 'resolved', resolved_at = CASE WHEN resolved_at = '' THEN ? ELSE resolved_at END,
            resolved_by_hash = CASE WHEN resolved_by_hash = '' THEN ? ELSE resolved_by_hash END, updated_at = ?
        WHERE alert_id = ? AND kind = 'task' AND status IN ('open', 'received')`,
+      now, actor, now, alertId
+    );
+    this.ctx.storage.sql.exec(
+      `UPDATE operational_tasks
+       SET status = 'resolved', resolved_at = CASE WHEN resolved_at = '' THEN ? ELSE resolved_at END,
+           resolved_by_hash = CASE WHEN resolved_by_hash = '' THEN ? ELSE resolved_by_hash END, updated_at = ?
+       WHERE alert_id = ? AND status IN ('open', 'received')`,
       now, actor, now, alertId
     );
     return { ok: true };
@@ -4055,6 +4115,76 @@ export class ConciergeStore extends DurableObject {
               created_at AS createdAt, updated_at AS updatedAt
        FROM reservation_activity WHERE id = ? LIMIT 1`,
       cleanText(activityId, 100)
+    ))[0] || null;
+  }
+
+  async mobileCreateOperationalTask(record) {
+    const id = cleanText(record.id, 100);
+    const room = cleanText(record.room, 24);
+    const body = cleanText(record.body, 1800);
+    const now = cleanText(record.createdAt, 40) || new Date().toISOString();
+    if (!id || !room || body.length < 2) return { ok: false, error: 'invalid_request' };
+    this.ctx.storage.sql.exec(
+      `INSERT INTO operational_tasks
+       (id, reservation_id, room, category, body, timing, due_at, assignee_key, assignee_label,
+        alert_id, source, source_activity_id, status, delivery_attempted, delivery_accepted,
+        created_by_hash, created_by_label, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'open', ?, ?, ?, ?, ?, ?)`,
+      id,
+      cleanText(record.reservationId, 100), room, cleanText(record.category, 60) || 'General', body,
+      cleanText(record.timing, 180), cleanText(record.dueAt, 40), cleanText(record.assigneeKey, 60),
+      cleanText(record.assigneeLabel, 120), cleanText(record.alertId, 100), cleanText(record.source, 60) || 'manual',
+      cleanText(record.sourceActivityId, 100), Math.max(0, Number(record.deliveryAttempted) || 0),
+      Math.max(0, Number(record.deliveryAccepted) || 0), cleanText(record.createdByHash, 100),
+      cleanText(record.createdByLabel, 120), now, now
+    );
+    return { ok: true, id };
+  }
+
+  async mobileUpdateOperationalTaskDelivery(taskId, delivery = {}, nowValue) {
+    const id = cleanText(taskId, 100);
+    const now = cleanText(nowValue, 40) || new Date().toISOString();
+    if (!id) return { ok: false, error: 'invalid_request' };
+    this.ctx.storage.sql.exec(
+      `UPDATE operational_tasks
+       SET delivery_attempted = ?, delivery_accepted = ?, updated_at = ?
+       WHERE id = ?`,
+      Math.max(0, Number(delivery.attempted) || 0), Math.max(0, Number(delivery.accepted) || 0), now, id
+    );
+    return { ok: true };
+  }
+
+  async mobileListOperationalTasks(limitValue = 250) {
+    const limit = Math.min(500, Math.max(1, Number(limitValue) || 250));
+    return rows(this.ctx.storage.sql.exec(
+      `SELECT id, reservation_id AS reservationId, room, category, body, timing, due_at AS dueAt,
+              assignee_key AS assigneeKey, assignee_label AS assigneeLabel, alert_id AS alertId,
+              source, source_activity_id AS sourceActivityId, status,
+              CASE WHEN alert_id <> '' THEN (SELECT COUNT(*) FROM concierge_alert_deliveries d WHERE d.alert_id = operational_tasks.alert_id) ELSE delivery_attempted END AS deliveryAttempted,
+              CASE WHEN alert_id <> '' THEN (SELECT COUNT(*) FROM concierge_alert_deliveries d WHERE d.alert_id = operational_tasks.alert_id AND d.status IN ('accepted','sent','delivered','read')) ELSE delivery_accepted END AS deliveryAccepted,
+              created_by_label AS createdByLabel, received_at AS receivedAt, resolved_at AS resolvedAt,
+              created_at AS createdAt, updated_at AS updatedAt
+       FROM operational_tasks
+       ORDER BY CASE WHEN status = 'resolved' THEN 1 ELSE 0 END ASC,
+                CASE WHEN due_at = '' THEN 1 ELSE 0 END ASC, due_at ASC, created_at DESC
+       LIMIT ?`, limit
+    )).map((item) => ({
+      ...item,
+      deliveryAttempted: Number(item.deliveryAttempted) || 0,
+      deliveryAccepted: Number(item.deliveryAccepted) || 0
+    }));
+  }
+
+  async mobileGetOperationalTask(taskId) {
+    return rows(this.ctx.storage.sql.exec(
+      `SELECT id, reservation_id AS reservationId, room, category, body, timing, due_at AS dueAt,
+              assignee_key AS assigneeKey, assignee_label AS assigneeLabel, alert_id AS alertId,
+              source, source_activity_id AS sourceActivityId, status,
+              CASE WHEN alert_id <> '' THEN (SELECT COUNT(*) FROM concierge_alert_deliveries d WHERE d.alert_id = operational_tasks.alert_id) ELSE delivery_attempted END AS deliveryAttempted,
+              CASE WHEN alert_id <> '' THEN (SELECT COUNT(*) FROM concierge_alert_deliveries d WHERE d.alert_id = operational_tasks.alert_id AND d.status IN ('accepted','sent','delivered','read')) ELSE delivery_accepted END AS deliveryAccepted,
+              created_by_label AS createdByLabel, received_at AS receivedAt, resolved_at AS resolvedAt,
+              created_at AS createdAt, updated_at AS updatedAt
+       FROM operational_tasks WHERE id = ? LIMIT 1`, cleanText(taskId, 100)
     ))[0] || null;
   }
 

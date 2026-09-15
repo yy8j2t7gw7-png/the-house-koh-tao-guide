@@ -7,6 +7,7 @@ function testHarness() {
   const alerts = [];
   const audits = [];
   const deliveries = [];
+  const operationalTasks = [];
   const reservations = [{
     id: "stay_6", room: "6", guestDisplayName: "Anna Example", guestFirstName: "Anna",
     checkInDate: "2026-09-15", checkOutDate: "2026-09-18", status: "confirmed"
@@ -18,6 +19,10 @@ function testHarness() {
     async getAdminOverview() { return { maintenanceReports: [], totals: { pendingRegistrations: 0 } }; },
     async getStayReservationById(id) { return reservations.find((item) => item.id === id) || null; },
     async mobileRecordAudit(record) { audits.push(record); return { ok: true }; },
+    async mobileCreateOperationalTask(record) { operationalTasks.push({ ...record, status: "open", deliveryAttempted: 0, deliveryAccepted: 0 }); return { ok: true, id: record.id }; },
+    async mobileUpdateOperationalTaskDelivery(id, delivery) { const task = operationalTasks.find((item) => item.id === id); if (task) { task.deliveryAttempted = Number(delivery.attempted) || 0; task.deliveryAccepted = Number(delivery.accepted) || 0; } return { ok: true }; },
+    async mobileListOperationalTasks() { return operationalTasks; },
+    async mobileGetOperationalTask(id) { return operationalTasks.find((item) => item.id === id) || null; },
     async createAlert(alert) { alerts.push(alert); return { created: true, alert }; },
     async recordAlertDelivery(record) { deliveries.push(record); return { ok: true }; },
     async recordWhatsAppDiagnostic() { return { ok: true }; }
@@ -42,7 +47,7 @@ function testHarness() {
     properties: [{ id: "property_test", displayName: "Test Hotel" }],
     now: "2026-09-15T08:30:00.000Z"
   };
-  return { store, env, access, alerts, audits, deliveries };
+  return { store, env, access, alerts, audits, deliveries, operationalTasks };
 }
 
 function post(body) {
@@ -92,7 +97,49 @@ test("Operations Copilot executes the exact signed proposal only after confirmat
   assert.equal(harness.alerts.length, 1);
   assert.equal(harness.alerts[0].room, "6");
   assert.match(harness.alerts[0].summary, /toilet is broken/i);
+  assert.equal(harness.operationalTasks.length, 1, "confirmed room task must persist in the shared task store");
+  assert.equal(harness.operationalTasks[0].room, "6");
+  assert.equal(confirmed.body.task.taskId, harness.operationalTasks[0].id);
   assert.ok(harness.audits.some((item) => item.action === "copilot_task_created"));
+});
+
+test("Operations Copilot answers the daily attention question deterministically", async () => {
+  const harness = testHarness();
+  harness.operationalTasks.push({ id: "otask_due", room: "6", category: "Maintenance", body: "Fix toilet", status: "open", dueAt: "2026-09-15T10:00:00.000Z" });
+  const outcome = await handleOperationsCopilot({
+    request: post({ message: "What needs my attention today?" }),
+    env: harness.env, store: harness.store, access: harness.access, actorHash: "actor_hash"
+  });
+  assert.equal(outcome.status, 200);
+  assert.equal(outcome.body.proposal, null);
+  assert.match(outcome.body.reply, /needs attention today/i);
+  assert.match(outcome.body.reply, /task/i);
+});
+
+test("Operations Copilot understands an ordinary room work instruction without the word task", async () => {
+  const harness = testHarness();
+  const outcome = await handleOperationsCopilot({
+    request: post({ message: "Room 6 needs the toilet fixed tomorrow 12 pm" }),
+    env: harness.env, store: harness.store, access: harness.access, actorHash: "actor_hash"
+  });
+  assert.equal(outcome.status, 200);
+  assert.equal(outcome.body.confirmationRequired, true);
+  assert.equal(outcome.body.proposal?.room, "6");
+  assert.equal(outcome.body.proposal?.category, "Maintenance");
+  assert.match(outcome.body.proposal?.timing || "", /tomorrow/i);
+});
+
+test("Operations Copilot may use validated booking screen context when the instruction is clearly contextual", async () => {
+  const harness = testHarness();
+  const outcome = await handleOperationsCopilot({
+    request: post({ message: "Bring two extra towels", context: { sourcePath: "/bookings/stay_6", reservationId: "stay_6" } }),
+    env: harness.env, store: harness.store, access: harness.access, actorHash: "actor_hash"
+  });
+  assert.equal(outcome.status, 200);
+  assert.equal(outcome.body.confirmationRequired, true);
+  assert.equal(outcome.body.proposal?.scope, "booking");
+  assert.equal(outcome.body.proposal?.reservationId, "stay_6");
+  assert.equal(outcome.body.proposal?.room, "6");
 });
 
 test("Operations Copilot refuses an unknown room instead of guessing", async () => {

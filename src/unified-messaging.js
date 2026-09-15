@@ -976,11 +976,26 @@ async function createReviewedOperationalTask({ env, store, thread, draft, actorL
     now: new Date(now)
   });
   if (!alert) return { required: true, error: "operational_alert_create_failed", activityId, delivery: { attempted: 0, accepted: 0 } };
+  const taskId = `otask_${crypto.randomUUID()}`;
+  if (typeof store.mobileCreateOperationalTask === "function") {
+    const taskCreated = await store.mobileCreateOperationalTask({
+      id: taskId, reservationId: thread.reservationId, room: thread.room, category,
+      body: cleanText(operation.summary || "Guest requested assistance.", 1800), timing: "", dueAt: "",
+      assigneeKey: cleanText(operation.recipientGroup, 80),
+      assigneeLabel: preview.members.join(" + ") || "Operational team", alertId: alert.id,
+      source: "unified_messaging_review", sourceActivityId: activityId,
+      createdByHash: "unified-messaging-ai-review", createdByLabel: cleanText(actorLabel, 100) || "AI review", createdAt: now
+    });
+    if (!taskCreated?.ok) return { required: true, error: taskCreated?.error || "operational_task_store_failed", activityId, alertId: alert.id, delivery: { attempted: 0, accepted: 0 } };
+  }
   const delivery = await dispatchConciergeAlert(alert, env).catch(() => ({ attempted: 0, accepted: 0 }));
   if (typeof store.mobileLinkReservationActivityAlert === "function") {
     await store.mobileLinkReservationActivityAlert(activityId, alert.id, delivery, now).catch(() => {});
   }
-  return { required: true, activityId, alertId: alert.id, delivery, members: preview.members };
+  if (typeof store.mobileUpdateOperationalTaskDelivery === "function") {
+    await store.mobileUpdateOperationalTaskDelivery(taskId, delivery, now).catch(() => {});
+  }
+  return { required: true, taskId, activityId, alertId: alert.id, delivery, members: preview.members };
 }
 
 async function sendReviewedGuestReply({ env, store, thread, text, now, automated = false }) {

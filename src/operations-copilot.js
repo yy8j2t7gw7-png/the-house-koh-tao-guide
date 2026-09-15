@@ -82,11 +82,14 @@ function bangkokDate(offsetDays = 0) {
 
 async function liveOperationalContext(store, access) {
   const canSeeInbox = access?.permissions?.has?.("messaging.view") === true;
-  const [operations, overview, threads] = await Promise.all([
+  const [operations, overview, threads, operationalTasks] = await Promise.all([
     store.getStayOperationsOverview().catch(() => ({ reservations: [], housekeepingStatuses: [], housekeepingTasks: [] })),
     store.getAdminOverview().catch(() => ({ maintenanceReports: [], totals: {} })),
     canSeeInbox && typeof store.listMessagingThreads === "function"
       ? store.listMessagingThreads(60).catch(() => [])
+      : Promise.resolve([]),
+    typeof store.mobileListOperationalTasks === "function"
+      ? store.mobileListOperationalTasks(200).catch(() => [])
       : Promise.resolve([])
   ]);
   const role = access?.record?.role || "staff";
@@ -120,6 +123,13 @@ async function liveOperationalContext(store, access) {
     unreadMessages: (threads || []).reduce((sum, item) => sum + (Number(item?.unreadCount) || 0), 0),
     needsHuman: (threads || []).filter((item) => item?.needsHuman).length
   } : null;
+  const openTasks = (operationalTasks || []).filter((item) => cleanText(item.status, 30) !== "resolved").slice(0, 80).map((item) => ({
+    id: cleanText(item.id, 120), reservationId: cleanText(item.reservationId, 120), room: cleanText(item.room, 30),
+    category: cleanText(item.category, 60), body: cleanText(item.body, 300), timing: cleanText(item.timing, 180),
+    dueAt: cleanText(item.dueAt, 40), status: cleanText(item.status, 30), assigneeLabel: cleanText(item.assigneeLabel, 120)
+  }));
+  const nowMs = Date.now();
+  const todayEndMs = Date.parse(`${today}T23:59:59+07:00`);
   const attention = {
     date: today,
     arrivalsToday: sourceReservations.filter((item) => cleanText(item.checkInDate, 20) === today).length,
@@ -130,6 +140,9 @@ async function liveOperationalContext(store, access) {
     pendingHousekeeping: pendingHousekeeping.length,
     openMaintenance: maintenance.length,
     urgentMaintenance: maintenance.filter((item) => ["critical", "urgent"].includes(item.severity)).length,
+    openTasks: openTasks.length,
+    overdueTasks: openTasks.filter((item) => item.dueAt && Date.parse(item.dueAt) < nowMs).length,
+    dueTodayTasks: openTasks.filter((item) => item.dueAt && Date.parse(item.dueAt) >= nowMs && Date.parse(item.dueAt) <= todayEndMs).length,
     pendingRegistrations: Number(overview?.totals?.pendingRegistrations) || 0,
     inbox
   };
@@ -143,11 +156,53 @@ async function liveOperationalContext(store, access) {
     roomStates,
     pendingHousekeeping,
     openMaintenance: maintenance,
+    openTasks,
     pendingRegistrationCount: attention.pendingRegistrations
   };
 }
 
-function systemInstructions({ access, workflows, live, canCreateTasks }) {
+function isAttentionSummaryIntent(message) {
+  const source = cleanText(message, MAX_MESSAGE).toLowerCase();
+  return /what(?:'s| is)?\s+needs?\s+(?:my\s+)?attention(?:\s+today)?/.test(source)
+    || /what\s+needs\s+my\s+attention/.test(source)
+    || /what\s+should\s+i\s+(?:handle|do|check)\s+today/.test(source)
+    || /today(?:'s)?\s+(?:attention|priorities|operations)/.test(source);
+}
+
+function attentionSummaryReply(live) {
+  const a = live?.attention || {};
+  const lines = [];
+  if (Array.isArray(a.dirtyRooms) && a.dirtyRooms.length) lines.push(`${a.dirtyRooms.length} room${a.dirtyRooms.length === 1 ? " is" : "s are"} not ready: ${a.dirtyRooms.map((room) => `Room ${room}`).join(", ")}.`);
+  if (Number(a.overdueTasks) > 0) lines.push(`${a.overdueTasks} operational task${a.overdueTasks === 1 ? " is" : "s are"} overdue.`);
+  if (Number(a.dueTodayTasks) > 0) lines.push(`${a.dueTodayTasks} task${a.dueTodayTasks === 1 ? " is" : "s are"} due later today.`);
+  if (Number(a.pendingHousekeeping) > 0) lines.push(`${a.pendingHousekeeping} housekeeping task${a.pendingHousekeeping === 1 ? " is" : "s are"} still open.`);
+  if (Number(a.openMaintenance) > 0) lines.push(`${a.openMaintenance} maintenance issue${a.openMaintenance === 1 ? " is" : "s are"} unresolved${Number(a.urgentMaintenance) > 0 ? `, including ${a.urgentMaintenance} urgent` : ""}.`);
+  if (Number(a.pendingRegistrations) > 0) lines.push(`${a.pendingRegistrations} guest registration check${a.pendingRegistrations === 1 ? " needs" : "s need"} attention.`);
+  if (a.inbox && Number(a.inbox.needsHuman) > 0) lines.push(`${a.inbox.needsHuman} guest conversation${a.inbox.needsHuman === 1 ? " needs" : "s need"} a person to review it.`);
+  else if (a.inbox && Number(a.inbox.unreadMessages) > 0) lines.push(`${a.inbox.unreadMessages} unread guest message${a.inbox.unreadMessages === 1 ? " is" : "s are"} waiting.`);
+  const arrivalLine = `${Number(a.arrivalsToday) || 0} arrival${Number(a.arrivalsToday) === 1 ? "" : "s"} and ${Number(a.departuresToday) || 0} departure${Number(a.departuresToday) === 1 ? "" : "s"} today.`;
+  if (!lines.length) return `Nothing urgent is showing right now. You have ${arrivalLine}`;
+  return `Here’s what needs attention today:\n• ${lines.join("\n• ")}\n\nFor context: ${arrivalLine}`;
+}
+
+async function safeUiContext(rawContext, store, access) {
+  if (!rawContext || typeof rawContext !== "object" || Array.isArray(rawContext)) return null;
+  const sourcePath = cleanText(rawContext.sourcePath, 180);
+  const reservationId = cleanText(rawContext.reservationId, 120);
+  if (!reservationId) return sourcePath ? { sourcePath } : null;
+  const reservation = await store.getStayReservationById(reservationId).catch(() => null);
+  if (!reservation) return sourcePath ? { sourcePath } : null;
+  return {
+    sourcePath,
+    reservationId: cleanText(reservation.id, 120),
+    room: cleanText(reservation.room, 30),
+    guestName: roleGuestName(reservation, access?.record?.role || "staff"),
+    checkInDate: cleanText(reservation.checkInDate, 20),
+    checkOutDate: cleanText(reservation.checkOutDate, 20)
+  };
+}
+
+function systemInstructions({ access, workflows, live, canCreateTasks, uiContext }) {
   return `You are Taoedge AI Support, a private hotel-operations assistant for owners, managers and staff.
 
 YOUR JOB
@@ -186,10 +241,15 @@ ${JSON.stringify(workflows)}
 LIVE PROPERTY CONTEXT (only data this user is permitted to use):
 ${JSON.stringify(live)}
 
+CURRENT APP SCREEN CONTEXT (a validated convenience hint, never a reason to override an explicit room/booking in the user's message):
+${JSON.stringify(uiContext || null)}
+
+If CURRENT APP SCREEN CONTEXT contains a reservationId and the user asks to do something for "this guest", "this booking", "this room", or gives an instruction that is clearly about the booking currently being viewed, you may use that exact reservationId. If the user explicitly names a different room or booking, the explicit instruction wins.
+
 Return only the structured JSON required by the schema.`;
 }
 
-async function callCopilotAI({ env, message, history, access, workflows, live, canCreateTasks }) {
+async function callCopilotAI({ env, message, history, access, workflows, live, canCreateTasks, uiContext }) {
   if (!env.OPENAI_API_KEY) throw new Error("ai_not_configured");
   const response = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
@@ -197,7 +257,7 @@ async function callCopilotAI({ env, message, history, access, workflows, live, c
     body: JSON.stringify({
       model: env.OPENAI_COPILOT_MODEL || env.OPENAI_MODEL || "gpt-5.6",
       store: false,
-      instructions: systemInstructions({ access, workflows, live, canCreateTasks }),
+      instructions: systemInstructions({ access, workflows, live, canCreateTasks, uiContext }),
       input: [...safeHistory(history), { role: "user", content: message }],
       reasoning: { effort: env.OPENAI_COPILOT_REASONING_EFFORT || "medium" },
       max_output_tokens: 1800,
@@ -220,27 +280,38 @@ function categoryFromMessage(message) {
   return "General";
 }
 
-function deterministicFallback(message, workflows, live, canCreateTasks) {
+function deterministicFallback(message, workflows, live, canCreateTasks, uiContext) {
   const source = cleanText(message, MAX_MESSAGE);
-  const taskIntent = /\b(create|add|assign|tell|notify|make|report|send)\b/i.test(source) && /\b(task|staff|maintenance|housekeeping|team|room)\b/i.test(source);
   const roomMatch = source.match(/\broom\s*#?\s*([a-z0-9-]{1,20})\b/i);
+  const explicitTaskIntent = /\b(create|add|assign|tell|notify|make|report|send)\b/i.test(source) && /\b(task|staff|maintenance|housekeeping|team|room)\b/i.test(source);
+  const implicitRoomWork = Boolean(roomMatch) && /\b(needs?|need|broken|leak(?:ing)?|fix(?:ed)?|repair|clean(?:ed|ing)?|bring|replace|check|blocked|clogged|drip(?:ping)?)\b/i.test(source);
+  const contextualWork = Boolean(uiContext?.reservationId) && /\b(needs?|need|broken|leak(?:ing)?|fix(?:ed)?|repair|clean(?:ed|ing)?|bring|replace|check|blocked|clogged|drip(?:ping)?|extra|send)\b/i.test(source);
+  const taskIntent = explicitTaskIntent || implicitRoomWork || contextualWork;
   if (taskIntent && canCreateTasks) {
-    if (!roomMatch) return {
+    if (!roomMatch && !uiContext?.reservationId) return {
       reply: "Which room or booking should I attach this task to?",
       matched_workflow_ids: ["booking_tasks"],
       action: { type: "create_task", status: "needs_clarification", scope: "none", reservation_id: "", room: "", category: categoryFromMessage(source), description: "", timing: "", clarification_question: "Which room or booking should I attach this task to?" }
     };
     const category = categoryFromMessage(source);
-    const description = cleanText(source.replace(/\b(create|add|assign|tell|notify|make|report|send)\b/ig, "").replace(/\b(task|staff|team)\b/ig, ""), 700);
+    const timingMatch = source.match(/\b(?:today|tomorrow)(?:\s+(?:at\s*)?\d{1,2}(?::\d{2})?\s*(?:am|pm)?)?\b/i);
+    const timing = cleanText(timingMatch?.[0] || "", 180);
+    const description = cleanText(source
+      .replace(/\b(create|add|assign|tell|notify|make|report|send)\b/ig, "")
+      .replace(/\b(task|staff|team)\b/ig, "")
+      .replace(timingMatch?.[0] || "", ""), 700);
+    const targetRoom = roomMatch?.[1] || cleanText(uiContext?.room, 24);
+    const targetReservationId = !roomMatch ? cleanText(uiContext?.reservationId, 120) : "";
+    const targetScope = targetReservationId ? "booking" : "room";
     if (description.length < 8) return {
-      reply: `What should ${category === "Maintenance" ? "maintenance" : "the team"} do in Room ${roomMatch[1]}?`,
+      reply: `What should ${category === "Maintenance" ? "maintenance" : "the team"} do${targetRoom ? ` in Room ${targetRoom}` : ""}?`,
       matched_workflow_ids: ["booking_tasks"],
-      action: { type: "create_task", status: "needs_clarification", scope: "room", reservation_id: "", room: roomMatch[1], category, description: "", timing: "", clarification_question: `What should the team do in Room ${roomMatch[1]}?` }
+      action: { type: "create_task", status: "needs_clarification", scope: targetScope, reservation_id: targetReservationId, room: targetRoom, category, description: "", timing: "", clarification_question: `What should the team do${targetRoom ? ` in Room ${targetRoom}` : ""}?` }
     };
     return {
-      reply: `I can prepare a ${category} task for Room ${roomMatch[1]}. Please review it before I create the alert.`,
+      reply: `I can prepare a ${category} task${targetRoom ? ` for Room ${targetRoom}` : ""}. Please review it before I create the alert.`,
       matched_workflow_ids: ["booking_tasks"],
-      action: { type: "create_task", status: "proposed", scope: "room", reservation_id: "", room: roomMatch[1], category, description, timing: "", clarification_question: "" }
+      action: { type: "create_task", status: "proposed", scope: targetScope, reservation_id: targetReservationId, room: targetRoom, category, description, timing, clarification_question: "" }
     };
   }
   const workflow = workflows[0];
@@ -380,6 +451,7 @@ export async function handleOperationsCopilot({ request, env, store, access, act
       timing: proposal.timing,
       actorHash,
       actorLabel: access.record.displayName,
+      source: "copilot",
       now: access.now
     };
     const outcome = proposal.scope === "booking"
@@ -416,6 +488,7 @@ export async function handleOperationsCopilot({ request, env, store, access, act
           category: proposal.category,
           description: proposal.description,
           timing: proposal.timing,
+          taskId: outcome?.taskId || outcome?.task?.id || "",
           activityId: outcome?.activity?.id || "",
           alertId: outcome?.alertId || "",
           recipients,
@@ -432,11 +505,26 @@ export async function handleOperationsCopilot({ request, env, store, access, act
   if (message.length < 2) return { status: 400, body: { error: "message_required" } };
   const workflows = relevantWorkflows(message, 8);
   const live = await liveOperationalContext(store, access);
+  const uiContext = await safeUiContext(body?.context, store, access);
+  if (isAttentionSummaryIntent(message)) {
+    return {
+      status: 200,
+      body: {
+        ok: true,
+        registryVersion: COPILOT_REGISTRY_VERSION,
+        reply: attentionSummaryReply(live),
+        matchedWorkflowIds: ["support_chat", "housekeeping", "maintenance", "guest_messaging"],
+        proposal: null,
+        confirmationRequired: false,
+        attention: live.attention
+      }
+    };
+  }
   let raw;
   try {
-    raw = await callCopilotAI({ env, message, history: body?.history, access, workflows, live, canCreateTasks });
+    raw = await callCopilotAI({ env, message, history: body?.history, access, workflows, live, canCreateTasks, uiContext });
   } catch (_error) {
-    raw = deterministicFallback(message, workflows, live, canCreateTasks);
+    raw = deterministicFallback(message, workflows, live, canCreateTasks, uiContext);
   }
   const result = normalizedModelResult(raw);
   if (!canCreateTasks && result.action.type === "create_task") {

@@ -1572,7 +1572,7 @@ async function handleProtected(request, env, path, store, handlers = {}) {
     const actorHash = await sha256(`mobile:${record.userId}:${record.membershipId}`);
     if (kind === "task") {
       const outcome = await createBookingOperationalTask({
-        env, store, reservationId, category, text, actorHash, actorLabel: record.displayName, now: access.now
+        env, store, reservationId, category, text, actorHash, actorLabel: record.displayName, source: "booking_form", now: access.now
       });
       if (!outcome?.ok) return json({ error: outcome?.error || "activity_create_failed" }, outcome?.error === "task_assignee_unavailable" ? 409 : 400);
       await store.mobileRecordAudit({
@@ -2013,17 +2013,47 @@ async function handleProtected(request, env, path, store, handlers = {}) {
   if (path === `${MOBILE_API_PREFIX}/operations` && request.method === "GET") {
     const denied = requireCapability(publicAccess, "operations.view", "core");
     if (denied) return denied;
-    const [operations, overview] = await Promise.all([store.getStayOperationsOverview(), store.getAdminOverview()]);
+    const [operations, overview, operationalTasks] = await Promise.all([
+      store.getStayOperationsOverview(),
+      store.getAdminOverview(),
+      typeof store.mobileListOperationalTasks === "function" ? store.mobileListOperationalTasks(300) : Promise.resolve([])
+    ]);
     const departureFrom = bangkokDate(0);
     const departureTo = bangkokDate(1);
     const departurePlans = (operations.reservations || [])
       .filter((item) => item.checkOutDate >= departureFrom && item.checkOutDate <= departureTo)
       .map((item) => publicReservation(item, record.role));
+    const reservationById = new Map((operations.reservations || []).map((item) => [String(item.id || ""), item]));
+    const tasks = (operationalTasks || []).map((item) => {
+      const reservation = item.reservationId ? reservationById.get(String(item.reservationId)) : null;
+      return {
+        id: item.id,
+        reservationId: item.reservationId || "",
+        room: item.room || "",
+        category: item.category || "General",
+        body: item.body || "",
+        timing: item.timing || "",
+        dueAt: item.dueAt || "",
+        assigneeLabel: item.assigneeLabel || "Operational team",
+        alertId: item.alertId || "",
+        source: item.source || "manual",
+        status: item.status || "open",
+        deliveryAttempted: Number(item.deliveryAttempted) || 0,
+        deliveryAccepted: Number(item.deliveryAccepted) || 0,
+        createdByLabel: item.createdByLabel || "Team member",
+        guestName: reservation ? reservationGuestDisplayName(reservation, record.role) : "",
+        receivedAt: item.receivedAt || "",
+        resolvedAt: item.resolvedAt || "",
+        createdAt: item.createdAt || "",
+        updatedAt: item.updatedAt || ""
+      };
+    });
     return json({
       ok: true,
       housekeepingStatuses: operations.housekeepingStatuses || [],
       housekeepingTasks: operations.housekeepingTasks || [],
       departurePlans,
+      tasks,
       maintenance: (overview.maintenanceReports || []).map((item) => ({
         id: item.id, room: item.room, issueType: item.issueType, severity: item.severity, details: item.details,
         status: item.status, hasPhoto: Boolean(item.hasPhoto), createdAt: item.createdAt, resolvedAt: item.resolvedAt || ""
@@ -2033,6 +2063,29 @@ async function handleProtected(request, env, path, store, handlers = {}) {
         rooms: (overview.pendingRegistrations || []).map((item) => ({ room: item.room, documentType: item.documentType, arrivalAt: item.arrivalAt, reminderSent: Boolean(item.reminderSentAt) }))
       }
     });
+  }
+
+  if (path === `${MOBILE_API_PREFIX}/operations/tasks/status` && request.method === "POST") {
+    const denied = requireCapability(publicAccess, "booking_activity.update", "core");
+    if (denied) return denied;
+    let body; try { body = await readJson(request); } catch (response) { return response; }
+    const id = cleanText(body?.id, 100);
+    const status = body?.status === "resolved" ? "resolved" : body?.status === "received" ? "received" : "";
+    if (!id || !status || typeof store.mobileGetOperationalTask !== "function") return json({ error: "invalid_request" }, 400);
+    const task = await store.mobileGetOperationalTask(id);
+    if (!task) return json({ error: "task_not_found" }, 404);
+    if (task.status === "resolved") return json({ ok: true, task });
+    if (!task.alertId) return json({ error: "task_alert_missing" }, 409);
+    const actorHash = await sha256(`mobile:${record.userId}:${record.membershipId}`);
+    if (status === "received") await store.acknowledgeAlert(task.alertId, actorHash, access.now);
+    else await store.resolveAlert(task.alertId, actorHash, access.now);
+    const updated = await store.mobileGetOperationalTask(id);
+    await store.mobileRecordAudit({
+      tenantId: record.tenantId, userId: record.userId, membershipId: record.membershipId,
+      action: status === "received" ? "operational_task_received" : "operational_task_resolved",
+      reference: `task:${id}`, metadata: { room: task.room || "", reservationId: task.reservationId || "", category: task.category || "" }, createdAt: access.now
+    });
+    return json({ ok: true, task: updated });
   }
 
   if (path === `${MOBILE_API_PREFIX}/operations/housekeeping` && request.method === "POST") {
@@ -2282,7 +2335,7 @@ async function handleProtected(request, env, path, store, handlers = {}) {
       messaging: messagingAllowed ? unifiedMessagingConfiguration(env) : undefined,
       financeAutomation: financeAllowed ? beds24FinanceSyncConfiguration(env) : undefined,
       connectionHealth,
-      apiContract: { backendVersion: "5.11.80", mobileApiVersion: "v1", listingsRatesRoute: `${MOBILE_API_PREFIX}/listings-rates`, directStayOperations: true },
+      apiContract: { backendVersion: "5.11.81", mobileApiVersion: "v1", listingsRatesRoute: `${MOBILE_API_PREFIX}/listings-rates`, directStayOperations: true },
       product: {
         workingName: "Taoedge Owner App",
         commercialBrandPending: true,

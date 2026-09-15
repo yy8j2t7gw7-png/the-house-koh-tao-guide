@@ -1,3 +1,14 @@
+# Changelog
+
+## v5.11.79 — Guest Messaging Review Safety & Information Routing
+
+- Fix Wi-Fi information requests being misclassified as Maintenance in Unified Messaging.
+- Preserve approved guest-shareable Wi-Fi credentials through auto-language sanitization without weakening generic privacy redaction.
+- Separate guest-reply approval from operational-task approval.
+- Add `approve_no_send` with zero external side effects.
+- Require explicit create/skip task decisions and fresh task confirmation after reply edits.
+- Block automated execution of proposed operational actions without human review.
+
 # v5.11.78 — Production Readiness & Guest Communication Hardening
 
 - Recognize guest statements that a passport image was attached/uploaded/sent in OTA or WhatsApp chat before generic AI handling.

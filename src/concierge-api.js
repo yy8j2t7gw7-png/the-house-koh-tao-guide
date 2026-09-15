@@ -656,14 +656,22 @@ function wifiPasswordKnowledgeResult(question, knowledge) {
   if (!isWifiPasswordInformationRequest(question)) return null;
   const intent = (knowledge?.intents || []).find((entry) => entry?.id === "wifi");
   if (!intent?.answer) return null;
-  return deterministicResult({
-    matched: true,
+  // Wi-Fi credentials are approved guest-shareable information for an authorized stay.
+  // A route action attached to the broader Wi-Fi knowledge entry must not turn a simple
+  // password question into a human handoff or an operational task.
+  return {
+    answer: intent.answer,
     intentId: intent.id,
     category: intent.category || "room",
     confidence: 1,
-    answer: intent.answer,
-    actions: intent.actions || []
-  }, "approved");
+    needsHuman: false,
+    handoff: "none",
+    learningGap: false,
+    learningReason: "none",
+    actions: [],
+    suppressDefaultActions: true,
+    source: "approved"
+  };
 }
 
 function isIndependentCurrentTurnInformation(question) {
@@ -3624,13 +3632,21 @@ async function interactionRecord({ env, store, interactionId, sessionId, room, q
 
 function trustedMessagingOperationProposal(result, question, room, now = new Date()) {
   if (!result?.needsHuman) return null;
+  // Human review is not itself permission to create an operational task. Informational
+  // detours (especially Wi-Fi credentials) must remain side-effect free.
+  if (isIndependentCurrentTurnInformation(question)
+    || (result.intentId === "wifi" && isWifiPasswordInformationRequest(question))) return null;
   const normalized = normalizeText(question);
-  const maintenanceLanguage = /(?:leak|broken|not working|clog|blocked|overflow|no water|no hot water|no power|no electricity|wifi|air con|aircon|ac |kaputt|defekt|tropf|verstopf|kein wasser|kein warmwasser|strom|klimaanlage|fuite|cassé|bloqué|sin agua|roto|atascado)/i.test(normalized);
-  const housekeepingLanguage = /(?:toilet paper|towel|soap|clean|cleaning|trash|rubbish|garbage|bin|toilettenpapier|handtuch|seife|reinig|müll|mull|papier|serviette|nettoy|poubelle|papel higiénico|toalla|limpi|basura)/i.test(normalized);
+  const maintenanceLanguage = /(?:leak|broken|not working|doesn t work|isn t working|clog|blocked|overflow|no water|no hot water|no power|no electricity|no wifi|wifi.{0,30}(?:not working|doesn t work|down|broken)|internet.{0,30}(?:not working|doesn t work|down|broken)|kaputt|defekt|tropf|verstopf|kein wasser|kein warmwasser|kein wlan|wlan.{0,30}(?:kaputt|geht nicht|funktioniert nicht)|klimaanlage.{0,30}(?:kaputt|geht nicht|funktioniert nicht)|fuite|cassé|bloqué|sin agua|roto|atascado)/i.test(normalized);
+  const housekeepingLanguage = /(?:need|please|bring|replace|change|send|request|want|would like|missing|no).{0,45}(?:toilet paper|towel|soap|cleaning|trash|rubbish|garbage|bin)|(?:toilettenpapier|handtuch|seife|müll|mull).{0,45}(?:bitte|brauch|fehlt|bringen|wechsel)|(?:serviette|papier|poubelle).{0,45}(?:s il vous plaît|besoin|manque|apporter|changer)|(?:papel higiénico|toalla|basura).{0,45}(?:por favor|necesito|falta|traer|cambiar)/i.test(normalized);
   const structuredCategory = String(result.operationalCategory || "");
-  const isBooking = structuredCategory === "reservations" || result.handoff === "booking";
+  const isBooking = structuredCategory === "reservations" || Boolean(result.bookingRequest) || result.handoff === "booking";
   const isMaintenance = !isBooking && (structuredCategory === "maintenance" || Boolean(result.propertyIssueRequest) || maintenanceLanguage);
   const isHousekeeping = !isBooking && !isMaintenance && (structuredCategory === "housekeeping" || Boolean(result.housekeepingRequest) || housekeepingLanguage);
+  const hasStructuredOperationalIntent = ["housekeeping", "maintenance", "guest_support", "reservations", "urgent", "lost_key"].includes(structuredCategory)
+    || Boolean(result.propertyIssueRequest || result.housekeepingRequest || result.bookingRequest || result.staySupportRequest)
+    || isMaintenance || isHousekeeping || isBooking;
+  if (!hasStructuredOperationalIntent) return null;
   const routeCategory = structuredCategory === "urgent"
     ? "urgent"
     : structuredCategory === "lost_key"
@@ -3994,10 +4010,26 @@ async function handleExplicitBookingRetry({
   });
 }
 
-async function translateApprovedReplyToCurrentMessageLanguage(env, question, answer) {
-  const source = sanitizeQuestion(answer, 1800);
+function protectGuestShareableNumericSecrets(value) {
+  const secrets = [];
+  const words = ["ALPHA", "BRAVO", "CHARLIE", "DELTA", "ECHO", "FOXTROT"];
+  const protectedText = String(value || "").replace(/\b\d{6,}\b/g, (secret) => {
+    const index = secrets.length;
+    if (index >= words.length) return secret;
+    secrets.push(secret);
+    return `TAOEDGEWIFISECRET${words[index]}TOKEN`;
+  });
+  return {
+    text: protectedText,
+    restore: (input) => secrets.reduce((output, secret, index) => output.replaceAll(`TAOEDGEWIFISECRET${words[index]}TOKEN`, secret), String(input || ""))
+  };
+}
+
+async function translateApprovedReplyToCurrentMessageLanguage(env, question, answer, { preserveGuestShareableNumbers = false } = {}) {
+  const protectedAnswer = preserveGuestShareableNumbers ? protectGuestShareableNumericSecrets(answer) : { text: answer, restore: (value) => value };
+  const source = sanitizeQuestion(protectedAnswer.text, 1800);
   const guestMessage = sanitizeQuestion(question, MAX_QUESTION_LENGTH);
-  if (!source || !guestMessage || !env.OPENAI_API_KEY) return source;
+  if (!source || !guestMessage || !env.OPENAI_API_KEY) return protectedAnswer.restore(source);
   const response = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
     headers: {
@@ -4013,9 +4045,9 @@ async function translateApprovedReplyToCurrentMessageLanguage(env, question, ans
       max_output_tokens: 2200
     })
   });
-  if (!response.ok) return source;
+  if (!response.ok) return protectedAnswer.restore(source);
   const translated = sanitizeQuestion(extractOutputText(await response.json()), 1800);
-  return translated || source;
+  return protectedAnswer.restore(translated || source);
 }
 
 export async function handleConciergeRequest(request, env, ctx, now = new Date()) {
@@ -4581,7 +4613,9 @@ export async function handleConciergeRequest(request, env, ctx, now = new Date()
   if (language === "auto" && result.source !== "ai") {
     result = {
       ...result,
-      answer: await translateApprovedReplyToCurrentMessageLanguage(env, question, result.answer).catch(() => result.answer)
+      answer: await translateApprovedReplyToCurrentMessageLanguage(env, question, result.answer, {
+        preserveGuestShareableNumbers: result.intentId === "wifi" && isWifiPasswordInformationRequest(question)
+      }).catch(() => result.answer)
     };
   } else if (language !== "en" && result.source !== "ai") {
     try {

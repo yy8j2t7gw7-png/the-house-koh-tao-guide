@@ -1,4 +1,8 @@
-# Guest Guide Platform with AI Concierge — The House v5.11.78
+# Guest Guide Platform with AI Concierge — The House v5.11.79
+
+## v5.11.79 — AI Review Safety & Wi-Fi Information Routing
+
+v5.11.79 fixes the real Room 4 Wi-Fi production incident, keeps authorized Wi-Fi credentials visible to the linked guest, separates informational questions from operational task creation, adds side-effect-free AI draft approval, and requires an explicit independent owner decision before any reviewed AI draft may create a task/WhatsApp alert. Pair with Taoedge Owner App v0.1.22.
 
 ## v5.11.78 — Production Readiness & Guest Communication Hardening
 

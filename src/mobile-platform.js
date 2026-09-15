@@ -1742,7 +1742,7 @@ async function handleProtected(request, env, path, store, handlers = {}) {
     const denied = requireCapability(publicAccess, "messaging.ai_control", "unified_messaging");
     if (denied) return denied;
     let body; try { body = await readJson(request); } catch (response) { return response; }
-    const action = ["approve", "reject", "regenerate"].includes(String(body?.action || "")) ? String(body.action) : "";
+    const action = ["approve", "approve_no_send", "reject", "regenerate"].includes(String(body?.action || "")) ? String(body.action) : "";
     if (!action) return json({ error: "invalid_review_action" }, 400);
     if (action === "approve") {
       const sendDenied = requireCapability(publicAccess, "messaging.send", "unified_messaging");
@@ -1753,6 +1753,7 @@ async function handleProtected(request, env, path, store, handlers = {}) {
     if (!threadId || !draftId) return json({ error: "invalid_request" }, 400);
     const outcome = await reviewMessagingDraft({
       env, store, threadId, draftId, action, message: cleanText(body?.message, 4000),
+      operationDecision: cleanText(body?.operationDecision, 24),
       generateReply: handlers.generateReply, actorLabel: record.displayName
     });
     const status = outcome?.ok ? 200 : outcome?.error === "draft_not_found" ? 404
@@ -1761,8 +1762,8 @@ async function handleProtected(request, env, path, store, handlers = {}) {
     if (outcome?.ok) {
       await store.mobileRecordAudit({
         tenantId: record.tenantId, userId: record.userId, membershipId: record.membershipId,
-        action: `ai_draft_${action === "approve" ? "approved" : action === "reject" ? "rejected" : "regenerated"}`,
-        reference: `thread:${threadId}`, metadata: { draftId, activityId: outcome?.operation?.activityId || "" }, createdAt: access.now
+        action: `ai_draft_${action === "approve" ? "approved" : action === "approve_no_send" ? "approved_no_send" : action === "reject" ? "rejected" : "regenerated"}`,
+        reference: `thread:${threadId}`, metadata: { draftId, activityId: outcome?.operation?.activityId || "", operationDecision: cleanText(body?.operationDecision, 24) }, createdAt: access.now
       });
     }
     return json(outcome || { error: "draft_review_failed" }, status);
@@ -2298,7 +2299,7 @@ async function handleProtected(request, env, path, store, handlers = {}) {
       messaging: messagingAllowed ? unifiedMessagingConfiguration(env) : undefined,
       financeAutomation: financeAllowed ? beds24FinanceSyncConfiguration(env) : undefined,
       connectionHealth,
-      apiContract: { backendVersion: "5.11.78", mobileApiVersion: "v1", listingsRatesRoute: `${MOBILE_API_PREFIX}/listings-rates`, directStayOperations: true },
+      apiContract: { backendVersion: "5.11.79", mobileApiVersion: "v1", listingsRatesRoute: `${MOBILE_API_PREFIX}/listings-rates`, directStayOperations: true },
       product: {
         workingName: "Taoedge Owner App",
         commercialBrandPending: true,

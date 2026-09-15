@@ -58,7 +58,8 @@ import {
   detectGuestMessageLanguage,
   detectExternalPassportSubmission,
   roomForBeds24Booking,
-  unifiedMessagingConfiguration
+  unifiedMessagingConfiguration,
+  reviewMessagingDraft
 } from "../src/unified-messaging.js";
 import {
   beds24AvailabilityAllowsStay,
@@ -14896,7 +14897,7 @@ test("v5.11.67 mobile AI review exposes approve reject regenerate and server-rou
   assert.doesNotMatch(mobileSource, /operationalTaskAssignment\(env, body\?\.assigneeKey\)/);
   assert.match(messagingSource, /action === "reject"/);
   assert.match(messagingSource, /action === "regenerate"/);
-  assert.match(messagingSource, /action !== "approve"/);
+  assert.match(messagingSource, /\["approve", "approve_no_send"\]\.includes\(action\)/);
   assert.match(messagingSource, /createReviewedOperationalTask/);
   assert.match(routingSource, /turnover.*recipientGroup: "support"/s);
   assert.match(routingSource, /room_ready.*recipientGroup: "owners"/s);
@@ -15641,7 +15642,7 @@ test("v5.11.77 Listings & Rates mobile route contract is explicit, aliased and t
   const source = await readFile(new URL("../src/mobile-platform.js", import.meta.url), "utf8");
   assert.ok(source.includes('[`${MOBILE_API_PREFIX}/listings-rates`, `${MOBILE_API_PREFIX}/listings`].includes(path)'));
   assert.ok(source.includes('path.replace(/\\/+$/, "")'));
-  assert.match(source, /backendVersion: "5\.11\.78"/);
+  assert.match(source, /backendVersion: "5\.11\.79"/);
   assert.match(source, /listingsRatesRoute: `\$\{MOBILE_API_PREFIX\}\/listings-rates`/);
   assert.match(source, /direct-stays\/update/);
   assert.match(source, /direct-stays\/cancel/);
@@ -15759,4 +15760,118 @@ test("v5.11.77 direct synchronization retries run on the minute while full Chann
   assert.match(storeSource, /CREATE TABLE IF NOT EXISTS reservation_distribution_events/);
   assert.match(storeSource, /recordReservationDistributionEvent/);
   assert.match(storeSource, /listReservationDistributionEvents/);
+});
+
+
+test("v5.11.79 authorized Wi-Fi password stays visible and informational provider messages create no operation", async () => {
+  const { env, store } = createEnvironment({
+    OPENAI_API_KEY: "test-key",
+    UNIFIED_MESSAGING_INTERNAL_TOKEN: "unified_internal_test_token",
+    WHATSAPP_ALERT_RECIPIENTS: JSON.stringify({
+      support: [{ label: "Su", phone: "+66 64 000 0004" }],
+      emergency: [
+        { label: "Owner 1", phone: "+66 81 000 0002" },
+        { label: "Owner 2", phone: "+66 82 000 0003" }
+      ]
+    })
+  });
+  store.stayReservations.push({
+    id: "stay_wifi_review_001", room: "4", status: "confirmed", provider: "airbnb", guestFirstName: "Guest",
+    checkInDate: "2026-09-14", checkOutDate: "2026-09-17"
+  });
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (_url, options = {}) => {
+    const body = JSON.parse(options.body || "{}");
+    const input = JSON.parse(body?.input?.[0]?.content || "{}");
+    return new Response(JSON.stringify({
+      output: [{ type: "message", content: [{ type: "output_text", text: String(input.approvedReply || "") }] }]
+    }), { status: 200, headers: { "content-type": "application/json" } });
+  };
+  try {
+    const result = await generateUnifiedMessageReply({
+      question: "What's the WiFi password .",
+      reservationId: "stay_wifi_review_001",
+      room: "4",
+      language: "auto",
+      history: []
+    }, env, undefined, new Date("2026-09-15T01:43:00.000Z"));
+    assert.match(result.answer, /123456789!/);
+    assert.doesNotMatch(result.answer, /\[number removed\]/i);
+    assert.equal(result.needsHuman, false);
+    assert.equal(result.operationProposal, null);
+    assert.equal(store.alerts.length, 0);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("v5.11.79 genuine Wi-Fi fault remains actionable maintenance while password question does not", async () => {
+  const { env, store } = createEnvironment({
+    UNIFIED_MESSAGING_INTERNAL_TOKEN: "unified_internal_test_token",
+    WHATSAPP_ALERT_RECIPIENTS: JSON.stringify({
+      support: [{ label: "Su", phone: "+66 64 000 0004" }],
+      emergency: [
+        { label: "Owner 1", phone: "+66 81 000 0002" },
+        { label: "Owner 2", phone: "+66 82 000 0003" }
+      ]
+    })
+  });
+  store.stayReservations.push({
+    id: "stay_wifi_fault_001", room: "4", status: "confirmed", provider: "airbnb", guestFirstName: "Guest",
+    checkInDate: "2026-09-14", checkOutDate: "2026-09-17"
+  });
+  const fault = await generateUnifiedMessageReply({
+    question: "The WiFi is not working in room 4.",
+    reservationId: "stay_wifi_fault_001",
+    room: "4",
+    language: "en",
+    history: []
+  }, env, undefined, new Date("2026-09-15T01:45:00.000Z"));
+  assert.equal(fault.operationProposal?.taskCategory, "Maintenance");
+  assert.equal(fault.operationProposal?.recipientGroup, "support_with_owners");
+  assert.equal(store.alerts.length, 0, "review-only provider messaging must not pre-alert staff");
+});
+
+test("v5.11.79 approve-no-send records positive review with zero guest or operational side effects", async () => {
+  const thread = { id: "thread_review_001", channel: "beds24", reservationId: "stay_review_001", room: "4" };
+  const draft = {
+    id: "draft_review_001", threadId: thread.id, direction: "draft", body: "The Wi-Fi password is correct.", deliveryStatus: "draft",
+    metadata: { operation: { required: true, taskCategory: "Maintenance", recipientGroup: "support_with_owners", summary: "stale task" } }
+  };
+  let taskCreates = 0;
+  let threadUpdates = 0;
+  const store = {
+    async getMessagingThread(id) { return id === thread.id ? thread : null; },
+    async getMessagingMessage(id) { return id === draft.id ? draft : null; },
+    async updateMessagingDraft(_id, patch) { Object.assign(draft, patch); return { ok: true }; },
+    async updateMessagingThreadState() { threadUpdates += 1; return { ok: true }; },
+    async mobileCreateReservationActivity() { taskCreates += 1; return { ok: true }; }
+  };
+  const outcome = await reviewMessagingDraft({
+    env: {}, store, threadId: thread.id, draftId: draft.id, action: "approve_no_send", actorLabel: "Owner"
+  });
+  assert.equal(outcome.ok, true);
+  assert.equal(outcome.sent, false);
+  assert.equal(outcome.operation?.skipped, true);
+  assert.equal(taskCreates, 0);
+  assert.equal(threadUpdates, 1);
+  assert.equal(draft.deliveryStatus, "approved_no_send");
+  assert.equal(draft.metadata?.decision, "approved_no_send");
+});
+
+test("v5.11.79 operational side effect requires an explicit independent owner decision", async () => {
+  const thread = { id: "thread_review_002", channel: "beds24", reservationId: "stay_review_002", room: "4" };
+  const draft = {
+    id: "draft_review_002", threadId: thread.id, direction: "draft", body: "We will check this.", deliveryStatus: "draft",
+    metadata: { operation: { required: true, taskCategory: "Maintenance", recipientGroup: "support_with_owners", summary: "Toilet broken" } }
+  };
+  const store = {
+    async getMessagingThread(id) { return id === thread.id ? thread : null; },
+    async getMessagingMessage(id) { return id === draft.id ? draft : null; }
+  };
+  const outcome = await reviewMessagingDraft({
+    env: {}, store, threadId: thread.id, draftId: draft.id, action: "approve", actorLabel: "Owner"
+  });
+  assert.equal(outcome.ok, false);
+  assert.equal(outcome.error, "operation_decision_required");
 });

@@ -1007,7 +1007,7 @@ async function sendReviewedGuestReply({ env, store, thread, text, now, automated
   });
 }
 
-export async function reviewMessagingDraft({ env, store, threadId, draftId, action, message = "", generateReply, actorLabel = "Team member", automated = false }) {
+export async function reviewMessagingDraft({ env, store, threadId, draftId, action, message = "", operationDecision = "", generateReply, actorLabel = "Team member", automated = false }) {
   const thread = await store.getMessagingThread(cleanText(threadId, 100));
   const draft = typeof store.getMessagingMessage === "function" ? await store.getMessagingMessage(cleanText(draftId, 100)) : null;
   if (!thread || !draft || draft.threadId !== thread.id || draft.direction !== "draft") return { ok: false, error: "draft_not_found" };
@@ -1031,12 +1031,43 @@ export async function reviewMessagingDraft({ env, store, threadId, draftId, acti
     await store.updateMessagingThreadState(thread.id, { needsHuman: true, aiDraft: true, lastError: result.reason || "review_required", updatedAt: now });
     return { ok: true, action: "regenerated", draft: reviewedDraftPublic(await store.getMessagingMessage(draft.id)) };
   }
-  if (action !== "approve") return { ok: false, error: "invalid_review_action" };
+  if (!["approve", "approve_no_send"].includes(action)) return { ok: false, error: "invalid_review_action" };
   const text = cleanText(message || draft.body, MAX_MESSAGE_LENGTH);
   if (!text) return { ok: false, error: "empty_reply" };
-  const operation = await createReviewedOperationalTask({ env, store, thread, draft, actorLabel, now });
+  const proposedOperation = draft?.metadata?.operation;
+
+  // "Approve — Don't Send" is deliberately side-effect free. It records a
+  // positive AI-quality decision without sending a guest message or creating
+  // any operational task/alert, even when the original draft carried a proposal.
+  if (action === "approve_no_send") {
+    const operation = proposedOperation?.required
+      ? { required: true, skipped: true, reason: "approve_no_send" }
+      : { required: false, skipped: true, reason: "approve_no_send" };
+    const metadata = {
+      ...(draft.metadata || {}),
+      decision: "approved_no_send",
+      decidedAt: now,
+      decidedBy: cleanText(actorLabel, 100),
+      edited: text !== draft.body,
+      operationDecision: "skip",
+      operationResult: operation
+    };
+    await store.updateMessagingDraft(draft.id, { body: text, deliveryStatus: "approved_no_send", metadata, updatedAt: now });
+    await store.updateMessagingThreadState(thread.id, { needsHuman: false, aiDraft: false, lastError: "", updatedAt: now });
+    return { ok: true, action: "approved_no_send", sent: false, operation, draft: reviewedDraftPublic(await store.getMessagingMessage(draft.id)) };
+  }
+
+  const normalizedOperationDecision = ["execute", "skip"].includes(String(operationDecision || "")) ? String(operationDecision) : "";
+  if (proposedOperation?.required && !normalizedOperationDecision) {
+    return { ok: false, error: "operation_decision_required", operation: { required: true } };
+  }
+  let operation = proposedOperation?.required && normalizedOperationDecision === "execute"
+    ? await createReviewedOperationalTask({ env, store, thread, draft, actorLabel, now })
+    : proposedOperation?.required
+      ? { required: true, skipped: true, reason: "owner_skipped" }
+      : { required: false, skipped: true };
   if (operation.required && operation.error) return { ok: false, error: operation.error, operation };
-  if (operation.required && Number(operation.delivery?.accepted) <= 0) {
+  if (operation.required && !operation.skipped && Number(operation.delivery?.accepted) <= 0) {
     return { ok: false, error: "operational_notification_failed", operation };
   }
   try {
@@ -1044,10 +1075,18 @@ export async function reviewMessagingDraft({ env, store, threadId, draftId, acti
   } catch (error) {
     return { ok: false, error: error?.message || "provider_send_failed", operation };
   }
-  const metadata = { ...(draft.metadata || {}), decision: "approved", decidedAt: now, decidedBy: cleanText(actorLabel, 100), edited: text !== draft.body, operationResult: operation };
+  const metadata = {
+    ...(draft.metadata || {}),
+    decision: "approved",
+    decidedAt: now,
+    decidedBy: cleanText(actorLabel, 100),
+    edited: text !== draft.body,
+    operationDecision: proposedOperation?.required ? normalizedOperationDecision : "none",
+    operationResult: operation
+  };
   await store.updateMessagingDraft(draft.id, { body: text, deliveryStatus: "approved", metadata, updatedAt: now });
   await store.updateMessagingThreadState(thread.id, { needsHuman: false, aiDraft: false, lastError: "", updatedAt: now });
-  return { ok: true, action: "approved", operation, draft: reviewedDraftPublic(await store.getMessagingMessage(draft.id)) };
+  return { ok: true, action: "approved", sent: true, operation, draft: reviewedDraftPublic(await store.getMessagingMessage(draft.id)) };
 }
 
 function maskedPhone(value) {

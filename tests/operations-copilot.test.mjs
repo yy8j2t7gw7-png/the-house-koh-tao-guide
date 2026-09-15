@@ -22,6 +22,9 @@ function testHarness() {
     async mobileCreateOperationalTask(record) { operationalTasks.push({ ...record, status: "open", deliveryAttempted: 0, deliveryAccepted: 0 }); return { ok: true, id: record.id }; },
     async mobileUpdateOperationalTaskDelivery(id, delivery) { const task = operationalTasks.find((item) => item.id === id); if (task) { task.deliveryAttempted = Number(delivery.attempted) || 0; task.deliveryAccepted = Number(delivery.accepted) || 0; } return { ok: true }; },
     async mobileListOperationalTasks() { return operationalTasks; },
+    async mobileListInventoryItems() { return [
+      { id: "inv_toilet", name: "Toilet paper", quantity: 2, reorderPoint: 5, minimumQty: 2, parLevel: 20, unit: "roll", active: 1 }
+    ]; },
     async mobileGetOperationalTask(id) { return operationalTasks.find((item) => item.id === id) || null; },
     async createAlert(alert) { alerts.push(alert); return { created: true, alert }; },
     async recordAlertDelivery(record) { deliveries.push(record); return { ok: true }; },
@@ -42,8 +45,8 @@ function testHarness() {
       tenantId: "tenant_test", userId: "user_owner", membershipId: "membership_owner",
       displayName: "Owner", role: "owner"
     },
-    permissions: new Set(["copilot.use", "booking_activity.create"]),
-    modules: new Set(["core", "bookings", "maintenance"]),
+    permissions: new Set(["copilot.use", "booking_activity.create", "inventory.view"]),
+    modules: new Set(["core", "bookings", "maintenance", "inventory"]),
     properties: [{ id: "property_test", displayName: "Test Hotel" }],
     now: "2026-09-15T08:30:00.000Z"
   };
@@ -182,4 +185,32 @@ test("Operations Copilot daily attention stays available when one live source ha
   assert.equal(outcome.body.proposal, null);
   assert.match(outcome.body.reply, /today|operations|urgent/i);
   assert.equal(outcome.body.sourceHealth.tasks, false);
+});
+
+
+test("Operations Copilot creates a property-wide Inventory proposal for a restock instruction without inventing a booking", async () => {
+  const harness = testHarness();
+  const outcome = await handleOperationsCopilot({
+    request: post({ message: "Create a restock task for toilet paper" }),
+    env: harness.env, store: harness.store, access: harness.access, actorHash: "actor_hash"
+  });
+  assert.equal(outcome.status, 200);
+  assert.equal(outcome.body.confirmationRequired, true);
+  assert.equal(outcome.body.proposal?.scope, "property");
+  assert.equal(outcome.body.proposal?.room, "Property");
+  assert.equal(outcome.body.proposal?.category, "Inventory");
+  assert.equal(outcome.body.proposal?.reservationId, "");
+  assert.equal(harness.alerts.length, 0);
+});
+
+test("Operations Copilot inventory summary uses live role-filtered stock data", async () => {
+  const harness = testHarness();
+  const outcome = await handleOperationsCopilot({
+    request: post({ message: "What inventory needs restocking?" }),
+    env: harness.env, store: harness.store, access: harness.access, actorHash: "actor_hash"
+  });
+  assert.equal(outcome.status, 200);
+  assert.equal(outcome.body.proposal, null);
+  assert.match(outcome.body.reply, /toilet paper/i);
+  assert.match(outcome.body.reply, /low stock/i);
 });

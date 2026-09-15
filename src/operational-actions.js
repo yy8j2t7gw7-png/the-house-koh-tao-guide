@@ -10,6 +10,7 @@ export function normalizeOperationalCategory(value) {
   if (["maintenance", "repair", "repairs"].includes(source)) return "Maintenance";
   if (["guest support", "guest_support", "guest", "support"].includes(source)) return "Guest support";
   if (["reservations", "reservation", "booking", "bookings"].includes(source)) return "Reservations";
+  if (["inventory", "stock", "restock", "procurement", "purchasing"].includes(source)) return "Inventory";
   if (["owner", "management"].includes(source)) return "Owner";
   if (["urgent", "emergency"].includes(source)) return "Urgent";
   return "General";
@@ -21,6 +22,7 @@ export function operationalCategoryRoutingKey(category) {
   if (value === "maintenance") return "maintenance";
   if (value === "guest support") return "guest_support";
   if (value === "reservations") return "reservations";
+  if (value === "inventory") return "inventory";
   if (value === "owner") return "owner";
   if (value === "urgent") return "urgent";
   return "general";
@@ -32,6 +34,7 @@ export function operationalCategoryAlertType(category) {
   if (key === "maintenance") return "booking_task_maintenance";
   if (key === "guest_support") return "booking_task_guest_support";
   if (key === "reservations") return "booking_task_reservations";
+  if (key === "inventory") return "booking_task_general";
   if (key === "owner") return "booking_task_owner";
   if (key === "urgent") return "booking_task_urgent";
   return "booking_task_general";

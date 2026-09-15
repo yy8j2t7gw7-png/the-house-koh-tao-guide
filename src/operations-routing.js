@@ -4,6 +4,7 @@ const ROUTES = Object.freeze({
   guest_support: Object.freeze({ key: "guest_support", label: "Guest support", recipientGroup: "support_with_owners" }),
   general: Object.freeze({ key: "general", label: "General guest request", recipientGroup: "support_with_owners" }),
   reservations: Object.freeze({ key: "reservations", label: "Bookings / reservations", recipientGroup: "booking_with_owners" }),
+  inventory: Object.freeze({ key: "inventory", label: "Inventory / purchasing", recipientGroup: "support_with_owners" }),
   owner: Object.freeze({ key: "owner", label: "Owners", recipientGroup: "owners" }),
   turnover: Object.freeze({ key: "turnover", label: "Routine room turnover", recipientGroup: "support" }),
   room_ready: Object.freeze({ key: "room_ready", label: "Room ready", recipientGroup: "owners" }),
@@ -21,6 +22,7 @@ export function canonicalOperationalCategory(value) {
   if (["maintenance", "repair", "repairs", "property_issue", "room_issue"].includes(category)) return "maintenance";
   if (["guest_support", "guest_service", "stay_support", "support"].includes(category)) return "guest_support";
   if (["reservation", "reservations", "booking", "bookings"].includes(category)) return "reservations";
+  if (["inventory", "stock", "restock", "procurement", "purchasing"].includes(category)) return "inventory";
   if (["owner", "owners", "management"].includes(category)) return "owner";
   if (["turnover", "housekeeping_turnover"].includes(category)) return "turnover";
   if (["room_ready", "ready"].includes(category)) return "room_ready";

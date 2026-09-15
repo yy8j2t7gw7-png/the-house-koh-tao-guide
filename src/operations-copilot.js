@@ -4,7 +4,7 @@ import { createBookingOperationalTask, createRoomOperationalTask, normalizeOpera
 const MAX_MESSAGE = 1800;
 const MAX_HISTORY = 12;
 const PROPOSAL_TTL_MS = 10 * 60_000;
-const TASK_CATEGORIES = ["Housekeeping", "Maintenance", "Guest support", "Reservations", "Owner", "Urgent", "General"];
+const TASK_CATEGORIES = ["Housekeeping", "Maintenance", "Guest support", "Reservations", "Inventory", "Owner", "Urgent", "General"];
 
 const COPILOT_SCHEMA = {
   type: "object",
@@ -20,7 +20,7 @@ const COPILOT_SCHEMA = {
       properties: {
         type: { type: "string", enum: ["none", "create_task"] },
         status: { type: "string", enum: ["none", "needs_clarification", "proposed"] },
-        scope: { type: "string", enum: ["none", "room", "booking"] },
+        scope: { type: "string", enum: ["none", "room", "booking", "property"] },
         reservation_id: { type: "string" },
         room: { type: "string" },
         category: { type: "string", enum: TASK_CATEGORIES },
@@ -60,10 +60,11 @@ function emptyLiveOperationalContext(access, sourceHealth = {}) {
     attention: {
       date: bangkokDate(0), arrivalsToday: 0, departuresToday: 0, arrivalsTomorrow: 0, dirtyRooms: [], readyRooms: [],
       pendingHousekeeping: 0, openMaintenance: 0, urgentMaintenance: 0, openTasks: 0, overdueTasks: 0, dueTodayTasks: 0,
-      pendingRegistrations: 0, inbox: null
+      pendingRegistrations: 0, inbox: null, lowStockItems: 0, outOfStockItems: 0
     },
     reservations: [], roomStates: [], pendingHousekeeping: [], openMaintenance: [], openTasks: [], pendingRegistrationCount: 0,
-    sourceHealth: { operations: false, overview: false, inbox: false, tasks: false, ...sourceHealth }
+    inventory: null,
+    sourceHealth: { operations: false, overview: false, inbox: false, tasks: false, inventory: false, ...sourceHealth }
   };
 }
 
@@ -109,23 +110,28 @@ function bangkokDate(offsetDays = 0) {
 
 async function liveOperationalContext(store, access) {
   const canSeeInbox = access?.permissions?.has?.("messaging.view") === true;
+  const canSeeInventory = access?.permissions?.has?.("inventory.view") === true && access?.modules?.has?.("inventory") === true;
+  const propertyId = asArray(access?.properties)[0]?.id || "";
   const requests = [
     typeof store?.getStayOperationsOverview === "function" ? store.getStayOperationsOverview() : Promise.reject(new Error("operations_unavailable")),
     typeof store?.getAdminOverview === "function" ? store.getAdminOverview() : Promise.reject(new Error("overview_unavailable")),
     canSeeInbox && typeof store?.listMessagingThreads === "function" ? store.listMessagingThreads(60) : Promise.resolve([]),
-    typeof store?.mobileListOperationalTasks === "function" ? store.mobileListOperationalTasks(200) : Promise.resolve([])
+    typeof store?.mobileListOperationalTasks === "function" ? store.mobileListOperationalTasks(200) : Promise.resolve([]),
+    canSeeInventory && typeof store?.mobileListInventoryItems === "function" ? store.mobileListInventoryItems(access?.record?.tenantId || "", propertyId, 500) : Promise.resolve([])
   ];
-  const [operationsResult, overviewResult, threadsResult, tasksResult] = await Promise.allSettled(requests);
+  const [operationsResult, overviewResult, threadsResult, tasksResult, inventoryResult] = await Promise.allSettled(requests);
   const sourceHealth = {
     operations: operationsResult.status === "fulfilled",
     overview: overviewResult.status === "fulfilled",
     inbox: !canSeeInbox || threadsResult.status === "fulfilled",
-    tasks: tasksResult.status === "fulfilled"
+    tasks: tasksResult.status === "fulfilled",
+    inventory: !canSeeInventory || inventoryResult.status === "fulfilled"
   };
   const operations = operationsResult.status === "fulfilled" && operationsResult.value && typeof operationsResult.value === "object" ? operationsResult.value : {};
   const overview = overviewResult.status === "fulfilled" && overviewResult.value && typeof overviewResult.value === "object" ? overviewResult.value : {};
   const threads = threadsResult.status === "fulfilled" ? asArray(threadsResult.value) : [];
   const operationalTasks = tasksResult.status === "fulfilled" ? asArray(tasksResult.value) : [];
+  const inventoryItems = inventoryResult.status === "fulfilled" ? asArray(inventoryResult.value) : [];
   const role = access?.record?.role || "staff";
   const today = bangkokDate(0);
   const tomorrow = bangkokDate(1);
@@ -161,6 +167,10 @@ async function liveOperationalContext(store, access) {
     }));
   const nowMs = Date.now();
   const todayEndMs = Date.parse(`${today}T23:59:59+07:00`);
+  const inventory = canSeeInventory ? {
+    lowStock: inventoryItems.filter((item) => { const q=Number(item?.quantity)||0; const threshold=(Number(item?.reorderPoint)||0) > 0 ? Number(item.reorderPoint) : Number(item?.minimumQty)||0; return threshold > 0 && q <= threshold; }).slice(0, 40).map((item) => ({ id: cleanText(item?.id,100), name: cleanText(item?.name,160), quantity: Number(item?.quantity)||0, unit: cleanText(item?.unit,40)||"unit", minimumQty: Number(item?.minimumQty)||0, reorderPoint: Number(item?.reorderPoint)||0, parLevel: Number(item?.parLevel)||0 })),
+    outOfStock: inventoryItems.filter((item) => (Number(item?.quantity)||0) <= 0 && Number(item?.active) !== 0).slice(0,40).map((item) => ({ id: cleanText(item?.id,100), name: cleanText(item?.name,160), unit: cleanText(item?.unit,40)||"unit" }))
+  } : null;
   const attention = {
     date: today,
     arrivalsToday: sourceReservations.filter((item) => cleanText(item?.checkInDate, 20) === today).length,
@@ -172,13 +182,14 @@ async function liveOperationalContext(store, access) {
     urgentMaintenance: maintenance.filter((item) => ["critical", "urgent"].includes(item.severity)).length, openTasks: openTasks.length,
     overdueTasks: openTasks.filter((item) => item.dueAt && Number.isFinite(Date.parse(item.dueAt)) && Date.parse(item.dueAt) < nowMs).length,
     dueTodayTasks: openTasks.filter((item) => item.dueAt && Number.isFinite(Date.parse(item.dueAt)) && Date.parse(item.dueAt) >= nowMs && Date.parse(item.dueAt) <= todayEndMs).length,
-    pendingRegistrations: Number(overview?.totals?.pendingRegistrations) || 0, inbox
+    pendingRegistrations: Number(overview?.totals?.pendingRegistrations) || 0, inbox,
+    lowStockItems: inventory?.lowStock?.length || 0, outOfStockItems: inventory?.outOfStock?.length || 0
   };
   const properties = asArray(access?.properties);
   return {
     property: properties[0]?.displayName || properties[0]?.name || "Current property", role,
     permissions: setLikeValues(access?.permissions).sort(), modules: setLikeValues(access?.modules).sort(),
-    attention, reservations, roomStates, pendingHousekeeping, openMaintenance: maintenance, openTasks,
+    attention, reservations, roomStates, pendingHousekeeping, openMaintenance: maintenance, openTasks, inventory,
     pendingRegistrationCount: attention.pendingRegistrations, sourceHealth
   };
 }
@@ -202,6 +213,8 @@ function attentionSummaryReply(live) {
   if (Number(a.pendingHousekeeping) > 0) lines.push(`${a.pendingHousekeeping} housekeeping task${a.pendingHousekeeping === 1 ? " is" : "s are"} still open.`);
   if (Number(a.openMaintenance) > 0) lines.push(`${a.openMaintenance} maintenance issue${a.openMaintenance === 1 ? " is" : "s are"} unresolved${Number(a.urgentMaintenance) > 0 ? `, including ${a.urgentMaintenance} urgent` : ""}.`);
   if (Number(a.pendingRegistrations) > 0) lines.push(`${a.pendingRegistrations} guest registration check${a.pendingRegistrations === 1 ? " needs" : "s need"} attention.`);
+  if (Number(a.outOfStockItems) > 0) lines.push(`${a.outOfStockItems} inventory item${a.outOfStockItems === 1 ? " is" : "s are"} out of stock.`);
+  else if (Number(a.lowStockItems) > 0) lines.push(`${a.lowStockItems} inventory item${a.lowStockItems === 1 ? " is" : "s are"} at or below the restock level.`);
   if (a.inbox && Number(a.inbox.needsHuman) > 0) lines.push(`${a.inbox.needsHuman} guest conversation${a.inbox.needsHuman === 1 ? " needs" : "s need"} a person to review it.`);
   else if (a.inbox && Number(a.inbox.unreadMessages) > 0) lines.push(`${a.inbox.unreadMessages} unread guest message${a.inbox.unreadMessages === 1 ? " is" : "s are"} waiting.`);
   const arrivalLine = `${Number(a.arrivalsToday) || 0} arrival${Number(a.arrivalsToday) === 1 ? "" : "s"} and ${Number(a.departuresToday) || 0} departure${Number(a.departuresToday) === 1 ? "" : "s"} today.`;
@@ -212,6 +225,23 @@ function attentionSummaryReply(live) {
   }
   const suffix = degraded ? `\n\nOne live section could not be checked, so use Operations if you need a complete manual review.` : "";
   return `Here’s what needs attention today:\n• ${lines.join("\n• ")}\n\nFor context: ${arrivalLine}${suffix}`;
+}
+
+function isInventorySummaryIntent(message) {
+  const source = cleanText(message, MAX_MESSAGE).toLowerCase();
+  return /(inventory|stock).*(low|left|restock|order|out)|what.*(?:need|needs).*restock|what.*(?:stock|inventory).*left/.test(source);
+}
+
+function inventorySummaryReply(live) {
+  const inventory = live?.inventory;
+  if (!inventory) return "Inventory is not available for your account or this property yet.";
+  const out = asArray(inventory.outOfStock);
+  const low = asArray(inventory.lowStock).filter((item) => !out.some((missing) => missing.id === item.id));
+  if (!out.length && !low.length) return "Nothing is currently flagged for restocking. Stock levels are above the configured minimum or reorder points.";
+  const lines = [];
+  if (out.length) lines.push(`Out of stock: ${out.slice(0,8).map((item)=>item.name).join(", ")}.`);
+  if (low.length) lines.push(`Low stock: ${low.slice(0,8).map((item)=>`${item.name} (${item.quantity} ${item.unit})`).join(", ")}.`);
+  return `Here’s the inventory attention list:\n• ${lines.join("\n• ")}\n\nOpen Inventory for the full stock list and restock levels.`;
 }
 
 async function safeUiContext(rawContext, store, access) {
@@ -245,17 +275,18 @@ YOUR JOB
 - Keep answers concise and operational. Prefer: what happened -> what it means -> what to do next.
 
 TASK CREATION
-- A user may ask in ordinary language to create/assign a task for a room or booking.
+- A user may ask in ordinary language to create/assign a task for a room, booking or property-wide operation such as restocking.
 - You may only PROPOSE a task. You never execute it yourself.
 - Proposal is not authorization. The product will separately ask the user to confirm.
 - ${canCreateTasks ? "This signed-in user is allowed to create operational tasks." : "This signed-in user is NOT allowed to create operational tasks. Explain that an authorized user must create it and return action.type=none."}
 - Propose a task only when the user clearly asks Taoedge/staff to DO something, not when they merely ask how the system works.
-- A task requires: what needs to be done, plus an identifiable room or booking.
+- Room/booking tasks require an identifiable room or booking. Property-wide Inventory/restock tasks do not require a room.
 - If a user says something like "tell maintenance to check room 233 at 10" but does not say WHAT should be checked, ask the missing question and return status=needs_clarification.
 - If the user says "room 233 toilet broken tomorrow 10", that contains enough information to propose a Maintenance task.
 - If a booking is clearly identified in LIVE PROPERTY CONTEXT, use its exact reservation id. Do not invent an id.
 - If only a room is identified, use scope=room.
-- Task category must be one of: Housekeeping, Maintenance, Guest support, Reservations, Owner, Urgent, General.
+- For an explicit property-wide stock/restock/procurement task with no room, use scope=property, room="Property", category=Inventory.
+- Task category must be one of: Housekeeping, Maintenance, Guest support, Reservations, Inventory, Owner, Urgent, General.
 - Use Urgent only for genuinely urgent operational situations, not for ordinary repairs.
 - Put any requested date/time in timing exactly in human-readable form. Do not claim Taoedge has scheduled delayed delivery; the operational alert is created after confirmation.
 - If information is ambiguous, ask one clear clarification question rather than guessing.
@@ -302,6 +333,7 @@ async function callCopilotAI({ env, message, history, access, workflows, live, c
 
 function categoryFromMessage(message) {
   const source = String(message || "").toLowerCase();
+  if (/\b(inventory|stock|restock|reorder|procurement|purchase order|order supplies?)\b/.test(source)) return "Inventory";
   if (/\b(toilet|leak|broken|repair|air\s*con|aircon|\bac\b|electric|plumb|maintenance)\b/.test(source)) return "Maintenance";
   if (/\b(clean|cleaning|housekeep|towel|linen|sheet|amenit|toilet paper)\b/.test(source)) return "Housekeeping";
   if (/\b(book|booking|reservation|extend|extension|change dates|cancel)\b/.test(source)) return "Reservations";
@@ -315,23 +347,25 @@ function deterministicFallback(message, workflows, live, canCreateTasks, uiConte
   const explicitTaskIntent = /\b(create|add|assign|tell|notify|make|report|send)\b/i.test(source) && /\b(task|staff|maintenance|housekeeping|team|room)\b/i.test(source);
   const implicitRoomWork = Boolean(roomMatch) && /\b(needs?|need|broken|leak(?:ing)?|fix(?:ed)?|repair|clean(?:ed|ing)?|bring|replace|check|blocked|clogged|drip(?:ping)?)\b/i.test(source);
   const contextualWork = Boolean(uiContext?.reservationId) && /\b(needs?|need|broken|leak(?:ing)?|fix(?:ed)?|repair|clean(?:ed|ing)?|bring|replace|check|blocked|clogged|drip(?:ping)?|extra|send)\b/i.test(source);
-  const taskIntent = explicitTaskIntent || implicitRoomWork || contextualWork;
+  const inventoryTaskIntent = /\b(restock|reorder|order|purchase|procure)\b/i.test(source) && /\b(inventory|stock|suppl(?:y|ies)|toilet paper|shampoo|soap|water|linen|towels?)\b/i.test(source);
+  const taskIntent = explicitTaskIntent || implicitRoomWork || contextualWork || inventoryTaskIntent;
   if (taskIntent && canCreateTasks) {
-    if (!roomMatch && !uiContext?.reservationId) return {
+    const category = categoryFromMessage(source);
+    const propertyInventoryTask = inventoryTaskIntent && !roomMatch && !uiContext?.reservationId;
+    if (!roomMatch && !uiContext?.reservationId && !propertyInventoryTask) return {
       reply: "Which room or booking should I attach this task to?",
       matched_workflow_ids: ["booking_tasks"],
-      action: { type: "create_task", status: "needs_clarification", scope: "none", reservation_id: "", room: "", category: categoryFromMessage(source), description: "", timing: "", clarification_question: "Which room or booking should I attach this task to?" }
+      action: { type: "create_task", status: "needs_clarification", scope: "none", reservation_id: "", room: "", category, description: "", timing: "", clarification_question: "Which room or booking should I attach this task to?" }
     };
-    const category = categoryFromMessage(source);
     const timingMatch = source.match(/\b(?:today|tomorrow)(?:\s+(?:at\s*)?\d{1,2}(?::\d{2})?\s*(?:am|pm)?)?\b/i);
     const timing = cleanText(timingMatch?.[0] || "", 180);
     const description = cleanText(source
       .replace(/\b(create|add|assign|tell|notify|make|report|send)\b/ig, "")
       .replace(/\b(task|staff|team)\b/ig, "")
       .replace(timingMatch?.[0] || "", ""), 700);
-    const targetRoom = roomMatch?.[1] || cleanText(uiContext?.room, 24);
-    const targetReservationId = !roomMatch ? cleanText(uiContext?.reservationId, 120) : "";
-    const targetScope = targetReservationId ? "booking" : "room";
+    const targetRoom = propertyInventoryTask ? "Property" : (roomMatch?.[1] || cleanText(uiContext?.room, 24));
+    const targetReservationId = !roomMatch && !propertyInventoryTask ? cleanText(uiContext?.reservationId, 120) : "";
+    const targetScope = propertyInventoryTask ? "property" : targetReservationId ? "booking" : "room";
     if (description.length < 8) return {
       reply: `What should ${category === "Maintenance" ? "maintenance" : "the team"} do${targetRoom ? ` in Room ${targetRoom}` : ""}?`,
       matched_workflow_ids: ["booking_tasks"],
@@ -355,7 +389,7 @@ function normalizedModelResult(value) {
   const action = value?.action && typeof value.action === "object" ? value.action : {};
   const type = action.type === "create_task" ? "create_task" : "none";
   const status = ["none", "needs_clarification", "proposed"].includes(action.status) ? action.status : "none";
-  const scope = ["none", "room", "booking"].includes(action.scope) ? action.scope : "none";
+  const scope = ["none", "room", "booking", "property"].includes(action.scope) ? action.scope : "none";
   return {
     reply: cleanText(value?.reply, 1800) || "Tell me what you need help with and I’ll guide you to the next step.",
     matchedWorkflowIds: (Array.isArray(value?.matched_workflow_ids) ? value.matched_workflow_ids : []).map((item) => cleanText(item, 80)).filter(Boolean).slice(0, 8),
@@ -403,9 +437,9 @@ async function signedProposal(action, access, env, store) {
     reservation = await store.getStayReservationById(action.reservationId);
     if (!reservation) return { error: "reservation_not_found" };
   }
-  const room = action.scope === "booking" ? cleanText(reservation?.room, 24) : cleanText(action.room, 24);
+  const room = action.scope === "property" ? "Property" : action.scope === "booking" ? cleanText(reservation?.room, 24) : cleanText(action.room, 24);
   if (!room) return { error: "room_required" };
-  if (action.scope !== "booking") {
+  if (action.scope === "room") {
     const operations = await store.getStayOperationsOverview().catch(() => ({ reservations: [], housekeepingStatuses: [] }));
     const knownRooms = new Set([
       ...(operations?.housekeepingStatuses || []).map((item) => cleanText(item.room, 24)),
@@ -419,7 +453,7 @@ async function signedProposal(action, access, env, store) {
   if (!env.MOBILE_SESSION_PEPPER) return { error: "confirmation_service_unavailable" };
   const proposal = {
     type: "create_task",
-    scope: action.scope === "booking" ? "booking" : "room",
+    scope: action.scope === "booking" ? "booking" : action.scope === "property" ? "property" : "room",
     reservationId: action.scope === "booking" ? action.reservationId : "",
     room,
     category: normalizeOperationalCategory(action.category),
@@ -492,7 +526,7 @@ export async function handleOperationsCopilot({ request, env, store, access, act
       userId: access.record.userId,
       membershipId: access.record.membershipId,
       action: "copilot_task_created",
-      reference: proposal.scope === "booking" ? `reservation:${proposal.reservationId}` : `room:${proposal.room}`,
+      reference: proposal.scope === "booking" ? `reservation:${proposal.reservationId}` : proposal.scope === "property" ? "property:operations" : `room:${proposal.room}`,
       metadata: {
         registryVersion: COPILOT_REGISTRY_VERSION,
         scope: proposal.scope,
@@ -555,6 +589,12 @@ export async function handleOperationsCopilot({ request, env, store, access, act
     };
   }
 
+  if (isInventorySummaryIntent(message)) {
+    let live;
+    try { live = await liveOperationalContext(store, access); } catch (_error) { live = emptyLiveOperationalContext(access); }
+    return { status: 200, body: { ok: true, registryVersion: COPILOT_REGISTRY_VERSION, reply: inventorySummaryReply(live), matchedWorkflowIds: ["support_chat"], proposal: null, confirmationRequired: false, inventory: live.inventory, sourceHealth: live.sourceHealth || {} } };
+  }
+
   const workflows = relevantWorkflows(message, 8);
   let live;
   try { live = await liveOperationalContext(store, access); }
@@ -598,7 +638,7 @@ export async function handleOperationsCopilot({ request, env, store, access, act
         userId: access.record.userId,
         membershipId: access.record.membershipId,
         action: "copilot_task_proposed",
-        reference: proposal.scope === "booking" ? `reservation:${proposal.reservationId}` : `room:${proposal.room}`,
+        reference: proposal.scope === "booking" ? `reservation:${proposal.reservationId}` : proposal.scope === "property" ? "property:operations" : `room:${proposal.room}`,
         metadata: { registryVersion: COPILOT_REGISTRY_VERSION, category: proposal.category, routeLabel: proposal.routeLabel },
         createdAt: access.now
       });

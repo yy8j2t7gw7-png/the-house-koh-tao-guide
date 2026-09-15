@@ -809,6 +809,105 @@ export class ConciergeStore extends DurableObject {
         CREATE INDEX IF NOT EXISTS platform_audit_tenant_created
           ON platform_audit(tenant_id, created_at);
 
+        CREATE TABLE IF NOT EXISTS property_operator_settings (
+          tenant_id TEXT NOT NULL,
+          property_id TEXT NOT NULL,
+          staff_language TEXT NOT NULL DEFAULT 'en',
+          updated_by_user_id TEXT NOT NULL DEFAULT '',
+          updated_at TEXT NOT NULL,
+          PRIMARY KEY (tenant_id, property_id)
+        );
+
+        CREATE TABLE IF NOT EXISTS inventory_locations (
+          id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL, property_id TEXT NOT NULL, name TEXT NOT NULL,
+          department TEXT NOT NULL DEFAULT '', parent_id TEXT NOT NULL DEFAULT '', active INTEGER NOT NULL DEFAULT 1,
+          created_by_label TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS inventory_locations_property ON inventory_locations(tenant_id, property_id, active, name);
+
+        CREATE TABLE IF NOT EXISTS inventory_items (
+          id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL, property_id TEXT NOT NULL, sku TEXT NOT NULL DEFAULT '', name TEXT NOT NULL,
+          category TEXT NOT NULL DEFAULT 'Other', item_class TEXT NOT NULL DEFAULT 'consumable', unit TEXT NOT NULL DEFAULT 'unit',
+          minimum_qty REAL NOT NULL DEFAULT 0, reorder_point REAL NOT NULL DEFAULT 0, par_level REAL NOT NULL DEFAULT 0, maximum_qty REAL NOT NULL DEFAULT 0,
+          unit_cost_minor INTEGER NOT NULL DEFAULT 0, currency TEXT NOT NULL DEFAULT 'THB', preferred_supplier_id TEXT NOT NULL DEFAULT '',
+          active INTEGER NOT NULL DEFAULT 1, created_by_label TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS inventory_items_property ON inventory_items(tenant_id, property_id, active, category, name);
+        CREATE INDEX IF NOT EXISTS inventory_items_sku ON inventory_items(tenant_id, property_id, sku);
+
+        CREATE TABLE IF NOT EXISTS inventory_stock (
+          tenant_id TEXT NOT NULL, property_id TEXT NOT NULL, location_id TEXT NOT NULL, item_id TEXT NOT NULL,
+          quantity REAL NOT NULL DEFAULT 0, updated_at TEXT NOT NULL, PRIMARY KEY (tenant_id, property_id, location_id, item_id)
+        );
+        CREATE INDEX IF NOT EXISTS inventory_stock_item ON inventory_stock(tenant_id, property_id, item_id);
+
+        CREATE TABLE IF NOT EXISTS inventory_movements (
+          id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL, property_id TEXT NOT NULL, item_id TEXT NOT NULL, movement_type TEXT NOT NULL,
+          quantity REAL NOT NULL, from_location_id TEXT NOT NULL DEFAULT '', to_location_id TEXT NOT NULL DEFAULT '', reason TEXT NOT NULL DEFAULT '',
+          unit_cost_minor INTEGER NOT NULL DEFAULT 0, reference_type TEXT NOT NULL DEFAULT '', reference_id TEXT NOT NULL DEFAULT '',
+          created_by_label TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS inventory_movements_item ON inventory_movements(tenant_id, property_id, item_id, created_at);
+
+        CREATE TABLE IF NOT EXISTS inventory_suppliers (
+          id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL, property_id TEXT NOT NULL, name TEXT NOT NULL, contact_name TEXT NOT NULL DEFAULT '',
+          phone TEXT NOT NULL DEFAULT '', email TEXT NOT NULL DEFAULT '', notes TEXT NOT NULL DEFAULT '', active INTEGER NOT NULL DEFAULT 1,
+          created_by_label TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS inventory_suppliers_property ON inventory_suppliers(tenant_id, property_id, active, name);
+
+        CREATE TABLE IF NOT EXISTS inventory_item_suppliers (
+          tenant_id TEXT NOT NULL, property_id TEXT NOT NULL, item_id TEXT NOT NULL, supplier_id TEXT NOT NULL,
+          supplier_sku TEXT NOT NULL DEFAULT '', unit_cost_minor INTEGER NOT NULL DEFAULT 0, lead_time_days INTEGER NOT NULL DEFAULT 0, preferred INTEGER NOT NULL DEFAULT 0, updated_at TEXT NOT NULL,
+          PRIMARY KEY (tenant_id, property_id, item_id, supplier_id)
+        );
+
+        CREATE TABLE IF NOT EXISTS inventory_purchase_orders (
+          id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL, property_id TEXT NOT NULL, supplier_id TEXT NOT NULL DEFAULT '', status TEXT NOT NULL DEFAULT 'draft',
+          expected_at TEXT NOT NULL DEFAULT '', notes TEXT NOT NULL DEFAULT '', currency TEXT NOT NULL DEFAULT 'THB',
+          created_by_label TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS inventory_po_property ON inventory_purchase_orders(tenant_id, property_id, status, created_at);
+
+        CREATE TABLE IF NOT EXISTS inventory_purchase_order_lines (
+          id TEXT PRIMARY KEY, purchase_order_id TEXT NOT NULL, item_id TEXT NOT NULL, quantity REAL NOT NULL, received_quantity REAL NOT NULL DEFAULT 0,
+          unit_cost_minor INTEGER NOT NULL DEFAULT 0, updated_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS inventory_po_lines_order ON inventory_purchase_order_lines(purchase_order_id);
+
+        CREATE TABLE IF NOT EXISTS inventory_assets (
+          id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL, property_id TEXT NOT NULL, item_id TEXT NOT NULL DEFAULT '', name TEXT NOT NULL,
+          asset_tag TEXT NOT NULL DEFAULT '', serial_number TEXT NOT NULL DEFAULT '', room TEXT NOT NULL DEFAULT '', location_id TEXT NOT NULL DEFAULT '',
+          status TEXT NOT NULL DEFAULT 'in_service', purchase_date TEXT NOT NULL DEFAULT '', purchase_cost_minor INTEGER NOT NULL DEFAULT 0,
+          warranty_until TEXT NOT NULL DEFAULT '', next_service_at TEXT NOT NULL DEFAULT '', supplier_id TEXT NOT NULL DEFAULT '', notes TEXT NOT NULL DEFAULT '',
+          created_by_label TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS inventory_assets_property ON inventory_assets(tenant_id, property_id, status, room);
+
+        CREATE TABLE IF NOT EXISTS inventory_batches (
+          id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL, property_id TEXT NOT NULL, item_id TEXT NOT NULL, location_id TEXT NOT NULL,
+          batch_number TEXT NOT NULL DEFAULT '', received_at TEXT NOT NULL DEFAULT '', manufactured_at TEXT NOT NULL DEFAULT '', expiry_at TEXT NOT NULL DEFAULT '',
+          quantity REAL NOT NULL DEFAULT 0, updated_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS inventory_batches_expiry ON inventory_batches(tenant_id, property_id, expiry_at);
+
+        CREATE TABLE IF NOT EXISTS inventory_stocktakes (
+          id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL, property_id TEXT NOT NULL, location_id TEXT NOT NULL DEFAULT '', status TEXT NOT NULL DEFAULT 'open',
+          scope_label TEXT NOT NULL DEFAULT '', created_by_label TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL, completed_at TEXT NOT NULL DEFAULT '', updated_at TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS inventory_stocktake_lines (
+          id TEXT PRIMARY KEY, stocktake_id TEXT NOT NULL, item_id TEXT NOT NULL, expected_qty REAL NOT NULL DEFAULT 0, counted_qty REAL, variance_qty REAL, updated_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS inventory_stocktake_lines_take ON inventory_stocktake_lines(stocktake_id);
+
+        CREATE TABLE IF NOT EXISTS inventory_consumption_recipes (
+          id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL, property_id TEXT NOT NULL, name TEXT NOT NULL, event_key TEXT NOT NULL DEFAULT '', active INTEGER NOT NULL DEFAULT 1, updated_at TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS inventory_consumption_recipe_lines (
+          id TEXT PRIMARY KEY, recipe_id TEXT NOT NULL, item_id TEXT NOT NULL, quantity REAL NOT NULL DEFAULT 0, updated_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS inventory_recipe_lines_recipe ON inventory_consumption_recipe_lines(recipe_id);
+
         CREATE TABLE IF NOT EXISTS revenue_engine_settings (
           tenant_id TEXT NOT NULL,
           property_id TEXT NOT NULL DEFAULT '',
@@ -958,6 +1057,11 @@ export class ConciergeStore extends DurableObject {
         this.ctx.storage.sql.exec("ALTER TABLE income_records ADD COLUMN synced_at TEXT NOT NULL DEFAULT ''");
       } catch (_error) {
         // Fresh databases and upgraded deployments already have provider-sync source metadata.
+      }
+      try {
+        this.ctx.storage.sql.exec("ALTER TABLE inventory_assets ADD COLUMN next_service_at TEXT NOT NULL DEFAULT ''");
+      } catch (_error) {
+        // Fresh databases and upgraded deployments already have the asset service date column.
       }
       this.ctx.storage.sql.exec(
         "CREATE INDEX IF NOT EXISTS expense_records_business_date ON expense_records(business_id, expense_date, created_at)"
@@ -5385,6 +5489,166 @@ export class ConciergeStore extends DurableObject {
        WHERE a.tenant_id = ? ORDER BY a.created_at DESC LIMIT ?`,
       tenantId, limit
     ));
+  }
+
+  async mobileGetOperatorSettings(tenantIdValue, propertyIdValue = "") {
+    const tenantId = cleanText(tenantIdValue, 100); const propertyId = cleanText(propertyIdValue, 100);
+    if (!tenantId) return null;
+    return rows(this.ctx.storage.sql.exec(
+      `SELECT tenant_id AS tenantId, property_id AS propertyId, staff_language AS staffLanguage,
+              updated_by_user_id AS updatedByUserId, updated_at AS updatedAt
+       FROM property_operator_settings WHERE tenant_id = ? AND property_id = ? LIMIT 1`, tenantId, propertyId
+    ))[0] || null;
+  }
+
+  async mobileUpsertOperatorSettings(record = {}) {
+    const tenantId = cleanText(record.tenantId, 100); const propertyId = cleanText(record.propertyId, 100);
+    const staffLanguage = cleanText(record.staffLanguage, 20) || "en"; const now = cleanText(record.updatedAt, 40) || new Date().toISOString();
+    if (!tenantId || !propertyId) return { ok: false, error: "invalid_property" };
+    this.ctx.storage.sql.exec(
+      `INSERT INTO property_operator_settings (tenant_id, property_id, staff_language, updated_by_user_id, updated_at)
+       VALUES (?, ?, ?, ?, ?)
+       ON CONFLICT(tenant_id, property_id) DO UPDATE SET staff_language=excluded.staff_language, updated_by_user_id=excluded.updated_by_user_id, updated_at=excluded.updated_at`,
+      tenantId, propertyId, staffLanguage, cleanText(record.updatedByUserId, 100), now
+    );
+    return { ok: true, staffLanguage, updatedAt: now };
+  }
+
+  async mobileListInventoryLocations(tenantIdValue, propertyIdValue = "", limitValue = 100) {
+    const tenantId = cleanText(tenantIdValue, 100); const propertyId = cleanText(propertyIdValue, 100); const limit = Math.max(1, Math.min(500, Number(limitValue) || 100));
+    return rows(this.ctx.storage.sql.exec(
+      `SELECT id, name, department, parent_id AS parentId, active, created_by_label AS createdByLabel, created_at AS createdAt, updated_at AS updatedAt
+       FROM inventory_locations WHERE tenant_id = ? AND property_id = ? ORDER BY active DESC, name ASC LIMIT ?`, tenantId, propertyId, limit
+    )).map((item) => ({ ...item, active: Boolean(item.active) }));
+  }
+
+  async mobileCreateInventoryLocation(record = {}) {
+    const tenantId=cleanText(record.tenantId,100), propertyId=cleanText(record.propertyId,100), id=cleanText(record.id,100), name=cleanText(record.name,120);
+    const now=cleanText(record.createdAt,40)||new Date().toISOString(); if(!tenantId||!propertyId||!id||!name) return {ok:false,error:"invalid_location"};
+    this.ctx.storage.sql.exec(`INSERT INTO inventory_locations (id,tenant_id,property_id,name,department,parent_id,active,created_by_label,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?)`,
+      id,tenantId,propertyId,name,cleanText(record.department,100),cleanText(record.parentId,100),record.active===false?0:1,cleanText(record.createdByLabel,100),now,now);
+    return {ok:true,location:{id,name,department:cleanText(record.department,100),parentId:cleanText(record.parentId,100),active:true,createdAt:now,updatedAt:now}};
+  }
+
+  async mobileListInventoryItems(tenantIdValue, propertyIdValue = "", limitValue = 500) {
+    const tenantId=cleanText(tenantIdValue,100), propertyId=cleanText(propertyIdValue,100), limit=Math.max(1,Math.min(1000,Number(limitValue)||500));
+    return rows(this.ctx.storage.sql.exec(
+      `SELECT i.id,i.sku,i.name,i.category,i.item_class AS itemClass,i.unit,i.minimum_qty AS minimumQty,i.reorder_point AS reorderPoint,
+              i.par_level AS parLevel,i.maximum_qty AS maximumQty,i.unit_cost_minor AS unitCostMinor,i.currency,
+              i.preferred_supplier_id AS preferredSupplierId,i.active,i.created_at AS createdAt,i.updated_at AS updatedAt,
+              COALESCE(SUM(s.quantity),0) AS quantity
+       FROM inventory_items i LEFT JOIN inventory_stock s ON s.tenant_id=i.tenant_id AND s.property_id=i.property_id AND s.item_id=i.id
+       WHERE i.tenant_id=? AND i.property_id=? GROUP BY i.id ORDER BY i.active DESC,i.category ASC,i.name ASC LIMIT ?`, tenantId,propertyId,limit
+    ));
+  }
+
+  async mobileGetInventoryItem(tenantIdValue, propertyIdValue, idValue) {
+    const tenantId=cleanText(tenantIdValue,100), propertyId=cleanText(propertyIdValue,100), id=cleanText(idValue,100);
+    return rows(this.ctx.storage.sql.exec(
+      `SELECT i.id,i.sku,i.name,i.category,i.item_class AS itemClass,i.unit,i.minimum_qty AS minimumQty,i.reorder_point AS reorderPoint,
+              i.par_level AS parLevel,i.maximum_qty AS maximumQty,i.unit_cost_minor AS unitCostMinor,i.currency,
+              i.preferred_supplier_id AS preferredSupplierId,i.active,i.created_at AS createdAt,i.updated_at AS updatedAt,
+              COALESCE(SUM(s.quantity),0) AS quantity
+       FROM inventory_items i LEFT JOIN inventory_stock s ON s.tenant_id=i.tenant_id AND s.property_id=i.property_id AND s.item_id=i.id
+       WHERE i.tenant_id=? AND i.property_id=? AND i.id=? GROUP BY i.id LIMIT 1`, tenantId,propertyId,id
+    ))[0] || null;
+  }
+
+  async mobileUpsertInventoryItem(record = {}) {
+    const tenantId=cleanText(record.tenantId,100), propertyId=cleanText(record.propertyId,100), id=cleanText(record.id,100), name=cleanText(record.name,160);
+    const now=cleanText(record.createdAt,40)||new Date().toISOString(); if(!tenantId||!propertyId||!id||!name) return {ok:false,error:"invalid_item"};
+    this.ctx.storage.sql.exec(
+      `INSERT INTO inventory_items (id,tenant_id,property_id,sku,name,category,item_class,unit,minimum_qty,reorder_point,par_level,maximum_qty,unit_cost_minor,currency,preferred_supplier_id,active,created_by_label,created_at,updated_at)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+       ON CONFLICT(id) DO UPDATE SET sku=excluded.sku,name=excluded.name,category=excluded.category,item_class=excluded.item_class,unit=excluded.unit,
+       minimum_qty=excluded.minimum_qty,reorder_point=excluded.reorder_point,par_level=excluded.par_level,maximum_qty=excluded.maximum_qty,
+       unit_cost_minor=excluded.unit_cost_minor,currency=excluded.currency,preferred_supplier_id=excluded.preferred_supplier_id,active=excluded.active,updated_at=excluded.updated_at`,
+      id,tenantId,propertyId,cleanText(record.sku,80),name,cleanText(record.category,120)||"Other",cleanText(record.itemClass,30)||"consumable",cleanText(record.unit,40)||"unit",
+      Number(record.minimumQty)||0,Number(record.reorderPoint)||0,Number(record.parLevel)||0,Number(record.maximumQty)||0,Math.max(0,Math.round(Number(record.unitCostMinor)||0)),cleanText(record.currency,8)||"THB",
+      cleanText(record.preferredSupplierId,100),record.active===false?0:1,cleanText(record.createdByLabel||record.updatedByLabel,100),now,now);
+    return {ok:true,id};
+  }
+
+  async mobileInventoryStockByLocation(tenantIdValue, propertyIdValue, itemIdValue="") {
+    const tenantId=cleanText(tenantIdValue,100), propertyId=cleanText(propertyIdValue,100), itemId=cleanText(itemIdValue,100);
+    const clauses=["s.tenant_id = ?","s.property_id = ?"]; const args=[tenantId,propertyId]; if(itemId){clauses.push("s.item_id = ?");args.push(itemId);}
+    return rows(this.ctx.storage.sql.exec(
+      `SELECT s.item_id AS itemId,s.location_id AS locationId,l.name AS locationName,s.quantity,s.updated_at AS updatedAt
+       FROM inventory_stock s LEFT JOIN inventory_locations l ON l.id=s.location_id WHERE ${clauses.join(" AND ")} ORDER BY l.name ASC`,...args));
+  }
+
+  async mobileCreateInventoryMovement(record = {}) {
+    const tenantId=cleanText(record.tenantId,100), propertyId=cleanText(record.propertyId,100), id=cleanText(record.id,100), itemId=cleanText(record.itemId,100), type=cleanText(record.movementType,40);
+    const qty=Math.abs(Number(record.quantity)||0), from=cleanText(record.fromLocationId,100), to=cleanText(record.toLocationId,100), now=cleanText(record.createdAt,40)||new Date().toISOString();
+    if(!tenantId||!propertyId||!id||!itemId||!type||qty<=0) return {ok:false,error:"invalid_movement"};
+    const getQty=(loc)=> Number((rows(this.ctx.storage.sql.exec(`SELECT quantity FROM inventory_stock WHERE tenant_id=? AND property_id=? AND location_id=? AND item_id=? LIMIT 1`,tenantId,propertyId,loc,itemId))[0]||{}).quantity)||0;
+    const setQty=(loc,value)=> this.ctx.storage.sql.exec(`INSERT INTO inventory_stock (tenant_id,property_id,location_id,item_id,quantity,updated_at) VALUES (?,?,?,?,?,?) ON CONFLICT(tenant_id,property_id,location_id,item_id) DO UPDATE SET quantity=excluded.quantity,updated_at=excluded.updated_at`,tenantId,propertyId,loc,itemId,value,now);
+    if(type==="receive"){ if(!to) return {ok:false,error:"destination_required"}; setQty(to,getQty(to)+qty); }
+    else if(type==="transfer"){ if(!from||!to||from===to) return {ok:false,error:"transfer_locations_required"}; const current=getQty(from); if(current<qty) return {ok:false,error:"insufficient_stock"}; setQty(from,current-qty); setQty(to,getQty(to)+qty); }
+    else if(["consume","waste","damage","lost","expired","complimentary","staff_use"].includes(type)){ if(!from) return {ok:false,error:"source_required"}; const current=getQty(from); if(current<qty) return {ok:false,error:"insufficient_stock"}; setQty(from,current-qty); }
+    else { const loc=to||from; if(!loc) return {ok:false,error:"location_required"}; setQty(loc,Math.max(0,getQty(loc)+(to?qty:-qty))); }
+    this.ctx.storage.sql.exec(`INSERT INTO inventory_movements (id,tenant_id,property_id,item_id,movement_type,quantity,from_location_id,to_location_id,reason,unit_cost_minor,reference_type,reference_id,created_by_label,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      id,tenantId,propertyId,itemId,type,qty,from,to,cleanText(record.reason,300),Math.max(0,Math.round(Number(record.unitCostMinor)||0)),cleanText(record.referenceType,80),cleanText(record.referenceId,120),cleanText(record.createdByLabel,100),now);
+    return {ok:true,movement:{id,itemId,movementType:type,quantity:qty,fromLocationId:from,toLocationId:to,reason:cleanText(record.reason,300),createdAt:now}};
+  }
+
+  async mobileListInventorySuppliers(tenantIdValue, propertyIdValue="", limitValue=200) {
+    const tenantId=cleanText(tenantIdValue,100),propertyId=cleanText(propertyIdValue,100),limit=Math.max(1,Math.min(500,Number(limitValue)||200));
+    return rows(this.ctx.storage.sql.exec(`SELECT id,name,contact_name AS contactName,phone,email,notes,active,created_at AS createdAt,updated_at AS updatedAt FROM inventory_suppliers WHERE tenant_id=? AND property_id=? ORDER BY active DESC,name ASC LIMIT ?`,tenantId,propertyId,limit)).map(x=>({...x,active:Boolean(x.active)}));
+  }
+
+  async mobileUpsertInventorySupplier(record={}) {
+    const id=cleanText(record.id,100),tenantId=cleanText(record.tenantId,100),propertyId=cleanText(record.propertyId,100),name=cleanText(record.name,160),now=cleanText(record.createdAt,40)||new Date().toISOString();
+    if(!id||!tenantId||!propertyId||!name)return{ok:false,error:"invalid_supplier"};
+    this.ctx.storage.sql.exec(`INSERT INTO inventory_suppliers (id,tenant_id,property_id,name,contact_name,phone,email,notes,active,created_by_label,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name,contact_name=excluded.contact_name,phone=excluded.phone,email=excluded.email,notes=excluded.notes,active=excluded.active,updated_at=excluded.updated_at`,id,tenantId,propertyId,name,cleanText(record.contactName,120),cleanText(record.phone,50),cleanText(record.email,180),cleanText(record.notes,500),record.active===false?0:1,cleanText(record.createdByLabel,100),now,now);
+    return{ok:true,supplier:{id,name,contactName:cleanText(record.contactName,120),phone:cleanText(record.phone,50),email:cleanText(record.email,180),active:true,updatedAt:now}};
+  }
+
+  async mobileListInventoryPurchaseOrders(tenantIdValue, propertyIdValue="", limitValue=100) {
+    const tenantId=cleanText(tenantIdValue,100),propertyId=cleanText(propertyIdValue,100),limit=Math.max(1,Math.min(300,Number(limitValue)||100));
+    const orders=rows(this.ctx.storage.sql.exec(`SELECT p.id,p.supplier_id AS supplierId,s.name AS supplierName,p.status,p.expected_at AS expectedAt,p.notes,p.currency,p.created_by_label AS createdByLabel,p.created_at AS createdAt,p.updated_at AS updatedAt FROM inventory_purchase_orders p LEFT JOIN inventory_suppliers s ON s.id=p.supplier_id WHERE p.tenant_id=? AND p.property_id=? ORDER BY p.created_at DESC LIMIT ?`,tenantId,propertyId,limit));
+    for(const order of orders){ const lines=rows(this.ctx.storage.sql.exec(`SELECT l.id,l.item_id AS itemId,i.name AS itemName,l.quantity,l.received_quantity AS receivedQuantity,l.unit_cost_minor AS unitCostMinor FROM inventory_purchase_order_lines l LEFT JOIN inventory_items i ON i.id=l.item_id WHERE l.purchase_order_id=? ORDER BY i.name`,order.id)); order.lines=lines; order.totalMinor=Math.round(lines.reduce((sum,l)=>sum+(Number(l.quantity)||0)*(Number(l.unitCostMinor)||0),0)); }
+    return orders;
+  }
+
+  async mobileCreateInventoryPurchaseOrder(record={}) {
+    const id=cleanText(record.id,100),tenantId=cleanText(record.tenantId,100),propertyId=cleanText(record.propertyId,100),now=cleanText(record.createdAt,40)||new Date().toISOString();
+    if(!id||!tenantId||!propertyId||!Array.isArray(record.lines)||!record.lines.length)return{ok:false,error:"invalid_purchase_order"};
+    this.ctx.storage.sql.exec(`INSERT INTO inventory_purchase_orders (id,tenant_id,property_id,supplier_id,status,expected_at,notes,currency,created_by_label,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)`,id,tenantId,propertyId,cleanText(record.supplierId,100),cleanText(record.status,30)||"draft",cleanText(record.expectedAt,40),cleanText(record.notes,500),cleanText(record.currency,8)||"THB",cleanText(record.createdByLabel,100),now,now);
+    for(const line of record.lines){this.ctx.storage.sql.exec(`INSERT INTO inventory_purchase_order_lines (id,purchase_order_id,item_id,quantity,received_quantity,unit_cost_minor,updated_at) VALUES (?,?,?,?,0,?,?)`,`invpol_${crypto.randomUUID()}`,id,cleanText(line.itemId,100),Number(line.quantity)||0,Math.max(0,Math.round(Number(line.unitCostMinor)||0)),now);}
+    return{ok:true,id,purchaseOrder:{id,status:cleanText(record.status,30)||"draft",supplierId:cleanText(record.supplierId,100),expectedAt:cleanText(record.expectedAt,40),currency:cleanText(record.currency,8)||"THB",createdAt:now}};
+  }
+
+  async mobileUpdateInventoryPurchaseOrderStatus(record={}) {
+    const tenantId=cleanText(record.tenantId,100),propertyId=cleanText(record.propertyId,100),id=cleanText(record.id,100),next=cleanText(record.status,30),now=cleanText(record.updatedAt,40)||new Date().toISOString();
+    const order=rows(this.ctx.storage.sql.exec(`SELECT id,status FROM inventory_purchase_orders WHERE id=? AND tenant_id=? AND property_id=? LIMIT 1`,id,tenantId,propertyId))[0];
+    if(!order)return{ok:false,error:"purchase_order_not_found"};
+    const allowed={draft:new Set(["approved","cancelled"]),approved:new Set(["ordered","cancelled"]),ordered:new Set(["cancelled"]),partial:new Set([]),received:new Set([]),cancelled:new Set([])};
+    if(!allowed[order.status]?.has(next))return{ok:false,error:"invalid_purchase_order_transition",currentStatus:order.status};
+    this.ctx.storage.sql.exec(`UPDATE inventory_purchase_orders SET status=?,updated_at=? WHERE id=?`,next,now,id);
+    return{ok:true,id,status:next,previousStatus:order.status,updatedAt:now};
+  }
+
+  async mobileReceiveInventoryPurchaseOrder(record={}) {
+    const tenantId=cleanText(record.tenantId,100),propertyId=cleanText(record.propertyId,100),id=cleanText(record.id,100),locationId=cleanText(record.locationId,100),now=cleanText(record.createdAt,40)||new Date().toISOString();
+    if(!tenantId||!propertyId||!id||!locationId)return{ok:false,error:"invalid_request"};
+    const order=rows(this.ctx.storage.sql.exec(`SELECT id,status FROM inventory_purchase_orders WHERE id=? AND tenant_id=? AND property_id=? LIMIT 1`,id,tenantId,propertyId))[0]; if(!order)return{ok:false,error:"purchase_order_not_found"};
+    if(!["ordered","partial"].includes(order.status))return{ok:false,error:"purchase_order_not_receivable",currentStatus:order.status};
+    const lines=rows(this.ctx.storage.sql.exec(`SELECT id,item_id AS itemId,quantity,received_quantity AS receivedQuantity,unit_cost_minor AS unitCostMinor FROM inventory_purchase_order_lines WHERE purchase_order_id=?`,id));
+    const requested=new Map((Array.isArray(record.lines)?record.lines:[]).map(l=>[cleanText(l.itemId,100),Math.max(0,Number(l.quantity)||0)])); let allReceived=true;
+    for(const line of lines){const remaining=Math.max(0,(Number(line.quantity)||0)-(Number(line.receivedQuantity)||0)); const receiveQty=requested.size?Math.min(remaining,requested.get(line.itemId)||0):remaining; if(receiveQty>0){await this.mobileCreateInventoryMovement({id:`invmove_${crypto.randomUUID()}`,tenantId,propertyId,itemId:line.itemId,movementType:"receive",quantity:receiveQty,toLocationId:locationId,reason:`PO ${id} received`,unitCostMinor:line.unitCostMinor,referenceType:"purchase_order",referenceId:id,createdByLabel:cleanText(record.createdByLabel,100),createdAt:now}); this.ctx.storage.sql.exec(`UPDATE inventory_purchase_order_lines SET received_quantity=received_quantity+?,updated_at=? WHERE id=?`,receiveQty,now,line.id);} if((Number(line.receivedQuantity)||0)+receiveQty < Number(line.quantity)||0) allReceived=false;}
+    const status=allReceived?"received":"partial"; this.ctx.storage.sql.exec(`UPDATE inventory_purchase_orders SET status=?,updated_at=? WHERE id=?`,status,now,id); return{ok:true,id,status};
+  }
+
+  async mobileListInventoryAssets(tenantIdValue, propertyIdValue="", limitValue=300) {
+    const tenantId=cleanText(tenantIdValue,100),propertyId=cleanText(propertyIdValue,100),limit=Math.max(1,Math.min(1000,Number(limitValue)||300));
+    return rows(this.ctx.storage.sql.exec(`SELECT id,item_id AS itemId,name,asset_tag AS assetTag,serial_number AS serialNumber,room,location_id AS locationId,status,purchase_date AS purchaseDate,purchase_cost_minor AS purchaseCostMinor,warranty_until AS warrantyUntil,next_service_at AS nextServiceAt,supplier_id AS supplierId,notes,created_by_label AS createdByLabel,created_at AS createdAt,updated_at AS updatedAt FROM inventory_assets WHERE tenant_id=? AND property_id=? ORDER BY status ASC,room ASC,name ASC LIMIT ?`,tenantId,propertyId,limit));
+  }
+
+  async mobileUpsertInventoryAsset(record={}) {
+    const id=cleanText(record.id,100),tenantId=cleanText(record.tenantId,100),propertyId=cleanText(record.propertyId,100),name=cleanText(record.name,160),now=cleanText(record.createdAt,40)||new Date().toISOString(); if(!id||!tenantId||!propertyId||!name)return{ok:false,error:"invalid_asset"};
+    this.ctx.storage.sql.exec(`INSERT INTO inventory_assets (id,tenant_id,property_id,item_id,name,asset_tag,serial_number,room,location_id,status,purchase_date,purchase_cost_minor,warranty_until,next_service_at,supplier_id,notes,created_by_label,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET item_id=excluded.item_id,name=excluded.name,asset_tag=excluded.asset_tag,serial_number=excluded.serial_number,room=excluded.room,location_id=excluded.location_id,status=excluded.status,purchase_date=excluded.purchase_date,purchase_cost_minor=excluded.purchase_cost_minor,warranty_until=excluded.warranty_until,next_service_at=excluded.next_service_at,supplier_id=excluded.supplier_id,notes=excluded.notes,updated_at=excluded.updated_at`,id,tenantId,propertyId,cleanText(record.itemId,100),name,cleanText(record.assetTag,80),cleanText(record.serialNumber,120),cleanText(record.room,30),cleanText(record.locationId,100),cleanText(record.status,40)||"in_service",cleanText(record.purchaseDate,20),Math.max(0,Math.round(Number(record.purchaseCostMinor)||0)),cleanText(record.warrantyUntil,20),cleanText(record.nextServiceAt,20),cleanText(record.supplierId,100),cleanText(record.notes,500),cleanText(record.createdByLabel,100),now,now);
+    return{ok:true,asset:{id,name,assetTag:cleanText(record.assetTag,80),serialNumber:cleanText(record.serialNumber,120),room:cleanText(record.room,30),status:cleanText(record.status,40)||"in_service",warrantyUntil:cleanText(record.warrantyUntil,20),nextServiceAt:cleanText(record.nextServiceAt,20),updatedAt:now}};
   }
 
   async mobileGetRevenueSettings(tenantIdValue, propertyIdValue = "") {

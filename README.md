@@ -1,10 +1,11 @@
-# Guest Guide Platform with AI Concierge — The House v5.11.82
+# Guest Guide Platform with AI Concierge — The House v5.11.83
 
-## v5.11.82 — Copilot Daily-Attention Reliability Hotfix
+## v5.11.83 — Multilingual Staff Review + Inventory/Assets/Procurement Foundation
 
-v5.11.82 isolates live Copilot data sources so `What needs my attention today?` cannot collapse because one production source is degraded. Pair with Owner App v0.1.26.
+Adds property staff-language translation/review, physical hotel stock/location/movement/supplier/PO/asset foundations and Inventory-aware Copilot while preserving all mature production boundaries.
 
-## v5.11.79 — AI Review Safety & Wi-Fi Information Routing
+See `RELEASE_NOTES_v5.11.83.md`, `DEVELOPMENT_HANDOFF_v5.11.83_INVENTORY_TRANSLATION_FOUNDATION.md`, `VALIDATION_RESULTS_v5.11.83.md` and the cumulative handoff.
+
 
 v5.11.79 fixes the real Room 4 Wi-Fi production incident, keeps authorized Wi-Fi credentials visible to the linked guest, separates informational questions from operational task creation, adds side-effect-free AI draft approval, and requires an explicit independent owner decision before any reviewed AI draft may create a task/WhatsApp alert. Pair with Taoedge Owner App v0.1.22.
 

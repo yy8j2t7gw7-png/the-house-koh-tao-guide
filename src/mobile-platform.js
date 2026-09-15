@@ -13,6 +13,8 @@ import { createBookingOperationalTask } from "./operational-actions.js";
 import { handleOperationsCopilot } from "./operations-copilot.js";
 import { operationalRecipientGroup } from "./operations-routing.js";
 import { reservationSourceCapabilities } from "./reservation-model.js";
+import { normalizeStaffLanguage, staffLanguageLabel, translateOperatorText } from "./staff-translation.js";
+import { createAsset, createInventoryItem, createInventoryLocation, createInventoryMovement, createPurchaseOrder, createSupplier, inventoryOverview, receivePurchaseOrder, seedStarterInventory, updateInventoryItem, updatePurchaseOrderStatus } from "./inventory-api.js";
 
 const MOBILE_API_PREFIX = "/api/mobile/v1";
 const PASSWORD_ITERATIONS = 100000;
@@ -33,6 +35,7 @@ const DEFAULT_MODULES = [
   "analytics",
   "integrations",
   "staff_access",
+  "inventory",
   "channel_manager"
 ];
 
@@ -43,13 +46,15 @@ export const MOBILE_PERMISSION_MATRIX = Object.freeze({
     "operations.view", "housekeeping.update", "maintenance.view", "maintenance.create", "maintenance.resolve",
     "registration.status", "finance.view", "finance.import", "finance.expense_submit", "analytics.view", "integrations.view",
     "staff.manage", "licenses.view", "licenses.manage", "security.sessions",
-    "direct_stays.manage", "guest_documents.view", "listings_rates.view", "listings_rates.manage"
+    "direct_stays.manage", "guest_documents.view", "listings_rates.view", "listings_rates.manage",
+    "inventory.view", "inventory.adjust", "inventory.purchase", "inventory.manage", "property_settings.manage"
   ]),
   manager: Object.freeze([
     "home.view", "bookings.view", "calendar.view", "copilot.use", "booking_activity.create", "booking_activity.update",
     "messaging.view", "messaging.send", "messaging.ai_control",
     "operations.view", "housekeeping.update", "maintenance.view", "maintenance.create", "maintenance.resolve",
-    "registration.status", "finance.expense_submit", "analytics.view", "integrations.view", "direct_stays.manage", "listings_rates.view"
+    "registration.status", "finance.expense_submit", "analytics.view", "integrations.view", "direct_stays.manage", "listings_rates.view",
+    "inventory.view", "inventory.adjust", "inventory.purchase", "property_settings.manage"
   ]),
   staff: Object.freeze([
     "home.view", "bookings.view", "calendar.view", "copilot.use", "booking_activity.create", "booking_activity.update", "operations.view",
@@ -58,8 +63,8 @@ export const MOBILE_PERMISSION_MATRIX = Object.freeze({
 });
 
 export const MOBILE_DELEGATABLE_PERMISSIONS = Object.freeze({
-  manager: Object.freeze(["finance.view", "finance.expense_submit", "copilot.use"]),
-  staff: Object.freeze(["finance.expense_submit", "copilot.use"])
+  manager: Object.freeze(["finance.view", "finance.expense_submit", "copilot.use", "inventory.view", "inventory.adjust", "inventory.purchase", "inventory.manage"]),
+  staff: Object.freeze(["finance.expense_submit", "copilot.use", "inventory.view", "inventory.adjust"])
 });
 
 function sanitizePermissionOverrides(roleValue, input = {}) {
@@ -421,22 +426,29 @@ function publicLicense(record, validation = null) {
 
 async function ensureHouseLicense(store, tenantId, env, now = new Date().toISOString()) {
   let license = typeof store.mobileGetLicense === "function" ? await store.mobileGetLicense(tenantId) : null;
-  if (license || tenantId !== HOUSE_TENANT_ID || !env.MOBILE_LICENSE_SIGNING_SECRET || typeof store.mobileUpsertLicense !== "function") return license;
+  if (tenantId !== HOUSE_TENANT_ID || !env.MOBILE_LICENSE_SIGNING_SECRET || typeof store.mobileUpsertLicense !== "function") return license;
+  const currentModules = canonicalLicenseModules(license?.modules || license?.modulesJson);
+  const needsUpgrade = !license || DEFAULT_MODULES.some((moduleKey) => !currentModules.includes(moduleKey));
+  if (!needsUpgrade) return license;
+  const metadata = safeJson(license?.metadataJson, {});
   const record = {
     tenantId,
-    licenseId: "lic_house_owner_preview",
-    status: "active",
-    planKey: "house-owner-preview",
-    validFrom: now,
-    validUntil: "",
-    maxDevices: 8,
-    issuedBy: "taoedge-legacy-migration",
+    licenseId: license?.licenseId || "lic_house_owner_preview",
+    status: license?.status || "active",
+    planKey: license?.planKey || "house-owner-preview",
+    validFrom: license?.validFrom || now,
+    validUntil: license?.validUntil || "",
+    maxDevices: Number(license?.maxDevices) || 8,
+    issuedBy: license?.issuedBy || "taoedge-legacy-migration",
     modules: DEFAULT_MODULES,
-    metadata: { protectedMigration: true },
+    metadata: { ...metadata, protectedMigration: true, inventoryEntitlementAddedAt: metadata.inventoryEntitlementAddedAt || now },
     updatedAt: now
   };
   record.signature = await signLicense(record, env);
   await store.mobileUpsertLicense(record);
+  if (typeof store.mobileUpsertEntitlements === "function") {
+    await store.mobileUpsertEntitlements(tenantId, DEFAULT_MODULES, { status: "active", source: "house_preview_upgrade", updatedAt: now });
+  }
   license = await store.mobileGetLicense(tenantId);
   return license;
 }
@@ -1268,9 +1280,10 @@ async function authenticate(request, env, store) {
   }
   const permissions = new Set(parsePermissions(record));
   const properties = await store.mobileListProperties(record.tenantId);
-  const entitlements = await store.mobileListEntitlements(record.tenantId);
-  let modules = activeModuleKeys(entitlements, now);
+  let entitlements = await store.mobileListEntitlements(record.tenantId);
   const license = await ensureHouseLicense(store, record.tenantId, env, now);
+  if (record.tenantId === HOUSE_TENANT_ID) entitlements = await store.mobileListEntitlements(record.tenantId);
+  let modules = activeModuleKeys(entitlements, now);
   const licenseCheck = await licenseValidation(license, env, now);
   if (!licenseCheck.ok) return { error: json({ error: licenseCheck.error }, licenseCheck.error === "license_service_unavailable" ? 503 : 402) };
   if (licenseCheck.enforced) {
@@ -1646,8 +1659,67 @@ async function handleProtected(request, env, path, store, handlers = {}) {
     const thread = await store.getMessagingThread(id);
     if (!thread) return json({ error: "not_found" }, 404);
     const messages = await store.listMessagingMessages(id, 100);
+    const operatorSettings = typeof store.mobileGetOperatorSettings === "function"
+      ? await store.mobileGetOperatorSettings(record.tenantId, access.properties?.[0]?.id || HOUSE_PROPERTY_ID)
+      : null;
+    const staffLanguage = normalizeStaffLanguage(operatorSettings?.staffLanguage || "en");
     await store.markMessagingThreadRead(id, access.now);
-    return json({ ok: true, thread: publicThread({ ...thread, unreadCount: 0 }), messages });
+    return json({ ok: true, thread: publicThread({ ...thread, unreadCount: 0 }), messages, staffLanguage, staffLanguageLabel: staffLanguageLabel(staffLanguage) });
+  }
+
+  if (path === `${MOBILE_API_PREFIX}/settings/operator-language` && request.method === "GET") {
+    const settings = typeof store.mobileGetOperatorSettings === "function"
+      ? await store.mobileGetOperatorSettings(record.tenantId, access.properties?.[0]?.id || HOUSE_PROPERTY_ID)
+      : null;
+    const staffLanguage = normalizeStaffLanguage(settings?.staffLanguage || "en");
+    return json({ ok: true, staffLanguage, staffLanguageLabel: staffLanguageLabel(staffLanguage) });
+  }
+
+  if (path === `${MOBILE_API_PREFIX}/settings/operator-language` && request.method === "POST") {
+    const denied = requirePermission(publicAccess, "property_settings.manage");
+    if (denied) return denied;
+    let body; try { body = await readJson(request); } catch (response) { return response; }
+    const staffLanguage = normalizeStaffLanguage(body?.staffLanguage);
+    if (typeof store.mobileUpsertOperatorSettings !== "function") return json({ error: "settings_unavailable" }, 503);
+    await store.mobileUpsertOperatorSettings({ tenantId: record.tenantId, propertyId: access.properties?.[0]?.id || HOUSE_PROPERTY_ID, staffLanguage, updatedByUserId: record.userId, updatedAt: access.now });
+    await store.mobileRecordAudit({ tenantId: record.tenantId, userId: record.userId, membershipId: record.membershipId, action: "operator_language_changed", reference: `property:${access.properties?.[0]?.id || HOUSE_PROPERTY_ID}`, metadata: { staffLanguage }, createdAt: access.now });
+    return json({ ok: true, staffLanguage, staffLanguageLabel: staffLanguageLabel(staffLanguage) });
+  }
+
+  if (path === `${MOBILE_API_PREFIX}/inbox/translate` && request.method === "POST") {
+    const denied = requireCapability(publicAccess, "messaging.view", "unified_messaging");
+    if (denied) return denied;
+    let body; try { body = await readJson(request); } catch (response) { return response; }
+    const messageId = cleanText(body?.messageId, 120);
+    const referenceMessageId = cleanText(body?.referenceMessageId, 120);
+    let sourceText = "";
+    let referenceText = "";
+    if (messageId) {
+      const stored = typeof store.getMessagingMessage === "function" ? await store.getMessagingMessage(messageId) : null;
+      if (!stored) return json({ error: "message_not_found" }, 404);
+      sourceText = cleanText(stored.body, 4000);
+    } else {
+      const customDenied = requirePermission(publicAccess, "messaging.ai_control");
+      if (customDenied) return customDenied;
+      sourceText = cleanText(body?.text, 4000);
+    }
+    if (referenceMessageId) {
+      const reference = typeof store.getMessagingMessage === "function" ? await store.getMessagingMessage(referenceMessageId) : null;
+      if (!reference) return json({ error: "reference_message_not_found" }, 404);
+      referenceText = cleanText(reference.body, 4000);
+    }
+    if (!sourceText) return json({ error: "text_required" }, 400);
+    const operatorSettings = typeof store.mobileGetOperatorSettings === "function"
+      ? await store.mobileGetOperatorSettings(record.tenantId, access.properties?.[0]?.id || HOUSE_PROPERTY_ID)
+      : null;
+    const targetLanguage = body?.targetLanguage === "match_reference" ? "match_reference" : normalizeStaffLanguage(body?.targetLanguage || operatorSettings?.staffLanguage || "en");
+    try {
+      const translated = await translateOperatorText(env, { text: sourceText, targetLanguage, referenceText });
+      await store.mobileRecordAudit({ tenantId: record.tenantId, userId: record.userId, membershipId: record.membershipId, action: "message_translation_requested", reference: messageId ? `message:${messageId}` : "draft:operator-edit", metadata: { targetLanguage: translated.targetLanguage, detectedSourceLanguage: translated.detectedSourceLanguage, sourceLength: sourceText.length }, createdAt: access.now });
+      return json({ ok: true, ...translated, targetLanguageLabel: staffLanguageLabel(translated.targetLanguage) });
+    } catch (error) {
+      return json({ error: cleanText(error?.message, 120) || "translation_unavailable" }, 503);
+    }
   }
 
   if (path === `${MOBILE_API_PREFIX}/inbox/send` && request.method === "POST") {
@@ -2010,6 +2082,92 @@ async function handleProtected(request, env, path, store, handlers = {}) {
     return json(buildAnalyticsPayload({ range, reservations, roomsTotal, operations, finance }));
   }
 
+  if (path === `${MOBILE_API_PREFIX}/inventory` && request.method === "GET") {
+    const denied = requireCapability(publicAccess, "inventory.view", "inventory");
+    if (denied) return denied;
+    try { return json({ ok: true, ...(await inventoryOverview({ store, access: publicAccess })) }); }
+    catch (error) { return json({ error: "inventory_unavailable", detail: cleanText(error?.message, 120) }, 503); }
+  }
+
+  if (path === `${MOBILE_API_PREFIX}/inventory/items` && request.method === "POST") {
+    const denied = requireCapability(publicAccess, "inventory.manage", "inventory"); if (denied) return denied;
+    let body; try { body = await readJson(request); } catch (response) { return response; }
+    const outcome = body?.id ? await updateInventoryItem({ store, access: publicAccess, body, actorLabel: record.displayName }) : await createInventoryItem({ store, access: publicAccess, body, actorLabel: record.displayName });
+    if (!outcome?.ok) return json({ error: outcome?.error || "inventory_item_failed" }, 400);
+    await store.mobileRecordAudit({ tenantId: record.tenantId, userId: record.userId, membershipId: record.membershipId, action: body?.id ? "inventory_item_updated" : "inventory_item_created", reference: `inventory:${outcome.item?.id || body?.id || ""}`, metadata: { name: outcome.item?.name || "" }, createdAt: access.now });
+    return json(outcome, body?.id ? 200 : 201);
+  }
+
+  if (path === `${MOBILE_API_PREFIX}/inventory/seed` && request.method === "POST") {
+    const denied = requireCapability(publicAccess, "inventory.manage", "inventory"); if (denied) return denied;
+    const outcome = await seedStarterInventory({ store, access: publicAccess, actorLabel: record.displayName });
+    await store.mobileRecordAudit({ tenantId: record.tenantId, userId: record.userId, membershipId: record.membershipId, action: "inventory_starter_catalogue_seeded", reference: `property:${access.properties?.[0]?.id || HOUSE_PROPERTY_ID}`, metadata: { created: Number(outcome?.created) || 0 }, createdAt: access.now });
+    return json(outcome);
+  }
+
+  if (path === `${MOBILE_API_PREFIX}/inventory/locations` && request.method === "POST") {
+    const denied = requireCapability(publicAccess, "inventory.manage", "inventory"); if (denied) return denied;
+    let body; try { body = await readJson(request); } catch (response) { return response; }
+    const outcome = await createInventoryLocation({ store, access: publicAccess, body, actorLabel: record.displayName });
+    if (!outcome?.ok) return json({ error: outcome?.error || "inventory_location_failed" }, 400);
+    await store.mobileRecordAudit({ tenantId: record.tenantId, userId: record.userId, membershipId: record.membershipId, action: "inventory_location_created", reference: `inventory-location:${outcome.location?.id || ""}`, metadata: { name: outcome.location?.name || "" }, createdAt: access.now });
+    return json(outcome, 201);
+  }
+
+  if (path === `${MOBILE_API_PREFIX}/inventory/movements` && request.method === "POST") {
+    const denied = requireCapability(publicAccess, "inventory.adjust", "inventory"); if (denied) return denied;
+    let body; try { body = await readJson(request); } catch (response) { return response; }
+    const outcome = await createInventoryMovement({ store, access: publicAccess, body, actorLabel: record.displayName });
+    if (!outcome?.ok) return json({ error: outcome?.error || "inventory_movement_failed" }, outcome?.error === "insufficient_stock" ? 409 : 400);
+    await store.mobileRecordAudit({ tenantId: record.tenantId, userId: record.userId, membershipId: record.membershipId, action: "inventory_movement_created", reference: `inventory:${body?.itemId || ""}`, metadata: { movementType: body?.movementType || "adjust", quantity: Number(body?.quantity) || 0, reason: cleanText(body?.reason, 120) }, createdAt: access.now });
+    return json(outcome, 201);
+  }
+
+  if (path === `${MOBILE_API_PREFIX}/inventory/suppliers` && request.method === "POST") {
+    const denied = requireCapability(publicAccess, "inventory.purchase", "inventory"); if (denied) return denied;
+    let body; try { body = await readJson(request); } catch (response) { return response; }
+    const outcome = await createSupplier({ store, access: publicAccess, body, actorLabel: record.displayName });
+    if (!outcome?.ok) return json({ error: outcome?.error || "supplier_failed" }, 400);
+    await store.mobileRecordAudit({ tenantId: record.tenantId, userId: record.userId, membershipId: record.membershipId, action: "inventory_supplier_created", reference: `supplier:${outcome.supplier?.id || outcome.id || ""}`, metadata: { name: cleanText(body?.name, 120) }, createdAt: access.now });
+    return json(outcome, 201);
+  }
+
+  if (path === `${MOBILE_API_PREFIX}/inventory/purchase-orders` && request.method === "POST") {
+    const denied = requireCapability(publicAccess, "inventory.purchase", "inventory"); if (denied) return denied;
+    let body; try { body = await readJson(request); } catch (response) { return response; }
+    const outcome = await createPurchaseOrder({ store, access: publicAccess, body, actorLabel: record.displayName });
+    if (!outcome?.ok) return json({ error: outcome?.error || "purchase_order_failed" }, 400);
+    await store.mobileRecordAudit({ tenantId: record.tenantId, userId: record.userId, membershipId: record.membershipId, action: "inventory_purchase_order_created", reference: `purchase-order:${outcome.id || outcome.purchaseOrder?.id || ""}`, metadata: { supplierId: cleanText(body?.supplierId, 100), lines: Array.isArray(body?.lines) ? body.lines.length : 0 }, createdAt: access.now });
+    return json(outcome, 201);
+  }
+
+  if (path === `${MOBILE_API_PREFIX}/inventory/purchase-orders/status` && request.method === "POST") {
+    const denied = requireCapability(publicAccess, "inventory.purchase", "inventory"); if (denied) return denied;
+    let body; try { body = await readJson(request); } catch (response) { return response; }
+    const outcome = await updatePurchaseOrderStatus({ store, access: publicAccess, body, actorLabel: record.displayName });
+    if (!outcome?.ok) return json({ error: outcome?.error || "purchase_order_status_failed", currentStatus: outcome?.currentStatus || "" }, outcome?.error === "invalid_purchase_order_transition" ? 409 : 400);
+    await store.mobileRecordAudit({ tenantId: record.tenantId, userId: record.userId, membershipId: record.membershipId, action: `inventory_purchase_order_${outcome.status}`, reference: `purchase-order:${body?.id || ""}`, metadata: { previousStatus: outcome.previousStatus || "", status: outcome.status }, createdAt: access.now });
+    return json(outcome);
+  }
+
+  if (path === `${MOBILE_API_PREFIX}/inventory/purchase-orders/receive` && request.method === "POST") {
+    const denied = requireCapability(publicAccess, "inventory.purchase", "inventory"); if (denied) return denied;
+    let body; try { body = await readJson(request); } catch (response) { return response; }
+    const outcome = await receivePurchaseOrder({ store, access: publicAccess, body, actorLabel: record.displayName });
+    if (!outcome?.ok) return json({ error: outcome?.error || "purchase_order_receive_failed" }, 400);
+    await store.mobileRecordAudit({ tenantId: record.tenantId, userId: record.userId, membershipId: record.membershipId, action: "inventory_purchase_order_received", reference: `purchase-order:${body?.id || ""}`, metadata: { locationId: cleanText(body?.locationId, 100) }, createdAt: access.now });
+    return json(outcome);
+  }
+
+  if (path === `${MOBILE_API_PREFIX}/inventory/assets` && request.method === "POST") {
+    const denied = requireCapability(publicAccess, "inventory.manage", "inventory"); if (denied) return denied;
+    let body; try { body = await readJson(request); } catch (response) { return response; }
+    const outcome = await createAsset({ store, access: publicAccess, body, actorLabel: record.displayName });
+    if (!outcome?.ok) return json({ error: outcome?.error || "asset_failed" }, 400);
+    await store.mobileRecordAudit({ tenantId: record.tenantId, userId: record.userId, membershipId: record.membershipId, action: "inventory_asset_created", reference: `asset:${outcome.asset?.id || outcome.id || ""}`, metadata: { name: cleanText(body?.name, 120), room: cleanText(body?.room, 30) }, createdAt: access.now });
+    return json(outcome, 201);
+  }
+
   if (path === `${MOBILE_API_PREFIX}/operations` && request.method === "GET") {
     const denied = requireCapability(publicAccess, "operations.view", "core");
     if (denied) return denied;
@@ -2335,7 +2493,7 @@ async function handleProtected(request, env, path, store, handlers = {}) {
       messaging: messagingAllowed ? unifiedMessagingConfiguration(env) : undefined,
       financeAutomation: financeAllowed ? beds24FinanceSyncConfiguration(env) : undefined,
       connectionHealth,
-      apiContract: { backendVersion: "5.11.82", mobileApiVersion: "v1", listingsRatesRoute: `${MOBILE_API_PREFIX}/listings-rates`, directStayOperations: true },
+      apiContract: { backendVersion: "5.11.83", mobileApiVersion: "v1", listingsRatesRoute: `${MOBILE_API_PREFIX}/listings-rates`, directStayOperations: true },
       product: {
         workingName: "Taoedge Owner App",
         commercialBrandPending: true,

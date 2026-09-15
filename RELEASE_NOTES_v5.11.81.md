@@ -1,36 +1,32 @@
-# RELEASE NOTES — Backend v5.11.81
-## Unified Operational Tasks & Copilot Reliability
+# The House / Taoedge Backend v5.11.81 — Unified Tasks & Copilot Reliability
 
-### Purpose
-Make an operational task a persistent Taoedge record instead of only an alert side effect, and make the Copilot's most important daily-priority question reliable without depending on a model call.
+## Release purpose
+Turn confirmed AI Support room work into persistent operational tasks instead of alert-only events, add a shared Operations task feed, and make the core “What needs my attention today?” question deterministic and reliable even when generative AI is unavailable.
 
-### What changed
-- Added a canonical `operational_tasks` store for room- and booking-linked work.
-- Copilot-created room tasks now persist in the shared task store as well as using the existing protected WhatsApp alert route.
-- Booking-created operational tasks now also persist in the shared task store while preserving the existing booking activity timeline.
-- Reviewed Unified Messaging operational actions now create the same canonical task record.
-- WhatsApp `RECEIVED` / `RESOLVE` alert actions update both booking activity and the canonical task status.
-- Mobile Operations payload exposes the unified task list.
-- Added guarded task-status endpoint for `received` / `resolved` transitions; existing backend permissions remain authoritative.
-- Added due-time parsing for simple `today/tomorrow + time` instructions so tasks can surface overdue/due-today state.
-- `What needs my attention today?` is now answered deterministically from current property data (rooms, housekeeping, maintenance, tasks, registrations, permitted Inbox state) before any generative AI call.
-- Copilot live context now includes open/overdue/due-today tasks.
-- Backend API contract advanced to `5.11.81`.
+## What changed
+- Added persistent `operational_tasks` storage for room- and booking-linked work.
+- New room tasks created by AI Support now persist with room, category, description, timing/due data, route, alert, delivery state, creator, status and audit context.
+- Booking-created tasks continue to appear in Booking activity and are also represented in the shared operational task store.
+- Existing historical booking tasks are backfilled into the shared task store on store initialization.
+- WhatsApp `RECEIVED` / `RESOLVE` alert actions now update the shared operational task status as well as existing booking/maintenance state.
+- Mobile Operations payload now includes the shared task list.
+- Added protected task status endpoint for Received / Resolved actions.
+- “What needs my attention today?” is generated from structured live operational data before the AI model is needed.
+- AI Support understands ordinary phrasing such as “Room 6 needs the toilet fixed tomorrow 12 pm” even in deterministic fallback mode.
+- Validated app-screen booking context can be used for contextual instructions such as “bring two extra towels”; explicit room/booking wording always wins.
+- Confirmed Copilot responses now return the persistent task ID so clients can link directly to the created task.
 
-### Task-linking rule
-- A global Copilot instruction that names only a room creates a **room task**. It is not silently attached to whichever booking happens to occupy that room.
-- A booking task is linked only when a booking is explicitly identified or the user deliberately enters Copilot from booking context and the booking is validated server-side.
-- Unknown rooms/bookings fail closed and require clarification.
-
-### Preserved safety boundaries
-- Mature Dashboard/Concierge routing remains authoritative.
-- No task is created before explicit Copilot confirmation.
+## Safety boundaries preserved
+- No action is executed from natural language without the existing signed proposal + explicit confirmation boundary.
+- Server permissions remain authoritative.
+- Unknown rooms/bookings are rejected rather than guessed.
+- Existing Dashboard/Concierge routing, lost-key, passport, Finance, OTA, maintenance and housekeeping rules remain preserved.
+- Full Beds24 Channel Manager remains separately gated/off unless explicitly enabled.
 - Provider credentials remain server-side.
-- `copilot.use` does not grant action authority; task execution still requires the appropriate operational permission.
-- Full Beds24 Channel Manager remains separately gated/off.
-- Physical hotel Inventory / Assets / Procurement is still a pending module and is not confused with OTA availability inventory.
 
-### Validation
+## Validation
 - Full backend regression suite: **382 / 382 passed**.
-- New Copilot tests include persistent room tasks, deterministic daily attention, unknown-room rejection and signed-proposal tamper protection.
-- Source syntax checks passed for changed backend files.
+- All backend JavaScript source syntax checks passed.
+
+## Deployment order
+Deploy backend v5.11.81 before Owner App v0.1.25.

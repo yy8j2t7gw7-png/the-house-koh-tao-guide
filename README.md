@@ -1,4 +1,8 @@
-# Guest Guide Platform with AI Concierge — The House v5.11.79
+# Guest Guide Platform with AI Concierge — The House v5.11.82
+
+## v5.11.82 — Copilot Daily-Attention Reliability Hotfix
+
+v5.11.82 isolates live Copilot data sources so `What needs my attention today?` cannot collapse because one production source is degraded. Pair with Owner App v0.1.26.
 
 ## v5.11.79 — AI Review Safety & Wi-Fi Information Routing
 

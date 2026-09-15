@@ -1,11 +1,19 @@
-# VALIDATION RESULTS — Backend v5.11.81
+# Validation Results — Backend v5.11.81
 
-- `npm test`: **382 / 382 passed**.
-- Changed backend source syntax checks: **PASS**.
-- Operations Copilot proposal-only safety: **PASS**.
-- Confirmed Copilot room task persists in canonical task store: **PASS**.
-- Deterministic `What needs my attention today?`: **PASS**.
-- Unknown-room rejection: **PASS**.
-- Signed proposal tamper protection: **PASS**.
-- Existing Concierge / lost-key / registration / Finance / OTA / messaging / security regression suite remains green.
-- No live production deployment is claimed by this source artifact.
+## Result
+**PASS**
+
+- Full automated test suite: **382 / 382 passed**.
+- Operations Copilot tests cover:
+  - proposal-before-execution;
+  - signed confirmation and tamper protection;
+  - persistent shared room task creation;
+  - deterministic daily-attention summary;
+  - natural room-work phrasing without the word “task”;
+  - validated booking-screen context;
+  - unknown-room rejection.
+- All `src/*.js` syntax checks passed with Node.
+
+## Not claimed
+- No live production deployment or live WhatsApp delivery test is claimed by this artifact validation.
+- Production Durable Object migration/backfill must be verified after deployment.

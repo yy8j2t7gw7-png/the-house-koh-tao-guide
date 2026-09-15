@@ -40,6 +40,33 @@ function bool(value) {
   return value === true || String(value || "").toLowerCase() === "true";
 }
 
+function asArray(value) {
+  return Array.isArray(value) ? value : [];
+}
+
+function setLikeValues(value) {
+  if (value instanceof Set) return [...value];
+  if (Array.isArray(value)) return value;
+  return [];
+}
+
+function emptyLiveOperationalContext(access, sourceHealth = {}) {
+  const properties = asArray(access?.properties);
+  return {
+    property: properties[0]?.displayName || properties[0]?.name || "Current property",
+    role: access?.record?.role || "staff",
+    permissions: setLikeValues(access?.permissions).sort(),
+    modules: setLikeValues(access?.modules).sort(),
+    attention: {
+      date: bangkokDate(0), arrivalsToday: 0, departuresToday: 0, arrivalsTomorrow: 0, dirtyRooms: [], readyRooms: [],
+      pendingHousekeeping: 0, openMaintenance: 0, urgentMaintenance: 0, openTasks: 0, overdueTasks: 0, dueTodayTasks: 0,
+      pendingRegistrations: 0, inbox: null
+    },
+    reservations: [], roomStates: [], pendingHousekeeping: [], openMaintenance: [], openTasks: [], pendingRegistrationCount: 0,
+    sourceHealth: { operations: false, overview: false, inbox: false, tasks: false, ...sourceHealth }
+  };
+}
+
 async function readBody(request) {
   const length = Number(request.headers.get("content-length") || 0);
   if (length > 24_000) throw new Error("request_too_large");
@@ -82,82 +109,77 @@ function bangkokDate(offsetDays = 0) {
 
 async function liveOperationalContext(store, access) {
   const canSeeInbox = access?.permissions?.has?.("messaging.view") === true;
-  const [operations, overview, threads, operationalTasks] = await Promise.all([
-    store.getStayOperationsOverview().catch(() => ({ reservations: [], housekeepingStatuses: [], housekeepingTasks: [] })),
-    store.getAdminOverview().catch(() => ({ maintenanceReports: [], totals: {} })),
-    canSeeInbox && typeof store.listMessagingThreads === "function"
-      ? store.listMessagingThreads(60).catch(() => [])
-      : Promise.resolve([]),
-    typeof store.mobileListOperationalTasks === "function"
-      ? store.mobileListOperationalTasks(200).catch(() => [])
-      : Promise.resolve([])
-  ]);
+  const requests = [
+    typeof store?.getStayOperationsOverview === "function" ? store.getStayOperationsOverview() : Promise.reject(new Error("operations_unavailable")),
+    typeof store?.getAdminOverview === "function" ? store.getAdminOverview() : Promise.reject(new Error("overview_unavailable")),
+    canSeeInbox && typeof store?.listMessagingThreads === "function" ? store.listMessagingThreads(60) : Promise.resolve([]),
+    typeof store?.mobileListOperationalTasks === "function" ? store.mobileListOperationalTasks(200) : Promise.resolve([])
+  ];
+  const [operationsResult, overviewResult, threadsResult, tasksResult] = await Promise.allSettled(requests);
+  const sourceHealth = {
+    operations: operationsResult.status === "fulfilled",
+    overview: overviewResult.status === "fulfilled",
+    inbox: !canSeeInbox || threadsResult.status === "fulfilled",
+    tasks: tasksResult.status === "fulfilled"
+  };
+  const operations = operationsResult.status === "fulfilled" && operationsResult.value && typeof operationsResult.value === "object" ? operationsResult.value : {};
+  const overview = overviewResult.status === "fulfilled" && overviewResult.value && typeof overviewResult.value === "object" ? overviewResult.value : {};
+  const threads = threadsResult.status === "fulfilled" ? asArray(threadsResult.value) : [];
+  const operationalTasks = tasksResult.status === "fulfilled" ? asArray(tasksResult.value) : [];
   const role = access?.record?.role || "staff";
   const today = bangkokDate(0);
   const tomorrow = bangkokDate(1);
-  const sourceReservations = operations?.reservations || [];
+  const sourceReservations = asArray(operations?.reservations);
   const reservations = sourceReservations.slice(0, 120).map((item) => ({
-    id: cleanText(item.id, 120),
-    room: cleanText(item.room, 30),
-    guestName: roleGuestName(item, role),
-    checkInDate: cleanText(item.checkInDate, 20),
-    checkOutDate: cleanText(item.checkOutDate, 20),
-    status: cleanText(item.status, 30),
-    lateCheckoutTime: cleanText(item.lateCheckoutTime, 30),
-    plannedDepartureTime: cleanText(item.plannedDepartureTime, 30)
+    id: cleanText(item?.id, 120), room: cleanText(item?.room, 30), guestName: roleGuestName(item, role),
+    checkInDate: cleanText(item?.checkInDate, 20), checkOutDate: cleanText(item?.checkOutDate, 20),
+    status: cleanText(item?.status, 30), lateCheckoutTime: cleanText(item?.lateCheckoutTime, 30),
+    plannedDepartureTime: cleanText(item?.plannedDepartureTime, 30)
   }));
-  const roomStates = (operations?.housekeepingStatuses || []).slice(0, 120).map((item) => ({
-    room: cleanText(item.room, 30), status: cleanText(item.status, 30), updatedAt: cleanText(item.updatedAt, 40)
+  const roomStates = asArray(operations?.housekeepingStatuses).slice(0, 120).map((item) => ({
+    room: cleanText(item?.room, 30), status: cleanText(item?.status, 30), updatedAt: cleanText(item?.updatedAt, 40)
   }));
-  const pendingHousekeeping = (operations?.housekeepingTasks || [])
-    .filter((item) => ["pending", "received"].includes(cleanText(item.status, 30).toLowerCase()))
+  const pendingHousekeeping = asArray(operations?.housekeepingTasks)
+    .filter((item) => ["pending", "received"].includes(cleanText(item?.status, 30).toLowerCase()))
     .slice(0, 40)
-    .map((item) => ({
-      id: cleanText(item.id, 120), room: cleanText(item.room, 30), status: cleanText(item.status, 30),
-      priority: bool(item.priority), requestedArrival: cleanText(item.requestedArrival, 40)
-    }));
-  const maintenance = (overview?.maintenanceReports || []).filter((item) => cleanText(item.status, 30) !== "resolved").slice(0, 40).map((item) => ({
-    id: cleanText(item.id, 120), room: cleanText(item.room, 30), issueType: cleanText(item.issueType, 120), severity: cleanText(item.severity, 30), status: cleanText(item.status, 30)
-  }));
+    .map((item) => ({ id: cleanText(item?.id, 120), room: cleanText(item?.room, 30), status: cleanText(item?.status, 30), priority: bool(item?.priority), requestedArrival: cleanText(item?.requestedArrival, 40) }));
+  const maintenance = asArray(overview?.maintenanceReports)
+    .filter((item) => cleanText(item?.status, 30) !== "resolved")
+    .slice(0, 40)
+    .map((item) => ({ id: cleanText(item?.id, 120), room: cleanText(item?.room, 30), issueType: cleanText(item?.issueType, 120), severity: cleanText(item?.severity, 30), status: cleanText(item?.status, 30) }));
   const inbox = canSeeInbox ? {
-    unreadMessages: (threads || []).reduce((sum, item) => sum + (Number(item?.unreadCount) || 0), 0),
-    needsHuman: (threads || []).filter((item) => item?.needsHuman).length
+    unreadMessages: threads.reduce((sum, item) => sum + (Number(item?.unreadCount) || 0), 0),
+    needsHuman: threads.filter((item) => item?.needsHuman).length
   } : null;
-  const openTasks = (operationalTasks || []).filter((item) => cleanText(item.status, 30) !== "resolved").slice(0, 80).map((item) => ({
-    id: cleanText(item.id, 120), reservationId: cleanText(item.reservationId, 120), room: cleanText(item.room, 30),
-    category: cleanText(item.category, 60), body: cleanText(item.body, 300), timing: cleanText(item.timing, 180),
-    dueAt: cleanText(item.dueAt, 40), status: cleanText(item.status, 30), assigneeLabel: cleanText(item.assigneeLabel, 120)
-  }));
+  const openTasks = operationalTasks
+    .filter((item) => cleanText(item?.status, 30) !== "resolved")
+    .slice(0, 80)
+    .map((item) => ({
+      id: cleanText(item?.id, 120), reservationId: cleanText(item?.reservationId, 120), room: cleanText(item?.room, 30),
+      category: cleanText(item?.category, 60), body: cleanText(item?.body, 300), timing: cleanText(item?.timing, 180),
+      dueAt: cleanText(item?.dueAt, 40), status: cleanText(item?.status, 30), assigneeLabel: cleanText(item?.assigneeLabel, 120)
+    }));
   const nowMs = Date.now();
   const todayEndMs = Date.parse(`${today}T23:59:59+07:00`);
   const attention = {
     date: today,
-    arrivalsToday: sourceReservations.filter((item) => cleanText(item.checkInDate, 20) === today).length,
-    departuresToday: sourceReservations.filter((item) => cleanText(item.checkOutDate, 20) === today).length,
-    arrivalsTomorrow: sourceReservations.filter((item) => cleanText(item.checkInDate, 20) === tomorrow).length,
+    arrivalsToday: sourceReservations.filter((item) => cleanText(item?.checkInDate, 20) === today).length,
+    departuresToday: sourceReservations.filter((item) => cleanText(item?.checkOutDate, 20) === today).length,
+    arrivalsTomorrow: sourceReservations.filter((item) => cleanText(item?.checkInDate, 20) === tomorrow).length,
     dirtyRooms: roomStates.filter((item) => item.status === "dirty").map((item) => item.room),
     readyRooms: roomStates.filter((item) => item.status === "ready").map((item) => item.room),
-    pendingHousekeeping: pendingHousekeeping.length,
-    openMaintenance: maintenance.length,
-    urgentMaintenance: maintenance.filter((item) => ["critical", "urgent"].includes(item.severity)).length,
-    openTasks: openTasks.length,
-    overdueTasks: openTasks.filter((item) => item.dueAt && Date.parse(item.dueAt) < nowMs).length,
-    dueTodayTasks: openTasks.filter((item) => item.dueAt && Date.parse(item.dueAt) >= nowMs && Date.parse(item.dueAt) <= todayEndMs).length,
-    pendingRegistrations: Number(overview?.totals?.pendingRegistrations) || 0,
-    inbox
+    pendingHousekeeping: pendingHousekeeping.length, openMaintenance: maintenance.length,
+    urgentMaintenance: maintenance.filter((item) => ["critical", "urgent"].includes(item.severity)).length, openTasks: openTasks.length,
+    overdueTasks: openTasks.filter((item) => item.dueAt && Number.isFinite(Date.parse(item.dueAt)) && Date.parse(item.dueAt) < nowMs).length,
+    dueTodayTasks: openTasks.filter((item) => item.dueAt && Number.isFinite(Date.parse(item.dueAt)) && Date.parse(item.dueAt) >= nowMs && Date.parse(item.dueAt) <= todayEndMs).length,
+    pendingRegistrations: Number(overview?.totals?.pendingRegistrations) || 0, inbox
   };
+  const properties = asArray(access?.properties);
   return {
-    property: access?.properties?.[0]?.displayName || access?.properties?.[0]?.name || "Current property",
-    role,
-    permissions: [...(access?.permissions || [])].sort(),
-    modules: [...(access?.modules || [])].sort(),
-    attention,
-    reservations,
-    roomStates,
-    pendingHousekeeping,
-    openMaintenance: maintenance,
-    openTasks,
-    pendingRegistrationCount: attention.pendingRegistrations
+    property: properties[0]?.displayName || properties[0]?.name || "Current property", role,
+    permissions: setLikeValues(access?.permissions).sort(), modules: setLikeValues(access?.modules).sort(),
+    attention, reservations, roomStates, pendingHousekeeping, openMaintenance: maintenance, openTasks,
+    pendingRegistrationCount: attention.pendingRegistrations, sourceHealth
   };
 }
 
@@ -172,6 +194,8 @@ function isAttentionSummaryIntent(message) {
 function attentionSummaryReply(live) {
   const a = live?.attention || {};
   const lines = [];
+  const sourceHealth = live?.sourceHealth || {};
+  const degraded = Object.values(sourceHealth).some((value) => value === false);
   if (Array.isArray(a.dirtyRooms) && a.dirtyRooms.length) lines.push(`${a.dirtyRooms.length} room${a.dirtyRooms.length === 1 ? " is" : "s are"} not ready: ${a.dirtyRooms.map((room) => `Room ${room}`).join(", ")}.`);
   if (Number(a.overdueTasks) > 0) lines.push(`${a.overdueTasks} operational task${a.overdueTasks === 1 ? " is" : "s are"} overdue.`);
   if (Number(a.dueTodayTasks) > 0) lines.push(`${a.dueTodayTasks} task${a.dueTodayTasks === 1 ? " is" : "s are"} due later today.`);
@@ -181,8 +205,13 @@ function attentionSummaryReply(live) {
   if (a.inbox && Number(a.inbox.needsHuman) > 0) lines.push(`${a.inbox.needsHuman} guest conversation${a.inbox.needsHuman === 1 ? " needs" : "s need"} a person to review it.`);
   else if (a.inbox && Number(a.inbox.unreadMessages) > 0) lines.push(`${a.inbox.unreadMessages} unread guest message${a.inbox.unreadMessages === 1 ? " is" : "s are"} waiting.`);
   const arrivalLine = `${Number(a.arrivalsToday) || 0} arrival${Number(a.arrivalsToday) === 1 ? "" : "s"} and ${Number(a.departuresToday) || 0} departure${Number(a.departuresToday) === 1 ? "" : "s"} today.`;
-  if (!lines.length) return `Nothing urgent is showing right now. You have ${arrivalLine}`;
-  return `Here’s what needs attention today:\n• ${lines.join("\n• ")}\n\nFor context: ${arrivalLine}`;
+  if (!lines.length) {
+    return degraded
+      ? `I can read part of today’s operations, but one live section is temporarily unavailable. I’m not seeing an urgent item in the data I could check. You have ${arrivalLine}`
+      : `Nothing urgent is showing right now. You have ${arrivalLine}`;
+  }
+  const suffix = degraded ? `\n\nOne live section could not be checked, so use Operations if you need a complete manual review.` : "";
+  return `Here’s what needs attention today:\n• ${lines.join("\n• ")}\n\nFor context: ${arrivalLine}${suffix}`;
 }
 
 async function safeUiContext(rawContext, store, access) {
@@ -503,10 +532,14 @@ export async function handleOperationsCopilot({ request, env, store, access, act
 
   const message = cleanText(body?.message, MAX_MESSAGE);
   if (message.length < 2) return { status: 400, body: { error: "message_required" } };
-  const workflows = relevantWorkflows(message, 8);
-  const live = await liveOperationalContext(store, access);
-  const uiContext = await safeUiContext(body?.context, store, access);
+
+  // Keep the daily-attention command independent from generative AI, workflow matching
+  // and optional screen-context resolution. It must still return a useful response
+  // when one live-data source is degraded in production.
   if (isAttentionSummaryIntent(message)) {
+    let live;
+    try { live = await liveOperationalContext(store, access); }
+    catch (_error) { live = emptyLiveOperationalContext(access); }
     return {
       status: 200,
       body: {
@@ -516,10 +549,17 @@ export async function handleOperationsCopilot({ request, env, store, access, act
         matchedWorkflowIds: ["support_chat", "housekeeping", "maintenance", "guest_messaging"],
         proposal: null,
         confirmationRequired: false,
-        attention: live.attention
+        attention: live.attention,
+        sourceHealth: live.sourceHealth || {}
       }
     };
   }
+
+  const workflows = relevantWorkflows(message, 8);
+  let live;
+  try { live = await liveOperationalContext(store, access); }
+  catch (_error) { live = emptyLiveOperationalContext(access); }
+  const uiContext = await safeUiContext(body?.context, store, access);
   let raw;
   try {
     raw = await callCopilotAI({ env, message, history: body?.history, access, workflows, live, canCreateTasks, uiContext });

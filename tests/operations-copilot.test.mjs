@@ -169,3 +169,17 @@ test("Operations Copilot signed proposal cannot be changed during confirmation",
   assert.equal(confirmed.body.error, "copilot_proposal_invalid_or_expired");
   assert.equal(harness.alerts.length, 0);
 });
+
+test("Operations Copilot daily attention stays available when one live source has an unexpected production shape", async () => {
+  const harness = testHarness();
+  harness.store.getAdminOverview = async () => ({ maintenanceReports: { unexpected: true }, totals: null });
+  harness.store.mobileListOperationalTasks = async () => { throw new Error("temporary_task_store_failure"); };
+  const outcome = await handleOperationsCopilot({
+    request: post({ message: "What needs my attention today?" }),
+    env: harness.env, store: harness.store, access: harness.access, actorHash: "actor_hash"
+  });
+  assert.equal(outcome.status, 200);
+  assert.equal(outcome.body.proposal, null);
+  assert.match(outcome.body.reply, /today|operations|urgent/i);
+  assert.equal(outcome.body.sourceHealth.tasks, false);
+});

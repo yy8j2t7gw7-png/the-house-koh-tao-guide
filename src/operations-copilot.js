@@ -1,5 +1,6 @@
 import { COPILOT_REGISTRY_VERSION, relevantWorkflows, workflowRegistrySummary } from "./capability-workflow-registry.js";
 import { createBookingOperationalTask, createRoomOperationalTask, normalizeOperationalCategory, operationalAssignmentPreview } from "./operational-actions.js";
+import { handleStayAdminRequest } from "./stay-api.js";
 
 const MAX_MESSAGE = 1800;
 const MAX_HISTORY = 12;
@@ -139,7 +140,7 @@ async function liveOperationalContext(store, access) {
   const reservations = sourceReservations.slice(0, 120).map((item) => ({
     id: cleanText(item?.id, 120), room: cleanText(item?.room, 30), guestName: roleGuestName(item, role),
     checkInDate: cleanText(item?.checkInDate, 20), checkOutDate: cleanText(item?.checkOutDate, 20),
-    status: cleanText(item?.status, 30), lateCheckoutTime: cleanText(item?.lateCheckoutTime, 30),
+    status: cleanText(item?.status, 30), provider: cleanText(item?.provider, 30), lateCheckoutTime: cleanText(item?.lateCheckoutTime, 30),
     plannedDepartureTime: cleanText(item?.plannedDepartureTime, 30)
   }));
   const roomStates = asArray(operations?.housekeepingStatuses).slice(0, 120).map((item) => ({
@@ -407,6 +408,186 @@ function normalizedModelResult(value) {
   };
 }
 
+
+function isoDateValid(value) {
+  const source = cleanText(value, 20);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(source)) return "";
+  const date = new Date(`${source}T00:00:00Z`);
+  return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === source ? source : "";
+}
+
+function addIsoDays(value, days) {
+  const source = isoDateValid(value); if (!source) return "";
+  const date = new Date(`${source}T00:00:00Z`); date.setUTCDate(date.getUTCDate() + Number(days || 0));
+  return date.toISOString().slice(0, 10);
+}
+
+const MONTH_INDEX = Object.freeze({ january:1, jan:1, february:2, feb:2, march:3, mar:3, april:4, apr:4, may:5, june:6, jun:6, july:7, jul:7, august:8, aug:8, september:9, sep:9, sept:9, october:10, oct:10, november:11, nov:11, december:12, dec:12 });
+function dateForMonthDay(dayValue, monthValue, yearValue = 0) {
+  const day = Number(dayValue), month = MONTH_INDEX[String(monthValue || "").toLowerCase()];
+  if (!month || day < 1 || day > 31) return "";
+  const today = bangkokDate(0); let year = Number(yearValue) || Number(today.slice(0,4));
+  let candidate = `${year}-${String(month).padStart(2,"0")}-${String(day).padStart(2,"0")}`;
+  if (!isoDateValid(candidate)) return "";
+  if (!yearValue && candidate < today) { year += 1; candidate = `${year}-${String(month).padStart(2,"0")}-${String(day).padStart(2,"0")}`; }
+  return isoDateValid(candidate);
+}
+
+function parseOperationalDateRange(message) {
+  const source = cleanText(message, MAX_MESSAGE);
+  const isoMatches = [...source.matchAll(/\b(20\d{2}-\d{2}-\d{2})\b/g)].map((m) => isoDateValid(m[1])).filter(Boolean);
+  if (isoMatches.length >= 2 && isoMatches[1] > isoMatches[0]) return { checkInDate: isoMatches[0], checkOutDate: isoMatches[1] };
+  const fullRange = source.match(/\b(\d{1,2})(?:st|nd|rd|th)?\s+([A-Za-z]+)(?:\s+(20\d{2}))?\s+(?:to|until|through|-)\s+(\d{1,2})(?:st|nd|rd|th)?\s+([A-Za-z]+)(?:\s+(20\d{2}))?/i);
+  if (fullRange) {
+    const start = dateForMonthDay(fullRange[1], fullRange[2], fullRange[3]);
+    const end = dateForMonthDay(fullRange[4], fullRange[5], fullRange[6] || fullRange[3]);
+    if (start && end && end > start) return { checkInDate: start, checkOutDate: end };
+  }
+  const sameMonth = source.match(/\b(\d{1,2})(?:st|nd|rd|th)?\s+(?:to|until|through|-)\s+(\d{1,2})(?:st|nd|rd|th)?\s+([A-Za-z]+)(?:\s+(20\d{2}))?/i);
+  if (sameMonth) {
+    const start = dateForMonthDay(sameMonth[1], sameMonth[3], sameMonth[4]);
+    const end = dateForMonthDay(sameMonth[2], sameMonth[3], sameMonth[4]);
+    if (start && end && end > start) return { checkInDate: start, checkOutDate: end };
+  }
+  const nights = source.match(/\b(?:tomorrow|today)\b[^\d]{0,20}(?:for\s+)?(\d{1,2})\s+nights?\b/i);
+  if (nights) {
+    const start = /\btomorrow\b/i.test(source) ? bangkokDate(1) : bangkokDate(0);
+    return { checkInDate: start, checkOutDate: addIsoDays(start, Math.max(1, Number(nights[1]) || 1)) };
+  }
+  const singleMonth = source.match(/\b(\d{1,2})(?:st|nd|rd|th)?\s+([A-Za-z]+)(?:\s+(20\d{2}))?\b/i);
+  const oneNightIntent = /\b(?:block|blocked|owner use|out of service|maintenance block)\b/i.test(source);
+  if (singleMonth && oneNightIntent) {
+    const start = dateForMonthDay(singleMonth[1], singleMonth[2], singleMonth[3]);
+    if (start) return { checkInDate: start, checkOutDate: addIsoDays(start, 1) };
+  }
+  return { checkInDate: "", checkOutDate: "" };
+}
+
+function explicitRoom(message) {
+  const match = cleanText(message, MAX_MESSAGE).match(/\b(?:room|villa|unit)\s*#?\s*([A-Za-z0-9_-]{1,20})\b/i);
+  return cleanText(match?.[1], 24);
+}
+
+function cancelDirectStayIntent(message) {
+  const source = cleanText(message, MAX_MESSAGE);
+  return /\b(?:cancel|delete|remove)\b/i.test(source) && /\b(?:direct\s+(?:stay|booking)|walk[- ]?in|manual\s+stay)\b/i.test(source);
+}
+function createDirectStayIntent(message) {
+  const source = cleanText(message, MAX_MESSAGE);
+  return /\b(?:create|add|make|book)\b/i.test(source) && /\b(?:direct\s+(?:stay|booking)|walk[- ]?in)\b/i.test(source);
+}
+function blockCalendarIntent(message) {
+  const source = cleanText(message, MAX_MESSAGE);
+  return /\b(?:block|close|hold|owner use|out of service)\b/i.test(source) && /\b(?:calendar|room|villa|unit|dates?|availability)\b/i.test(source) && !/\bunblock\b/i.test(source);
+}
+function unblockCalendarIntent(message) {
+  const source = cleanText(message, MAX_MESSAGE);
+  return /\b(?:unblock|reopen|remove\s+(?:the\s+)?block|cancel\s+(?:the\s+)?block)\b/i.test(source);
+}
+
+function operationalProposalBase(type, payload, access) {
+  const issued = new Date();
+  return {
+    type, scope: payload.scope || "property", reservationId: cleanText(payload.reservationId,120), blockId: cleanText(payload.blockId,120),
+    room: cleanText(payload.room,24), category: cleanText(payload.category,60), description: cleanText(payload.description,1200), timing: cleanText(payload.timing,180),
+    checkInDate: isoDateValid(payload.checkInDate), checkOutDate: isoDateValid(payload.checkOutDate), reason: cleanText(payload.reason,500),
+    actionLabel: cleanText(payload.actionLabel,80), recipients: Array.isArray(payload.recipients) ? payload.recipients.map((x)=>cleanText(x,120)).filter(Boolean) : [],
+    routeLabel: cleanText(payload.routeLabel,120), issuedAt: issued.toISOString(), expiresAt: new Date(issued.getTime()+PROPOSAL_TTL_MS).toISOString(),
+    propertyId: cleanText(asArray(access?.properties)[0]?.id,100)
+  };
+}
+
+async function signOperationalProposal(type, payload, access, env) {
+  if (!env.MOBILE_SESSION_PEPPER) return null;
+  const proposal = operationalProposalBase(type, payload, access);
+  proposal.signature = await hmacHex(env.MOBILE_SESSION_PEPPER, canonicalProposal(proposal, access));
+  return proposal;
+}
+
+async function callStayAdmin(store, env, path, body) {
+  const request = new Request(`https://internal.taoedge.invalid${path}`, { method:"POST", headers:{"content-type":"application/json"}, body:JSON.stringify(body||{}) });
+  const response = await handleStayAdminRequest(request, env, path, store);
+  const payload = await response.clone().json().catch(()=>({ error:"stay_action_failed" }));
+  return { ok: response.ok && payload?.ok === true, status: response.status, payload };
+}
+
+async function executeOperationalProposal(proposal, { env, store, access }) {
+  const permission = access?.permissions?.has?.("direct_stays.manage") === true;
+  if (!["create_direct_stay","cancel_direct_stay","block_room","unblock_room"].includes(proposal.type)) return { ok:false,error:"unsupported_copilot_action" };
+  if (!permission) return { ok:false,error:"forbidden",permission:"direct_stays.manage" };
+  if (proposal.type === "create_direct_stay") {
+    const result = await callStayAdmin(store, env, "/api/concierge/admin/direct-stays", { room:proposal.room, checkInDate:proposal.checkInDate, checkOutDate:proposal.checkOutDate });
+    return result.ok ? { ok:true, result:{ type:proposal.type, reservationId:result.payload.reservationId||"", room:proposal.room, checkInDate:proposal.checkInDate, checkOutDate:proposal.checkOutDate, distributionSync:result.payload.distributionSync||null } } : { ok:false,error:result.payload?.error||"direct_stay_create_failed", conflict:result.payload?.conflict||null };
+  }
+  if (proposal.type === "cancel_direct_stay") {
+    const current = await store.getStayReservationById(proposal.reservationId).catch(()=>null);
+    if (!current || cleanText(current.provider,30) !== "direct" || cleanText(current.status,30) !== "confirmed") return { ok:false,error:"direct_stay_no_longer_available" };
+    const result = await callStayAdmin(store, env, "/api/concierge/admin/manual-stay-delete", { reservationId:proposal.reservationId, confirmed:true });
+    return result.ok ? { ok:true, result:{ type:proposal.type, reservationId:proposal.reservationId, room:proposal.room, checkInDate:proposal.checkInDate, checkOutDate:proposal.checkOutDate, distributionSync:result.payload.distributionSync||null } } : { ok:false,error:result.payload?.error||"direct_stay_cancel_failed" };
+  }
+  if (proposal.type === "block_room") {
+    const result = await callStayAdmin(store, env, "/api/concierge/admin/direct-stays", { room:proposal.room, checkInDate:proposal.checkInDate, checkOutDate:proposal.checkOutDate });
+    if (!result.ok) return { ok:false,error:result.payload?.error||"calendar_block_failed",conflict:result.payload?.conflict||null };
+    const reservationId = cleanText(result.payload.reservationId,120);
+    if (!reservationId || typeof store.mobileCreateOwnerCalendarBlock !== "function") {
+      if (reservationId) await callStayAdmin(store, env, "/api/concierge/admin/manual-stay-delete", { reservationId, confirmed:true }).catch(()=>null);
+      return { ok:false,error:"calendar_block_store_unavailable" };
+    }
+    const block = await store.mobileCreateOwnerCalendarBlock({ id:`ownerblock_${crypto.randomUUID()}`, tenantId:access.record.tenantId, propertyId:proposal.propertyId, reservationId, room:proposal.room, checkInDate:proposal.checkInDate, checkOutDate:proposal.checkOutDate, reason:proposal.reason, createdByLabel:access.record.displayName, createdAt:access.now });
+    if (!block?.ok) { await callStayAdmin(store, env, "/api/concierge/admin/manual-stay-delete", { reservationId, confirmed:true }).catch(()=>null); return { ok:false,error:block?.error||"calendar_block_store_failed" }; }
+    return { ok:true, result:{ type:proposal.type, blockId:block.id, reservationId, room:proposal.room, checkInDate:proposal.checkInDate, checkOutDate:proposal.checkOutDate, reason:proposal.reason, distributionSync:result.payload.distributionSync||null } };
+  }
+  const blocks = typeof store.mobileListOwnerCalendarBlocks === "function" ? await store.mobileListOwnerCalendarBlocks(access.record.tenantId, proposal.propertyId, 300) : [];
+  const block = blocks.find((item)=>item.id===proposal.blockId && item.status==="active");
+  if (!block) return { ok:false,error:"calendar_block_not_found" };
+  const result = await callStayAdmin(store, env, "/api/concierge/admin/manual-stay-delete", { reservationId:block.reservationId, confirmed:true });
+  if (!result.ok) return { ok:false,error:result.payload?.error||"calendar_unblock_failed" };
+  await store.mobileCancelOwnerCalendarBlock(access.record.tenantId, block.id, access.now);
+  return { ok:true, result:{ type:proposal.type, blockId:block.id, reservationId:block.reservationId, room:block.room, checkInDate:block.checkInDate, checkOutDate:block.checkOutDate, distributionSync:result.payload.distributionSync||null } };
+}
+
+async function deterministicOperationalAction(message, live, access, env, store) {
+  const source = cleanText(message, MAX_MESSAGE); const room = explicitRoom(source); const range = parseOperationalDateRange(source);
+  if (cancelDirectStayIntent(source)) {
+    if (access?.permissions?.has?.("direct_stays.manage") !== true) return { reply:"Your role can review Direct Stays, but it cannot cancel them.", proposal:null };
+    const tomorrow = bangkokDate(1);
+    const candidates = asArray(live?.reservations).filter((item)=>item.provider==="direct" && item.status==="confirmed")
+      .filter((item)=>!room || item.room===room)
+      .filter((item)=>!/\btomorrow\b/i.test(source) || item.checkInDate===tomorrow || (item.checkInDate<=tomorrow && item.checkOutDate>tomorrow));
+    if (!candidates.length) return { reply:`I couldn’t find a matching active Direct Stay${room?` for Room ${room}`:""}. I won’t cancel an OTA booking or guess.`, proposal:null };
+    if (candidates.length>1) return { reply:`I found more than one matching Direct Stay. Tell me the room and arrival date so I can identify the correct one safely.`, proposal:null };
+    const stay=candidates[0];
+    const proposal=await signOperationalProposal("cancel_direct_stay",{scope:"booking",reservationId:stay.id,room:stay.room,checkInDate:stay.checkInDate,checkOutDate:stay.checkOutDate,description:`Cancel Direct Stay in Room ${stay.room}`,actionLabel:"Cancel Direct Stay"},access,env);
+    return { reply:`I found the Direct Stay in Room ${stay.room}, ${stay.checkInDate} to ${stay.checkOutDate}. I can cancel it and reopen availability after you confirm.`, proposal };
+  }
+  if (createDirectStayIntent(source)) {
+    if (access?.permissions?.has?.("direct_stays.manage") !== true) return { reply:"Your role cannot create Direct Stays.", proposal:null };
+    if (!room) return { reply:"Which room should I use for the Direct Stay?", proposal:null };
+    if (!range.checkInDate || !range.checkOutDate) return { reply:"What are the check-in and check-out dates? Please give me both dates so I don’t guess.", proposal:null };
+    const proposal=await signOperationalProposal("create_direct_stay",{scope:"room",room,...range,description:`Create Direct Stay in Room ${room}`,actionLabel:"Create Direct Stay"},access,env);
+    return { reply:`I can create a Direct Stay for Room ${room} from ${range.checkInDate} to ${range.checkOutDate}. Taoedge will check for conflicts again when you confirm.`, proposal };
+  }
+  if (unblockCalendarIntent(source)) {
+    if (access?.permissions?.has?.("direct_stays.manage") !== true) return { reply:"Your role cannot change calendar blocks.", proposal:null };
+    const blocks = typeof store.mobileListOwnerCalendarBlocks === "function" ? await store.mobileListOwnerCalendarBlocks(access.record.tenantId, cleanText(asArray(access.properties)[0]?.id,100), 300) : [];
+    const candidates=asArray(blocks).filter((item)=>item.status==="active").filter((item)=>!room||item.room===room).filter((item)=>!range.checkInDate||item.checkInDate===range.checkInDate);
+    if (!candidates.length) return { reply:`I couldn’t find a matching Taoedge calendar block${room?` for Room ${room}`:""}.`,proposal:null };
+    if (candidates.length>1) return { reply:"I found more than one matching block. Tell me the room and start date so I can identify the correct one safely.",proposal:null };
+    const block=candidates[0];
+    const proposal=await signOperationalProposal("unblock_room",{scope:"room",blockId:block.id,reservationId:block.reservationId,room:block.room,checkInDate:block.checkInDate,checkOutDate:block.checkOutDate,reason:block.reason,description:`Unblock Room ${block.room}`,actionLabel:"Unblock calendar"},access,env);
+    return { reply:`I can unblock Room ${block.room} from ${block.checkInDate} to ${block.checkOutDate} and reopen availability after you confirm.`,proposal };
+  }
+  if (blockCalendarIntent(source)) {
+    if (access?.permissions?.has?.("direct_stays.manage") !== true) return { reply:"Your role cannot block calendar availability.", proposal:null };
+    if (!room) return { reply:"Which room, villa or unit should I block?",proposal:null };
+    if (!range.checkInDate || !range.checkOutDate) return { reply:"What dates should I block? Please give me the start and end dates so I don’t guess.",proposal:null };
+    const reason = cleanText(source.replace(/\b(?:block|close|hold)\b/ig,"").replace(new RegExp(`\\b(?:room|villa|unit)\\s*#?\\s*${room}\\b`,'ig'),"").replace(range.checkInDate,"").replace(range.checkOutDate,""),300) || "Owner block";
+    const proposal=await signOperationalProposal("block_room",{scope:"room",room,...range,reason,description:`Block Room ${room}`,actionLabel:"Block calendar"},access,env);
+    return { reply:`I can block Room ${room} from ${range.checkInDate} to ${range.checkOutDate}. Taoedge will conflict-check the room and close availability only after you confirm.`,proposal };
+  }
+  return null;
+}
+
 async function hmacHex(secret, value) {
   const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(String(secret || "")), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
   const signature = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(String(value || "")));
@@ -419,13 +600,19 @@ function canonicalProposal(proposal, access) {
     userId: cleanText(access?.record?.userId, 120),
     issuedAt: cleanText(proposal.issuedAt, 40),
     expiresAt: cleanText(proposal.expiresAt, 40),
-    type: proposal.type,
-    scope: proposal.scope,
+    type: cleanText(proposal.type, 60),
+    scope: cleanText(proposal.scope, 30),
+    propertyId: cleanText(proposal.propertyId, 100),
     reservationId: cleanText(proposal.reservationId, 120),
+    blockId: cleanText(proposal.blockId, 120),
     room: cleanText(proposal.room, 24),
-    category: normalizeOperationalCategory(proposal.category),
+    category: proposal.type === "create_task" ? normalizeOperationalCategory(proposal.category) : cleanText(proposal.category, 60),
     description: cleanText(proposal.description, 1200),
-    timing: cleanText(proposal.timing, 180)
+    timing: cleanText(proposal.timing, 180),
+    checkInDate: isoDateValid(proposal.checkInDate),
+    checkOutDate: isoDateValid(proposal.checkOutDate),
+    reason: cleanText(proposal.reason, 500),
+    actionLabel: cleanText(proposal.actionLabel, 80)
   });
 }
 
@@ -462,14 +649,17 @@ async function signedProposal(action, access, env, store) {
     issuedAt: issued.toISOString(),
     expiresAt: new Date(issued.getTime() + PROPOSAL_TTL_MS).toISOString(),
     recipients: assignment.members,
-    routeLabel: assignment.label
+    routeLabel: assignment.label,
+    propertyId: cleanText(asArray(access?.properties)[0]?.id, 100),
+    blockId: "", checkInDate: "", checkOutDate: "", reason: "", actionLabel: "Create task"
   };
   proposal.signature = await hmacHex(env.MOBILE_SESSION_PEPPER, canonicalProposal(proposal, access));
   return { proposal, reservation };
 }
 
 async function verifyProposal(proposal, access, env) {
-  if (!proposal || proposal.type !== "create_task" || !env.MOBILE_SESSION_PEPPER) return false;
+  const allowed = new Set(["create_task", "create_direct_stay", "cancel_direct_stay", "block_room", "unblock_room"]);
+  if (!proposal || !allowed.has(cleanText(proposal.type, 60)) || !env.MOBILE_SESSION_PEPPER) return false;
   if (!proposal.signature || !proposal.expiresAt || Date.parse(proposal.expiresAt) <= Date.now()) return false;
   const expected = await hmacHex(env.MOBILE_SESSION_PEPPER, canonicalProposal(proposal, access));
   const supplied = String(proposal.signature || "");
@@ -483,13 +673,19 @@ function publicProposal(proposal) {
   return {
     type: proposal.type,
     scope: proposal.scope,
-    reservationId: proposal.reservationId,
-    room: proposal.room,
-    category: proposal.category,
-    description: proposal.description,
-    timing: proposal.timing,
-    recipients: proposal.recipients,
-    routeLabel: proposal.routeLabel,
+    propertyId: proposal.propertyId || "",
+    reservationId: proposal.reservationId || "",
+    blockId: proposal.blockId || "",
+    room: proposal.room || "",
+    category: proposal.category || "",
+    description: proposal.description || "",
+    timing: proposal.timing || "",
+    checkInDate: proposal.checkInDate || "",
+    checkOutDate: proposal.checkOutDate || "",
+    reason: proposal.reason || "",
+    actionLabel: proposal.actionLabel || "",
+    recipients: Array.isArray(proposal.recipients) ? proposal.recipients : [],
+    routeLabel: proposal.routeLabel || "",
     issuedAt: proposal.issuedAt,
     expiresAt: proposal.expiresAt,
     signature: proposal.signature
@@ -504,9 +700,29 @@ export async function handleOperationsCopilot({ request, env, store, access, act
   const canCreateTasks = access?.permissions?.has("booking_activity.create") === true;
 
   if (body?.confirm === true) {
-    if (!canCreateTasks) return { status: 403, body: { error: "forbidden", permission: "booking_activity.create" } };
     const proposal = body?.proposal;
     if (!(await verifyProposal(proposal, access, env))) return { status: 409, body: { error: "copilot_proposal_invalid_or_expired" } };
+
+    if (proposal.type !== "create_task") {
+      const outcome = await executeOperationalProposal(proposal, { env, store, access });
+      if (!outcome?.ok) return { status: outcome?.error === "forbidden" ? 403 : 409, body: { error: outcome?.error || "copilot_action_failed", conflict: outcome?.conflict || null, permission: outcome?.permission || "" } };
+      const result = outcome.result || {};
+      const actionReplies = {
+        create_direct_stay: `Done. I created the Direct Stay for Room ${proposal.room} from ${proposal.checkInDate} to ${proposal.checkOutDate}.`,
+        cancel_direct_stay: `Done. I cancelled the Direct Stay for Room ${proposal.room}. Taoedge kept the audit history and processed the availability reopen check.`,
+        block_room: `Done. I blocked Room ${proposal.room} from ${proposal.checkInDate} to ${proposal.checkOutDate}.`,
+        unblock_room: `Done. I removed the calendar block for Room ${proposal.room} and processed the availability reopen check.`
+      };
+      await store.mobileRecordAudit({
+        tenantId: access.record.tenantId, userId: access.record.userId, membershipId: access.record.membershipId,
+        action: `copilot_${proposal.type}_executed`, reference: proposal.reservationId ? `reservation:${proposal.reservationId}` : proposal.blockId ? `block:${proposal.blockId}` : `room:${proposal.room}`,
+        metadata: { registryVersion: COPILOT_REGISTRY_VERSION, type: proposal.type, room: proposal.room, checkInDate: proposal.checkInDate, checkOutDate: proposal.checkOutDate, blockId: result.blockId || "", distributionSync: result.distributionSync?.status || "" },
+        createdAt: access.now
+      });
+      return { status: 201, body: { ok: true, executed: true, registryVersion: COPILOT_REGISTRY_VERSION, action: result, reply: actionReplies[proposal.type] || "Done. The hotel operation was completed." } };
+    }
+
+    if (!canCreateTasks) return { status: 403, body: { error: "forbidden", permission: "booking_activity.create" } };
     const common = {
       env, store,
       category: proposal.category,
@@ -599,6 +815,21 @@ export async function handleOperationsCopilot({ request, env, store, access, act
   let live;
   try { live = await liveOperationalContext(store, access); }
   catch (_error) { live = emptyLiveOperationalContext(access); }
+
+  const operationalAction = await deterministicOperationalAction(message, live, access, env, store);
+  if (operationalAction) {
+    const proposal = operationalAction.proposal ? publicProposal(operationalAction.proposal) : null;
+    if (proposal) {
+      await store.mobileRecordAudit({
+        tenantId: access.record.tenantId, userId: access.record.userId, membershipId: access.record.membershipId,
+        action: `copilot_${proposal.type}_proposed`, reference: proposal.reservationId ? `reservation:${proposal.reservationId}` : proposal.blockId ? `block:${proposal.blockId}` : `room:${proposal.room}`,
+        metadata: { registryVersion: COPILOT_REGISTRY_VERSION, type: proposal.type, room: proposal.room, checkInDate: proposal.checkInDate, checkOutDate: proposal.checkOutDate },
+        createdAt: access.now
+      });
+    }
+    return { status: 200, body: { ok: true, registryVersion: COPILOT_REGISTRY_VERSION, reply: operationalAction.reply, matchedWorkflowIds: ["support_chat"], proposal, confirmationRequired: Boolean(proposal) } };
+  }
+
   const uiContext = await safeUiContext(body?.context, store, access);
   let raw;
   try {

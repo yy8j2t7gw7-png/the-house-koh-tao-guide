@@ -908,6 +908,31 @@ export class ConciergeStore extends DurableObject {
         );
         CREATE INDEX IF NOT EXISTS inventory_recipe_lines_recipe ON inventory_consumption_recipe_lines(recipe_id);
 
+        CREATE TABLE IF NOT EXISTS inventory_shopping_lists (
+          id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL, property_id TEXT NOT NULL, title TEXT NOT NULL DEFAULT '',
+          assigned_user_id TEXT NOT NULL DEFAULT '', assigned_label TEXT NOT NULL DEFAULT '', status TEXT NOT NULL DEFAULT 'draft',
+          due_at TEXT NOT NULL DEFAULT '', notes TEXT NOT NULL DEFAULT '', receipt_required INTEGER NOT NULL DEFAULT 1,
+          receipt_status TEXT NOT NULL DEFAULT 'missing', finance_expense_id TEXT NOT NULL DEFAULT '', currency TEXT NOT NULL DEFAULT 'THB',
+          created_by_label TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS inventory_shopping_lists_property ON inventory_shopping_lists(tenant_id, property_id, status, due_at, created_at);
+        CREATE INDEX IF NOT EXISTS inventory_shopping_lists_assignee ON inventory_shopping_lists(tenant_id, assigned_user_id, status, due_at);
+
+        CREATE TABLE IF NOT EXISTS inventory_shopping_list_lines (
+          id TEXT PRIMARY KEY, list_id TEXT NOT NULL, property_id TEXT NOT NULL, item_id TEXT NOT NULL DEFAULT '', item_name TEXT NOT NULL,
+          quantity REAL NOT NULL DEFAULT 0, unit TEXT NOT NULL DEFAULT 'unit', room TEXT NOT NULL DEFAULT '', specification TEXT NOT NULL DEFAULT '',
+          notes TEXT NOT NULL DEFAULT '', line_status TEXT NOT NULL DEFAULT 'needed', actual_quantity REAL NOT NULL DEFAULT 0,
+          actual_cost_minor INTEGER NOT NULL DEFAULT 0, updated_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS inventory_shopping_list_lines_list ON inventory_shopping_list_lines(list_id, line_status, item_name);
+
+        CREATE TABLE IF NOT EXISTS owner_calendar_blocks (
+          id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL, property_id TEXT NOT NULL DEFAULT '', reservation_id TEXT NOT NULL UNIQUE,
+          room TEXT NOT NULL, check_in_date TEXT NOT NULL, check_out_date TEXT NOT NULL, reason TEXT NOT NULL DEFAULT '',
+          status TEXT NOT NULL DEFAULT 'active', created_by_label TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS owner_calendar_blocks_property ON owner_calendar_blocks(tenant_id, property_id, status, room, check_in_date, check_out_date);
+
         CREATE TABLE IF NOT EXISTS revenue_engine_settings (
           tenant_id TEXT NOT NULL,
           property_id TEXT NOT NULL DEFAULT '',
@@ -4487,6 +4512,29 @@ export class ConciergeStore extends DurableObject {
     return { ...rest, metadata, automated: Boolean(item.automated) };
   }
 
+  async listPendingMessagingAutoReplies(nowValue, limitValue = 60) {
+    const now = new Date(cleanText(nowValue, 40) || new Date().toISOString()).getTime();
+    const limit = Math.max(1, Math.min(200, Number(limitValue) || 60));
+    const candidates = rows(this.ctx.storage.sql.exec(
+      `SELECT id, thread_id AS threadId, provider_message_id AS providerMessageId, direction, sender, body, automated,
+              delivery_status AS deliveryStatus, metadata_json AS metadataJson, created_at AS createdAt, updated_at AS updatedAt
+       FROM messaging_messages
+       WHERE direction = 'draft' AND delivery_status = 'pending_auto_send'
+       ORDER BY created_at ASC, id ASC
+       LIMIT ?`,
+      limit
+    ));
+    return candidates.map((item) => {
+      let metadata = {};
+      try { metadata = JSON.parse(item.metadataJson || "{}"); } catch (_error) { metadata = {}; }
+      const { metadataJson, ...rest } = item;
+      return { ...rest, metadata, automated: Boolean(item.automated) };
+    }).filter((item) => {
+      const eligibleAt = new Date(item?.metadata?.automaticSend?.eligibleAt || 0).getTime();
+      return Number.isFinite(eligibleAt) && eligibleAt > 0 && eligibleAt <= now;
+    });
+  }
+
   async updateMessagingDraft(idValue, patch = {}) {
     const id = cleanText(idValue, 100);
     const current = await this.getMessagingMessage(id);
@@ -5649,6 +5697,124 @@ export class ConciergeStore extends DurableObject {
     const id=cleanText(record.id,100),tenantId=cleanText(record.tenantId,100),propertyId=cleanText(record.propertyId,100),name=cleanText(record.name,160),now=cleanText(record.createdAt,40)||new Date().toISOString(); if(!id||!tenantId||!propertyId||!name)return{ok:false,error:"invalid_asset"};
     this.ctx.storage.sql.exec(`INSERT INTO inventory_assets (id,tenant_id,property_id,item_id,name,asset_tag,serial_number,room,location_id,status,purchase_date,purchase_cost_minor,warranty_until,next_service_at,supplier_id,notes,created_by_label,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET item_id=excluded.item_id,name=excluded.name,asset_tag=excluded.asset_tag,serial_number=excluded.serial_number,room=excluded.room,location_id=excluded.location_id,status=excluded.status,purchase_date=excluded.purchase_date,purchase_cost_minor=excluded.purchase_cost_minor,warranty_until=excluded.warranty_until,next_service_at=excluded.next_service_at,supplier_id=excluded.supplier_id,notes=excluded.notes,updated_at=excluded.updated_at`,id,tenantId,propertyId,cleanText(record.itemId,100),name,cleanText(record.assetTag,80),cleanText(record.serialNumber,120),cleanText(record.room,30),cleanText(record.locationId,100),cleanText(record.status,40)||"in_service",cleanText(record.purchaseDate,20),Math.max(0,Math.round(Number(record.purchaseCostMinor)||0)),cleanText(record.warrantyUntil,20),cleanText(record.nextServiceAt,20),cleanText(record.supplierId,100),cleanText(record.notes,500),cleanText(record.createdByLabel,100),now,now);
     return{ok:true,asset:{id,name,assetTag:cleanText(record.assetTag,80),serialNumber:cleanText(record.serialNumber,120),room:cleanText(record.room,30),status:cleanText(record.status,40)||"in_service",warrantyUntil:cleanText(record.warrantyUntil,20),nextServiceAt:cleanText(record.nextServiceAt,20),updatedAt:now}};
+  }
+
+  async mobileDeactivateUnconfiguredStarterInventory(tenantIdValue, propertyIdValue, starterNames = [], nowValue = "") {
+    const tenantId=cleanText(tenantIdValue,100), propertyId=cleanText(propertyIdValue,100), now=cleanText(nowValue,40)||new Date().toISOString();
+    const names=(Array.isArray(starterNames)?starterNames:[]).map((v)=>cleanText(v,160)).filter(Boolean);
+    let deactivated=0;
+    for(const name of names){
+      const item=rows(this.ctx.storage.sql.exec(`SELECT i.id,i.active,COALESCE(SUM(s.quantity),0) AS quantity,i.minimum_qty AS minimumQty,i.reorder_point AS reorderPoint,i.par_level AS parLevel,i.maximum_qty AS maximumQty,i.unit_cost_minor AS unitCostMinor FROM inventory_items i LEFT JOIN inventory_stock s ON s.tenant_id=i.tenant_id AND s.property_id=i.property_id AND s.item_id=i.id WHERE i.tenant_id=? AND i.property_id=? AND lower(i.name)=lower(?) GROUP BY i.id LIMIT 1`,tenantId,propertyId,name))[0];
+      if(!item||Number(item.active)===0)continue;
+      const blank=[item.quantity,item.minimumQty,item.reorderPoint,item.parLevel,item.maximumQty,item.unitCostMinor].every((v)=>Number(v||0)===0);
+      if(!blank)continue;
+      const movement=rows(this.ctx.storage.sql.exec(`SELECT id FROM inventory_movements WHERE tenant_id=? AND property_id=? AND item_id=? LIMIT 1`,tenantId,propertyId,item.id))[0];
+      const poLine=rows(this.ctx.storage.sql.exec(`SELECT l.id FROM inventory_purchase_order_lines l JOIN inventory_purchase_orders p ON p.id=l.purchase_order_id WHERE p.tenant_id=? AND p.property_id=? AND l.item_id=? LIMIT 1`,tenantId,propertyId,item.id))[0];
+      const asset=rows(this.ctx.storage.sql.exec(`SELECT id FROM inventory_assets WHERE tenant_id=? AND property_id=? AND item_id=? LIMIT 1`,tenantId,propertyId,item.id))[0];
+      if(movement||poLine||asset)continue;
+      this.ctx.storage.sql.exec(`UPDATE inventory_items SET active=0,updated_at=? WHERE id=?`,now,item.id); deactivated+=1;
+    }
+    return{ok:true,deactivated};
+  }
+
+  async mobileHasInventoryMovementReference(tenantIdValue, propertyIdValue, referenceTypeValue, referenceIdValue) {
+    const tenantId=cleanText(tenantIdValue,100),propertyId=cleanText(propertyIdValue,100),referenceType=cleanText(referenceTypeValue,80),referenceId=cleanText(referenceIdValue,120);
+    if(!tenantId||!propertyId||!referenceType||!referenceId)return false;
+    return Boolean(rows(this.ctx.storage.sql.exec(`SELECT id FROM inventory_movements WHERE tenant_id=? AND property_id=? AND reference_type=? AND reference_id=? LIMIT 1`,tenantId,propertyId,referenceType,referenceId))[0]);
+  }
+
+  async mobileListInventoryShoppingLists(tenantIdValue, propertyIdValue="", limitValue=200) {
+    const tenantId=cleanText(tenantIdValue,100),propertyId=cleanText(propertyIdValue,100),limit=Math.max(1,Math.min(500,Number(limitValue)||200));
+    const args=[tenantId]; let propertyClause=""; if(propertyId){propertyClause=" AND l.property_id=?";args.push(propertyId);} args.push(limit);
+    const lists=rows(this.ctx.storage.sql.exec(`SELECT l.id,l.property_id AS propertyId,l.title,l.assigned_user_id AS assignedUserId,l.assigned_label AS assignedLabel,l.status,l.due_at AS dueAt,l.notes,l.receipt_required AS receiptRequired,l.receipt_status AS receiptStatus,l.finance_expense_id AS financeExpenseId,l.currency,l.created_by_label AS createdByLabel,l.created_at AS createdAt,l.updated_at AS updatedAt FROM inventory_shopping_lists l WHERE l.tenant_id=?${propertyClause} ORDER BY CASE WHEN l.status IN ('completed','cancelled') THEN 1 ELSE 0 END,l.due_at ASC,l.created_at DESC LIMIT ?`,...args));
+    for(const list of lists){
+      list.receiptRequired=Boolean(list.receiptRequired);
+      list.lines=rows(this.ctx.storage.sql.exec(`SELECT id,list_id AS listId,property_id AS propertyId,item_id AS itemId,item_name AS itemName,quantity,unit,room,specification,notes,line_status AS lineStatus,actual_quantity AS actualQuantity,actual_cost_minor AS actualCostMinor,updated_at AS updatedAt FROM inventory_shopping_list_lines WHERE list_id=? ORDER BY item_name ASC`,list.id));
+      list.expectedLines=list.lines.length; list.boughtLines=list.lines.filter((x)=>['bought','substituted','partial'].includes(x.lineStatus)).length;
+      list.actualTotalMinor=Math.round(list.lines.reduce((sum,x)=>sum+(Number(x.actualCostMinor)||0),0));
+    }
+    return lists;
+  }
+
+  async mobileGetInventoryShoppingList(tenantIdValue,idValue){
+    const tenantId=cleanText(tenantIdValue,100),id=cleanText(idValue,100); if(!tenantId||!id)return null;
+    const list=rows(this.ctx.storage.sql.exec(`SELECT id,tenant_id AS tenantId,property_id AS propertyId,title,assigned_user_id AS assignedUserId,assigned_label AS assignedLabel,status,due_at AS dueAt,notes,receipt_required AS receiptRequired,receipt_status AS receiptStatus,finance_expense_id AS financeExpenseId,currency,created_by_label AS createdByLabel,created_at AS createdAt,updated_at AS updatedAt FROM inventory_shopping_lists WHERE tenant_id=? AND id=? LIMIT 1`,tenantId,id))[0]||null;
+    if(!list)return null; list.receiptRequired=Boolean(list.receiptRequired); list.lines=rows(this.ctx.storage.sql.exec(`SELECT id,list_id AS listId,property_id AS propertyId,item_id AS itemId,item_name AS itemName,quantity,unit,room,specification,notes,line_status AS lineStatus,actual_quantity AS actualQuantity,actual_cost_minor AS actualCostMinor,updated_at AS updatedAt FROM inventory_shopping_list_lines WHERE list_id=? ORDER BY item_name ASC`,id)); return list;
+  }
+
+  async mobileCreateInventoryShoppingList(record={}){
+    const id=cleanText(record.id,100),tenantId=cleanText(record.tenantId,100),propertyId=cleanText(record.propertyId,100),now=cleanText(record.createdAt,40)||new Date().toISOString();
+    if(!id||!tenantId||!propertyId)return{ok:false,error:'invalid_shopping_list'};
+    this.ctx.storage.sql.exec(`INSERT INTO inventory_shopping_lists (id,tenant_id,property_id,title,assigned_user_id,assigned_label,status,due_at,notes,receipt_required,receipt_status,finance_expense_id,currency,created_by_label,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,'',?,?,?,?)`,id,tenantId,propertyId,cleanText(record.title,160)||'Shopping list',cleanText(record.assignedUserId,100),cleanText(record.assignedLabel,120),cleanText(record.status,30)||'draft',cleanText(record.dueAt,40),cleanText(record.notes,600),record.receiptRequired===false?0:1,'missing',cleanText(record.currency,8)||'THB',cleanText(record.createdByLabel,120),now,now);
+    return{ok:true,id};
+  }
+
+  async mobileAddInventoryShoppingListLine(record={}){
+    const id=cleanText(record.id,100),listId=cleanText(record.listId,100),propertyId=cleanText(record.propertyId,100),itemName=cleanText(record.itemName,160),now=cleanText(record.updatedAt,40)||new Date().toISOString();
+    if(!id||!listId||!propertyId||!itemName||!(Number(record.quantity)>0))return{ok:false,error:'invalid_shopping_list_line'};
+    this.ctx.storage.sql.exec(`INSERT INTO inventory_shopping_list_lines (id,list_id,property_id,item_id,item_name,quantity,unit,room,specification,notes,line_status,actual_quantity,actual_cost_minor,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,'needed',0,0,?)`,id,listId,propertyId,cleanText(record.itemId,100),itemName,Number(record.quantity),cleanText(record.unit,40)||'unit',cleanText(record.room,60),cleanText(record.specification,240),cleanText(record.notes,500),now);
+    this.ctx.storage.sql.exec(`UPDATE inventory_shopping_lists SET updated_at=? WHERE id=?`,now,listId); return{ok:true,id};
+  }
+
+  async mobileAssignInventoryShoppingList(record={}){
+    const tenantId=cleanText(record.tenantId,100),id=cleanText(record.id,100),userId=cleanText(record.assignedUserId,100),label=cleanText(record.assignedLabel,120),now=cleanText(record.updatedAt,40)||new Date().toISOString();
+    const list=rows(this.ctx.storage.sql.exec(`SELECT id,status FROM inventory_shopping_lists WHERE tenant_id=? AND id=? LIMIT 1`,tenantId,id))[0]; if(!list)return{ok:false,error:'shopping_list_not_found'};
+    if(['completed','cancelled'].includes(list.status))return{ok:false,error:'shopping_list_closed'};
+    this.ctx.storage.sql.exec(`UPDATE inventory_shopping_lists SET assigned_user_id=?,assigned_label=?,status=CASE WHEN ?<>'' AND status='draft' THEN 'assigned' ELSE status END,updated_at=? WHERE id=?`,userId,label,userId,now,id); return{ok:true,id,assignedUserId:userId,assignedLabel:label};
+  }
+
+  async mobileUpdateInventoryShoppingLine(record={}){
+    const tenantId=cleanText(record.tenantId,100),listId=cleanText(record.listId,100),lineId=cleanText(record.lineId,100),status=cleanText(record.lineStatus,30),now=cleanText(record.updatedAt,40)||new Date().toISOString();
+    const allowed=new Set(['needed','bought','partial','unavailable','substituted']); if(!allowed.has(status))return{ok:false,error:'invalid_line_status'};
+    const list=rows(this.ctx.storage.sql.exec(`SELECT id FROM inventory_shopping_lists WHERE tenant_id=? AND id=? LIMIT 1`,tenantId,listId))[0]; if(!list)return{ok:false,error:'shopping_list_not_found'};
+    this.ctx.storage.sql.exec(`UPDATE inventory_shopping_list_lines SET line_status=?,actual_quantity=?,actual_cost_minor=?,notes=CASE WHEN ?<>'' THEN ? ELSE notes END,updated_at=? WHERE id=? AND list_id=?`,status,Math.max(0,Number(record.actualQuantity)||0),Math.max(0,Math.round(Number(record.actualCostMinor)||0)),cleanText(record.notes,500),cleanText(record.notes,500),now,lineId,listId);
+    this.ctx.storage.sql.exec(`UPDATE inventory_shopping_lists SET status=CASE WHEN status='assigned' THEN 'shopping' ELSE status END,updated_at=? WHERE id=?`,now,listId);
+    const remaining=rows(this.ctx.storage.sql.exec(`SELECT COUNT(*) AS count FROM inventory_shopping_list_lines WHERE list_id=? AND line_status='needed'`,listId))[0];
+    const receipt=rows(this.ctx.storage.sql.exec(`SELECT receipt_required AS receiptRequired,finance_expense_id AS financeExpenseId,status FROM inventory_shopping_lists WHERE id=? LIMIT 1`,listId))[0];
+    if(Number(remaining?.count||0)===0 && Boolean(receipt?.receiptRequired) && !cleanText(receipt?.financeExpenseId,100) && !['completed','cancelled'].includes(receipt?.status)){
+      this.ctx.storage.sql.exec(`UPDATE inventory_shopping_lists SET status='awaiting_receipt',receipt_status='missing',updated_at=? WHERE id=?`,now,listId);
+    }
+    return{ok:true,listId,lineId,lineStatus:status};
+  }
+
+  async mobileSetInventoryShoppingListStatus(record={}){
+    const tenantId=cleanText(record.tenantId,100),id=cleanText(record.id,100),next=cleanText(record.status,30),now=cleanText(record.updatedAt,40)||new Date().toISOString();
+    const list=rows(this.ctx.storage.sql.exec(`SELECT id,status,assigned_user_id AS assignedUserId,receipt_required AS receiptRequired,finance_expense_id AS financeExpenseId FROM inventory_shopping_lists WHERE tenant_id=? AND id=? LIMIT 1`,tenantId,id))[0]; if(!list)return{ok:false,error:'shopping_list_not_found'};
+    const allowed={draft:new Set(['assigned','cancelled']),assigned:new Set(['shopping','cancelled']),shopping:new Set(['awaiting_receipt','completed','cancelled']),awaiting_receipt:new Set(['completed','shopping','cancelled']),completed:new Set([]),cancelled:new Set([])};
+    if(!allowed[list.status]?.has(next))return{ok:false,error:'invalid_shopping_list_transition',currentStatus:list.status};
+    if(next==='assigned'&&!list.assignedUserId)return{ok:false,error:'shopping_list_assignee_required'};
+    if(next==='completed'&&Boolean(list.receiptRequired)&&!list.financeExpenseId)return{ok:false,error:'shopping_list_receipt_required'};
+    this.ctx.storage.sql.exec(`UPDATE inventory_shopping_lists SET status=?,updated_at=? WHERE id=?`,next,now,id); return{ok:true,id,status:next,previousStatus:list.status};
+  }
+
+  async mobileLinkInventoryShoppingExpense(record={}){
+    const tenantId=cleanText(record.tenantId,100),id=cleanText(record.id,100),expenseId=cleanText(record.financeExpenseId,100),now=cleanText(record.updatedAt,40)||new Date().toISOString(); if(!tenantId||!id||!expenseId)return{ok:false,error:'invalid_request'};
+    const list=rows(this.ctx.storage.sql.exec(`SELECT id,status FROM inventory_shopping_lists WHERE tenant_id=? AND id=? LIMIT 1`,tenantId,id))[0]; if(!list)return{ok:false,error:'shopping_list_not_found'};
+    this.ctx.storage.sql.exec(`UPDATE inventory_shopping_lists SET finance_expense_id=?,receipt_status='linked',status=CASE WHEN status='shopping' THEN 'awaiting_receipt' ELSE status END,updated_at=? WHERE id=?`,expenseId,now,id); return{ok:true,id,financeExpenseId:expenseId,receiptStatus:'linked'};
+  }
+
+  async mobileCreateOwnerCalendarBlock(record={}){
+    const id=cleanText(record.id,120),tenantId=cleanText(record.tenantId,100),propertyId=cleanText(record.propertyId,100),reservationId=cleanText(record.reservationId,120),room=cleanText(record.room,30),checkInDate=cleanText(record.checkInDate,20),checkOutDate=cleanText(record.checkOutDate,20),now=cleanText(record.createdAt,40)||new Date().toISOString();
+    if(!id||!tenantId||!reservationId||!room||!checkInDate||!checkOutDate)return{ok:false,error:'invalid_block'};
+    this.ctx.storage.sql.exec(`INSERT INTO owner_calendar_blocks (id,tenant_id,property_id,reservation_id,room,check_in_date,check_out_date,reason,status,created_by_label,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,id,tenantId,propertyId,reservationId,room,checkInDate,checkOutDate,cleanText(record.reason,500),'active',cleanText(record.createdByLabel,120),now,now);
+    return{ok:true,id,reservationId};
+  }
+
+  async mobileListOwnerCalendarBlocks(tenantIdValue,propertyIdValue='',limitValue=200){
+    const tenantId=cleanText(tenantIdValue,100),propertyId=cleanText(propertyIdValue,100),limit=Math.max(1,Math.min(500,Number(limitValue)||200));
+    const propertyClause=propertyId?' AND property_id=?':''; const args=propertyId?[tenantId,propertyId,limit]:[tenantId,limit];
+    return rows(this.ctx.storage.sql.exec(`SELECT id,tenant_id AS tenantId,property_id AS propertyId,reservation_id AS reservationId,room,check_in_date AS checkInDate,check_out_date AS checkOutDate,reason,status,created_by_label AS createdByLabel,created_at AS createdAt,updated_at AS updatedAt FROM owner_calendar_blocks WHERE tenant_id=?${propertyClause} ORDER BY check_in_date ASC,created_at DESC LIMIT ?`,...args));
+  }
+
+  async mobileGetOwnerCalendarBlockByReservation(tenantIdValue,reservationIdValue){
+    const tenantId=cleanText(tenantIdValue,100),reservationId=cleanText(reservationIdValue,120);
+    return rows(this.ctx.storage.sql.exec(`SELECT id,tenant_id AS tenantId,property_id AS propertyId,reservation_id AS reservationId,room,check_in_date AS checkInDate,check_out_date AS checkOutDate,reason,status,created_by_label AS createdByLabel,created_at AS createdAt,updated_at AS updatedAt FROM owner_calendar_blocks WHERE tenant_id=? AND reservation_id=? LIMIT 1`,tenantId,reservationId))[0]||null;
+  }
+
+  async mobileCancelOwnerCalendarBlock(tenantIdValue,idValue,updatedAtValue=''){
+    const tenantId=cleanText(tenantIdValue,100),id=cleanText(idValue,120),now=cleanText(updatedAtValue,40)||new Date().toISOString();
+    const block=rows(this.ctx.storage.sql.exec(`SELECT id,status,reservation_id AS reservationId FROM owner_calendar_blocks WHERE tenant_id=? AND id=? LIMIT 1`,tenantId,id))[0]; if(!block)return{ok:false,error:'block_not_found'};
+    this.ctx.storage.sql.exec(`UPDATE owner_calendar_blocks SET status='cancelled',updated_at=? WHERE tenant_id=? AND id=?`,now,tenantId,id); return{ok:true,id,reservationId:block.reservationId};
   }
 
   async mobileGetRevenueSettings(tenantIdValue, propertyIdValue = "") {

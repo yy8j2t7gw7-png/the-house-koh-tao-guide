@@ -15,7 +15,8 @@ import {
   handleInboundWhatsAppGuestMessage,
   handleBeds24MessagingWebhook,
   handleWhatsAppMessagingStatus,
-  maintainBeds24Authentication
+  maintainBeds24Authentication,
+  processDueAutomaticGuestReplies
 } from "./unified-messaging.js";
 import {
   beds24ChannelManagerEnabled,
@@ -272,6 +273,7 @@ export default {
         processDueAlertEscalations(env),
         processHousekeepingTurnovers(env),
         processGuestLifecycleMessaging(env),
+        processDueAutomaticGuestReplies(env, (context) => generateUnifiedMessageReply(context, env, ctx)),
         processBeds24ChannelManagerRetries(env)
       ]));
       return;

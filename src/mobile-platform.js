@@ -14,7 +14,8 @@ import { handleOperationsCopilot } from "./operations-copilot.js";
 import { operationalRecipientGroup } from "./operations-routing.js";
 import { reservationSourceCapabilities } from "./reservation-model.js";
 import { normalizeStaffLanguage, staffLanguageLabel, translateOperatorText } from "./staff-translation.js";
-import { createAsset, createInventoryItem, createInventoryLocation, createInventoryMovement, createPurchaseOrder, createSupplier, inventoryOverview, receivePurchaseOrder, seedStarterInventory, updateInventoryItem, updatePurchaseOrderStatus } from "./inventory-api.js";
+import { activateCatalogueItems, addShoppingListLine, assignShoppingList, createAsset, createInventoryItem, createInventoryLocation, createInventoryMovement, createPurchaseOrder, createShoppingList, createSupplier, inventoryOverview, linkShoppingListExpense, receivePurchaseOrder, seedStarterInventory, shoppingListAssignmentMessage, updateInventoryItem, updatePurchaseOrderStatus, updateShoppingListLine, updateShoppingListStatus } from "./inventory-api.js";
+import { sendMobilePush } from "./mobile-push.js";
 
 const MOBILE_API_PREFIX = "/api/mobile/v1";
 const PASSWORD_ITERATIONS = 100000;
@@ -47,14 +48,14 @@ export const MOBILE_PERMISSION_MATRIX = Object.freeze({
     "registration.status", "finance.view", "finance.import", "finance.expense_submit", "analytics.view", "integrations.view",
     "staff.manage", "licenses.view", "licenses.manage", "security.sessions",
     "direct_stays.manage", "guest_documents.view", "listings_rates.view", "listings_rates.manage",
-    "inventory.view", "inventory.adjust", "inventory.purchase", "inventory.manage", "property_settings.manage"
+    "inventory.view", "inventory.adjust", "inventory.purchase", "inventory.local_purchase", "inventory.manage", "property_settings.manage"
   ]),
   manager: Object.freeze([
     "home.view", "bookings.view", "calendar.view", "copilot.use", "booking_activity.create", "booking_activity.update",
     "messaging.view", "messaging.send", "messaging.ai_control",
     "operations.view", "housekeeping.update", "maintenance.view", "maintenance.create", "maintenance.resolve",
     "registration.status", "finance.expense_submit", "analytics.view", "integrations.view", "direct_stays.manage", "listings_rates.view",
-    "inventory.view", "inventory.adjust", "inventory.purchase", "property_settings.manage"
+    "inventory.view", "inventory.adjust", "inventory.purchase", "inventory.local_purchase", "property_settings.manage"
   ]),
   staff: Object.freeze([
     "home.view", "bookings.view", "calendar.view", "copilot.use", "booking_activity.create", "booking_activity.update", "operations.view",
@@ -64,7 +65,7 @@ export const MOBILE_PERMISSION_MATRIX = Object.freeze({
 
 export const MOBILE_DELEGATABLE_PERMISSIONS = Object.freeze({
   manager: Object.freeze(["finance.view", "finance.expense_submit", "copilot.use", "inventory.view", "inventory.adjust", "inventory.purchase", "inventory.manage"]),
-  staff: Object.freeze(["finance.expense_submit", "copilot.use", "inventory.view", "inventory.adjust"])
+  staff: Object.freeze(["finance.expense_submit", "copilot.use", "inventory.view", "inventory.adjust", "inventory.local_purchase"])
 });
 
 function sanitizePermissionOverrides(roleValue, input = {}) {
@@ -2085,8 +2086,18 @@ async function handleProtected(request, env, path, store, handlers = {}) {
   if (path === `${MOBILE_API_PREFIX}/inventory` && request.method === "GET") {
     const denied = requireCapability(publicAccess, "inventory.view", "inventory");
     if (denied) return denied;
-    try { return json({ ok: true, ...(await inventoryOverview({ store, access: publicAccess })) }); }
+    const propertyId = cleanText(new URL(request.url).searchParams.get("propertyId"), 100);
+    try { return json({ ok: true, ...(await inventoryOverview({ store, access: publicAccess, propertyId })) }); }
     catch (error) { return json({ error: "inventory_unavailable", detail: cleanText(error?.message, 120) }, 503); }
+  }
+
+  if (path === `${MOBILE_API_PREFIX}/inventory/catalogue/activate` && request.method === "POST") {
+    const denied = requireCapability(publicAccess, "inventory.manage", "inventory"); if (denied) return denied;
+    let body; try { body = await readJson(request); } catch (response) { return response; }
+    const outcome = await activateCatalogueItems({ store, access: publicAccess, body, actorLabel: record.displayName });
+    if (!outcome?.ok) return json({ error: outcome?.error || "inventory_catalogue_failed" }, 400);
+    await store.mobileRecordAudit({ tenantId: record.tenantId, userId: record.userId, membershipId: record.membershipId, action: "inventory_catalogue_items_activated", reference: `property:${cleanText(body?.propertyId || access.properties?.[0]?.id, 100)}`, metadata: { count: outcome.activated?.length || 0 }, createdAt: access.now });
+    return json(outcome, 201);
   }
 
   if (path === `${MOBILE_API_PREFIX}/inventory/items` && request.method === "POST") {
@@ -2157,6 +2168,94 @@ async function handleProtected(request, env, path, store, handlers = {}) {
     if (!outcome?.ok) return json({ error: outcome?.error || "purchase_order_receive_failed" }, 400);
     await store.mobileRecordAudit({ tenantId: record.tenantId, userId: record.userId, membershipId: record.membershipId, action: "inventory_purchase_order_received", reference: `purchase-order:${body?.id || ""}`, metadata: { locationId: cleanText(body?.locationId, 100) }, createdAt: access.now });
     return json(outcome);
+  }
+
+  if (path === `${MOBILE_API_PREFIX}/inventory/shopping-lists` && request.method === "POST") {
+    const denied = requireCapability(publicAccess, "inventory.purchase", "inventory"); if (denied) return denied;
+    let body; try { body = await readJson(request); } catch (response) { return response; }
+    const outcome = await createShoppingList({ store, access: publicAccess, body, actorLabel: record.displayName });
+    if (!outcome?.ok) return json({ error: outcome?.error || "shopping_list_failed" }, 400);
+    const list = outcome.shoppingList;
+    await store.mobileRecordAudit({ tenantId: record.tenantId, userId: record.userId, membershipId: record.membershipId, action: "inventory_shopping_list_created", reference: `shopping-list:${list?.id || ""}`, metadata: { propertyId: list?.propertyId || "", assignedUserId: list?.assignedUserId || "", lines: list?.lines?.length || 0 }, createdAt: access.now });
+    return json(outcome, 201);
+  }
+
+  if (path === `${MOBILE_API_PREFIX}/inventory/shopping-lists/line` && request.method === "POST") {
+    const allowed = hasPermission(publicAccess, "inventory.purchase") || hasPermission(publicAccess, "inventory.local_purchase");
+    if (!allowed) return json({ error: "forbidden", permission: "inventory.local_purchase" }, 403);
+    let body; try { body = await readJson(request); } catch (response) { return response; }
+    const list = await store.mobileGetInventoryShoppingList(record.tenantId, cleanText(body?.listId, 100));
+    if (!list) return json({ error: "shopping_list_not_found" }, 404);
+    if (record.role === "staff" && list.assignedUserId && list.assignedUserId !== record.userId) return json({ error: "shopping_list_not_assigned" }, 403);
+    const outcome = await addShoppingListLine({ store, access: publicAccess, body, actorLabel: record.displayName });
+    if (!outcome?.ok) return json({ error: outcome?.error || "shopping_list_line_failed" }, 400);
+    await store.mobileRecordAudit({ tenantId: record.tenantId, userId: record.userId, membershipId: record.membershipId, action: "inventory_shopping_list_line_added", reference: `shopping-list:${body?.listId || ""}`, metadata: { itemId: cleanText(body?.itemId,100), quantity: Number(body?.quantity)||0, room: cleanText(body?.room,60) }, createdAt: access.now });
+    return json(outcome, 201);
+  }
+
+  if (path === `${MOBILE_API_PREFIX}/inventory/shopping-lists/assign` && request.method === "POST") {
+    const denied = requireCapability(publicAccess, "inventory.purchase", "inventory"); if (denied) return denied;
+    let body; try { body = await readJson(request); } catch (response) { return response; }
+    const outcome = await assignShoppingList({ store, access: publicAccess, body });
+    if (!outcome?.ok) return json({ error: outcome?.error || "shopping_list_assign_failed" }, 400);
+    const list = await store.mobileGetInventoryShoppingList(record.tenantId, cleanText(body?.id,100));
+    const taskId = `otask_${list.id}`;
+    const existingTask = typeof store.mobileGetOperationalTask === "function" ? await store.mobileGetOperationalTask(taskId).catch(() => null) : null;
+    if (!existingTask) {
+      await store.mobileCreateOperationalTask({ id: taskId, reservationId: "", room: list.lines?.find((line) => line.room)?.room || "Property", category: "Inventory", body: shoppingListAssignmentMessage(list), timing: list.dueAt || "", dueAt: list.dueAt || "", assigneeKey: list.assignedUserId, assigneeLabel: list.assignedLabel, alertId: "", source: "shopping_list", sourceActivityId: list.id, deliveryAttempted: 0, deliveryAccepted: 0, createdByHash: await sha256(`mobile:${record.userId}:${record.membershipId}`), createdByLabel: record.displayName, createdAt: access.now }).catch(() => {});
+    }
+    const push = await sendMobilePush(env, { targetUserId: outcome.assignedUserId, audience: "operations", category: "operations", title: `Shopping list · ${outcome.assignedLabel || "Assigned"}`, body: shoppingListAssignmentMessage(list), data: { route: "/inventory", eventType: "shopping_list", shoppingListId: list.id } }).catch(() => ({ attempted: 0, accepted: 0 }));
+    await store.mobileUpdateOperationalTaskDelivery?.(taskId, push, access.now).catch(() => {});
+    await store.mobileRecordAudit({ tenantId: record.tenantId, userId: record.userId, membershipId: record.membershipId, action: "inventory_shopping_list_assigned", reference: `shopping-list:${body?.id || ""}`, metadata: { assignedUserId: outcome.assignedUserId, assignedLabel: outcome.assignedLabel, lineCount: list.lines?.length || 0 }, createdAt: access.now });
+    return json({ ok: true, ...outcome, shoppingList: list, notification: push });
+  }
+
+  if (path === `${MOBILE_API_PREFIX}/inventory/shopping-lists/line-status` && request.method === "POST") {
+    const allowed = hasPermission(publicAccess, "inventory.purchase") || hasPermission(publicAccess, "inventory.local_purchase");
+    if (!allowed) return json({ error: "forbidden", permission: "inventory.local_purchase" }, 403);
+    let body; try { body = await readJson(request); } catch (response) { return response; }
+    const list = await store.mobileGetInventoryShoppingList(record.tenantId, cleanText(body?.listId,100)); if (!list) return json({ error: "shopping_list_not_found" }, 404);
+    if (record.role === "staff" && list.assignedUserId !== record.userId) return json({ error: "shopping_list_not_assigned" }, 403);
+    const outcome = await updateShoppingListLine({ store, access: publicAccess, body });
+    if (!outcome?.ok) return json({ error: outcome?.error || "shopping_list_line_update_failed" }, 400);
+    const updatedList = await store.mobileGetInventoryShoppingList(record.tenantId, cleanText(body?.listId,100));
+    if (updatedList?.status === "awaiting_receipt" && updatedList?.assignedUserId) {
+      await sendMobilePush(env, { targetUserId: updatedList.assignedUserId, audience: "operations", category: "operations", title: "Receipt needed", body: `Please upload the bill for ${cleanText(updatedList.title,120) || "your shopping list"} so Taoedge can link it to Finance.`, data: { route: "/inventory", eventType: "shopping_receipt" } }).catch(() => {});
+    }
+    await store.mobileRecordAudit({ tenantId: record.tenantId, userId: record.userId, membershipId: record.membershipId, action: "inventory_shopping_list_line_updated", reference: `shopping-list:${body?.listId || ""}`, metadata: { lineId: cleanText(body?.lineId,100), lineStatus: cleanText(body?.lineStatus,30), actualQuantity: Number(body?.actualQuantity)||0, actualCostMinor: Number(body?.actualCostMinor)||0 }, createdAt: access.now });
+    return json({ ...outcome, shoppingList: updatedList });
+  }
+
+  if (path === `${MOBILE_API_PREFIX}/inventory/shopping-lists/status` && request.method === "POST") {
+    const allowed = hasPermission(publicAccess, "inventory.purchase") || hasPermission(publicAccess, "inventory.local_purchase");
+    if (!allowed) return json({ error: "forbidden", permission: "inventory.local_purchase" }, 403);
+    let body; try { body = await readJson(request); } catch (response) { return response; }
+    const list = await store.mobileGetInventoryShoppingList(record.tenantId, cleanText(body?.id,100)); if (!list) return json({ error: "shopping_list_not_found" }, 404);
+    if (record.role === "staff" && list.assignedUserId !== record.userId) return json({ error: "shopping_list_not_assigned" }, 403);
+    const outcome = await updateShoppingListStatus({ store, access: publicAccess, body, actorLabel: record.displayName });
+    if (!outcome?.ok) return json({ error: outcome?.error || "shopping_list_status_failed", currentStatus: outcome?.currentStatus || "" }, outcome?.error === "shopping_list_receipt_required" ? 409 : 400);
+    await store.mobileRecordAudit({ tenantId: record.tenantId, userId: record.userId, membershipId: record.membershipId, action: `inventory_shopping_list_${outcome.status}`, reference: `shopping-list:${body?.id || ""}`, metadata: { previousStatus: outcome.previousStatus || "", locationId: cleanText(body?.locationId,100) }, createdAt: access.now });
+    return json(outcome);
+  }
+
+  if (path === `${MOBILE_API_PREFIX}/inventory/shopping-lists/expense-submit` && request.method === "POST") {
+    const allowed = hasPermission(publicAccess, "inventory.purchase") || hasPermission(publicAccess, "inventory.local_purchase");
+    if (!allowed) return json({ error: "forbidden", permission: "inventory.local_purchase" }, 403);
+    const listId = cleanText(new URL(request.url).searchParams.get("listId"), 100);
+    const list = await store.mobileGetInventoryShoppingList(record.tenantId, listId); if (!list) return json({ error: "shopping_list_not_found" }, 404);
+    if (record.role === "staff" && list.assignedUserId !== record.userId) return json({ error: "shopping_list_not_assigned" }, 403);
+    const actorHash = await sha256(`mobile:${record.userId}:${record.membershipId}`);
+    const response = await handleExpenseAdminRequest(request, env, "/api/concierge/admin/expenses", store, actorHash, { role: record.role === "owner" ? "owner" : "staff", businessId: HOUSE_FINANCE_BUSINESS_ID });
+    if (!response) return json({ error: "expense_submit_failed" }, 502);
+    if (response.ok) {
+      const payload = await response.clone().json().catch(() => ({}));
+      if (payload?.id) {
+        await linkShoppingListExpense({ store, access: publicAccess, body: { id: listId, financeExpenseId: payload.id } });
+        await store.mobileRecordAudit({ tenantId: record.tenantId, userId: record.userId, membershipId: record.membershipId, action: "inventory_shopping_receipt_linked", reference: `shopping-list:${listId}`, metadata: { financeExpenseId: payload.id }, createdAt: access.now });
+        return json({ ...payload, shoppingListId: listId, financeExpenseId: payload.id, linked: true }, response.status);
+      }
+    }
+    return response;
   }
 
   if (path === `${MOBILE_API_PREFIX}/inventory/assets` && request.method === "POST") {
@@ -2493,7 +2592,7 @@ async function handleProtected(request, env, path, store, handlers = {}) {
       messaging: messagingAllowed ? unifiedMessagingConfiguration(env) : undefined,
       financeAutomation: financeAllowed ? beds24FinanceSyncConfiguration(env) : undefined,
       connectionHealth,
-      apiContract: { backendVersion: "5.11.83", mobileApiVersion: "v1", listingsRatesRoute: `${MOBILE_API_PREFIX}/listings-rates`, directStayOperations: true },
+      apiContract: { backendVersion: "5.11.84", mobileApiVersion: "v1", listingsRatesRoute: `${MOBILE_API_PREFIX}/listings-rates`, directStayOperations: true, inventoryShoppingLists: true, copilotOperationalActions: true },
       product: {
         workingName: "Taoedge Owner App",
         commercialBrandPending: true,

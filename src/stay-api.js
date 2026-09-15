@@ -972,10 +972,12 @@ export async function handleStayAdminRequest(request, env, path, store) {
       }
       return json({ error: "stay_creation_failed" }, 503);
     }
-    let localReservation = null;
+    let localReservation = typeof store.getStayReservationByCodeHash === "function"
+      ? await store.getStayReservationByCodeHash(confirmationCodeHash, room).catch(() => null)
+      : null;
     let distributionSync = { status: beds24Booking?.externalBookingId ? "booking_accepted" : "local_only" };
     if (beds24Booking?.externalBookingId && typeof store.getStayReservationByCodeHash === "function" && typeof store.linkBeds24Reservation === "function") {
-      localReservation = await store.getStayReservationByCodeHash(confirmationCodeHash, room);
+      localReservation = localReservation || await store.getStayReservationByCodeHash(confirmationCodeHash, room);
       const linked = localReservation?.id ? await store.linkBeds24Reservation({
         reservationId: localReservation.id,
         externalBookingId: beds24Booking.externalBookingId,

@@ -57,6 +57,7 @@ import {
   beds24SourceLabel,
   detectGuestMessageLanguage,
   detectExternalPassportSubmission,
+  processDueAutomaticGuestReplies,
   roomForBeds24Booking,
   unifiedMessagingConfiguration,
   reviewMessagingDraft
@@ -13908,7 +13909,8 @@ test("v5.11.56 House routes and Owner Admin use Beds24 plus direct WhatsApp with
   assert.doesNotMatch(`${indexSource}\n${messagingSource}\n${adminHtml}\n${adminJs}`, /Smoobu|smoobu|SMOOBU/);
   assert.match(messagingSource, /status: \["confirmed", "new"\]/);
   assert.match(messagingSource, /latest_message_not_guest/);
-  assert.match(messagingSource, /auto_send_disabled/);
+  assert.match(messagingSource, /AUTOMATIC_GUEST_REPLY_MIN_DELAY_MS = 5 \* 60 \* 1000/);
+  assert.match(messagingSource, /pending_auto_send/);
 });
 
 test("v5.11.56 Beds24 access tokens are cached in the Durable Object while the refresh token remains a secret", async () => {
@@ -14309,7 +14311,7 @@ test("v5.11.58 expense submission is granular: owners/managers have it, staff re
   assert.equal(new Set(MOBILE_PERMISSION_MATRIX.owner).has("finance.expense_submit"), true);
   assert.equal(new Set(MOBILE_PERMISSION_MATRIX.manager).has("finance.expense_submit"), true);
   assert.equal(new Set(MOBILE_PERMISSION_MATRIX.staff).has("finance.expense_submit"), false);
-  assert.deepEqual(MOBILE_DELEGATABLE_PERMISSIONS.staff, ["finance.expense_submit", "copilot.use", "inventory.view", "inventory.adjust"]);
+  assert.deepEqual(MOBILE_DELEGATABLE_PERMISSIONS.staff, ["finance.expense_submit", "copilot.use", "inventory.view", "inventory.adjust", "inventory.local_purchase"]);
   assert.equal(new Set(MOBILE_DELEGATABLE_PERMISSIONS.staff).has("finance.view"), false);
   assert.equal(new Set(MOBILE_DELEGATABLE_PERMISSIONS.manager).has("finance.view"), true);
 });
@@ -15645,7 +15647,7 @@ test("v5.11.77 Listings & Rates mobile route contract is explicit, aliased and t
   const source = await readFile(new URL("../src/mobile-platform.js", import.meta.url), "utf8");
   assert.ok(source.includes('[`${MOBILE_API_PREFIX}/listings-rates`, `${MOBILE_API_PREFIX}/listings`].includes(path)'));
   assert.ok(source.includes('path.replace(/\\/+$/, "")'));
-  assert.match(source, /backendVersion: "5\.11\.83"/);
+  assert.match(source, /backendVersion: "5\.11\.84"/);
   assert.match(source, /listingsRatesRoute: `\$\{MOBILE_API_PREFIX\}\/listings-rates`/);
   assert.match(source, /direct-stays\/update/);
   assert.match(source, /direct-stays\/cancel/);
@@ -15877,4 +15879,130 @@ test("v5.11.79 operational side effect requires an explicit independent owner de
   });
   assert.equal(outcome.ok, false);
   assert.equal(outcome.error, "operation_decision_required");
+});
+
+test("v5.11.84 trusted guest messaging applies hospitality and customer-satisfaction quality gate", async () => {
+  const { env, store } = createEnvironment({
+    OPENAI_API_KEY: "test-key",
+    UNIFIED_MESSAGING_INTERNAL_TOKEN: "unified_internal_test_token"
+  });
+  store.stayReservations.push({
+    id: "stay_hospitality_001", room: "7", status: "confirmed", provider: "direct", guestFirstName: "Guest",
+    checkInDate: "2026-09-14", checkOutDate: "2026-09-16"
+  });
+  const originalFetch = globalThis.fetch;
+  let instructions = "";
+  globalThis.fetch = async (_url, options = {}) => {
+    const body = JSON.parse(options.body || "{}");
+    instructions = String(body.instructions || "");
+    return new Response(JSON.stringify({
+      output: [{ type: "message", content: [{ type: "output_text", text: JSON.stringify({
+        answer: "You're very welcome, and thank you for your kind words. We're delighted you had a wonderful stay with us. It was a pleasure having you, and we hope to welcome you back to Koh Tao again. Safe travels!",
+        intent_id: "guest_appreciation", category: "concierge", confidence: 0.98,
+        needs_human: false, handoff: "none", operational_category: "none", learning_gap: false, learning_reason: "none"
+      }) }] }]
+    }), { status: 200, headers: { "content-type": "application/json" } });
+  };
+  try {
+    const result = await generateUnifiedMessageReply({
+      question: "No I just wanted to say thank you. Had a great time and the hotel was fantastic.",
+      reservationId: "stay_hospitality_001", room: "7", language: "auto", history: []
+    }, env, undefined, new Date("2026-09-15T13:00:00.000Z"));
+    assert.match(instructions, /excellent hotel host/i);
+    assert.match(instructions, /Would this answer make the guest feel acknowledged, cared for and satisfied/i);
+    assert.match(instructions, /thank them for staying with us/i);
+    assert.match(instructions, /safe onward travels/i);
+    assert.match(instructions, /Do not ask for a review, rating, tip or public recommendation/i);
+    assert.match(result.answer, /thank you/i);
+    assert.match(result.answer, /welcome you back/i);
+    assert.equal(result.autoSend, true);
+    assert.equal(result.operationProposal, null);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("v5.11.84 automatic guest replies wait at least five minutes and re-check before sending", async () => {
+  const trigger = {
+    id: "msg_guest_delay_001", threadId: "thread_delay_001", direction: "inbound", sender: "guest",
+    body: "Thank you, everything was great.", createdAt: "2026-09-15T13:00:00.000Z"
+  };
+  const draft = {
+    id: "msg_draft_delay_001", threadId: "thread_delay_001", direction: "draft", sender: "ai",
+    body: "Initial draft", deliveryStatus: "pending_auto_send", createdAt: "2026-09-15T13:00:04.000Z",
+    metadata: { operation: null, automaticSend: { pending: true, eligibleAt: "2026-09-15T13:05:00.000Z", triggerMessageId: trigger.id, qualityChecks: ["initial_policy", "hospitality_prompt"] } }
+  };
+  const thread = {
+    id: "thread_delay_001", channel: "whatsapp", reservationId: "stay_delay_001", room: "7",
+    guestPhone: "66812345678", aiPaused: false
+  };
+  const outbound = [];
+  const threadStates = [];
+  const store = {
+    async listPendingMessagingAutoReplies() { return [draft]; },
+    async getMessagingThread() { return thread; },
+    async listMessagingMessages() { return [trigger]; },
+    async getMessagingMessage(id) { return id === draft.id ? draft : null; },
+    async updateMessagingDraft(_id, patch) { Object.assign(draft, patch); return { ok: true, message: draft }; },
+    async updateMessagingThreadState(_id, state) { threadStates.push(state); return { ok: true }; },
+    async recordMessagingMessage(record) { outbound.push(record); return { inserted: true, id: record.id }; }
+  };
+  const env = {
+    CONCIERGE_STORE: { getByName() { return store; } },
+    UNIFIED_MESSAGING_ENABLED: "true",
+    UNIFIED_MESSAGING_AI_REPLY_ENABLED: "true",
+    UNIFIED_MESSAGING_AI_AUTO_SEND_ENABLED: "true",
+    WHATSAPP_ACCESS_TOKEN: "token",
+    WHATSAPP_PHONE_NUMBER_ID: "123456789"
+  };
+  let generationCount = 0;
+  const generateReply = async () => {
+    generationCount += 1;
+    return {
+      answer: "You're very welcome. Thank you for staying with us; we're delighted you enjoyed your stay. Safe travels, and we'd be happy to welcome you back.",
+      autoSend: true, reason: "routine_reply", intentId: "guest_appreciation", category: "concierge",
+      needsHuman: false, handoff: "none", language: "en", operationProposal: null, confidence: 0.99
+    };
+  };
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => new Response(JSON.stringify({ messages: [{ id: "wamid.delay001" }] }), { status: 200, headers: { "content-type": "application/json" } });
+  try {
+    const early = await processDueAutomaticGuestReplies(env, generateReply, new Date("2026-09-15T13:04:59.000Z"));
+    assert.equal(early.sent, 0);
+    assert.equal(generationCount, 0);
+    assert.equal(outbound.length, 0);
+
+    const due = await processDueAutomaticGuestReplies(env, generateReply, new Date("2026-09-15T13:05:01.000Z"));
+    assert.equal(due.sent, 1);
+    assert.equal(generationCount, 1, "due reply is regenerated as a second quality/context pass");
+    assert.equal(outbound.length, 1);
+    assert.equal(outbound[0].automated, true);
+    assert.match(outbound[0].body, /thank you for staying/i);
+    assert.equal(draft.deliveryStatus, "approved");
+    assert.ok(draft.metadata?.automaticSend?.qualityChecks?.includes("five_star_hospitality"));
+    assert.ok(threadStates.some((state) => state.needsHuman === false));
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("v5.11.84 pending automatic reply is superseded by a newer guest message", async () => {
+  const trigger = { id: "msg_guest_old", threadId: "thread_delay_002", direction: "inbound", sender: "guest", body: "Can I check out later?", createdAt: "2026-09-15T13:00:00.000Z" };
+  const newer = { id: "msg_guest_new", threadId: "thread_delay_002", direction: "inbound", sender: "guest", body: "Never mind, 11 is fine.", createdAt: "2026-09-15T13:02:00.000Z" };
+  const draft = { id: "msg_draft_old", threadId: "thread_delay_002", direction: "draft", sender: "ai", body: "Old answer", deliveryStatus: "pending_auto_send", metadata: { automaticSend: { pending: true, eligibleAt: "2026-09-15T13:05:00.000Z", triggerMessageId: trigger.id } } };
+  const thread = { id: "thread_delay_002", channel: "whatsapp", reservationId: "stay_delay_002", room: "3", guestPhone: "66812345678", aiPaused: false };
+  const store = {
+    async listPendingMessagingAutoReplies() { return [draft]; },
+    async getMessagingThread() { return thread; },
+    async listMessagingMessages() { return [trigger, newer]; },
+    async updateMessagingDraft(_id, patch) { Object.assign(draft, patch); return { ok: true, message: draft }; }
+  };
+  const env = { CONCIERGE_STORE: { getByName() { return store; } }, UNIFIED_MESSAGING_ENABLED: "true", UNIFIED_MESSAGING_AI_REPLY_ENABLED: "true", UNIFIED_MESSAGING_AI_AUTO_SEND_ENABLED: "true" };
+  let generations = 0;
+  const result = await processDueAutomaticGuestReplies(env, async () => { generations += 1; return { answer: "Should not send", autoSend: true }; }, new Date("2026-09-15T13:06:00.000Z"));
+  assert.equal(result.sent, 0);
+  assert.equal(result.superseded, 1);
+  assert.equal(generations, 0);
+  assert.equal(draft.deliveryStatus, "superseded");
+  assert.equal(draft.metadata?.automaticSend?.heldReason, "newer_guest_message");
 });

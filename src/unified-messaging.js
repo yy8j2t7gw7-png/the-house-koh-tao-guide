@@ -6,6 +6,7 @@ const MAX_THREADS = 80;
 const MAX_THREAD_MESSAGES = 100;
 const BEDS24_BASE_URL = "https://beds24.com/api/v2";
 const BEDS24_TOKEN_SAFETY_SECONDS = 300;
+const AUTOMATIC_GUEST_REPLY_MIN_DELAY_MS = 5 * 60 * 1000;
 
 function getStore(env) {
   if (!env.CONCIERGE_STORE?.getByName) return null;
@@ -166,6 +167,12 @@ function aiAutoSendEnabled(env) {
   return aiReplyEnabled(env) && String(env.UNIFIED_MESSAGING_AI_AUTO_SEND_ENABLED || "false").toLowerCase() === "true";
 }
 
+function automaticReplyEligibleAt(receivedAtValue) {
+  const receivedAt = new Date(receivedAtValue || Date.now());
+  const base = Number.isFinite(receivedAt.getTime()) ? receivedAt.getTime() : Date.now();
+  return new Date(base + AUTOMATIC_GUEST_REPLY_MIN_DELAY_MS).toISOString();
+}
+
 export function beds24RoomMap(env) {
   try {
     const value = JSON.parse(String(env.BEDS24_ROOM_MAP || "{}"));
@@ -213,6 +220,7 @@ export function unifiedMessagingConfiguration(env = {}) {
     enabled: messagingEnabled(env),
     aiReplyEnabled: aiReplyEnabled(env),
     aiAutoSendEnabled: aiAutoSendEnabled(env),
+    automaticReplyDelayMinutes: 5,
     aiInternalTokenReady,
     aiReplyReady: aiReplyEnabled(env) && aiInternalTokenReady,
     whatsAppReady,
@@ -489,7 +497,7 @@ async function maybeGenerateReply({ env, store, thread, inboundText, generateRep
   }
 }
 
-function draftMetadata(result, reason, env) {
+function draftMetadata(result, reason, env, extra = {}) {
   const proposal = result?.operationProposal && typeof result.operationProposal === "object"
     ? { ...result.operationProposal }
     : null;
@@ -505,13 +513,25 @@ function draftMetadata(result, reason, env) {
     category: String(result?.category || "").slice(0, 80),
     handoff: String(result?.handoff || "none").slice(0, 80),
     operation: proposal,
-    decision: "pending"
+    decision: "pending",
+    ...(extra && typeof extra === "object" ? extra : {})
   };
 }
 
-async function recordAiDraft(store, thread, result, reason = "review_required", env = {}) {
-  const now = new Date().toISOString();
+async function recordAiDraft(store, thread, result, reason = "review_required", env = {}, options = {}) {
+  const now = cleanText(options.now, 40) || new Date().toISOString();
   const id = `msg_${crypto.randomUUID()}`;
+  const pendingAutoSend = options.pendingAutoSend === true;
+  const metadata = draftMetadata(result, reason, env, pendingAutoSend ? {
+    automaticSend: {
+      pending: true,
+      eligibleAt: automaticReplyEligibleAt(options.receivedAt || now),
+      triggerMessageId: cleanText(options.triggerMessageId, 100),
+      triggerMessageCreatedAt: cleanText(options.triggerMessageCreatedAt, 40),
+      receivedAt: cleanText(options.receivedAt, 40) || now,
+      qualityChecks: ["initial_policy", "hospitality_prompt"]
+    }
+  } : {});
   await store.recordMessagingMessage({
     id,
     threadId: thread.id,
@@ -520,17 +540,120 @@ async function recordAiDraft(store, thread, result, reason = "review_required", 
     sender: "ai",
     body: cleanText(result.answer, MAX_MESSAGE_LENGTH),
     automated: true,
-    deliveryStatus: "draft",
-    metadata: draftMetadata(result, reason, env),
+    deliveryStatus: pendingAutoSend ? "pending_auto_send" : "draft",
+    metadata,
     createdAt: now
   });
   await store.updateMessagingThreadState(thread.id, {
-    needsHuman: true,
+    needsHuman: pendingAutoSend ? false : true,
     aiDraft: true,
     lastError: reason,
     updatedAt: now
   });
   return { id };
+}
+
+async function holdAutomaticDraftForReview(store, thread, draft, reason, result = null, nowValue = new Date().toISOString()) {
+  const metadata = {
+    ...(draft?.metadata || {}),
+    reviewReason: cleanText(reason || "automatic_reply_review_required", 80),
+    decision: "pending",
+    automaticSend: {
+      ...(draft?.metadata?.automaticSend || {}),
+      pending: false,
+      heldAt: cleanText(nowValue, 40),
+      heldReason: cleanText(reason, 100),
+      qualityChecks: [...new Set([...(draft?.metadata?.automaticSend?.qualityChecks || []), "final_policy_failed"])]
+    }
+  };
+  if (result?.operationProposal) metadata.operation = result.operationProposal;
+  await store.updateMessagingDraft(draft.id, {
+    ...(result?.answer ? { body: cleanText(result.answer, MAX_MESSAGE_LENGTH) } : {}),
+    deliveryStatus: "draft",
+    metadata,
+    updatedAt: nowValue
+  });
+  await store.updateMessagingThreadState(thread.id, { needsHuman: true, aiDraft: true, lastError: cleanText(reason, 120), updatedAt: nowValue });
+}
+
+export async function processDueAutomaticGuestReplies(env, generateReply, nowValue = new Date()) {
+  if (!aiAutoSendEnabled(env)) return { ok: true, ignored: "automatic_guest_replies_disabled", checked: 0, sent: 0 };
+  const store = getStore(env);
+  if (!store || typeof store.listPendingMessagingAutoReplies !== "function") return { ok: false, error: "messaging_store_unavailable", checked: 0, sent: 0 };
+  const now = nowValue instanceof Date ? nowValue : new Date(nowValue || Date.now());
+  const nowIso = Number.isFinite(now.getTime()) ? now.toISOString() : new Date().toISOString();
+  const pending = await store.listPendingMessagingAutoReplies(nowIso, 60).catch(() => []);
+  let sent = 0;
+  let held = 0;
+  let superseded = 0;
+  for (const draft of pending) {
+    const eligibleAt = new Date(draft?.metadata?.automaticSend?.eligibleAt || 0).getTime();
+    if (!Number.isFinite(eligibleAt) || eligibleAt <= 0 || eligibleAt > new Date(nowIso).getTime()) continue;
+    const thread = await store.getMessagingThread(draft.threadId).catch(() => null);
+    if (!thread) {
+      await store.updateMessagingDraft(draft.id, { deliveryStatus: "superseded", metadata: { ...(draft.metadata || {}), decision: "superseded", automaticSend: { ...(draft.metadata?.automaticSend || {}), pending: false, heldReason: "thread_missing", heldAt: nowIso } }, updatedAt: nowIso }).catch(() => {});
+      superseded += 1;
+      continue;
+    }
+    if (thread.aiPaused) {
+      await holdAutomaticDraftForReview(store, thread, draft, "ai_paused", null, nowIso);
+      held += 1;
+      continue;
+    }
+    const messages = await store.listMessagingMessages(thread.id, 100).catch(() => []);
+    const triggerId = cleanText(draft?.metadata?.automaticSend?.triggerMessageId, 100);
+    const trigger = messages.find((item) => item.id === triggerId && item.direction === "inbound") || null;
+    if (!trigger) {
+      await holdAutomaticDraftForReview(store, thread, draft, "trigger_message_missing", null, nowIso);
+      held += 1;
+      continue;
+    }
+    const triggerIndex = messages.findIndex((item) => item.id === trigger.id);
+    const afterTrigger = triggerIndex >= 0 ? messages.slice(triggerIndex + 1) : [];
+    const newerGuestMessage = afterTrigger.some((item) => item.direction === "inbound");
+    const newerHumanReply = afterTrigger.some((item) => item.direction === "outbound" && item.sender !== "ai");
+    if (newerGuestMessage || newerHumanReply) {
+      const reason = newerGuestMessage ? "newer_guest_message" : "human_replied";
+      await store.updateMessagingDraft(draft.id, {
+        deliveryStatus: "superseded",
+        metadata: { ...(draft.metadata || {}), decision: "superseded", automaticSend: { ...(draft.metadata?.automaticSend || {}), pending: false, heldReason: reason, heldAt: nowIso } },
+        updatedAt: nowIso
+      }).catch(() => {});
+      superseded += 1;
+      continue;
+    }
+
+    // The five-minute window is a deliberate second full pass over the current
+    // conversation. The generator re-evaluates language, policy, context and
+    // hospitality, followed by the deterministic auto-send safety gate below.
+    const result = await maybeGenerateReply({ env, store, thread, inboundText: trigger.body, generateReply });
+    if (!result.generated || !result.autoSend || result.operationProposal) {
+      await holdAutomaticDraftForReview(store, thread, draft, result.reason || (result.operationProposal ? "operational_action_review_required" : "final_quality_review_required"), result.generated ? result : null, nowIso);
+      held += 1;
+      continue;
+    }
+    const metadata = draftMetadata(result, "automatic_reply_final_review_passed", env, {
+      automaticSend: {
+        ...(draft.metadata?.automaticSend || {}),
+        pending: true,
+        finalReviewedAt: nowIso,
+        qualityChecks: [...new Set([...(draft.metadata?.automaticSend?.qualityChecks || []), "freshness", "second_generation", "five_star_hospitality", "final_policy"])]
+      }
+    });
+    await store.updateMessagingDraft(draft.id, { body: cleanText(result.answer, MAX_MESSAGE_LENGTH), deliveryStatus: "pending_auto_send", metadata, updatedAt: nowIso });
+    const approved = await reviewMessagingDraft({
+      env, store, threadId: thread.id, draftId: draft.id, action: "approve",
+      message: result.answer, actorLabel: "Taoedge AI", automated: true
+    }).catch(() => ({ ok: false, error: "automatic_reply_failed" }));
+    if (approved?.ok) {
+      sent += 1;
+    } else {
+      const refreshed = await store.getMessagingMessage(draft.id).catch(() => draft);
+      await holdAutomaticDraftForReview(store, thread, refreshed || draft, approved?.error || "automatic_reply_failed", null, nowIso);
+      held += 1;
+    }
+  }
+  return { ok: true, checked: pending.length, sent, held, superseded };
 }
 
 export async function sendBeds24GuestText(env, store, externalReservationId, text) {
@@ -782,6 +905,7 @@ export async function handleBeds24MessagingWebhook(request, env, ctx, generateRe
   const plan = beds24MessageSyncPlan(messages);
   if (!plan.messages.length) return json({ ok: true, ignored: "no_message_text", threadId: thread.id });
   let replyCandidateInserted = false;
+  let replyCandidateMessageId = "";
   let insertedCount = 0;
   for (const message of plan.messages) {
     if (message.direction === "outbound" && typeof store.reconcileMessagingProviderEcho === "function") {
@@ -805,12 +929,16 @@ export async function handleBeds24MessagingWebhook(request, env, ctx, generateRe
       createdAt: message.createdAt
     });
     if (recorded?.inserted) insertedCount += 1;
-    if (recorded?.inserted && plan.replyCandidate?.providerMessageId === message.providerMessageId) replyCandidateInserted = true;
+    if (recorded?.inserted && plan.replyCandidate?.providerMessageId === message.providerMessageId) {
+      replyCandidateInserted = true;
+      replyCandidateMessageId = cleanText(recorded.id, 100);
+    }
   }
   if (!plan.replyCandidate || !replyCandidateInserted) {
     return json({ ok: true, synced: insertedCount, ignored: plan.replyCandidate ? "no_new_guest_message" : "latest_message_not_guest", threadId: thread.id });
   }
   const inboundText = plan.replyCandidate.body;
+  const receivedAt = new Date().toISOString();
   const linkedReservationId = reservation?.id || thread.reservationId;
   const linkedThread = { ...thread, reservationId: linkedReservationId };
   const externalPassport = detectExternalPassportSubmission(inboundText);
@@ -832,15 +960,14 @@ export async function handleBeds24MessagingWebhook(request, env, ctx, generateRe
       }
       return;
     }
-    const draft = await recordAiDraft(store, linkedThread, result, result.autoSend ? "auto_send_disabled" : (result.reason || "review_required"), env);
-    if (!result.autoSend || !aiAutoSendEnabled(env)) return;
-    const approved = await reviewMessagingDraft({
-      env, store, threadId: linkedThread.id, draftId: draft.id, action: "approve",
-      message: result.answer, actorLabel: "Taoedge AI", automated: true
-    }).catch(() => ({ ok: false, error: "automatic_reply_failed" }));
-    if (!approved?.ok) {
-      await store.updateMessagingThreadState(linkedThread.id, { needsHuman: true, aiDraft: true, lastError: approved?.error || "automatic_reply_failed", updatedAt: new Date().toISOString() });
-    }
+    const pendingAutoSend = result.autoSend && aiAutoSendEnabled(env);
+    await recordAiDraft(store, linkedThread, result, pendingAutoSend ? "pending_auto_send" : (result.reason || "review_required"), env, {
+      pendingAutoSend,
+      receivedAt,
+      triggerMessageId: replyCandidateMessageId,
+      triggerMessageCreatedAt: plan.replyCandidate.createdAt,
+      now: new Date().toISOString()
+    });
   };
   if (ctx?.waitUntil) ctx.waitUntil(task()); else await task();
   return json({ ok: true, threadId: thread.id, linkedReservation: Boolean(reservation?.id), source: beds24SourceLabel(booking), synced: insertedCount, channelManager });
@@ -886,6 +1013,7 @@ export async function handleInboundWhatsAppGuestMessage(message, env, ctx, gener
     createdAt: now
   });
   if (!recorded?.inserted) return { ok: true, duplicate: true, threadId: thread.id };
+  const receivedAt = now;
   const externalPassport = detectExternalPassportSubmission(body);
   const pushTask = externalPassport ? Promise.resolve(null) : pushInboundOtaMessage(env, thread, body).catch(() => null);
   const departureTask = thread.reservationId
@@ -903,15 +1031,14 @@ export async function handleInboundWhatsAppGuestMessage(message, env, ctx, gener
       if (!thread.reservationId) await store.updateMessagingThreadState(thread.id, { needsHuman: true, lastError: "reservation_unlinked", updatedAt: new Date().toISOString() });
       return;
     }
-    const draft = await recordAiDraft(store, thread, result, result.autoSend ? "auto_send_disabled" : (result.reason || "review_required"), env);
-    if (!result.autoSend || !aiAutoSendEnabled(env)) return;
-    const approved = await reviewMessagingDraft({
-      env, store, threadId: thread.id, draftId: draft.id, action: "approve",
-      message: result.answer, actorLabel: "Taoedge AI", automated: true
-    }).catch(() => ({ ok: false, error: "automatic_reply_failed" }));
-    if (!approved?.ok) {
-      await store.updateMessagingThreadState(thread.id, { needsHuman: true, aiDraft: true, lastError: approved?.error || "automatic_reply_failed", updatedAt: new Date().toISOString() });
-    }
+    const pendingAutoSend = result.autoSend && aiAutoSendEnabled(env);
+    await recordAiDraft(store, thread, result, pendingAutoSend ? "pending_auto_send" : (result.reason || "review_required"), env, {
+      pendingAutoSend,
+      receivedAt,
+      triggerMessageId: cleanText(recorded.id, 100),
+      triggerMessageCreatedAt: now,
+      now: new Date().toISOString()
+    });
   };
   if (ctx?.waitUntil) ctx.waitUntil(task()); else await task();
   return { ok: true, threadId: thread.id, linkedReservation: Boolean(thread.reservationId) };
@@ -1026,7 +1153,7 @@ export async function reviewMessagingDraft({ env, store, threadId, draftId, acti
   const thread = await store.getMessagingThread(cleanText(threadId, 100));
   const draft = typeof store.getMessagingMessage === "function" ? await store.getMessagingMessage(cleanText(draftId, 100)) : null;
   if (!thread || !draft || draft.threadId !== thread.id || draft.direction !== "draft") return { ok: false, error: "draft_not_found" };
-  if (!["draft", "regenerated"].includes(draft.deliveryStatus)) return { ok: false, error: "draft_already_reviewed" };
+  if (!["draft", "regenerated", "pending_auto_send"].includes(draft.deliveryStatus)) return { ok: false, error: "draft_already_reviewed" };
   const now = new Date().toISOString();
   if (action === "reject") {
     const metadata = { ...(draft.metadata || {}), decision: "rejected", decidedAt: now, decidedBy: cleanText(actorLabel, 100) };

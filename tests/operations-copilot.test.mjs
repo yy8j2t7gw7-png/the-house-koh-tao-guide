@@ -8,6 +8,7 @@ function testHarness() {
   const audits = [];
   const deliveries = [];
   const operationalTasks = [];
+  const ownerBlocks = [];
   const reservations = [{
     id: "stay_6", room: "6", guestDisplayName: "Anna Example", guestFirstName: "Anna",
     checkInDate: "2026-09-15", checkOutDate: "2026-09-18", status: "confirmed"
@@ -18,6 +19,19 @@ function testHarness() {
     },
     async getAdminOverview() { return { maintenanceReports: [], totals: { pendingRegistrations: 0 } }; },
     async getStayReservationById(id) { return reservations.find((item) => item.id === id) || null; },
+    async getStayReservationForChannelManager(id) { return reservations.find((item) => item.id === id) || null; },
+    async cancelOwnerManagedStay(id) { const item = reservations.find((entry) => entry.id === id); if (!item) return { ok: false, error: "reservation_not_found" }; item.status = "cancelled"; return { ok: true, room: item.room }; },
+    async findStayOverlap(room, checkInDate, checkOutDate, excludeId = "") { return reservations.find((item) => item.id !== excludeId && item.status === "confirmed" && item.room === room && item.checkInDate < checkOutDate && item.checkOutDate > checkInDate) || null; },
+    async syncStayReservations(payload) {
+      const record = payload.records?.[0];
+      const id = `stay_${crypto.randomUUID().replaceAll("-", "")}`;
+      reservations.push({ id, room: payload.room, provider: payload.provider, status: "confirmed", checkInDate: record.checkInDate, checkOutDate: record.checkOutDate, confirmationCodeHash: record.confirmationCodeHash });
+      return { upserted: 1 };
+    },
+    async getStayReservationByCodeHash(codeHash, room) { return reservations.find((item) => item.confirmationCodeHash === codeHash && item.room === room) || null; },
+    async mobileCreateOwnerCalendarBlock(record) { ownerBlocks.push({ ...record, status: "active" }); return { ok: true, id: record.id }; },
+    async mobileListOwnerCalendarBlocks() { return ownerBlocks; },
+    async mobileCancelOwnerCalendarBlock(_tenantId, id) { const block = ownerBlocks.find((item) => item.id === id); if (!block) return { ok: false }; block.status = "cancelled"; return { ok: true }; },
     async mobileRecordAudit(record) { audits.push(record); return { ok: true }; },
     async mobileCreateOperationalTask(record) { operationalTasks.push({ ...record, status: "open", deliveryAttempted: 0, deliveryAccepted: 0 }); return { ok: true, id: record.id }; },
     async mobileUpdateOperationalTaskDelivery(id, delivery) { const task = operationalTasks.find((item) => item.id === id); if (task) { task.deliveryAttempted = Number(delivery.attempted) || 0; task.deliveryAccepted = Number(delivery.accepted) || 0; } return { ok: true }; },
@@ -34,6 +48,7 @@ function testHarness() {
     CONCIERGE_STORE: { getByName: () => store },
     MOBILE_SESSION_PEPPER: "copilot_test_session_pepper_1234567890",
     CONCIERGE_HASH_SALT: "copilot_test_hash_salt",
+    STAY_TOKEN_PEPPER: "copilot_test_stay_pepper_1234567890",
     WHATSAPP_ALERT_RECIPIENTS: JSON.stringify({
       support: [{ label: "Su", phone: "+66640000004" }],
       booking: [{ label: "Fah", phone: "+66960000001" }],
@@ -45,12 +60,12 @@ function testHarness() {
       tenantId: "tenant_test", userId: "user_owner", membershipId: "membership_owner",
       displayName: "Owner", role: "owner"
     },
-    permissions: new Set(["copilot.use", "booking_activity.create", "inventory.view"]),
+    permissions: new Set(["copilot.use", "booking_activity.create", "inventory.view", "direct_stays.manage"]),
     modules: new Set(["core", "bookings", "maintenance", "inventory"]),
     properties: [{ id: "property_test", displayName: "Test Hotel" }],
     now: "2026-09-15T08:30:00.000Z"
   };
-  return { store, env, access, alerts, audits, deliveries, operationalTasks };
+  return { store, env, access, alerts, audits, deliveries, operationalTasks, reservations, ownerBlocks };
 }
 
 function post(body) {
@@ -213,4 +228,106 @@ test("Operations Copilot inventory summary uses live role-filtered stock data", 
   assert.equal(outcome.body.proposal, null);
   assert.match(outcome.body.reply, /toilet paper/i);
   assert.match(outcome.body.reply, /low stock/i);
+});
+
+test("v5.11.84 Copilot can safely identify and cancel only a Direct Stay after confirmation", async () => {
+  const harness = testHarness();
+  harness.reservations.push({ id: "stay_direct-cancel-123456789012", room: "7", provider: "direct", status: "confirmed", checkInDate: "2026-09-16", checkOutDate: "2026-09-17" });
+  const proposed = await handleOperationsCopilot({
+    request: post({ message: "Cancel the direct stay in room 7 tomorrow" }),
+    env: harness.env, store: harness.store, access: harness.access, actorHash: "actor_hash"
+  });
+  assert.equal(proposed.status, 200);
+  assert.equal(proposed.body.confirmationRequired, true);
+  assert.equal(proposed.body.proposal?.type, "cancel_direct_stay");
+  assert.equal(proposed.body.proposal?.reservationId, "stay_direct-cancel-123456789012");
+  assert.equal(harness.reservations.find((item) => item.id === "stay_direct-cancel-123456789012")?.status, "confirmed");
+
+  const confirmed = await handleOperationsCopilot({
+    request: post({ confirm: true, proposal: proposed.body.proposal }),
+    env: harness.env, store: harness.store, access: harness.access, actorHash: "actor_hash"
+  });
+  assert.equal(confirmed.status, 201);
+  assert.equal(confirmed.body.executed, true);
+  assert.equal(harness.reservations.find((item) => item.id === "stay_direct-cancel-123456789012")?.status, "cancelled");
+  assert.match(confirmed.body.reply, /audit history/i);
+});
+
+test("v5.11.84 Copilot proposes Direct Stay creation and calendar blocks without mutating before confirmation", async () => {
+  const harness = testHarness();
+  const direct = await handleOperationsCopilot({
+    request: post({ message: "Create a direct stay in room 8 from 20 September to 22 September 2026" }),
+    env: harness.env, store: harness.store, access: harness.access, actorHash: "actor_hash"
+  });
+  assert.equal(direct.status, 200);
+  assert.equal(direct.body.proposal?.type, "create_direct_stay");
+  assert.equal(direct.body.proposal?.room, "8");
+  assert.equal(direct.body.proposal?.checkInDate, "2026-09-20");
+  assert.equal(direct.body.proposal?.checkOutDate, "2026-09-22");
+
+  const block = await handleOperationsCopilot({
+    request: post({ message: "Block room 9 from 23 September to 25 September 2026 for AC replacement" }),
+    env: harness.env, store: harness.store, access: harness.access, actorHash: "actor_hash"
+  });
+  assert.equal(block.status, 200);
+  assert.equal(block.body.proposal?.type, "block_room");
+  assert.equal(block.body.proposal?.room, "9");
+  assert.equal(harness.ownerBlocks.length, 0, "proposal must not create a calendar block");
+});
+
+test("v5.11.84 Copilot Direct Stay creation returns the canonical local reservation id without provider protection", async () => {
+  const harness = testHarness();
+  const proposed = await handleOperationsCopilot({
+    request: post({ message: "Create a direct stay in room 8 from 20 September to 22 September 2026" }),
+    env: harness.env, store: harness.store, access: harness.access, actorHash: "actor_hash"
+  });
+  const confirmed = await handleOperationsCopilot({
+    request: post({ confirm: true, proposal: proposed.body.proposal }),
+    env: harness.env, store: harness.store, access: harness.access, actorHash: "actor_hash"
+  });
+  assert.equal(confirmed.status, 201);
+  assert.equal(confirmed.body.action?.type, "create_direct_stay");
+  assert.match(confirmed.body.action?.reservationId || "", /^stay_[A-Za-z0-9-]{20,}$/);
+  assert.ok(harness.reservations.some((item) => item.id === confirmed.body.action.reservationId && item.provider === "direct"));
+});
+
+test("v5.11.84 Copilot calendar block and unblock both require confirmation and preserve canonical availability state", async () => {
+  const harness = testHarness();
+  const proposedBlock = await handleOperationsCopilot({
+    request: post({ message: "Block room 9 from 23 September to 25 September 2026 for AC replacement" }),
+    env: harness.env, store: harness.store, access: harness.access, actorHash: "actor_hash"
+  });
+  assert.equal(proposedBlock.status, 200);
+  assert.equal(proposedBlock.body.proposal?.type, "block_room");
+  assert.equal(harness.ownerBlocks.length, 0);
+
+  const confirmedBlock = await handleOperationsCopilot({
+    request: post({ confirm: true, proposal: proposedBlock.body.proposal }),
+    env: harness.env, store: harness.store, access: harness.access, actorHash: "actor_hash"
+  });
+  assert.equal(confirmedBlock.status, 201);
+  assert.equal(confirmedBlock.body.executed, true);
+  assert.equal(confirmedBlock.body.action?.type, "block_room");
+  const block = harness.ownerBlocks.find((item) => item.id === confirmedBlock.body.action?.blockId);
+  assert.equal(block?.status, "active");
+  const blockerStay = harness.reservations.find((item) => item.id === confirmedBlock.body.action?.reservationId);
+  assert.equal(blockerStay?.status, "confirmed");
+  assert.equal(blockerStay?.provider, "direct");
+
+  const proposedUnblock = await handleOperationsCopilot({
+    request: post({ message: "Unblock room 9 from 23 September 2026" }),
+    env: harness.env, store: harness.store, access: harness.access, actorHash: "actor_hash"
+  });
+  assert.equal(proposedUnblock.status, 200);
+  assert.equal(proposedUnblock.body.proposal?.type, "unblock_room");
+  assert.equal(block?.status, "active", "unblock proposal must not mutate state");
+
+  const confirmedUnblock = await handleOperationsCopilot({
+    request: post({ confirm: true, proposal: proposedUnblock.body.proposal }),
+    env: harness.env, store: harness.store, access: harness.access, actorHash: "actor_hash"
+  });
+  assert.equal(confirmedUnblock.status, 201);
+  assert.equal(confirmedUnblock.body.action?.type, "unblock_room");
+  assert.equal(block?.status, "cancelled");
+  assert.equal(blockerStay?.status, "cancelled");
 });

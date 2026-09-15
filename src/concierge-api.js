@@ -3314,7 +3314,7 @@ function bangkokContext() {
   }).format(new Date());
 }
 
-function systemInstructions({ knowledge, approvedKnowledge, projectKnowledge, room, language, stayContext = null }) {
+function systemInstructions({ knowledge, approvedKnowledge, projectKnowledge, room, language, stayContext = null, guestMessagingMode = false }) {
   const responseLanguage = language === "auto"
     ? "the same natural language as the guest's current message (detect it automatically, including languages not listed in the guest-guide language selector)"
     : (LANGUAGE_NAMES[language] || LANGUAGE_NAMES.en);
@@ -3329,6 +3329,15 @@ function systemInstructions({ knowledge, approvedKnowledge, projectKnowledge, ro
     : room
       ? `The guest selected Room ${room}. Treat this as useful context but NOT as proof of identity or an active stay.`
       : "The guest has not selected a room. Ask for it only when room-specific operational help is needed.";
+  const toneAndHospitality = guestMessagingMode
+    ? `- Sound like an excellent hotel host: warm, polished, attentive, natural and concise. Be genuinely hospitable without sounding promotional, scripted or overly familiar.
+- Treat customer satisfaction as a writing-quality requirement. Before finalizing, silently check: “Would this answer make the guest feel acknowledged, cared for and satisfied with how the hotel responded?” If not, improve the wording without changing facts, policy, price, permissions or operational truth. Never mention this internal quality check to the guest.
+- Run a second silent hospitality check before finalizing: “Could this response come from a five-star hotel concierge?” The standard is not luxury wording; it is calm competence, accurate context, warmth, ownership, useful next steps and a natural close. If the answer is no, improve it without adding promises or changing policy.
+- When the guest is thanking the hotel, praising the stay, saying goodbye or clearly reaching the end of the stay, acknowledge the sentiment sincerely, thank them for staying with us, express that we are pleased they enjoyed their stay, and close naturally with an appropriate farewell such as safe onward travels and/or that we would be happy to welcome them again. Use the verified stay timeline so you do not say “before you leave” after they have already checked out.
+- When the guest reports a problem, complaint or disappointment, prioritize empathy, ownership and a clear next step. Do not use a generic farewell or celebratory closing while the issue is unresolved.
+- Do not ask for a review, rating, tip or public recommendation unless an owner-approved policy explicitly instructs you to do so.
+- Avoid repetitive boilerplate. Match the emotional tone of the guest while remaining professional.`
+    : `- Sound like a calm, professional hotel concierge: neutral, practical, concise and never promotional.`;
   return `You are the private digital concierge for The House – Koh Tao, a guesthouse in Thailand.
 
 VOICE AND LANGUAGE
@@ -3336,7 +3345,7 @@ VOICE AND LANGUAGE
 - When automatic language mode is active, infer the language from the CURRENT guest message, not from names, phone numbers, old transcript messages or a fixed supported-language list. If the current message is multilingual, answer in the language that carries the request unless the guest explicitly asks for another language.
 - Understand the request semantically in any language. Do not depend on English keywords or a finite menu of supported requests. A guest may ask ordinary hotel questions, operational requests, directions, recommendations, transport, activities, local services, unusual questions or something not anticipated by the UI. First understand what they mean, then apply the existing House knowledge, policy and safety rules.
 - Keep business and place names in their approved form. Do not translate names, numbers, prices, times or contact details.
-- Sound like a calm, professional hotel concierge: neutral, practical, concise and never promotional.
+${toneAndHospitality}
 - Preserve names, numbers, fees and times exactly as stated in approved knowledge.
 
 AUTHORITATIVE KNOWLEDGE
@@ -3426,11 +3435,11 @@ function validateModelResult(value) {
   };
 }
 
-async function callOpenAI({ env, question, history, knowledge, approvedKnowledge, projectKnowledge, room, language, stayContext = null }) {
+async function callOpenAI({ env, question, history, knowledge, approvedKnowledge, projectKnowledge, room, language, stayContext = null, guestMessagingMode = false }) {
   const requestBody = {
     model: env.OPENAI_MODEL || "gpt-5.6",
     store: false,
-    instructions: systemInstructions({ knowledge, approvedKnowledge, projectKnowledge, room, language, stayContext }),
+    instructions: systemInstructions({ knowledge, approvedKnowledge, projectKnowledge, room, language, stayContext, guestMessagingMode }),
     input: [
       ...history.map((item) => ({ role: item.role, content: item.content })),
       { role: "user", content: question }
@@ -4307,7 +4316,7 @@ export async function handleConciergeRequest(request, env, ctx, now = new Date()
       } else {
         const modelHistory = independentInformationRequest ? [] : history;
         result = {
-          ...(await callOpenAI({ env, question, history: modelHistory, knowledge, approvedKnowledge, projectKnowledge, room, language, stayContext: trustedMessaging ? access.session : null })),
+          ...(await callOpenAI({ env, question, history: modelHistory, knowledge, approvedKnowledge, projectKnowledge, room, language, stayContext: trustedMessaging ? access.session : null, guestMessagingMode: trustedMessagingReviewOnly })),
           source: "ai"
         };
       }
@@ -4649,6 +4658,7 @@ function unifiedMessagingAutoSendDecision(question, result) {
   if (Number(result.confidence || 0) < 0.96) return { autoSend: false, reason: "confidence_below_threshold" };
   if (result.needsHuman === true) return { autoSend: false, reason: "human_review_required" };
   if (result.handoff && result.handoff !== "none") return { autoSend: false, reason: "handoff_required" };
+  if (result.operationProposal) return { autoSend: false, reason: "operational_action_review_required" };
   if (["emergency", "property-emergency"].includes(result.category)) return { autoSend: false, reason: "emergency_review" };
   if (UNIFIED_MESSAGING_REVIEW_PATTERN.test(String(question || ""))) return { autoSend: false, reason: "sensitive_topic" };
   const riskyAction = (Array.isArray(result.actions) ? result.actions : []).some((action) =>

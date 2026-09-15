@@ -48,9 +48,11 @@ export async function sendMobilePush(env, event = {}) {
   const devices = await store.mobileListPushDevices(cleanText(event.tenantId, 100) || HOUSE_TENANT_ID);
   const audience = cleanText(event.audience || "operations", 30);
   const category = cleanText(event.category || "operations", 40);
+  const targetUserId = cleanText(event.targetUserId, 100);
   const eligible = devices.filter((device) => {
     if (!isExpoToken(device.expoPushToken)) return false;
     if (!preferenceEnabled(device, category)) return false;
+    if (targetUserId && cleanText(device.userId, 100) !== targetUserId) return false;
     if (audience === "management") return ["owner", "manager"].includes(device.role);
     return true;
   });

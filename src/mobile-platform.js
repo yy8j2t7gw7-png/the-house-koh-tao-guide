@@ -12,6 +12,7 @@ import { createProtectedOperationsAlert, dispatchConciergeAlert, operationalTask
 import { createBookingOperationalTask } from "./operational-actions.js";
 import { handleOperationsCopilot } from "./operations-copilot.js";
 import { handleCopilotVoiceTranscription } from "./voice-copilot.js";
+import { createLiveVoiceSession, liveVoicePlanCatalogue, liveVoiceUsage, recordLiveVoiceUsage, updateLiveVoiceSettings } from "./live-voice.js";
 import { operationalRecipientGroup } from "./operations-routing.js";
 import { reservationSourceCapabilities } from "./reservation-model.js";
 import { normalizeStaffLanguage, staffLanguageLabel, translateOperatorText } from "./staff-translation.js";
@@ -39,6 +40,7 @@ const DEFAULT_MODULES = [
   "integrations",
   "staff_access",
   "inventory",
+  "voice_live",
   "channel_manager"
 ];
 
@@ -1503,6 +1505,37 @@ async function handleProtected(request, env, path, store, handlers = {}) {
     return json({ ok: true });
   }
 
+  if (path === `${MOBILE_API_PREFIX}/copilot/voice/live/usage` && request.method === "GET") {
+    const denied = requireCapability(publicAccess, "copilot.use", "voice_live");
+    if (denied) return denied;
+    return json({ ok: true, voiceUsage: await liveVoiceUsage({ store, access: publicAccess, env }), plans: liveVoicePlanCatalogue() });
+  }
+
+  if (path === `${MOBILE_API_PREFIX}/copilot/voice/live/settings` && request.method === "POST") {
+    const denied = requireCapability(publicAccess, "licenses.manage", "voice_live");
+    if (denied) return denied;
+    const body = await readJson(request);
+    const outcome = await updateLiveVoiceSettings({ body, store, access: publicAccess, env });
+    return json(outcome.body, outcome.status);
+  }
+
+  if (path === `${MOBILE_API_PREFIX}/copilot/voice/live/session` && request.method === "POST") {
+    const denied = requireCapability(publicAccess, "copilot.use", "voice_live");
+    if (denied) return denied;
+    const body = await readJson(request);
+    const outcome = await createLiveVoiceSession({ body, store, access: publicAccess, env });
+    return json(outcome.body, outcome.status);
+  }
+
+  const liveUsageMatch = path.match(new RegExp(`^${MOBILE_API_PREFIX}/copilot/voice/live/session/([^/]+)/usage$`));
+  if (liveUsageMatch && request.method === "POST") {
+    const denied = requireCapability(publicAccess, "copilot.use", "voice_live");
+    if (denied) return denied;
+    const body = await readJson(request);
+    const outcome = await recordLiveVoiceUsage({ sessionId: decodeURIComponent(liveUsageMatch[1]), body, store, access: publicAccess, env });
+    return json(outcome.body, outcome.status);
+  }
+
   if (path === `${MOBILE_API_PREFIX}/copilot/voice/transcribe` && request.method === "POST") {
     const denied = requireCapability(publicAccess, "copilot.use", "core");
     if (denied) return denied;
@@ -2601,7 +2634,7 @@ async function handleProtected(request, env, path, store, handlers = {}) {
       messaging: messagingAllowed ? unifiedMessagingConfiguration(env) : undefined,
       financeAutomation: financeAllowed ? beds24FinanceSyncConfiguration(env) : undefined,
       connectionHealth,
-      apiContract: { backendVersion: "5.11.85", mobileApiVersion: "v1", listingsRatesRoute: `${MOBILE_API_PREFIX}/listings-rates`, directStayOperations: true, inventoryShoppingLists: true, copilotOperationalActions: true },
+      apiContract: { backendVersion: "5.11.86", mobileApiVersion: "v1", liveVoice: true, listingsRatesRoute: `${MOBILE_API_PREFIX}/listings-rates`, directStayOperations: true, inventoryShoppingLists: true, copilotOperationalActions: true },
       product: {
         workingName: "Taoedge Owner App",
         commercialBrandPending: true,

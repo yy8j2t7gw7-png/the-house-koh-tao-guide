@@ -809,6 +809,38 @@ export class ConciergeStore extends DurableObject {
         CREATE INDEX IF NOT EXISTS platform_audit_tenant_created
           ON platform_audit(tenant_id, created_at);
 
+        CREATE TABLE IF NOT EXISTS platform_voice_settings (
+          tenant_id TEXT PRIMARY KEY,
+          plan_key TEXT NOT NULL DEFAULT 'voice_trial',
+          overage_enabled INTEGER NOT NULL DEFAULT 0,
+          spend_cap_thb_minor INTEGER NOT NULL DEFAULT 0,
+          updated_by_user_id TEXT NOT NULL DEFAULT '',
+          updated_at TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS platform_voice_sessions (
+          id TEXT PRIMARY KEY,
+          tenant_id TEXT NOT NULL,
+          user_id TEXT NOT NULL DEFAULT '',
+          membership_id TEXT NOT NULL DEFAULT '',
+          openai_session_id TEXT NOT NULL DEFAULT '',
+          month_key TEXT NOT NULL,
+          plan_key TEXT NOT NULL DEFAULT 'voice_trial',
+          model TEXT NOT NULL DEFAULT 'gpt-live-1',
+          voice TEXT NOT NULL DEFAULT 'marin',
+          status TEXT NOT NULL DEFAULT 'active',
+          started_at TEXT NOT NULL,
+          last_seen_at TEXT NOT NULL,
+          ended_at TEXT NOT NULL DEFAULT '',
+          usage_seconds INTEGER NOT NULL DEFAULT 0,
+          billable_thb_minor INTEGER NOT NULL DEFAULT 0,
+          metadata_json TEXT NOT NULL DEFAULT '{}'
+        );
+        CREATE INDEX IF NOT EXISTS platform_voice_sessions_tenant_month
+          ON platform_voice_sessions(tenant_id, month_key, started_at);
+        CREATE INDEX IF NOT EXISTS platform_voice_sessions_status
+          ON platform_voice_sessions(tenant_id, status, last_seen_at);
+
         CREATE TABLE IF NOT EXISTS property_operator_settings (
           tenant_id TEXT NOT NULL,
           property_id TEXT NOT NULL,
@@ -6405,6 +6437,112 @@ export class ConciergeStore extends DurableObject {
       now, sessionId, tenantId
     );
     return { ok: true };
+  }
+
+  async mobileGetVoiceSettings(tenantIdValue) {
+    const tenantId = cleanText(tenantIdValue, 100);
+    if (!tenantId) return null;
+    const item = rows(this.ctx.storage.sql.exec(
+      `SELECT tenant_id AS tenantId, plan_key AS planKey, overage_enabled AS overageEnabled,
+              spend_cap_thb_minor AS spendCapThbMinor, updated_by_user_id AS updatedByUserId, updated_at AS updatedAt
+       FROM platform_voice_settings WHERE tenant_id = ? LIMIT 1`,
+      tenantId
+    ))[0] || null;
+    if (!item) return null;
+    return { ...item, overageEnabled: Boolean(Number(item.overageEnabled)), spendCapThbMinor: Number(item.spendCapThbMinor) || 0 };
+  }
+
+  async mobileUpsertVoiceSettings(record = {}) {
+    const tenantId = cleanText(record.tenantId, 100);
+    if (!tenantId) return { ok: false, error: "invalid_tenant" };
+    const now = cleanText(record.updatedAt, 40) || new Date().toISOString();
+    const planKey = cleanText(record.planKey, 80) || "voice_trial";
+    const overageEnabled = record.overageEnabled === true ? 1 : 0;
+    const spendCapThbMinor = Math.max(0, Math.floor(Number(record.spendCapThbMinor) || 0));
+    this.ctx.storage.sql.exec(
+      `INSERT INTO platform_voice_settings
+       (tenant_id, plan_key, overage_enabled, spend_cap_thb_minor, updated_by_user_id, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?)
+       ON CONFLICT(tenant_id) DO UPDATE SET
+         plan_key = excluded.plan_key, overage_enabled = excluded.overage_enabled,
+         spend_cap_thb_minor = excluded.spend_cap_thb_minor, updated_by_user_id = excluded.updated_by_user_id,
+         updated_at = excluded.updated_at`,
+      tenantId, planKey, overageEnabled, spendCapThbMinor, cleanText(record.updatedByUserId, 100), now
+    );
+    return { ok: true, tenantId, planKey, overageEnabled: Boolean(overageEnabled), spendCapThbMinor };
+  }
+
+  async mobileCreateVoiceSession(record = {}) {
+    const id = cleanText(record.id, 100) || `voice_session_${crypto.randomUUID()}`;
+    const tenantId = cleanText(record.tenantId, 100);
+    const startedAt = cleanText(record.startedAt, 40) || new Date().toISOString();
+    if (!tenantId) return { ok: false, error: "invalid_tenant" };
+    this.ctx.storage.sql.exec(
+      `INSERT INTO platform_voice_sessions
+       (id, tenant_id, user_id, membership_id, openai_session_id, month_key, plan_key, model, voice, status,
+        started_at, last_seen_at, ended_at, usage_seconds, billable_thb_minor, metadata_json)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '', 0, 0, ?)`,
+      id, tenantId, cleanText(record.userId, 100), cleanText(record.membershipId, 100),
+      cleanText(record.openAiSessionId, 160), cleanText(record.monthKey, 20), cleanText(record.planKey, 80) || "voice_trial",
+      cleanText(record.model, 80) || "gpt-live-1", cleanText(record.voice, 80) || "marin", cleanText(record.status, 30) || "active",
+      startedAt, startedAt, JSON.stringify(record.metadata || {})
+    );
+    return { ok: true, id };
+  }
+
+  async mobileGetVoiceSession(tenantIdValue, sessionIdValue) {
+    const tenantId = cleanText(tenantIdValue, 100);
+    const sessionId = cleanText(sessionIdValue, 100);
+    if (!tenantId || !sessionId) return null;
+    const item = rows(this.ctx.storage.sql.exec(
+      `SELECT id, tenant_id AS tenantId, user_id AS userId, membership_id AS membershipId,
+              openai_session_id AS openAiSessionId, month_key AS monthKey, plan_key AS planKey, model, voice, status,
+              started_at AS startedAt, last_seen_at AS lastSeenAt, ended_at AS endedAt,
+              usage_seconds AS usageSeconds, billable_thb_minor AS billableThbMinor, metadata_json AS metadataJson
+       FROM platform_voice_sessions WHERE tenant_id = ? AND id = ? LIMIT 1`,
+      tenantId, sessionId
+    ))[0] || null;
+    return item ? { ...item, usageSeconds: Number(item.usageSeconds) || 0, billableThbMinor: Number(item.billableThbMinor) || 0 } : null;
+  }
+
+  async mobileUpdateVoiceSessionUsage(record = {}) {
+    const tenantId = cleanText(record.tenantId, 100);
+    const id = cleanText(record.id, 100);
+    const now = cleanText(record.updatedAt, 40) || new Date().toISOString();
+    if (!tenantId || !id) return { ok: false, error: "invalid_voice_session" };
+    const status = cleanText(record.status, 30) || "active";
+    const endedAt = status === "closed" || status === "error" ? (cleanText(record.endedAt, 40) || now) : "";
+    const usageSeconds = Math.max(0, Math.floor(Number(record.usageSeconds) || 0));
+    const billableThbMinor = Math.max(0, Math.floor(Number(record.billableThbMinor) || 0));
+    this.ctx.storage.sql.exec(
+      `UPDATE platform_voice_sessions SET
+         status = ?, last_seen_at = ?, ended_at = CASE WHEN ? <> '' THEN ? ELSE ended_at END,
+         usage_seconds = CASE WHEN usage_seconds < ? THEN ? ELSE usage_seconds END,
+         billable_thb_minor = CASE WHEN billable_thb_minor < ? THEN ? ELSE billable_thb_minor END
+       WHERE tenant_id = ? AND id = ?`,
+      status, now, endedAt, endedAt, usageSeconds, usageSeconds, billableThbMinor, billableThbMinor, tenantId, id
+    );
+    return { ok: true, id, status, usageSeconds, billableThbMinor };
+  }
+
+  async mobileVoiceUsageSummary(tenantIdValue, monthKeyValue) {
+    const tenantId = cleanText(tenantIdValue, 100);
+    const monthKey = cleanText(monthKeyValue, 20);
+    if (!tenantId || !monthKey) return { usageSeconds: 0, billableThbMinor: 0, sessions: 0, activeSessions: 0 };
+    const summary = rows(this.ctx.storage.sql.exec(
+      `SELECT COALESCE(SUM(usage_seconds), 0) AS usageSeconds,
+              COALESCE(SUM(billable_thb_minor), 0) AS billableThbMinor,
+              COUNT(*) AS sessions,
+              COALESCE(SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END), 0) AS activeSessions
+       FROM platform_voice_sessions WHERE tenant_id = ? AND month_key = ?`,
+      tenantId, monthKey
+    ))[0] || {};
+    return {
+      usageSeconds: Number(summary.usageSeconds) || 0,
+      billableThbMinor: Number(summary.billableThbMinor) || 0,
+      sessions: Number(summary.sessions) || 0,
+      activeSessions: Number(summary.activeSessions) || 0
+    };
   }
 
   async mobileRecordAudit(record = {}) {

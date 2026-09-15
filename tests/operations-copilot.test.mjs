@@ -234,7 +234,7 @@ test("v5.11.84 Copilot can safely identify and cancel only a Direct Stay after c
   const harness = testHarness();
   harness.reservations.push({ id: "stay_direct-cancel-123456789012", room: "7", provider: "direct", status: "confirmed", checkInDate: "2026-09-16", checkOutDate: "2026-09-17" });
   const proposed = await handleOperationsCopilot({
-    request: post({ message: "Cancel the direct stay in room 7 tomorrow" }),
+    request: post({ message: "Cancel the direct stay in room 7 on 16 September 2026" }),
     env: harness.env, store: harness.store, access: harness.access, actorHash: "actor_hash"
   });
   assert.equal(proposed.status, 200);
@@ -337,10 +337,10 @@ test("v5.11.85 multilingual voice routing can safely prepare a German Direct Sta
   harness.reservations.push({ id: "stay_direct-voice-de-123456789012", room: "7", provider: "direct", status: "confirmed", checkInDate: "2026-09-16", checkOutDate: "2026-09-17" });
   const outcome = await handleOperationsCopilot({
     request: post({
-      message: "Storniere bitte den Direct Stay in Zimmer 7 morgen",
+      message: "Storniere bitte den Direct Stay in Zimmer 7 am 16. September 2026",
       voice: true,
       preferredLanguage: "de-DE",
-      voiceRoutingText: "Cancel the direct stay in room 7 tomorrow"
+      voiceRoutingText: "Cancel the direct stay in room 7 on 16 September 2026"
     }),
     env: harness.env, store: harness.store, access: harness.access, actorHash: "actor_hash"
   });
